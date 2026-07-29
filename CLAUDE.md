@@ -1,0 +1,87 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Repository status
+
+**Pre-scaffold.** As of this writing the repo contains only `docs/` and these two markdown files — no `package.json`, no `app/`, not yet a git repository. Don't go looking for code that isn't there. Stage 0 in `tasks.md` creates all of it.
+
+`docs/student-org-website-architecture.md` is the source of truth for this project: a student-org attendance system replacing spreadsheet tracking. Section references below (§) point into it. `tasks.md` is the short-horizon checklist.
+
+## Commands
+
+**Planned, not yet verified** — nothing is installed. Replace this section with verified commands once Stage 0 lands.
+
+```bash
+npm run dev                 # local dev server
+npm run build               # production build
+npm run lint                # eslint
+
+npx supabase db push        # apply migrations to the linked project
+npx supabase db reset       # re-run all migrations + seed.sql (destructive, local)
+npx supabase gen types typescript --linked > lib/types/database.ts
+```
+
+Regenerate `lib/types/database.ts` after **every** migration — the generated types are what make the schema type-safe end to end (§2).
+
+No test framework is chosen yet. Stage 3 requires explicit test cases for event-window resolution (§7, Stage 3), so pick the framework there and document the single-test invocation in this file at that point.
+
+## Architecture
+
+Next.js App Router on Vercel → Supabase Postgres. No separate API service: Server Components read, Server Actions and Route Handlers write. Authorization lives in Postgres Row Level Security, not in the frontend (§2, §3).
+
+Three audiences, one codebase:
+
+| Audience | Auth |
+|---|---|
+| Public — org info, upcoming events | none |
+| Members — check in, leaderboard, own history | none; identity-based (student ID + matching email), no accounts in v1 |
+| Officers — schedule, roster, attendance review, points | Supabase Auth session + a matching `admin_profiles` row, enforced by `middleware.ts` |
+
+Domain model: `members` ↔ `events` ↔ `attendance`, plus `point_adjustments`, `admin_profiles`, and one `admin_audit` log. Aggregates live in the `leaderboard` and `member_directory` views rather than in application code (§4). Routes are listed in §5.
+
+## Invariants
+
+These are decisions the architecture doc argues for at length. Don't quietly reverse one — if a change needs to, raise it and update the doc.
+
+- **All writes go through Server Actions or Route Handlers.** The browser holds only the anon key, and RLS policies are written assuming the anon role is hostile. Never ship a client-side write; never expose the service role key to the client. (§3, §6)
+- **Nothing is ever dropped on the floor.** A check-in matching no open event and/or no roster member is still stored, as `pending`, for an officer to resolve. A member who showed up and got no credit is the failure mode that erodes trust in the whole system. (§4.2)
+- **`present_requires_resolution` is load-bearing.** `status = 'present'` guarantees both `event_id` and `member_id` are non-null, so leaderboard queries can trust the status alone. Never work around it in application code. (§4.1)
+- **Match and dedupe on `normalized_student_id`**, the generated column, never the raw `submitted_student_id`. `ut-12345`, `UT 12345`, and `UT12345` are the same person. (§4.2)
+- **Every officer mutation writes an `admin_audit` row** — actor, timestamp, before/after JSON, reason. One audit table keyed `(entity_type, entity_id)`; do not add per-entity audit tables. Append-only: no client role may update or delete a row. (§4.2, §6)
+- **Point adjustments require a `reason`, are voided rather than deleted, and may be negative.** A void is itself a recorded action with its own reason. (§4.2)
+- **`attendance_points` and `bonus_points` stay separate columns everywhere**, public and admin. Collapsing them into a total hides exactly the thing worth watching. (§4.4)
+- **No unauthenticated route returns an email or student ID** — including the `leaderboard` view, which deliberately omits both. (§4.4, §6)
+- **Event edits are not retroactive.** Recorded attendance is a fact; the check-in window is consulted only at resolution time. Narrowing a window warns, it never revokes. Deleting an event that has attendance is blocked — offer `status = 'cancelled'` instead. Changing `points` is allowed but must warn with the count of members affected. (§4.6)
+- **Check-ins outside the 48-hour orphan grace window are refused, not queued.** Inside it with no open event, they're stored `pending` with ranked `nearby_events()` suggestions. (§4.3)
+- **Don't auto-resolve near-misses.** A submission five minutes past the window is probably legitimate, but auto-approving it just moves the boundary. Keep the human in the loop and make the human's job fast instead. (§7, Stage 5)
+- **"Select all N matching this filter" is not "select the 25 rows on this page."** Conflating them silently produces partial email lists — the classic bug in this kind of screen. (§7, Stage 6)
+
+## Layout
+
+Per §10:
+
+```
+app/(public)/           landing, /attend, /leaderboard, /lookup
+app/admin/              login, dashboard, events/, members/, attendance/, points/, audit/
+app/actions/            attendance.ts, events.ts, members.ts, points.ts, audit.ts
+lib/supabase/           server.ts (server client), client.ts (browser client)
+lib/types/database.ts   generated — do not hand-edit
+lib/validation.ts       zod schemas
+lib/filters.ts          directory filter → SQL translation
+lib/export.ts           CSV / TSV / clipboard formatting
+supabase/migrations/    versioned SQL
+supabase/seed.sql
+components/ui/          shared primitives
+middleware.ts           admin route protection
+```
+
+`app/actions/audit.ts` is the shared `admin_audit` writer — every other action calls it rather than inserting directly.
+
+## Working agreements
+
+- When a decision changes, update `docs/student-org-website-architecture.md` and bump its version header. Code and doc drifting apart is how the next officer inherits a mystery.
+- Keep `tasks.md` current; refill its "Later" section as each stage is reached.
+- **Don't rush Stage 1.** Schema changes get expensive once UI depends on them (§7).
+- Stages are ordered so each ends with something demonstrable. Prefer finishing a stage's exit criteria over starting the next stage's interesting parts.
+- Operational gotcha: the Supabase free tier pauses after inactivity and needs a manual resume from the dashboard. Check before the first event of each semester — it's the single most likely operational surprise (§2.2).
