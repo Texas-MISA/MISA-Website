@@ -8,15 +8,21 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 *Goal: a deployed skeleton, so deployment is never the thing that blocks a feature. Exit: a live URL that reads one row from Postgres. ~half a day.*
 
-- [ ] `git init`; add `.gitignore` (`.env*.local`, `node_modules`, `.next`, `.vercel`); commit `docs/`, `CLAUDE.md`, `tasks.md`
-- [ ] `npx create-next-app@latest` — TypeScript, Tailwind, App Router, ESLint, **no `src/` directory** (§10 puts `app/` and `lib/` at the root)
+- [x] `git init`; add `.gitignore` (`.env*.local`, `node_modules`, `.next`, `.vercel`); commit `docs/`, `CLAUDE.md`, `tasks.md`
+- [x] `npx create-next-app@latest` — TypeScript, Tailwind, App Router, ESLint, **no `src/` directory** (§10 puts `app/` and `lib/` at the root). Landed Next **16.2.12** + React 19.2.4 + Tailwind 4. `npm run lint` and `npm run build` both pass.
 - [ ] Create the GitHub repo and push `main`
 - [ ] Import the repo into Vercel; confirm push-to-`main` deploys to `*.vercel.app`
 - [ ] Create the Supabase project; note the region and save the DB password somewhere durable
 - [ ] Env vars in both `.env.local` and the Vercel project: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The service role key, if used at all, is server-only and never prefixed `NEXT_PUBLIC_`
 - [ ] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10)
 - [ ] Throwaway verification: a Server Component reads one row from a scratch table and renders it **on the deployed URL**, not just locally — then delete the page and the scratch table
-- [ ] Update the Commands section of `CLAUDE.md` with the verified `dev` / `build` / `lint` invocations and drop the "not yet verified" caveat
+- [x] Update the Commands section of `CLAUDE.md` with the verified `dev` / `build` / `lint` invocations and drop the "not yet verified" caveat
+
+**Noted during the scaffold** — carry into later stages:
+
+- `npm audit` reports 12 high-severity advisories, all transitive dev/build-time deps of `eslint` and `next` (`brace-expansion`, `postcss`, `sharp`). **Never run `npm audit fix --force`** — npm's proposed "fix" downgrades Next to 9.3.3. Revisit when `eslint-config-next` supports eslint 10.
+- `create-next-app` generated `AGENTS.md` warning that Next 16 diverges from model training data, and a `CLAUDE.md` that was just `@AGENTS.md`. Merged: the project `CLAUDE.md` now imports `AGENTS.md` at the top. Read `node_modules/next/dist/docs/` before writing App Router / caching / Server Action code.
+- §10's layout predates Next 16. Where the doc and the framework disagree, the framework wins — record the divergence in the doc.
 
 ---
 
