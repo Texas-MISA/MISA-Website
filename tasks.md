@@ -12,12 +12,15 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [x] `npx create-next-app@latest` — TypeScript, Tailwind, App Router, ESLint, **no `src/` directory** (§10 puts `app/` and `lib/` at the root). Landed Next **16.2.12** + React 19.2.4 + Tailwind 4. `npm run lint` and `npm run build` both pass.
 - [x] Create the GitHub repo and push `main` — now [Texas-MISA/MISA-Website](https://github.com/Texas-MISA/MISA-Website), **public**, owned by the org (transferred from the personal account 2026-07-29, per §2.3)
 - [ ] Import the repo into Vercel; confirm push-to-`main` deploys to `*.vercel.app`
-- [ ] Create the Supabase project — **under a dedicated org account, not a personal one** (decided 2026-07-29: the personal account's 2-free-project limit is full, and a dedicated account survives officer turnover; ownership/transfer policy now documented in §2.3). Log the CLI in with `npx supabase login --profile misa` so the personal login stays intact, then `npx supabase projects create misa-website --profile misa ...`. Note the region and save the DB password somewhere durable.
+- [x] Create the Supabase project — done via the dashboard under the MISA account. Ref `sqgqaxegeawtlccaxdij`, URL `https://sqgqaxegeawtlccaxdij.supabase.co`. DB password held by the org account, not in the repo.
 - [ ] **Promote `cgonztx-gif` to Owner in the Texas-MISA org** (org → People → role). It was invited as `member`; the repo transfer only worked because the org allows members to create repos. Owner is needed to manage org settings and add officers without logging into the MISA email each time.
 - [ ] Vercel import: connect the **Texas-MISA** org, not the personal account, so the deployment is org-owned too (§2.3). The repo is public, which sidesteps the Hobby-tier restriction on private org repos.
-- [ ] Env vars in both `.env.local` and the Vercel project: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (template committed as `.env.example`). The service role key, if used at all, is server-only and never prefixed `NEXT_PUBLIC_`
+- [x] `.env.local` written with `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the new `sb_publishable_…` key format; template committed as `.env.example`). Confirmed gitignored. Service role key unused so far — server-only when it is, never `NEXT_PUBLIC_`.
+- [ ] Same two env vars into the Vercel project at import time
 - [x] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10) — `@supabase/ssr` 0.12 pattern, async `cookies()`, lint/build clean
-- [ ] Throwaway verification: a Server Component reads one row from a scratch table and renders it **on the deployed URL**, not just locally — then delete the page and the scratch table
+- [x] Throwaway verification page `/db-check` written and **passing locally** (HTTP 200, row renders, RLS-gated via an explicit anon select policy)
+- [ ] Confirm `/db-check` passes **on the deployed URL** — this is the actual Stage 0 exit criteria; local success doesn't prove the Vercel env vars are right
+- [ ] Then tear down: delete `app/db-check/` and `drop table public._stage0_check;`
 - [x] Update the Commands section of `CLAUDE.md` with the verified `dev` / `build` / `lint` invocations and drop the "not yet verified" caveat
 
 **Noted during the scaffold** — carry into later stages:
