@@ -10,7 +10,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 - [x] `git init`; add `.gitignore` (`.env*.local`, `node_modules`, `.next`, `.vercel`); commit `docs/`, `CLAUDE.md`, `tasks.md`
 - [x] `npx create-next-app@latest` — TypeScript, Tailwind, App Router, ESLint, **no `src/` directory** (§10 puts `app/` and `lib/` at the root). Landed Next **16.2.12** + React 19.2.4 + Tailwind 4. `npm run lint` and `npm run build` both pass.
-- [ ] Create the GitHub repo and push `main`
+- [x] Create the GitHub repo and push `main` — [cgonztx-gif/MISA-Website](https://github.com/cgonztx-gif/MISA-Website), private
 - [ ] Import the repo into Vercel; confirm push-to-`main` deploys to `*.vercel.app`
 - [ ] Create the Supabase project; note the region and save the DB password somewhere durable
 - [ ] Env vars in both `.env.local` and the Vercel project: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The service role key, if used at all, is server-only and never prefixed `NEXT_PUBLIC_`
