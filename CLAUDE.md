@@ -67,6 +67,7 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **Check-ins outside the 48-hour orphan grace window are refused, not queued.** Inside it with no open event, they're stored `pending` with ranked `nearby_events()` suggestions. (§4.3)
 - **Don't auto-resolve near-misses.** A submission five minutes past the window is probably legitimate, but auto-approving it just moves the boundary. Keep the human in the loop and make the human's job fast instead. (§7, Stage 5)
 - **"Select all N matching this filter" is not "select the 25 rows on this page."** Conflating them silently produces partial email lists — the classic bug in this kind of screen. (§7, Stage 6)
+- **The database must stay disposable.** Every schema change is a file in `supabase/migrations/` — never applied only through the dashboard SQL editor. The whole handoff/transfer story (§2.3) rests on `create project → link → db push` recreating the database from the repo alone; drift between the live schema and `migrations/` breaks it silently. (§2.3)
 
 ## Layout
 
@@ -97,3 +98,4 @@ proxy.ts                admin route protection — Next 16 renamed middleware.ts
 - **Don't rush Stage 1.** Schema changes get expensive once UI depends on them (§7).
 - Stages are ordered so each ends with something demonstrable. Prefer finishing a stage's exit criteria over starting the next stage's interesting parts.
 - Operational gotcha: the Supabase free tier pauses after inactivity and needs a manual resume from the dashboard. Check before the first event of each semester — it's the single most likely operational surprise (§2.2).
+- Accounts: all services live under one dedicated org account (shared org email), and everything must remain transferable between accounts — officers turn over every year. Per-service transfer paths and the disposable-database escape hatch are in §2.3. Don't create project infrastructure under an individual's personal account.

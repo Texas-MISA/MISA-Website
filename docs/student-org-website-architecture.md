@@ -1,9 +1,14 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.3
+**Version:** 1.4
 **Status:** In progress — Stage 0
 **Last updated:** July 2026
 
+> **v1.4:** added §2.3 — account ownership and transferability. All services
+> live under one dedicated org account; every service is also individually
+> transferable, and the database is disposable by design (schema as
+> migrations in the repo).
+>
 > **v1.3:** the build landed on Next.js 16, which renames the `middleware.ts`
 > file convention to `proxy.ts` (exported function `proxy()`). References
 > updated in §5, §7, and §10. The gating logic is unchanged.
@@ -75,6 +80,21 @@ Scoping these out keeps v1 shippable. They are candidates for later stages, not 
 | Domain | Optional | — | ~$12/year |
 
 **Note on the Supabase free tier:** projects pause after a period of inactivity and need a manual resume from the dashboard. For an org with events during the semester this is rarely an issue, but plan a wake-up check before the first meeting of each semester. This is the single most likely operational surprise.
+
+### 2.3 Account ownership and transferability
+
+Officers turn over every year, so every account this project depends on must be either handed over or moved without rebuilding anything. Current policy: **all services live under one dedicated org account** (a shared org email, not any individual's), so the common handoff is simply transferring that login. But the dedicated account itself may need to move someday — a compromised email, a change in org structure — so the per-service transfer paths matter too:
+
+| Service | Handoff via shared login | Transfer between accounts | Notes |
+|---|---|---|---|
+| GitHub | ✔ | ✔ Settings → Transfer ownership; history, issues, and redirects preserved | A GitHub **organization** is the cleanest long-term home: handoff = add the next owner, remove the last. Caveat: Vercel Hobby has historically restricted deploying *private* org-owned repos — making the repo public sidesteps this; verify current policy before moving. |
+| Supabase | ✔ | ✔ Project Settings → General → Transfer project (receiving org needs a free-tier slot) | Or skip transfer entirely: the database is **disposable by design** — see below. |
+| Vercel | ✔ | Possible, but re-importing is easier | A Vercel project is just the git connection + env vars + domain settings. A successor imports the repo and pastes the two env vars from `.env.example`; ~10 minutes. |
+| Domain | ✔ (registrar login) | ✔ Registrar transfer: unlock + auth code, takes days | Slowest to move; keep the registrar login in the shared credentials, or leave it and re-point DNS. |
+
+**The database is disposable, and must stay that way.** Because the full schema lives in `supabase/migrations/` and `seed.sql` in the repo, a brand-new database is: create project → `supabase link` → `db push` → update two env vars. Past years' data is not operationally needed — export tables to CSV (or `pg_dump`) for the archive before decommissioning, and start clean. This is the escape hatch if a transfer is ever awkward, and it only works under one discipline: **never change the schema through the dashboard SQL editor without capturing the change as a migration file.** The moment the live database and `migrations/` drift, the database stops being recreatable. (Within a school year, prefer the `term` column for resets — a new database is for handoffs and fresh starts, not semesters.)
+
+The Stage 9 handoff guide should amount to: the shared login, where the domain lives, and a pointer to this section.
 
 ---
 
@@ -602,7 +622,7 @@ Stages are ordered so that each one ends with something demonstrable. Effort est
 
 - Custom domain purchase + DNS to Vercel; update Supabase redirect URLs
 - Migrate historical data from the existing spreadsheet tracker
-- Officer walkthrough and a one-page written handoff guide
+- Officer walkthrough and a one-page written handoff guide — the account side is just the shared login plus §2.3; the guide's real content is operations (review queue, semester wake-up check, event duplication)
 - Soft launch at one event with a paper backup sign-in sheet on hand
 
 **Exit criteria:** one full event runs on the system with no manual intervention.
@@ -639,7 +659,7 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 | Discretionary points quietly decide the leaderboard | Medium | Medium | Bonus and attendance points shown as separate columns everywhere; required reason on every grant; ledger view surfaces per-officer patterns |
 | Officer edits an event's points and silently changes past standings | Medium | Medium | Edit-impact warning with affected-member count before saving; before/after captured in `admin_audit` |
 | Bulk email copy grabs only the visible page | Medium | Low | Explicit "select all N matching" semantics with the count shown on the copy confirmation; covered by tests in Stage 6 |
-| Project has no maintainer after handoff | High | High | Written handoff doc, plain-vanilla stack, no exotic dependencies |
+| Project has no maintainer after handoff | High | High | Written handoff doc, plain-vanilla stack, no exotic dependencies; all services under one dedicated, transferable org account and the database recreatable from the repo (§2.3) |
 | Scope creep delays past the semester start | High | Medium | Stage 10 exists precisely so good ideas can be recorded and deferred |
 
 ---
