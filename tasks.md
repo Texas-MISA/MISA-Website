@@ -173,11 +173,25 @@ later stage; pick it up between stages or when someone hands over the assets.
 - [ ] **Decide whether the contact form gets a backend** — it renders disabled with email as the working path. Wiring it means a Server Action plus somewhere to deliver the message (§3: all writes go through Server Actions). Doing nothing is a legitimate answer; the emails work.
 - [ ] **The heavier redesign** this recreation is a starting point for.
 
+## Now — Stage 3: Attendance capture — built & tested 2026-07-30; deploy pending
+
+*The core feature (§7). All code, tests, and docs are done and verified locally; what remains needs the production service-role key.*
+
+- [x] **Vitest chosen** (the Stage 3 decision) — 37 tests in 4 files, integration-first against the **local stack**: real Postgres, timestamps injected into `open_event_at()`/`nearby_events()`, no clock mocking. `npm test` needs Docker Desktop + `npx supabase start`; single test: `npx vitest run tests/checkin.test.ts -t "<name>"`.
+- [x] `lib/checkin.ts` — `resolveCheckin()` core (§4.2/§4.3 order), `ORPHAN_WINDOW_HOURS = 48` (the §9 #7 exported constant), `normalizeStudentId()` JS mirror of the SQL expression (lockstep-tested), `checkRateLimit()`. No `next/*` imports, so tests inject clients and time.
+- [x] `app/actions/attendance.ts` — `submitCheckin` Server Action: honeypot → zod (`lib/validation.ts`) → per-IP rate limit → resolve. Service-role client only here + `lib/supabase/admin.ts` (`server-only`-guarded).
+- [x] `/attend` — three-field, phone-first form (`useActionState`, works pre-hydration); distinct present/pending/duplicate/refused/invalid/rate-limited/error states; in the nav as **Check In** and linked from the home events section.
+- [x] **Duplicate rule decided and recorded** (doc v1.18): index on `(event_id, normalized_student_id)` + app check on `(event_id, member_id)` + orphan-resubmission check. Pending orphan never blocks a later resolved check-in; rejected never blocks re-entry.
+- [x] Migrations: `…000011_checkin_throttle` (rate-limit table, deny-all RLS) and `…000012_api_role_grants` — **the trap find of the stage**: newer stacks grant the API roles only `TRUNCATE/REFERENCES/TRIGGER` on new tables, so a fresh `create → link → db push` would be silently broken; codified the classic grants, RLS stays the boundary. Types regenerated.
+- [x] **§7 exit criteria verified in a real browser** against the local stack: during-window ⇒ `present` on the correct event + member self-registered (`source='self_checkin'`); 1h after close ⇒ `pending` orphan; nothing within 48h ⇒ refused, zero rows. Lint + build green (`/attend` static, action request-time).
+- [ ] **Deploy** — needs you: paste the **service_role key** (Supabase dashboard → Project Settings → API) into `.env.local` as `SUPABASE_SERVICE_ROLE_KEY`, then add it to Vercel **via CLI** (`printf '%s' "$KEY" | vercel env add SUPABASE_SERVICE_ROLE_KEY production`, and again for `preview`) — never the dashboard (see the Stage 0 env-var trap above).
+- [ ] `npx supabase db push` of `…000012_api_role_grants` to the remote — blocked by tool permissions this session; remote behaviour is unchanged either way (it already has the classic grants), but migration history must catch up before the next push.
+- [ ] Production smoke test after deploy: synthetic published event via one-line `db query --linked`, obviously fake identity, verify `present`, then clean up attendance → member → event.
+
 ## Later
 
 Placeholders — expand on arrival. Effort estimates from §7.
 
-- **Stage 3 — Attendance capture** · 3–4 days · the core feature; budget most of it for the 7 explicit edge cases in §7, not the happy path. Pick the test framework here.
 - **Stage 4 — Admin foundation & event management** · 6–7 days · duplicate-event and recurring-series creation are what make it worth its size
 - **Stage 5 — Attendance review & point adjustments** · 5–6 days · until this ships, pending rows accumulate with no way to resolve them
 - **Stage 6 — Member directory** · 4–5 days · the screen officers will live in; select-all-matching semantics need real tests

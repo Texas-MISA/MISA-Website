@@ -1,8 +1,59 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.17
-**Status:** Stages 0–1 complete; Stage 2 in progress
+**Version:** 1.18
+**Status:** Stages 0–1 complete; Stage 2 in progress; Stage 3 built and tested
 **Last updated:** July 2026
+
+> **v1.18: Stage 3 (attendance capture) is built, tested, and verified
+> end-to-end locally.** `/attend` + the `submitCheckin` Server Action resolve
+> submissions per §4.2/§4.3; all three §7 exit criteria were exercised through
+> a real browser against the local stack. Decisions made and now normative:
+>
+> - **Test framework: Vitest.** The §7 resolution/dedupe/normalization cases
+>   run as integration tests against the **local Supabase stack** with
+>   timestamps injected into `open_event_at()`/`nearby_events()` — real
+>   Postgres semantics, no clock mocking. 37 tests across 4 files.
+> - **Duplicate rule** (§4.2 addendum): a submission is a duplicate iff
+>   (a) a non-rejected row exists for the same `(event_id,
+>   normalized_student_id)` — the partial unique index, caught as 23505; or
+>   (b) a non-rejected row exists for the same `(event_id, member_id)` after
+>   member resolution — an application check closing the double-credit hole
+>   the index cannot see, where the same member is reached via two different
+>   raw IDs (email-matched typo, then the correct ID); or (c) the submission
+>   is an orphan and a pending orphan with the same `normalized_student_id`
+>   exists within `ORPHAN_WINDOW_HOURS` — an application check, since the
+>   index ignores `event_id is null` rows. A prior pending orphan **never**
+>   blocks a new event-resolved submission: the new row inserts as `present`
+>   and the orphan stays in the officer queue untouched. Rejected rows never
+>   block re-entry. (Optional future hardening, deliberately not built: a
+>   partial unique index on `(event_id, member_id)` to make check (b)
+>   race-proof.)
+> - **Member resolution runs on the orphan path too** — §4.2's order doesn't
+>   condition on an open event, so a grace-window orphan also
+>   matches-or-creates its member. A later-rejected orphan may leave a
+>   `self_checkin` roster row behind; that is §6's roster-pollution row.
+> - **Rate limiting** is a Postgres table (`checkin_throttle`), 30
+>   submissions / 10 min per SHA-256-hashed IP, pruned opportunistically,
+>   **failing open** so a throttle bug can never block a real check-in. No
+>   external KV — a new service would violate §2.3 transferability. The limit
+>   is generous on purpose: event-venue NAT puts a room of legitimate members
+>   behind one IP; the honeypot and the 48-hour window bound are the primary
+>   controls.
+> - **Honeypot:** a hidden `website` field; when filled, the action returns
+>   the same response as a legitimate off-window submission and writes
+>   nothing — bots get no signal.
+> - **`ORPHAN_WINDOW_HOURS` (48)** is exported once from `lib/checkin.ts` and
+>   always passed explicitly to `nearby_events()`; the SQL-side `default 48`
+>   is a fallback for ad-hoc SQL only.
+> - **Grants migration** (`…000012`): newer Supabase stacks no longer
+>   auto-grant DML on tables to the API roles — a fresh stack gives
+>   anon/authenticated/service_role only TRUNCATE/REFERENCES/TRIGGER, so the
+>   §2.3 handoff path (`create project → link → db push`) would produce a
+>   silently broken database. The migration codifies the classic grants;
+>   **RLS remains the security boundary**, and deny-all-until-Stage-8 still
+>   holds because grants are not what does the denying.
+> - The success screen shows the event title only — never a roster email or
+>   student ID (§6).
 
 > **v1.17:** Stage 2's scope is now **recreating the existing Squarespace site**
 > ([txmisa.org](https://www.txmisa.org/)) rather than writing a landing page
@@ -824,18 +875,17 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 3 — Attendance Capture
+### Stage 3 — Attendance Capture ✅ built & tested (v1.18)
 **Goal:** The core feature. This is the reason the project exists.
 
-- `/attend` form: name, student ID, email
-- Server Action that resolves the submission against `open_event_at()`, then matches `normalized_student_id` to the roster
-- Both links resolved → `present`. Either missing → `pending`, with a message telling the member their check-in was received and is awaiting officer review
-- No published event within the 48-hour orphan window → refuse outright
-- Clear success, pending, duplicate, and refused states
-- Honeypot field + basic rate limiting
+- `/attend` form: name, student ID, email — live, linked from the nav and the home page's events section
+- Server Action `submitCheckin` (`app/actions/attendance.ts`) resolving via `open_event_at()`; the testable core is `resolveCheckin` in `lib/checkin.ts`, using the service-role client (`lib/supabase/admin.ts`, guarded by `server-only`)
+- Both links resolved → `present`. Because self-registration always resolves a member, the only pending rows this action produces are **orphans** (no event link); the member sees the received-awaiting-review message
+- No published event within the 48-hour orphan window → refused outright, nothing written
+- Success, pending, duplicate (prior-aware), refused, invalid, rate-limited, and error states all render distinctly
+- Honeypot field + per-IP rate limiting via `checkin_throttle` (see the v1.18 changelog for both mechanisms and the duplicate rule)
 
-**Exit criteria:** a check-in submitted during a test event window lands on the correct event as `present`; one submitted an hour after the window closes is stored as `pending`; one submitted three weeks from any event is refused.
-**Effort:** 3–4 days. Budget most of it for edge cases, not the happy path.
+**Exit criteria: met, verified through a real browser against the local stack** — during-window ⇒ `present` on the correct event with the member self-registered (`source='self_checkin'`); an hour after close ⇒ `pending` orphan; with nothing inside 48 hours ⇒ refused with zero rows written. The test list below runs as Vitest integration tests (37 passing).
 
 **Test cases to write explicitly:**
 - Before window opens / during / after window closes

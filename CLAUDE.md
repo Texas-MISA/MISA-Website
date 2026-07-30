@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–1 complete; Stage 2 (public site) in progress.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. `app/(public)/` recreates all six pages of the existing Squarespace site, [txmisa.org](https://www.txmisa.org/) — see `docs/existing-site-inventory.md` for what was reproduced and what was deliberately left as a placeholder (photography, partner logos, the contact form backend). The home page also reads published upcoming events live, which the original has no equivalent of. Stage 0 scaffolding (`/db-check`, `_stage0_check`) is torn down. See `tasks.md`.
+**Stages 0–1 complete; Stage 2 (public site) in progress; Stage 3 (attendance capture) built and tested.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. `app/(public)/` recreates all six pages of the existing Squarespace site, [txmisa.org](https://www.txmisa.org/) — see `docs/existing-site-inventory.md` for what was reproduced and what was deliberately left as a placeholder (photography, partner logos, the contact form backend). The home page reads published upcoming events live, and `/attend` is the public check-in form backed by the `submitCheckin` Server Action (needs `SUPABASE_SERVICE_ROLE_KEY` in the environment). See `tasks.md`.
 
 Content carried over from the old site lives in `lib/site.ts` (mission, pillars, socials, emails, partners) and `lib/officers.ts` (the 13-officer roster) — edit those rather than hardcoding copy into pages. The recreation is a starting point for a heavier redesign, not a final design.
 
@@ -41,11 +41,20 @@ Three sharp edges in the Supabase CLI on this machine:
 
 - **`db query` reads only the first line of its SQL argument.** Multi-line SQL silently truncates and fails with a confusing syntax error. Flatten to one line, and remember Windows caps a command line near 8k characters — `scripts/seed-remote.sh` exists to work around both.
 - **`db reset` needs Docker Desktop running.** WSL 2 and Docker Desktop are both installed (Docker at the *user-level* path `%LOCALAPPDATA%\Programs\DockerDesktop`, not `C:\Program Files\Docker` — a default-path check wrongly reports it missing). The engine is not a service: if `docker info` fails on `npipe:////./pipe/dockerDesktopLinuxEngine`, launch `Docker Desktop.exe` and wait for it. `wsl --list` showing no distributions is also a red herring — Docker Desktop supplies its own `docker-desktop` distro.
+- **Newer stacks don't auto-grant table privileges to the API roles.** A fresh local stack gives anon/authenticated/service_role only `TRUNCATE/REFERENCES/TRIGGER` on new tables — every API read/write fails with 42501 no matter what RLS says. The remote project predates the change, which is why production worked while local tests couldn't insert as service_role. Migration `20260730000012_api_role_grants.sql` codifies the classic grants (plus default privileges for future tables); RLS remains the actual security boundary.
 - **`~/.supabase/profile` breaks every command that shells out to the legacy Go child.** A dangling active-profile pointer (a bare name, no extension) makes the child feed the path to viper, which fails with `failed to read profile: Unsupported Config Type ""` → `LegacyGoChildExitError`. `start` and `db query --linked` are unaffected, so it looks like a `db reset`-only fault. The file was deleted (it contained just `misa`, and there is no `profiles` subcommand or config file defining it). Don't recreate it; `--profile` does not work around it.
 
 `npx supabase start` applies every migration and runs `seed.sql` itself, so a fresh stack is already a full rebuild-from-repo check. Local `config.toml` pins `major_version = 17`, matching the remote's 17.6.
 
-No test framework is chosen yet. Stage 3 requires explicit test cases for event-window resolution (§7, Stage 3), so pick the framework there and document the single-test invocation in this file at that point.
+**Tests: Vitest**, chosen at Stage 3. The §7 resolution/dedupe/normalization cases run as integration tests against the **local Supabase stack** — real Postgres semantics with timestamps injected into `open_event_at()`/`nearby_events()`, no clock mocking. `tests/global-setup.ts` reads the local keys from `npx supabase status` and refuses to run against anything non-local.
+
+```bash
+npm test                                              # all tests (needs: Docker Desktop up, npx supabase start)
+npm run test:watch                                    # watch mode
+npx vitest run tests/checkin.test.ts -t "<test name>" # single test
+```
+
+Test identities are obviously fake (`T3-…` IDs, `example.edu`); fixture events live in 2030, each test in its own 7-day slot so no 48-hour orphan window reaches a neighbour's events.
 
 ## Architecture
 
@@ -65,7 +74,9 @@ Domain model: `members` ↔ `events` ↔ `attendance`, plus `point_adjustments`,
 
 These are decisions the architecture doc argues for at length. Don't quietly reverse one — if a change needs to, raise it and update the doc.
 
-- **All writes go through Server Actions or Route Handlers.** The browser holds only the anon key, and RLS policies are written assuming the anon role is hostile. Never ship a client-side write; never expose the service role key to the client. (§3, §6)
+- **All writes go through Server Actions or Route Handlers.** The browser holds only the anon key, and RLS policies are written assuming the anon role is hostile. Never ship a client-side write; never expose the service role key to the client. The service-role client exists **only** in `lib/supabase/admin.ts`, guarded by `server-only`; anon-capable reads belong on `lib/supabase/server.ts` so RLS stays exercised. (§3, §6)
+- **The duplicate rule is three checks, not one** (v1.18): the `(event_id, normalized_student_id)` partial unique index (23505), an app check on `(event_id, member_id)` after member resolution (same member via two raw IDs), and an app check for a prior pending orphan within the grace window (the index ignores `event_id is null`). A pending orphan never blocks a new event-resolved submission; rejected rows never block re-entry.
+- **`ORPHAN_WINDOW_HOURS` lives in `lib/checkin.ts` and is always passed explicitly** to `nearby_events()`; the SQL `default 48` is for ad-hoc SQL only. (§9 #7)
 - **Nothing is ever dropped on the floor.** A check-in matching no open event and/or no roster member is still stored, as `pending`, for an officer to resolve. A member who showed up and got no credit is the failure mode that erodes trust in the whole system. (§4.2)
 - **`present_requires_resolution` is load-bearing.** `status = 'present'` guarantees both `event_id` and `member_id` are non-null, so leaderboard queries can trust the status alone. Never work around it in application code. (§4.1)
 - **Match and dedupe on `normalized_student_id`**, the generated column, never the raw `submitted_student_id`. `ut-12345`, `UT 12345`, and `UT12345` are the same person. (§4.2)
@@ -94,12 +105,16 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         holds the shared header/footer; _components/ holds
                         page-private pieces (leading underscore = not a route)
 app/admin/              login, dashboard, events/, members/, attendance/, points/, audit/
-app/actions/            attendance.ts, events.ts, members.ts, points.ts, audit.ts
-lib/supabase/           server.ts (server client), client.ts (browser client)
+app/actions/            attendance.ts (submitCheckin — live); later events.ts, members.ts, points.ts, audit.ts
+lib/supabase/           server.ts (anon server client), client.ts (browser client),
+                        admin.ts (service-role client, `server-only`-guarded)
 lib/types/database.ts   generated — do not hand-edit
+lib/checkin.ts          check-in resolution core + ORPHAN_WINDOW_HOURS + rate limit —
+                        no next/* imports, so tests can inject clients and timestamps
 lib/site.ts             org copy, socials, emails, partners
 lib/officers.ts         officer roster
 lib/validation.ts       zod schemas
+tests/                  Vitest suite — integration tests against the local stack
 lib/filters.ts          directory filter → SQL translation
 lib/export.ts           CSV / TSV / clipboard formatting
 supabase/migrations/    versioned SQL

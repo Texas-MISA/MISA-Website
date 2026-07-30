@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
 
 import type { Database } from "@/lib/types/database";
@@ -59,6 +61,16 @@ export async function UpcomingEvents() {
         <h2 className="text-center font-display text-3xl font-extrabold sm:text-4xl">
           Upcoming Events
         </h2>
+        <p className="mt-3 text-center text-sm text-foreground/70">
+          At an event right now?{" "}
+          <Link
+            href="/attend"
+            className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+          >
+            Check in here
+          </Link>
+          .
+        </p>
 
         <div className="mt-10">
           {result.kind === "error" ? (

@@ -191,6 +191,24 @@ export type Database = {
           },
         ]
       }
+      checkin_throttle: {
+        Row: {
+          id: number
+          ip_hash: string
+          submitted_at: string
+        }
+        Insert: {
+          id?: never
+          ip_hash: string
+          submitted_at?: string
+        }
+        Update: {
+          id?: never
+          ip_hash?: string
+          submitted_at?: string
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           category: string | null
