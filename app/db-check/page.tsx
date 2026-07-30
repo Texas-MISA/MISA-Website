@@ -63,6 +63,11 @@ export default async function DbCheckPage() {
           NEXT_PUBLIC_SUPABASE_ANON_KEY:{" "}
           {key ? `present (${key.slice(0, 12)}…, ${key.length} chars)` : "MISSING"}
         </div>
+        <div>
+          build:{" "}
+          {process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "local"}
+          {process.env.VERCEL_ENV ? ` (${process.env.VERCEL_ENV})` : ""}
+        </div>
         <div>read at {new Date().toISOString()}</div>
       </dl>
     </main>
