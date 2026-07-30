@@ -161,7 +161,17 @@ Carried over from Stage 0; none blocked Stage 2, and all are now resolved. Kept 
 
 **Verified 2026-07-30:** all six routes return 200 and were eyeballed in the browser; `Fall Kickoff` still shows on the home page and the draft still doesn't; `npm run lint` and `npm run build` both clean (`/` dynamic, the other five static).
 
-**Next on this page, when you want it:** real photos and partner logos; decide whether the contact form gets a backend; then the heavier redesign this is a starting point for.
+## Low priority — deferred, not blocking anything
+
+Cosmetic and content polish on the public site. None of it gates Stage 3 or any
+later stage; pick it up between stages or when someone hands over the assets.
+
+- [ ] **Add real photography** — officer headshots (`/officers` and the home grid), gallery photos, project photos. Cards currently show initials; gallery and projects show correctly-sized placeholder tiles, so the layout won't shift much. Drop files in `public/` (e.g. `public/officers/`, `public/gallery/`), then swap the placeholder `div`s for `next/image` — `components/ui/officer-card.tsx`, `app/(public)/gallery/page.tsx`, `app/(public)/projects/page.tsx`. Add a `photo` field to the `Officer` type in `lib/officers.ts` rather than deriving filenames from names.
+  - ⚠️ **The repo is public.** These are photos of identifiable students, so get the officers' okay before committing them, and prefer images the org already publishes on the live site.
+  - `next/image` needs no config for files served from `public/`; only remote hosts need `images.remotePatterns` in `next.config.ts`.
+- [ ] **Add partner logos** — currently rendered as styled wordmarks in `components/ui/partners.tsx` (KPMG, pwc, ConocoPhillips, Credera). Real logos are trademarked; the safe route is the versions each company publishes in its own brand/press kit, used per those guidelines. Worth confirming the partner list is current before spending effort on it.
+- [ ] **Decide whether the contact form gets a backend** — it renders disabled with email as the working path. Wiring it means a Server Action plus somewhere to deliver the message (§3: all writes go through Server Actions). Doing nothing is a legitimate answer; the emails work.
+- [ ] **The heavier redesign** this recreation is a starting point for.
 
 ## Later
 
