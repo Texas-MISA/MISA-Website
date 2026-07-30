@@ -39,21 +39,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      _stage0_check: {
-        Row: {
-          id: number
-          note: string
-        }
-        Insert: {
-          id: number
-          note: string
-        }
-        Update: {
-          id?: number
-          note?: string
-        }
-        Relationships: []
-      }
       admin_audit: {
         Row: {
           acted_at: string

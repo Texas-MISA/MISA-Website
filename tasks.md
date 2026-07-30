@@ -144,14 +144,18 @@ Carried over from Stage 0; none blocked Stage 2, and all are now resolved. Kept 
 
 *Goal: something worth showing people. Exit: a stranger understands what the org does and when it meets. 2–3 days, mostly content and design rather than logic.*
 
-- [ ] Org overview, mission, meeting cadence, contact/social links — **needs real copy from you**; I can only put placeholders in
-- [ ] Upcoming events pulled live from `events where status = 'published'` and `starts_at > now()`. The seed has `Fall Kickoff` published and `Fall Info Session` as a draft, so the draft must *not* appear — that is the test.
-- [ ] Officer roster section (static content is fine for v1)
-- [ ] Mobile-first responsive layout — §1.2 targets a check-in in under 20 seconds on a phone, and this page sets the layout conventions the rest inherits
-- [ ] Replace the `create-next-app` boilerplate in `app/page.tsx` and drop the unused `public/*.svg` assets
-- [ ] Once the landing page reads events, tear down the Stage 0 scaffolding: delete `app/db-check/`, and drop `_stage0_check` in a migration
+**Structure built 2026-07-30** at `app/(public)/page.tsx` (§10's route group, so later public routes share its conventions). What remains is real content.
 
-**Watch for:** this is the first page to read Supabase in anger. `lib/supabase/server.ts` exists and is proven, but nothing has yet used the generated types — expect to import `Database` from `lib/types/database.ts` and thread it through `createClient()`.
+- [ ] **Real copy** — mission, meeting cadence, officer names, contact/social links. Every placeholder is in square brackets, so a search for `[` in `app/(public)/page.tsx` finds them all. **Needs you; nothing else in Stage 2 does.**
+- [x] Upcoming events pulled live from `events where status = 'published'` and `starts_at > now()` — verified on the rendered page: `Fall Kickoff` appears; the draft `Fall Info Session`, the cancelled `Rained Out Tabling`, and past published events do not. Times render in **America/Chicago** via `Intl.DateTimeFormat` (the server runs in UTC — never format without an explicit zone).
+  - This needed one RLS policy **pulled forward from Stage 8**: `20260730000009_events_public_read.sql` — anon/authenticated `select` where `status = 'published'`, which is exactly the §6 grant (doc v1.16). Verified at the PostgREST boundary with the anon key: 13 published rows, no draft, no cancelled. Everything else stays deny-all; all writes stay deny-all.
+  - First use of the generated types: `Database` is now threaded through both `createServerClient` and `createBrowserClient`.
+- [x] Officer roster section — structure done, names are placeholders (covered by the copy item above)
+- [x] Mobile-first responsive layout — single-column, `max-w-2xl`, cards stack on phone; sets the conventions §1.2's 20-second check-in inherits
+- [x] Replace the `create-next-app` boilerplate — `app/page.tsx` deleted in favour of `app/(public)/page.tsx`, all five `public/*.svg` boilerplate assets dropped, root layout metadata now MISA
+- [x] Stage 0 scaffolding torn down: `app/db-check/` deleted; `_stage0_check` dropped in `20260730000010_drop_stage0_check.sql` (the original `00000000000000_stage0_check` migration stays so `db reset` replays cleanly)
+
+**Exit check when copy lands:** re-read the page as a stranger — org, meetings, how to join, all findable on a phone.
 
 ## Later
 

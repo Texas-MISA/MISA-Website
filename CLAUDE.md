@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–1 complete; Stage 2 (public landing page) is next.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. No feature UI exists yet — `app/` holds the default landing page and a throwaway `/db-check` diagnostic. See `tasks.md`.
+**Stages 0–1 complete; Stage 2 (public landing page) in progress.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. The landing page (`app/(public)/page.tsx`) reads published upcoming events live; its static copy is bracketed placeholder text awaiting real content. Stage 0 scaffolding (`/db-check`, `_stage0_check`) is torn down. See `tasks.md`.
 
 `docs/student-org-website-architecture.md` is the source of truth for this project: a student-org attendance system replacing spreadsheet tracking. Section references below (§) point into it. `tasks.md` is the short-horizon checklist.
 
@@ -79,7 +79,7 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **"Select all N matching this filter" is not "select the 25 rows on this page."** Conflating them silently produces partial email lists — the classic bug in this kind of screen. (§7, Stage 6)
 - **The database must stay disposable.** Every schema change is a file in `supabase/migrations/` — never applied only through the dashboard SQL editor. The whole handoff/transfer story (§2.3) rests on `create project → link → db push` recreating the database from the repo alone; drift between the live schema and `migrations/` breaks it silently. (§2.3)
 - **Check-in window bounds are half-open (`>= opens`, `< closes`) in three places that must agree:** the `events_no_overlapping_checkin` exclusion constraint, `open_event_at()`, and any application-side window logic. Making one inclusive either blocks back-to-back events from being published or lets one instant match two events. (§4.3)
-- **RLS is enabled with no policies on every table** — deny-all until Stage 8 writes them. New tables must do the same in their own migration. Reads reach clients only through `leaderboard` and `member_directory`, which run as owner and are the security boundary. (§4.4)
+- **RLS is enabled on every table, deny-all until Stage 8** — with one deliberate exception: `events_public_read` grants anon `select` on `status = 'published'` events (the §6 grant, pulled forward for the Stage 2 landing page). New tables must ship deny-all in their own migration. All other reads reach clients only through `leaderboard` and `member_directory`, which run as owner and are the security boundary; writes are deny-all everywhere. (§4.4, §6)
 - **`seed.sql` must not use trailing inline comments.** `scripts/seed-remote.sh` flattens each chunk onto one line, so a `--` after code would comment out everything following it. Full-line comments are stripped and safe.
 
 ## Layout

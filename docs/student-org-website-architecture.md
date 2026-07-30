@@ -1,8 +1,19 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.15
-**Status:** Stages 0–1 complete; Stage 2 next
+**Version:** 1.16
+**Status:** Stages 0–1 complete; Stage 2 in progress
 **Last updated:** July 2026
+
+> **v1.16:** Stage 2 landing page is live-reading the schedule. One RLS policy
+> is **pulled forward from Stage 8**: `events_public_read` (migration
+> `…000009`) grants anon/authenticated `select` on `events` where
+> `status = 'published'` — exactly the §6 "published `events`" grant, landed
+> early because the landing page is its first consumer. Everything else
+> remains deny-all, and writes everywhere stay deny-all. Verified at the API
+> boundary: the anon key sees all 13 published rows and neither the draft nor
+> the cancelled seed event. Stage 0 scaffolding is gone (`app/db-check/`
+> deleted; `_stage0_check` dropped in migration `…000010`). Landing-page copy
+> is still bracketed placeholder text awaiting real content from officers.
 
 > **v1.15:** Every §2.4/§2.5 account item is now closed. Org-wide 2FA is
 > **enabled and verified**, with both Owners confirmed still present afterwards
@@ -291,8 +302,11 @@ The Stage 9 handoff guide should amount to: §2.4 filled in, the vault handed ov
 > review queue and directory filters, not-blank checks on required text (a bare
 > `not null` accepts `''`), an `updated_at` trigger on `events`, append-only
 > triggers on `admin_audit`, and `enable row level security` on every table —
-> deny-all until the policies land in Stage 8. If the two ever disagree, the
-> migrations are right and this section is stale.
+> deny-all until the policies land in Stage 8, with one deliberate exception:
+> `events_public_read` (anon `select` on published events only) landed in
+> Stage 2 because the landing page needs it — it is the §6 grant, not a new
+> surface. If the two ever disagree, the migrations are right and this
+> section is stale.
 
 ```sql
 -- Roster. Seeded by admins, and also self-populating: an unrecognized student
