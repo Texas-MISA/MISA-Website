@@ -424,6 +424,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. The log is append-only and not deletable from the app. |
 | Bulk roster export leaks member PII | Export is the largest PII egress point in the system. Gate it behind an authenticated session, log every export to `admin_audit` with the filter used and row count, and consider restricting it to the `admin` role. |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
+| Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. |
 | Admin privilege escalation | `admin_profiles` is not writable by any client role; officers are added via the Supabase dashboard or a seeded SQL script |
 
 **Threat model boundary:** this system protects against casual abuse and accidental data exposure. It is not designed to withstand a determined attacker, and it holds no financial or highly sensitive data. Scope the security work accordingly — the RLS policies matter far more than, say, elaborate bot detection.

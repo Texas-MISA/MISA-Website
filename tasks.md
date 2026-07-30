@@ -11,7 +11,9 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [x] `git init`; add `.gitignore` (`.env*.local`, `node_modules`, `.next`, `.vercel`); commit `docs/`, `CLAUDE.md`, `tasks.md`
 - [x] `npx create-next-app@latest` — TypeScript, Tailwind, App Router, ESLint, **no `src/` directory** (§10 puts `app/` and `lib/` at the root). Landed Next **16.2.12** + React 19.2.4 + Tailwind 4. `npm run lint` and `npm run build` both pass.
 - [x] Create the GitHub repo and push `main` — now [Texas-MISA/MISA-Website](https://github.com/Texas-MISA/MISA-Website), **public**, owned by the org (transferred from the personal account 2026-07-29, per §2.3)
-- [ ] Import the repo into Vercel; confirm push-to-`main` deploys to `*.vercel.app`
+- [x] Import the repo into Vercel — team scope `txmisa-jds-projects`, production alias `misa-website-txmisa-jds-projects.vercel.app` (the short `misa-website.vercel.app` is taken by someone else)
+- [ ] **Set Deployment Protection to Standard Protection** (Settings → Deployment Protection → Vercel Authentication). It defaulted to "All Deployments", which SSO-gates production — unusable for a public check-in form. Standard = production public, previews gated, which is what we want: previews inherit prod env vars and would otherwise be a second public form writing to the real database (§6).
+- [ ] Confirm push-to-`main` deploys
 - [x] Create the Supabase project — done via the dashboard under the MISA account. Ref `sqgqaxegeawtlccaxdij`, URL `https://sqgqaxegeawtlccaxdij.supabase.co`. DB password held by the org account, not in the repo.
 - [ ] **Promote `cgonztx-gif` to Owner in the Texas-MISA org** (org → People → role). It was invited as `member`; the repo transfer only worked because the org allows members to create repos. Owner is needed to manage org settings and add officers without logging into the MISA email each time.
 - [ ] Vercel import: connect the **Texas-MISA** org, not the personal account, so the deployment is org-owned too (§2.3). The repo is public, which sidesteps the Hobby-tier restriction on private org repos.
