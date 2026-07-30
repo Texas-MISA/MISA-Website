@@ -11,8 +11,9 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [x] `git init`; add `.gitignore` (`.env*.local`, `node_modules`, `.next`, `.vercel`); commit `docs/`, `CLAUDE.md`, `tasks.md`
 - [x] `npx create-next-app@latest` — TypeScript, Tailwind, App Router, ESLint, **no `src/` directory** (§10 puts `app/` and `lib/` at the root). Landed Next **16.2.12** + React 19.2.4 + Tailwind 4. `npm run lint` and `npm run build` both pass.
 - [x] Create the GitHub repo and push `main` — now [Texas-MISA/MISA-Website](https://github.com/Texas-MISA/MISA-Website), **public**, owned by the org (transferred from the personal account 2026-07-29, per §2.3)
-- [x] Import the repo into Vercel — team scope `txmisa-jds-projects`, production alias `misa-website-txmisa-jds-projects.vercel.app` (the short `misa-website.vercel.app` is taken by someone else)
-- [ ] **Set Deployment Protection to Standard Protection** (Settings → Deployment Protection → Vercel Authentication). It defaulted to "All Deployments", which SSO-gates production — unusable for a public check-in form. Standard = production public, previews gated, which is what we want: previews inherit prod env vars and would otherwise be a second public form writing to the real database (§6).
+- [x] Import the repo into Vercel — scope `txmisa-jds-projects` (the MISA email's personal **Hobby** account; Vercel Teams are Pro-only, so there is no Texas-MISA team). Connected to `Texas-MISA/MISA-Website`. Production alias **`misa-website-beta.vercel.app`** (`misa-website.vercel.app` is taken by someone else).
+- [x] Deployment Protection no longer SSO-gates production — it defaulted to "All Deployments" on import and now returns 200.
+- [ ] Confirm previews are still gated: Settings → Deployment Protection should read **Standard Protection**, not Disabled. Previews inherit production env vars, so an open preview URL is a second public check-in form writing to the real database (§6).
 - [ ] Confirm push-to-`main` deploys
 - [x] Create the Supabase project — done via the dashboard under the MISA account. Ref `sqgqaxegeawtlccaxdij`, URL `https://sqgqaxegeawtlccaxdij.supabase.co`. DB password held by the org account, not in the repo.
 - [ ] **Promote `cgonztx-gif` to Owner in the Texas-MISA org** (org → People → role). It was invited as `member`; the repo transfer only worked because the org allows members to create repos. Owner is needed to manage org settings and add officers without logging into the MISA email each time.
@@ -21,7 +22,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [ ] Same two env vars into the Vercel project at import time
 - [x] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10) — `@supabase/ssr` 0.12 pattern, async `cookies()`, lint/build clean
 - [x] Throwaway verification page `/db-check` written and **passing locally** (HTTP 200, row renders, RLS-gated via an explicit anon select policy)
-- [ ] Confirm `/db-check` passes **on the deployed URL** — this is the actual Stage 0 exit criteria; local success doesn't prove the Vercel env vars are right
+- [x] Confirm `/db-check` passes **on the deployed URL** — ✅ https://misa-website-beta.vercel.app/db-check returns 200 and renders the row. Verified request-time (timestamps differ across requests, `X-Vercel-Cache: MISS`), so the Vercel env vars are correct. **Stage 0 exit criteria met.**
 - [ ] Then tear down: delete `app/db-check/` and `drop table public._stage0_check;`
 - [x] Update the Commands section of `CLAUDE.md` with the verified `dev` / `build` / `lint` invocations and drop the "not yet verified" caveat
 
