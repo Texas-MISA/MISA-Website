@@ -27,6 +27,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
   - `NEXT_PUBLIC_SUPABASE_URL` = `https://gbxypeofjnhrhotlhyzs.supabase.co`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_CnJ934Lcn_TSFLN02--J2Q_aPa_VEfZ`
   - ⚠️ **`NEXT_PUBLIC_*` values are inlined at build time**, so editing them in Vercel settings changes nothing until a rebuild. Changing an env var always needs a redeploy — a restart won't do it.
+  - ⚠️ Two paste errors cost ~30 minutes here: the values went into each other's slots, and then the key picked up a stray `│` (U+2502) from a rendered markdown table, giving 48 chars instead of 46. **Never copy credentials out of a rendered table** — use a plain code block. The anon key is exactly 46 chars, all ASCII; the URL is 40.
 - [ ] **Set the Vercel function region to `cle1` (Cleveland)** — Settings → Functions. Currently `iad1`; `cle1` is both closest to Austin and ~230 km from the us-east-2 database.
 - [x] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10) — `@supabase/ssr` 0.12 pattern, async `cookies()`, lint/build clean
 - [x] Throwaway verification page `/db-check` written and **passing locally** (HTTP 200, row renders, RLS-gated via an explicit anon select policy)
