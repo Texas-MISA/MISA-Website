@@ -10,10 +10,11 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 - [x] `git init`; add `.gitignore` (`.env*.local`, `node_modules`, `.next`, `.vercel`); commit `docs/`, `CLAUDE.md`, `tasks.md`
 - [x] `npx create-next-app@latest` — TypeScript, Tailwind, App Router, ESLint, **no `src/` directory** (§10 puts `app/` and `lib/` at the root). Landed Next **16.2.12** + React 19.2.4 + Tailwind 4. `npm run lint` and `npm run build` both pass.
-- [x] Create the GitHub repo and push `main` — [cgonztx-gif/MISA-Website](https://github.com/cgonztx-gif/MISA-Website), private
+- [x] Create the GitHub repo and push `main` — now [Texas-MISA/MISA-Website](https://github.com/Texas-MISA/MISA-Website), **public**, owned by the org (transferred from the personal account 2026-07-29, per §2.3)
 - [ ] Import the repo into Vercel; confirm push-to-`main` deploys to `*.vercel.app`
 - [ ] Create the Supabase project — **under a dedicated org account, not a personal one** (decided 2026-07-29: the personal account's 2-free-project limit is full, and a dedicated account survives officer turnover; ownership/transfer policy now documented in §2.3). Log the CLI in with `npx supabase login --profile misa` so the personal login stays intact, then `npx supabase projects create misa-website --profile misa ...`. Note the region and save the DB password somewhere durable.
-- [ ] GitHub repo currently sits under the personal `cgonztx-gif` account — fine for now, but per §2.3 it should end up in a GitHub org (or at minimum be transferred with the handoff). Check the Vercel-Hobby-vs-private-org-repo restriction before moving; making the repo public sidesteps it.
+- [ ] **Promote `cgonztx-gif` to Owner in the Texas-MISA org** (org → People → role). It was invited as `member`; the repo transfer only worked because the org allows members to create repos. Owner is needed to manage org settings and add officers without logging into the MISA email each time.
+- [ ] Vercel import: connect the **Texas-MISA** org, not the personal account, so the deployment is org-owned too (§2.3). The repo is public, which sidesteps the Hobby-tier restriction on private org repos.
 - [ ] Env vars in both `.env.local` and the Vercel project: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (template committed as `.env.example`). The service role key, if used at all, is server-only and never prefixed `NEXT_PUBLIC_`
 - [x] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10) — `@supabase/ssr` 0.12 pattern, async `cookies()`, lint/build clean
 - [ ] Throwaway verification: a Server Component reads one row from a scratch table and renders it **on the deployed URL**, not just locally — then delete the page and the scratch table

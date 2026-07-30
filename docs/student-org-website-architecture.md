@@ -4,10 +4,12 @@
 **Status:** In progress — Stage 0
 **Last updated:** July 2026
 
-> **v1.4:** added §2.3 — account ownership and transferability. All services
-> live under one dedicated org account; every service is also individually
+> **v1.4:** added §2.3 — account ownership and transferability. Services live
+> under a dedicated org identity; every service is also individually
 > transferable, and the database is disposable by design (schema as
-> migrations in the repo).
+> migrations in the repo). The repo now lives in the `Texas-MISA` GitHub org
+> and is public — officers use their own accounts as org members, which is
+> the preferred pattern over a shared login wherever a service supports it.
 >
 > **v1.3:** the build landed on Next.js 16, which renames the `middleware.ts`
 > file convention to `proxy.ts` (exported function `proxy()`). References
@@ -83,11 +85,13 @@ Scoping these out keeps v1 shippable. They are candidates for later stages, not 
 
 ### 2.3 Account ownership and transferability
 
-Officers turn over every year, so every account this project depends on must be either handed over or moved without rebuilding anything. Current policy: **all services live under one dedicated org account** (a shared org email, not any individual's), so the common handoff is simply transferring that login. But the dedicated account itself may need to move someday — a compromised email, a change in org structure — so the per-service transfer paths matter too:
+Officers turn over every year, so every account this project depends on must be either handed over or moved without rebuilding anything. Current policy: **the services live under a dedicated org identity** (a shared org email, not any individual's), so the common handoff is transferring that login. GitHub is the exception and the better model — a real GitHub *organization*, where each officer uses their own account and membership is granted and revoked, so there is no shared login to hand over at all. Prefer that pattern wherever a service supports it.
+
+The dedicated account itself may need to move someday — a compromised email, a change in org structure — so the per-service transfer paths matter too:
 
 | Service | Handoff via shared login | Transfer between accounts | Notes |
 |---|---|---|---|
-| GitHub | ✔ | ✔ Settings → Transfer ownership; history, issues, and redirects preserved | A GitHub **organization** is the cleanest long-term home: handoff = add the next owner, remove the last. Caveat: Vercel Hobby has historically restricted deploying *private* org-owned repos — making the repo public sidesteps this; verify current policy before moving. |
+| GitHub | ✔ | ✔ Settings → Transfer ownership; history, issues, and redirects preserved | **Done:** the repo lives in the `Texas-MISA` org and is public. Handoff = add the next owner, remove the last; no transfer needed. Public also sidesteps Vercel Hobby's restriction on deploying *private* org-owned repos. Officers work through their own GitHub accounts as org members, so no shared GitHub login exists or is needed. |
 | Supabase | ✔ | ✔ Project Settings → General → Transfer project (receiving org needs a free-tier slot) | Or skip transfer entirely: the database is **disposable by design** — see below. |
 | Vercel | ✔ | Possible, but re-importing is easier | A Vercel project is just the git connection + env vars + domain settings. A successor imports the repo and pastes the two env vars from `.env.example`; ~10 minutes. |
 | Domain | ✔ (registrar login) | ✔ Registrar transfer: unlock + auth code, takes days | Slowest to move; keep the registrar login in the shared credentials, or leave it and re-point DNS. |

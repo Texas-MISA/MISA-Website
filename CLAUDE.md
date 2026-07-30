@@ -98,4 +98,5 @@ proxy.ts                admin route protection — Next 16 renamed middleware.ts
 - **Don't rush Stage 1.** Schema changes get expensive once UI depends on them (§7).
 - Stages are ordered so each ends with something demonstrable. Prefer finishing a stage's exit criteria over starting the next stage's interesting parts.
 - Operational gotcha: the Supabase free tier pauses after inactivity and needs a manual resume from the dashboard. Check before the first event of each semester — it's the single most likely operational surprise (§2.2).
-- Accounts: all services live under one dedicated org account (shared org email), and everything must remain transferable between accounts — officers turn over every year. Per-service transfer paths and the disposable-database escape hatch are in §2.3. Don't create project infrastructure under an individual's personal account.
+- Accounts: project infrastructure belongs to the org, never to an individual. The repo is [Texas-MISA/MISA-Website](https://github.com/Texas-MISA/MISA-Website) (public, org-owned); other services use a dedicated org email. Everything must stay transferable — officers turn over every year. See §2.3.
+- **The repo is public.** Seed and test data must be obviously fake — never a real roster export, real student IDs, or real emails.
