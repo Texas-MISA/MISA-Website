@@ -56,7 +56,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 |---|---|---|
 | 2 | Roster policy | **Self-registering, no confirmation.** Unknown ID → active member created immediately. Resolve by `normalized_student_id`, then `lower(email)`, then create with `source = 'self_checkin'`. |
 | 3 | Points weighting | Per-event `points`, default 1. |
-| 4 | Semester boundaries | **One leaderboard, current term only.** One row per member, `total_points` only (no attendance/bonus split), ties alphabetical. Term comes from `app_settings.current_term`, officer-set. |
+| 4 | Semester boundaries | **One leaderboard, current term only; terms derived from dates.** One row per member, `total_points` only (no split), ties alphabetical. `events.term` generated from `starts_at` → `'Fall 2026'` / `'Spring 2027'`, half-open at Aug 1 / Jan 1, anchored America/Chicago. Rollover automatic; `app_settings.current_term` is a nullable override. |
 | 5 | Excused absences | Deferred post-v1. Rate stays raw `attended / possible`. |
 | 7 | Orphan grace window | 48h as one exported constant (`ORPHAN_WINDOW_HOURS`) feeding `nearby_events()`. |
 
@@ -82,7 +82,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 **Migrations** — numbered, one concern each, SQL from §4.1:
 
 - [ ] `0001_members.sql` — including `normalized_student_id` (generated, unique) and `source`, plus the `lower(email)` unique index. Both are new in doc v1.6 and required by self-registration.
-- [ ] `0002_events.sql` — including the `valid_window` check and the `status` check
+- [ ] `0002_events.sql` — `valid_window` and `status` checks, plus `term` as a generated column. **`term_of()` must exist before this migration** (§4.7), so define it in `0001` or its own earlier file.
 - [ ] `0003_attendance.sql` — the `normalized_student_id` generated column, `present_requires_resolution`, and the partial unique index `attendance_one_per_event` (excludes `rejected` so a corrected re-entry is possible)
 - [ ] `0004_point_adjustments.sql` — `points <> 0`, `reason not null`, `void_is_complete`
 - [ ] `0005_admin_profiles.sql` and `app_settings` (single-row, holds `current_term`) — seed the initial term here
@@ -95,7 +95,8 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [ ] `nearby_events(ts, window_hours)` — ranked by gap; drives both the refuse/queue decision and the officer's suggestion list
 - [ ] `leaderboard` view — one row per active member for `app_settings.current_term`, `total_points` only, ties alphabetical; excludes `student_id` and `email`. Leave `security_invoker` at its default so the view stays the security boundary (§4.4).
 - [ ] `member_directory` view — keeps the `attendance_points`/`bonus_points` split (officer oversight moved here), plus `source`, `pending_count`, `last_seen_at`, `events_possible`. **Scope every aggregate to `current_term`, denominators included** — an all-time `events_possible` against a current-term numerator understates every rate and still looks plausible.
-- [ ] Decide whether `events.term` should be `not null`. Both views filter on it, so an event with a null term silently contributes to nobody's score. If the answer is "always set it," enforce it rather than relying on discipline.
+- [x] ~~Decide whether `events.term` should be `not null`~~ — moot: it's generated from a `not null` column, so it can never be null or wrong (§4.7).
+- [ ] Ordering matters in the migration sequence: `term_of()` → `app_settings` → `current_term()` → `events` (needs `term_of`) → `point_adjustments` (defaults to `current_term()`). Getting this wrong fails the push rather than silently misbehaving, but it will fail.
 
 **Types and seed:**
 
@@ -112,6 +113,8 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [ ] `voided_at` set without `voided_by`
 - [ ] Two members whose student IDs differ only by case, spacing, or hyphens (`UT-123` vs `ut 123`) — must be rejected by `members_normalized_id`
 - [ ] Two members whose emails differ only by case — must be rejected by `members_email_lower`
+- [ ] Attempt to set `events.term` directly — must be rejected, it's generated
+- [ ] Term boundary values, by inserting events and reading back `term` (§4.7): Jul 31 23:59 → `Spring`, Aug 1 00:00 → `Fall`, Dec 31 23:59 → `Fall`, Jan 1 00:00 → `Spring`. Use America/Chicago local times, and include a 7pm-Central July 31 event, which is Aug 1 in UTC and would tag wrong if the anchoring is off.
 
 ---
 

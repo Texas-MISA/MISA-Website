@@ -1,15 +1,20 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.7
+**Version:** 1.8
 **Status:** In progress — Stage 1
 **Last updated:** July 2026
 
+> **v1.8:** terms are **derived from dates, never typed** (§4.7).
+> `events.term` is a generated column producing `'Fall 2026'` / `'Spring 2027'`
+> from `starts_at`, anchored to America/Chicago, with half-open boundaries at
+> Aug 1 and Jan 1. Leaderboard rollover is therefore automatic;
+> `app_settings.current_term` becomes a nullable override.
+>
 > **v1.7:** the leaderboard is **one row per member for the current term,
 > showing only `total_points`** — no attendance/bonus split, ties alphabetical.
 > This reverses the split-column argument earlier versions made; §4.4 records
 > what it costs and where the oversight moved. New `app_settings` table holds
-> the officer-set `current_term`, which both `leaderboard` and
-> `member_directory` scope to.
+> `current_term`, which both `leaderboard` and `member_directory` scope to.
 >
 > **v1.6:** the five schema-affecting open decisions are resolved (§9) and §4
 > updated to match. The roster **self-registers with no officer confirmation**;
@@ -226,7 +231,8 @@ create table events (
   checkin_closes_at  timestamptz,   -- defaults to ends_at if null
   points             integer not null default 1,
   category           text,          -- 'general_meeting' | 'workshop' | 'social' | 'flagship' | ...
-  term               text,          -- e.g. 'F26'; scopes leaderboard resets
+  -- Derived from starts_at, never set by hand. See 4.7.
+  term               text generated always as (term_of(starts_at)) stored,
   status             text not null default 'draft'
                        check (status in ('draft','published','cancelled')),
   series_id          uuid,          -- groups events created as a recurring batch
@@ -279,7 +285,9 @@ create table point_adjustments (
   category    text not null default 'other'
                 check (category in ('volunteer','recruitment','competition','leadership','correction','other')),
   event_id    uuid references events(id) on delete set null,  -- optional context
-  term        text,
+  -- Defaulted, not generated: a grant made in Spring for Fall work belongs to
+  -- the term it credits, so officers can override. See 4.7.
+  term        text not null default current_term(),
   awarded_by  uuid not null references auth.users(id),
   awarded_at  timestamptz not null default now(),
   voided_at   timestamptz,
@@ -312,12 +320,12 @@ create index admin_audit_entity_idx
 create index admin_audit_actor_idx
   on admin_audit (actor_id, acted_at desc);
 
--- Single-row settings table. Currently only holds the term the leaderboard
--- ranks. The `id boolean primary key check (id)` trick makes a second row
--- impossible, so the view can subselect without a limit.
+-- Single-row settings table. `current_term` is an OVERRIDE: null means
+-- "whatever term_of(now()) says", which is the normal state. Officers pin it
+-- only to hold the board on a finished term — see 4.7.
 create table app_settings (
   id           boolean primary key default true check (id),
-  current_term text not null,
+  current_term text,
   updated_by   uuid references auth.users(id),
   updated_at   timestamptz not null default now()
 );
@@ -428,7 +436,9 @@ order by total_points desc, m.full_name;
 
 **Ties break alphabetically**, since `events_attended` is no longer in the view to break them with.
 
-**Rolling over a semester is an officer action, not a deploy** — update `app_settings.current_term` and the board resets. The failure mode is forgetting: nobody is told the term is stale, and the leaderboard silently keeps ranking last semester. Surface the current term prominently on both the public page and the admin dashboard so it is visible rather than assumed, and make rollover part of the start-of-semester checklist alongside the Supabase wake-up check (§2.2).
+**Rollover is automatic.** `current_term()` derives the term from today's date (§4.7), so the board moves to Fall on August 1 and Spring on January 1 with no officer action and nothing to forget. `app_settings.current_term` exists only as an override: set it to pin the board on a finished term, set it back to null to resume automatic behavior.
+
+The one rough edge is early August, when the new term is live but has no events yet, so the board is all zeros until the first meeting. Pinning the previous term is exactly what the override is for.
 
 **This reverses the position earlier versions of this document took.** Prior versions kept `attendance_points` and `bonus_points` as separate columns everywhere, arguing that a member should see how much of their standing came from showing up versus from discretionary grants, and that an officer should notice at a glance if the top of the board is driven by bonuses. That transparency is now gone from the public view: a member sees only a number, and cannot tell that five of their thirteen points were granted rather than earned. The oversight it provided moves to two officer-facing surfaces — the split columns in `member_directory` (§4.5) and the points ledger at `/admin/points` — so the check on discretionary grants still exists, but only officers can perform it. Accept the tradeoff knowingly; the underlying data is unchanged, so restoring the columns later is a view change with no migration.
 
@@ -503,6 +513,7 @@ Events are editable at any point, including after attendance exists. That flexib
 | Change `points` | Recomputes every attendee's total retroactively | Allowed, but warn with the count of members affected before saving |
 | Narrow the check-in window | Existing `present` rows may now fall outside it | **Not retroactive.** Recorded attendance is a fact; the window is only consulted at resolution time. Warn, don't revoke. |
 | Move `starts_at` / `ends_at` | Same as above | Allowed with the same warning |
+| Move `starts_at` **across a term boundary** | The event and all its attendance silently move to the other term's leaderboard | `term` is generated from `starts_at` (§4.7), so this happens automatically with no prompt. Detect it in the edit form — compare `term_of(old)` with `term_of(new)` — and warn explicitly, since rescheduling a July meeting into August moves every attendee's points between semesters |
 | Delete an event with attendance | Would orphan real records | Blocked. Offer `status = 'cancelled'` instead, which preserves history and removes it from the upcoming list |
 
 Cancelled events are excluded from leaderboard totals but remain visible in a member's attendance history, so someone who attended an event that was later cancelled can still see they were there.
@@ -510,6 +521,53 @@ Cancelled events are excluded from leaderboard totals but remain visible in a me
 Every event edit writes an `admin_audit` row with the before/after JSON, which makes "why did everyone's total change last Tuesday" answerable.
 
 ---
+
+### 4.7 Terms are derived, not typed
+
+A term is a pure function of a date. Nobody types `'Fall 2026'` anywhere, so nobody can typo it, and events tag themselves as time goes on.
+
+```sql
+-- IMMUTABLE so it can back a generated column. See the caveat below.
+create or replace function term_of(ts timestamptz)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when extract(month from ts at time zone 'America/Chicago') >= 8
+      then 'Fall '   || extract(year from ts at time zone 'America/Chicago')::int
+      else 'Spring ' || extract(year from ts at time zone 'America/Chicago')::int
+  end
+$$;
+
+-- The term the leaderboard ranks: automatic, unless an officer has pinned it.
+create or replace function current_term()
+returns text
+language sql
+stable
+as $$
+  select coalesce((select current_term from app_settings), term_of(now()))
+$$;
+```
+
+**Boundaries are half-open**, so every instant belongs to exactly one term with no overlap and no gap:
+
+| Range | Term |
+|---|---|
+| Aug 1 2026 00:00 → Dec 31 2026 23:59 | `Fall 2026` |
+| Jan 1 2027 00:00 → Jul 31 2027 23:59 | `Spring 2027` |
+
+January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June meeting is `Spring 2027` — which follows from the two-season rule rather than being an oversight. Add a `Summer` branch to `term_of()` if that ever stops being acceptable; it is a one-function change plus a regeneration of the stored column.
+
+**Anchored to `America/Chicago`, not UTC.** An event at 7pm Central on July 31 is 00:00 UTC on August 1 — anchoring to UTC would file it under Fall. The org is in Austin, so the local calendar is the correct one.
+
+**Caveat on `IMMUTABLE`.** `at time zone` is officially `STABLE`, because timezone rules can change when tzdata is updated, so marking this function `IMMUTABLE` is a deliberate (and conventional) overstatement to make the generated column legal. The exposure is that a tzdata change could in principle leave a stored value stale. For this to matter, a tzdata update would have to shift America/Chicago's offset across an exact term boundary — an event at literally midnight on August 1. Accepted.
+
+**What follows from `events.term` being generated:**
+
+- It can never be null, since `starts_at` is `not null`. This closes the "should term be `not null`" question — the column cannot be wrong or missing.
+- It cannot be overridden. Moving an event across a boundary re-tags it automatically, which also means an event rescheduled from July to August moves between terms and changes both members' standings — the §4.6 edit-impact warning should say so.
+- `point_adjustments.term` is **defaulted, not generated**, precisely because it does need overriding: a bonus awarded in Spring for Fall work belongs to Fall. This is the independence §4.4 relies on.
 
 ## 5. Route Structure
 
@@ -788,7 +846,8 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 | Pending queue is never reviewed and members lose credit | Medium | High | Pending badge on the admin dashboard; oldest-first default sort; make queue review part of the officer handoff doc |
 | Late check-in becomes the norm once members learn overrides exist | Medium | Medium | Widen `checkin_closes_at` if it's systemic; the audit log makes the pattern visible per member |
 | Discretionary points quietly decide the leaderboard | Medium | Medium | **Weakened by design (§4.4):** the public leaderboard shows a single total, so members cannot see the composition of the standings. Remaining controls are officer-side only — the split columns in `member_directory`, the required reason on every grant, and the `/admin/points` ledger surfacing per-officer patterns |
-| Semester rollover forgotten, leaderboard silently ranks last term | Medium | Medium | `app_settings.current_term` is an officer-set value with no automatic rollover. Display the active term prominently on the public page and admin dashboard, and put rollover on the start-of-semester checklist next to the Supabase wake-up check |
+| Empty leaderboard at the start of a term | Medium | Low | Rollover is automatic on Aug 1 / Jan 1 (§4.7), so the new term's board is all zeros until the first event. Pin `app_settings.current_term` to the previous term over the break, or accept it. Display the active term on the page either way |
+| Event rescheduled across a term boundary moves points between semesters | Low | Medium | `events.term` is generated from `starts_at`, so it re-tags silently. The edit form compares `term_of(old)` with `term_of(new)` and warns (§4.6) |
 | Officer edits an event's points and silently changes past standings | Medium | Medium | Edit-impact warning with affected-member count before saving; before/after captured in `admin_audit` |
 | Bulk email copy grabs only the visible page | Medium | Low | Explicit "select all N matching" semantics with the count shown on the copy confirmation; covered by tests in Stage 6 |
 | Project has no maintainer after handoff | High | High | Written handoff doc, plain-vanilla stack, no exotic dependencies; all services under one dedicated, transferable org account and the database recreatable from the repo (§2.3) |
@@ -806,7 +865,7 @@ The five that affect the schema. Decided together; the schema in §4 reflects th
 
 2. **Roster policy** — ✅ **Self-registering, no confirmation.** An unrecognized student ID at check-in creates an active member immediately. Resolution order is `normalized_student_id`, then `lower(email)`, then create; matching on email second contains the common typo case. `members.source` marks self-registered rows for review. Accepted residual risk: a typo in both ID *and* email creates a duplicate person, merged by an officer. Chosen for zero-friction check-in at recruiting events.
 3. **Points weighting** — ✅ **Per-event `points`, default 1.** Flat scoring in practice, weighting available without a migration.
-4. **Semester boundaries** — ✅ **One leaderboard, current term only.** One row per member, ranked on a single `total_points` figure with no attendance/bonus breakdown; ties break alphabetically. The term comes from `app_settings.current_term`, an officer-set value — so rollover is a UI action, not a deploy, and forgetting it is the failure mode to design against. This reverses the split-column position earlier versions argued for; see §4.4 for what that costs and where the oversight moved.
+4. **Semester boundaries** — ✅ **One leaderboard, current term only, terms derived from dates.** One row per member ranked on a single `total_points` figure with no attendance/bonus breakdown; ties alphabetical. `events.term` is a generated column computing `'Fall YYYY'` / `'Spring YYYY'` from `starts_at` (§4.7), so terms are never typed and rollover happens on its own each August and January. `app_settings.current_term` is a nullable override for pinning the board on a finished term. This reverses the split-column position earlier versions argued for; see §4.4 for what that costs and where the oversight moved.
 5. **Excused absences** — ✅ **Deferred to post-v1.** Attendance rate stays raw `attended / possible`. `point_adjustments` already handles the standing side with a required reason, so the gap is cosmetic rather than punitive.
 7. **Orphan grace window** — ✅ **48 hours**, as one exported constant feeding `nearby_events()`.
 
