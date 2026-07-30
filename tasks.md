@@ -56,7 +56,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 |---|---|---|
 | 2 | Roster policy | **Self-registering, no confirmation.** Unknown ID → active member created immediately. Resolve by `normalized_student_id`, then `lower(email)`, then create with `source = 'self_checkin'`. |
 | 3 | Points weighting | Per-event `points`, default 1. |
-| 4 | Semester boundaries | **Views keyed on `(member, term)`** — filter for one term, sum for all-time. No function conversion ever needed. |
+| 4 | Semester boundaries | **One leaderboard, current term only.** One row per member, `total_points` only (no attendance/bonus split), ties alphabetical. Term comes from `app_settings.current_term`, officer-set. |
 | 5 | Excused absences | Deferred post-v1. Rate stays raw `attended / possible`. |
 | 7 | Orphan grace window | 48h as one exported constant (`ORPHAN_WINDOW_HOURS`) feeding `nearby_events()`. |
 
@@ -85,7 +85,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [ ] `0002_events.sql` — including the `valid_window` check and the `status` check
 - [ ] `0003_attendance.sql` — the `normalized_student_id` generated column, `present_requires_resolution`, and the partial unique index `attendance_one_per_event` (excludes `rejected` so a corrected re-entry is possible)
 - [ ] `0004_point_adjustments.sql` — `points <> 0`, `reason not null`, `void_is_complete`
-- [ ] `0005_admin_profiles.sql`
+- [ ] `0005_admin_profiles.sql` and `app_settings` (single-row, holds `current_term`) — seed the initial term here
 - [ ] `0006_admin_audit.sql` — plus both indexes (`entity` and `actor`)
 - [ ] Overlap prevention for published events: decide between a Postgres exclusion constraint (`btree_gist` on the check-in window where `status = 'published'`) and an application-level check at publish time (§4.3). Prefer the constraint if it can be expressed cleanly — §7 Stage 3 calls for explicit test coverage either way.
 
@@ -93,8 +93,9 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 - [ ] `open_event_at(ts)` — at most one open published event at any instant
 - [ ] `nearby_events(ts, window_hours)` — ranked by gap; drives both the refuse/queue decision and the officer's suggestion list
-- [ ] `leaderboard` view — keyed `(member, term)`; `attendance_points` and `bonus_points` separate; excludes `student_id` and `email`. Three silent-wrong-answer cases to get right (§4.4): zero-attendance members still need a row per term, `term is null` rows must be handled deliberately, and attendance terms are independent of adjustment terms.
-- [ ] `member_directory` view — pre-joined aggregates plus `pending_count`, `last_seen_at`, `events_possible`
+- [ ] `leaderboard` view — one row per active member for `app_settings.current_term`, `total_points` only, ties alphabetical; excludes `student_id` and `email`. Leave `security_invoker` at its default so the view stays the security boundary (§4.4).
+- [ ] `member_directory` view — keeps the `attendance_points`/`bonus_points` split (officer oversight moved here), plus `source`, `pending_count`, `last_seen_at`, `events_possible`. **Scope every aggregate to `current_term`, denominators included** — an all-time `events_possible` against a current-term numerator understates every rate and still looks plausible.
+- [ ] Decide whether `events.term` should be `not null`. Both views filter on it, so an event with a null term silently contributes to nobody's score. If the answer is "always set it," enforce it rather than relying on discipline.
 
 **Types and seed:**
 

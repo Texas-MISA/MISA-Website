@@ -1,15 +1,19 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.6
+**Version:** 1.7
 **Status:** In progress — Stage 1
 **Last updated:** July 2026
 
+> **v1.7:** the leaderboard is **one row per member for the current term,
+> showing only `total_points`** — no attendance/bonus split, ties alphabetical.
+> This reverses the split-column argument earlier versions made; §4.4 records
+> what it costs and where the oversight moved. New `app_settings` table holds
+> the officer-set `current_term`, which both `leaderboard` and
+> `member_directory` scope to.
+>
 > **v1.6:** the five schema-affecting open decisions are resolved (§9) and §4
-> updated to match. Two are departures from what this doc previously assumed:
-> the roster **self-registers with no officer confirmation**, and `leaderboard`
-> is keyed on **(member, term)** rather than being a flat view or a
-> term-parameterized function. `members` gains `normalized_student_id` and
-> `source`.
+> updated to match. The roster **self-registers with no officer confirmation**;
+> `members` gains `normalized_student_id` and `source`.
 >
 > **v1.5:** §2.3 now covers Supabase account moves alongside Vercel's. Added
 > §2.4 (account inventory — what exists, who owns it, where credentials are)
@@ -308,6 +312,16 @@ create index admin_audit_entity_idx
 create index admin_audit_actor_idx
   on admin_audit (actor_id, acted_at desc);
 
+-- Single-row settings table. Currently only holds the term the leaderboard
+-- ranks. The `id boolean primary key check (id)` trick makes a second row
+-- impossible, so the view can subselect without a limit.
+create table app_settings (
+  id           boolean primary key default true check (id),
+  current_term text not null,
+  updated_by   uuid references auth.users(id),
+  updated_at   timestamptz not null default now()
+);
+
 -- Officer accounts, keyed to Supabase Auth users.
 create table admin_profiles (
   user_id      uuid primary key references auth.users(id) on delete cascade,
@@ -378,95 +392,107 @@ If `nearby_events()` returns nothing, the check-in is refused outright with a me
 
 Points now come from two sources, and the view keeps them separate rather than collapsing them into one number:
 
-The view is keyed on **`(member, term)`** — one row per member per term (Open Decision #4, resolved). Callers filter to a term for semester standings, or sum across terms for all-time, so no term-parameterized function is needed and no migration is required when the second semester starts:
+**One leaderboard, one row per member, current term only** (Open Decision #4, resolved). It exposes a single `total_points` figure — attendance and bonus points are summed together, not broken out. The term it ranks comes from `app_settings.current_term`, set by an officer:
 
 ```sql
 create or replace view leaderboard as
-with terms as (
-  -- Every term a member could appear in, so someone with bonus points but no
-  -- attendance (or vice versa) still gets a row rather than vanishing.
-  select term from events where term is not null
-  union
-  select term from point_adjustments where term is not null
-),
-member_terms as (
-  select m.id as member_id, m.full_name, t.term
-  from members m cross join terms t
-  where m.active
+with cur as (
+  select current_term from app_settings
 ),
 attendance_pts as (
-  select a.member_id, e.term,
-         count(*)                   as events_attended,
-         coalesce(sum(e.points), 0) as pts
+  select a.member_id, coalesce(sum(e.points), 0) as pts
   from attendance a
   join events e on e.id = a.event_id
   where a.status = 'present'
     and e.status <> 'cancelled'
-  group by a.member_id, e.term
+    and e.term = (select current_term from cur)
+  group by a.member_id
 ),
 bonus_pts as (
-  select member_id, term, coalesce(sum(points), 0) as pts
+  select member_id, coalesce(sum(points), 0) as pts
   from point_adjustments
   where voided_at is null
-  group by member_id, term
+    and term = (select current_term from cur)
+  group by member_id
 )
 select
-  mt.member_id                                   as id,
-  mt.full_name,
-  mt.term,
-  coalesce(ap.events_attended, 0)                as events_attended,
-  coalesce(ap.pts, 0)                            as attendance_points,
-  coalesce(bp.pts, 0)                            as bonus_points,
-  coalesce(ap.pts, 0) + coalesce(bp.pts, 0)      as total_points
-from member_terms mt
-left join attendance_pts ap
-       on ap.member_id = mt.member_id and ap.term = mt.term
-left join bonus_pts bp
-       on bp.member_id = mt.member_id and bp.term = mt.term;
+  m.id,
+  m.full_name,
+  coalesce(ap.pts, 0) + coalesce(bp.pts, 0) as total_points
+from members m
+left join attendance_pts ap on ap.member_id = m.id
+left join bonus_pts      bp on bp.member_id = m.id
+where m.active
+order by total_points desc, m.full_name;
 ```
 
-Ordering moves to the caller, since it differs by use (`order by total_points desc, events_attended desc` for a single term; a `sum(...) group by id` wrapper for all-time).
+**Ties break alphabetically**, since `events_attended` is no longer in the view to break them with.
 
-**Three cases the migration has to get right**, all of them silent-wrong-answer bugs rather than errors:
+**Rolling over a semester is an officer action, not a deploy** — update `app_settings.current_term` and the board resets. The failure mode is forgetting: nobody is told the term is stale, and the leaderboard silently keeps ranking last semester. Surface the current term prominently on both the public page and the admin dashboard so it is visible rather than assumed, and make rollover part of the start-of-semester checklist alongside the Supabase wake-up check (§2.2).
 
-- **Zero-attendance members** must still appear with 0 in a term, which is why `member_terms` cross-joins rather than starting from `attendance`.
-- **Events or adjustments with `term is null`** are excluded from every term bucket. Either backfill `term` on all events, or treat null as its own bucket — decide in Stage 1 and enforce with a `not null` if the answer is "always set it."
-- **Attendance and bonus terms are independent.** A bonus awarded in S27 for work done in F26 counts in whichever `point_adjustments.term` says, not the event's.
+**This reverses the position earlier versions of this document took.** Prior versions kept `attendance_points` and `bonus_points` as separate columns everywhere, arguing that a member should see how much of their standing came from showing up versus from discretionary grants, and that an officer should notice at a glance if the top of the board is driven by bonuses. That transparency is now gone from the public view: a member sees only a number, and cannot tell that five of their thirteen points were granted rather than earned. The oversight it provided moves to two officer-facing surfaces — the split columns in `member_directory` (§4.5) and the points ledger at `/admin/points` — so the check on discretionary grants still exists, but only officers can perform it. Accept the tradeoff knowingly; the underlying data is unchanged, so restoring the columns later is a view change with no migration.
 
-**Why the split columns matter:** a member looking at their total should be able to see how much of it came from showing up versus from discretionary grants, and an officer should be able to notice at a glance if the top of the leaderboard is driven by bonuses rather than attendance. Collapsing both into `total_points` hides exactly the thing worth watching.
+**Anon reaches this view, not the tables under it.** Postgres views run as their owner by default (`security_invoker = false`), which is what lets the anon role read aggregated standings while RLS still denies it direct access to `members`, `attendance`, `events`, and `app_settings`. The view *is* the security boundary — do not set `security_invoker = true` on it without re-checking §6.
 
 **Privacy note:** the view deliberately excludes `student_id` and `email`. A public leaderboard should never expose identifiers that are used elsewhere as credentials. Consider offering members an opt-out or a display-name field before making it fully public.
 
 ### 4.5 Member directory view
 
-Backs the admin roster screen. Pre-joining the aggregates means filtering and sorting is one indexed query rather than N per row:
+Backs the admin roster screen. Pre-joining the aggregates means filtering and sorting is one indexed query rather than N per row.
+
+It does **not** build on `leaderboard`, which now exposes only a total. This is the officer-facing surface, so it keeps the attendance/bonus split — it is where the check on discretionary grants lives (§4.4). It is scoped to the same `current_term` so the two screens can never disagree:
 
 ```sql
 create or replace view member_directory as
+with cur as (
+  select current_term from app_settings
+),
+attendance_agg as (
+  select a.member_id,
+         count(*)                   as events_attended,
+         coalesce(sum(e.points), 0) as attendance_points
+  from attendance a
+  join events e on e.id = a.event_id
+  where a.status = 'present'
+    and e.status <> 'cancelled'
+    and e.term = (select current_term from cur)
+  group by a.member_id
+),
+bonus_agg as (
+  select member_id, coalesce(sum(points), 0) as bonus_points
+  from point_adjustments
+  where voided_at is null
+    and term = (select current_term from cur)
+  group by member_id
+)
 select
   m.id,
   m.student_id,
   m.full_name,
   m.email,
   m.active,
+  m.source,
   m.joined_at,
-  coalesce(l.events_attended, 0)   as events_attended,
-  coalesce(l.attendance_points, 0) as attendance_points,
-  coalesce(l.bonus_points, 0)      as bonus_points,
-  coalesce(l.total_points, 0)      as total_points,
+  coalesce(aa.events_attended, 0)    as events_attended,
+  coalesce(aa.attendance_points, 0)  as attendance_points,
+  coalesce(ba.bonus_points, 0)       as bonus_points,
+  coalesce(aa.attendance_points, 0)
+    + coalesce(ba.bonus_points, 0)   as total_points,
   (select count(*) from attendance a
     where a.member_id = m.id and a.status = 'pending')       as pending_count,
   (select max(a.submitted_at) from attendance a
     where a.member_id = m.id and a.status = 'present')       as last_seen_at,
   (select count(*) from events e
-    where e.status = 'published' and e.ends_at < now())      as events_possible
+    where e.status = 'published' and e.ends_at < now()
+      and e.term = (select current_term from cur))           as events_possible
 from members m
-left join leaderboard l on l.id = m.id;
+left join attendance_agg aa on aa.member_id = m.id
+left join bonus_agg      ba on ba.member_id = m.id;
 ```
 
-`events_possible` enables an attendance-rate column (`events_attended::numeric / nullif(events_possible,0)`) without a second round trip.
+`events_possible` enables an attendance-rate column (`events_attended::numeric / nullif(events_possible,0)`) without a second round trip. Note it is scoped to the current term too — an all-time denominator against a current-term numerator would understate every rate, and nobody would notice because the number still looks plausible.
 
-Since `leaderboard` is now per `(member, term)`, this view must either take the same shape or aggregate across terms — pick one in Stage 1 and be consistent, because a directory silently showing one term's points while the leaderboard shows all-time is exactly the kind of discrepancy nobody notices until an award is decided. `events_possible` needs the same treatment: scoped to the term being displayed, not all events ever.
+`source` is exposed so officers can filter to self-registered members and review what the check-in form has added (§4.2).
 
 ### 4.6 Event edit semantics
 
@@ -653,7 +679,7 @@ Stages are ordered so that each one ends with something demonstrable. Effort est
 - Ledger view of all adjustments, filterable by officer, category, date range, and member — so the question "who has been handing out points" has a one-screen answer
 - Void with a reason rather than delete; voided rows stay visible, struck through, and stop counting immediately
 
-**Exit criteria:** an officer takes a submission that arrived 40 minutes after an event closed, assigns it to the correct event, approves it, sees the member's leaderboard count increase, and can later see exactly who made that change and when. Separately, an officer awards 5 bonus points to three members at once with a reason, and those points appear in the `bonus_points` column, distinct from attendance points.
+**Exit criteria:** an officer takes a submission that arrived 40 minutes after an event closed, assigns it to the correct event, approves it, sees the member's leaderboard count increase, and can later see exactly who made that change and when. Separately, an officer awards 5 bonus points to three members at once with a reason, sees those points in the `bonus_points` column of the admin directory distinct from attendance points, and sees the members' public leaderboard totals rise by 5 with no breakdown shown.
 **Effort:** 5–6 days. The suggestion ranking is what turns the review queue from a tedious data-entry screen into a two-click operation — worth the extra time.
 
 **Design note:** resist the urge to auto-resolve near-misses. A submission five minutes past the window is *probably* legitimate, but auto-approving it just moves the boundary and invites the same problem five minutes later. Keep the human in the loop and make the human's job fast instead.
@@ -696,10 +722,10 @@ Stages are ordered so that each one ends with something demonstrable. Effort est
 ### Stage 7 — Member-Facing Views
 **Goal:** Members can answer their own questions.
 
-- `/leaderboard` — ranked standings from the view, with tie handling
-- Attendance points and bonus points shown as separate columns, so standings are explicable
+- `/leaderboard` — one row per member for the current term, ranked on `total_points`, ties alphabetical (§4.4)
+- **The active term shown prominently on the page.** It is officer-set with no automatic rollover, so a stale term must be visible rather than silently assumed correct
 - `/lookup` — student ID + email, returns per-event attended/missed summary
-- Any point adjustments shown with their reason, so a member can see why their total differs from their attendance count
+- Any point adjustments shown with their reason. The public board is a bare total, so this is the *only* place a member can see why their total exceeds their attendance count — which makes it more important here, not less
 - Pending submissions shown distinctly from confirmed ones, so a member who checked in late knows their form was received and is awaiting review rather than assuming it vanished
 - Attendance-rate calculation and a visual summary of the semester
 
@@ -761,7 +787,8 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 | Overlapping events create ambiguous matching | Low | High | Constraint at publish time; explicit test coverage in Stage 3 |
 | Pending queue is never reviewed and members lose credit | Medium | High | Pending badge on the admin dashboard; oldest-first default sort; make queue review part of the officer handoff doc |
 | Late check-in becomes the norm once members learn overrides exist | Medium | Medium | Widen `checkin_closes_at` if it's systemic; the audit log makes the pattern visible per member |
-| Discretionary points quietly decide the leaderboard | Medium | Medium | Bonus and attendance points shown as separate columns everywhere; required reason on every grant; ledger view surfaces per-officer patterns |
+| Discretionary points quietly decide the leaderboard | Medium | Medium | **Weakened by design (§4.4):** the public leaderboard shows a single total, so members cannot see the composition of the standings. Remaining controls are officer-side only — the split columns in `member_directory`, the required reason on every grant, and the `/admin/points` ledger surfacing per-officer patterns |
+| Semester rollover forgotten, leaderboard silently ranks last term | Medium | Medium | `app_settings.current_term` is an officer-set value with no automatic rollover. Display the active term prominently on the public page and admin dashboard, and put rollover on the start-of-semester checklist next to the Supabase wake-up check |
 | Officer edits an event's points and silently changes past standings | Medium | Medium | Edit-impact warning with affected-member count before saving; before/after captured in `admin_audit` |
 | Bulk email copy grabs only the visible page | Medium | Low | Explicit "select all N matching" semantics with the count shown on the copy confirmation; covered by tests in Stage 6 |
 | Project has no maintainer after handoff | High | High | Written handoff doc, plain-vanilla stack, no exotic dependencies; all services under one dedicated, transferable org account and the database recreatable from the repo (§2.3) |
@@ -779,7 +806,7 @@ The five that affect the schema. Decided together; the schema in §4 reflects th
 
 2. **Roster policy** — ✅ **Self-registering, no confirmation.** An unrecognized student ID at check-in creates an active member immediately. Resolution order is `normalized_student_id`, then `lower(email)`, then create; matching on email second contains the common typo case. `members.source` marks self-registered rows for review. Accepted residual risk: a typo in both ID *and* email creates a duplicate person, merged by an officer. Chosen for zero-friction check-in at recruiting events.
 3. **Points weighting** — ✅ **Per-event `points`, default 1.** Flat scoring in practice, weighting available without a migration.
-4. **Semester boundaries** — ✅ **Views keyed on `(member, term)`.** Callers filter to a term or sum across terms, so per-semester and all-time both work from one view and §4.5's function conversion is never needed.
+4. **Semester boundaries** — ✅ **One leaderboard, current term only.** One row per member, ranked on a single `total_points` figure with no attendance/bonus breakdown; ties break alphabetically. The term comes from `app_settings.current_term`, an officer-set value — so rollover is a UI action, not a deploy, and forgetting it is the failure mode to design against. This reverses the split-column position earlier versions argued for; see §4.4 for what that costs and where the oversight moved.
 5. **Excused absences** — ✅ **Deferred to post-v1.** Attendance rate stays raw `attended / possible`. `point_adjustments` already handles the standing side with a required reason, so the gap is cosmetic rather than punitive.
 7. **Orphan grace window** — ✅ **48 hours**, as one exported constant feeding `nearby_events()`.
 
