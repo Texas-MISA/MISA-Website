@@ -18,14 +18,15 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [x] Create the Supabase project — `misa-website`, ref **`gbxypeofjnhrhotlhyzs`**, region **us-east-2 (Ohio)**, under the MISA account. CLI is linked and `supabase/` is initialized, so migrations go through `db push`.
   - Region chosen as the closest Supabase region to Austin (~1,700 km, vs us-east-1 ~2,000 and us-west-2 ~2,900). Neither AWS nor Vercel has a Texas region. **Regions are fixed at creation** — changing later means recreating the project.
   - Replaces the original `sqgqaxegeawtlccaxdij` in us-west-2, created and discarded the same day.
-- [ ] **Delete the old `MISA Website` project** (ref `sqgqaxegeawtlccaxdij`, us-west-2) — it only ever held the scratch table. Frees a free-tier slot.
+- [x] **Delete the old `MISA Website` project** (ref `sqgqaxegeawtlccaxdij`, us-west-2) — done; `projects list` now shows only `misa-website`.
 - [ ] **Move the DB password out of `C:\Users\dadia\misa-supabase-db-password.txt`** into the org password manager, then delete the file. Needed for `db push` and direct connections.
 - [ ] **Promote `cgonztx-gif` to Owner in the Texas-MISA org** (org → People → role). It was invited as `member`; the repo transfer only worked because the org allows members to create repos. Owner is needed to manage org settings and add officers without logging into the MISA email each time.
 - [ ] Vercel import: connect the **Texas-MISA** org, not the personal account, so the deployment is org-owned too (§2.3). The repo is public, which sidesteps the Hobby-tier restriction on private org repos.
 - [x] `.env.local` written with `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the new `sb_publishable_…` key format; template committed as `.env.example`). Confirmed gitignored. Service role key unused so far — server-only when it is, never `NEXT_PUBLIC_`.
-- [ ] **Update the two Vercel env vars to the us-east-2 project**, then redeploy (env changes don't apply to existing builds):
+- [x] **Update the two Vercel env vars to the us-east-2 project** — done in settings.
   - `NEXT_PUBLIC_SUPABASE_URL` = `https://gbxypeofjnhrhotlhyzs.supabase.co`
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_CnJ934Lcn_TSFLN02--J2Q_aPa_VEfZ`
+  - ⚠️ **`NEXT_PUBLIC_*` values are inlined at build time**, so editing them in Vercel settings changes nothing until a rebuild. Changing an env var always needs a redeploy — a restart won't do it.
 - [ ] **Set the Vercel function region to `cle1` (Cleveland)** — Settings → Functions. Currently `iad1`; `cle1` is both closest to Austin and ~230 km from the us-east-2 database.
 - [x] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10) — `@supabase/ssr` 0.12 pattern, async `cookies()`, lint/build clean
 - [x] Throwaway verification page `/db-check` written and **passing locally** (HTTP 200, row renders, RLS-gated via an explicit anon select policy)
