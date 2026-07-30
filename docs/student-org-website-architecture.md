@@ -1,8 +1,18 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.13
+**Version:** 1.14
 **Status:** Stages 0–1 complete; Stage 2 next
 **Last updated:** July 2026
+
+> **v1.14:** §2.5 is **no longer an open decision** — Bitwarden is chosen, and
+> holds the GitHub 2FA recovery codes and the Supabase database password; §2.4's
+> inventory is filled in accordingly. Two follow-ups are called out rather than
+> assumed: the vault must be a Bitwarden *organization* rather than a personal
+> account, and the original plaintext password file must be deleted, since
+> copying is not moving. §2.4 also records the trap that cost three attempts:
+> `two_factor_requirement_enabled` is **read-only** in the REST API, so a PATCH
+> reports success and changes nothing. The org 2FA requirement can only be set
+> in the web UI.
 
 > **v1.13:** §2.4 corrected: both org accounts now have 2FA, so the blocker
 > named in v1.12 is cleared. The org-level `two_factor_requirement_enabled`
@@ -200,23 +210,33 @@ Every account the project depends on. "The shared login" is not an actionable ha
 
 | Account | Identity | What it controls | Credentials live |
 |---|---|---|---|
-| MISA email | shared org mailbox | The recovery address for every account below — the root of the whole tree | *TBD (§2.5)* |
+| MISA email | shared org mailbox | The recovery address for every account below — the root of the whole tree | Bitwarden (§2.5) |
 | GitHub org `Texas-MISA` | two Owners: `TXMISA-JD` (MISA email) and `cgonztx-gif` (officer personal account); further officers join as members with their own accounts | The repository | No shared login; membership only |
-| Supabase | MISA email | Project `misa-website` / `gbxypeofjnhrhotlhyzs`, us-east-2 | *TBD (§2.5)* |
-| Supabase database password | — | `db push`, direct Postgres connections | ⚠️ Currently a plaintext file on one officer's laptop. **Must move.** |
-| Vercel | MISA email, personal Hobby account `txmisa-jds-projects` | Hosting, env vars, domain binding | *TBD (§2.5)* |
-| Domain registrar | not yet purchased (Stage 9) | DNS | *TBD (§2.5)* |
+| Supabase | MISA email | Project `misa-website` / `gbxypeofjnhrhotlhyzs`, us-east-2 | Bitwarden (§2.5) |
+| Supabase database password | — | `db push`, direct Postgres connections | Bitwarden (§2.5). ⚠️ Confirm the original plaintext file on the officer's laptop is **deleted** — copying is not moving. |
+| Vercel | MISA email, personal Hobby account `txmisa-jds-projects` | Hosting, env vars, domain binding | Bitwarden (§2.5) |
+| Domain registrar | not yet purchased (Stage 9) | DNS | Bitwarden (§2.5), once purchased |
 
 **The MISA email is the single point of failure.** It is the password-reset address for everything else, so losing it is materially worse than losing any individual service. Two mitigations, both cheap:
 
 - **Keep at least two GitHub org Owners** — the MISA account plus one current officer's personal account. GitHub requires an owner to administer an org, and an org whose only owner is an inaccessible mailbox needs a slow manual support process to recover. ✅ **Satisfied July 2026:** `Texas-MISA` has two Owners, `TXMISA-JD` (the MISA email) and `cgonztx-gif` (an officer's personal account) — verified via `gh api /orgs/Texas-MISA/members?role=admin`. This was previously the one live single point of failure; it is now closed. Re-check at every officer turnover, since the graduating officer's personal account must be replaced, not merely removed.
-- **Require 2FA org-wide.** ⚠️ **Still off** (`two_factor_requirement_enabled: false`, July 2026) — but the blocker is cleared: **both member accounts now have 2FA** (`/orgs/Texas-MISA/members?filter=2fa_disabled` returns 0, having previously returned `TXMISA-JD`). Only the org-level flag remains unset. GitHub refuses the requirement while any member is non-compliant, and that refusal is safe — it rejects the change rather than removing anyone — so an attempt made before the member state was compliant simply does not apply. Re-run the PATCH and **read its output**; a silent non-change here means an error was returned, not that the setting took.
-- **Enabling 2FA on the shared mailbox account is gated on §2.5, not independent of it.** `TXMISA-JD` is the recovery root for Supabase, Vercel, and the registrar. Binding 2FA to it *without* storing the recovery codes in a durable, non-personal place makes the handoff strictly worse — that is precisely the failure mode §2.5 describes, where 2FA lives on a phone belonging to someone who graduates. And the codes cannot live inside the MISA Google account, because that account is the recovery path for everything else. **Therefore: choose the vault first, then enable 2FA and store the codes in the same pass.** This raises §2.5 from a Stage 9 nicety to a prerequisite for closing the org's weakest link.
+- **Require 2FA org-wide.** ⚠️ **Still off** (`two_factor_requirement_enabled: false`, July 2026), but the prerequisite is met: **both member accounts have 2FA** (`/orgs/Texas-MISA/members?filter=2fa_disabled` returns 0, having previously returned `TXMISA-JD`). Only the org-level flag remains.
+  - 🪤 **`two_factor_requirement_enabled` is read-only in the REST API.** It appears in the *response* schema of `GET /orgs/{org}` but is **not** a settable body parameter of `PATCH /orgs/{org}`. A PATCH sending it returns **success while changing nothing** — no error to notice, no effect. Three attempts were spent on this. Do not retry it via the API.
+  - ✅ **The only route is the web UI:** Organization settings → **Authentication security** → *Require two-factor authentication for everyone in the Texas-MISA organization*. Verify after with `gh api /orgs/Texas-MISA --jq .two_factor_requirement_enabled`.
+  - Enabling it removes members lacking 2FA. Currently safe, since both accounts are compliant — but re-check `filter=2fa_disabled` before adding officers.
+- **The recovery codes for that 2FA must live outside the account they protect.** `TXMISA-JD` is the recovery root for Supabase, Vercel, and the registrar, so 2FA bound only to one person's phone makes handoff strictly worse — the exact failure §2.5 describes. Resolved: the codes are in the §2.5 Bitwarden vault, which is what made enabling 2FA on the mailbox account safe to do.
 - **Store 2FA recovery codes wherever the passwords are stored.** The standard student-org failure is a shared account with 2FA bound to one person's phone, and that person graduates. Recovery codes are what make the account survivable; a password alone is not enough.
 
-### 2.5 Credential storage — open decision
+### 2.5 Credential storage — Bitwarden
 
-**Not yet decided.** The rules below hold regardless of which vault is chosen; pick the vault during Stage 9 and fill in §2.4.
+**Decided July 2026: Bitwarden.** A vault exists and holds the GitHub 2FA recovery codes and the Supabase database password. This closes what earlier versions left open, and it is what made enabling 2FA on the shared mailbox account safe (§2.4).
+
+Two things must be true for this to meet the requirements below. Both are worth confirming rather than assuming:
+
+1. **It must be a Bitwarden *organization*, not a personal vault.** The free organization tier supports two users and shared collections. A personal Bitwarden account fails "survives one person graduating" and "can be handed to a successor as a unit" just as surely as a plaintext file does — the credentials would have moved from one individual's laptop to one individual's account. If the vault is personal, create a free organization and move the items into a shared collection.
+2. **The plaintext database-password file must actually be deleted.** Copying it into the vault is only half of "move"; until the original is gone, the exposure that motivated this is unchanged.
+
+One asymmetry to preserve deliberately: Bitwarden must **not** use the MISA email as its own recovery path, because the vault holds that mailbox's 2FA recovery codes. A vault whose recovery depends on an account it protects is circular — the same trap this section already rules out for storing codes inside the Google account.
 
 What must be stored, for each account: the login email, the password, the 2FA recovery codes, and a one-line note on what breaks if it is lost. Plus the Supabase database password, which is not recoverable from any dashboard — only resettable.
 
