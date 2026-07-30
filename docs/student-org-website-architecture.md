@@ -1,8 +1,17 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.9
+**Version:** 1.10
 **Status:** Stages 0–1 complete; Stage 2 next
 **Last updated:** July 2026
+
+> **v1.10:** Records the function-region decision now implemented (§2, new
+> §2.6): Vercel Functions are pinned to `cle1`, which *is* AWS us-east-2 — the
+> same region as the Supabase project — so functions are co-located with the
+> database rather than merely near Austin. Declared in `vercel.json` rather
+> than the dashboard, because a dashboard-only value does not survive the §2.3
+> `create project → link → db push` handoff. Also confirms the §6 preview-write
+> risk is mitigated: Deployment Protection is verified at **Standard
+> Protection** by response behaviour, not by dashboard label.
 
 > **v1.9:** §4 reconciled with the migrations that were actually built.
 > Check-in windows are **half-open** in both `open_event_at()` and a new
@@ -112,6 +121,25 @@ Scoping these out keeps v1 shippable. They are candidates for later stages, not 
 | Domain | Optional | — | ~$12/year |
 
 **Note on the Supabase free tier:** projects pause after a period of inactivity and need a manual resume from the dashboard. For an org with events during the semester this is rarely an issue, but plan a wake-up check before the first meeting of each semester. This is the single most likely operational surprise.
+
+### 2.6 Function region
+
+Vercel Functions default to `iad1` (us-east-1, Washington DC) for all new projects. This project pins them to **`cle1`**, whose AWS region is **us-east-2 (Cleveland)** — the *same* region as the Supabase project. Every Server Component read and Server Action write therefore talks to the database within one region instead of across two, which matters because the attendance path is chatty and §1.2 budgets a check-in at under 20 seconds on a phone.
+
+Note that "closest to Austin" is the wrong way to frame this: what the latency budget cares about is the function-to-database hop, not the user-to-function hop. Static assets are served from the nearest of Vercel's PoPs regardless of function region, so users far from Ohio are not penalised for this choice.
+
+The region is declared in **`vercel.json`**, not in the dashboard's Settings → Functions:
+
+```json
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["cle1"]
+}
+```
+
+This is deliberate. A dashboard-only setting is invisible to the repository and is silently lost when the project is recreated — which is exactly the handoff path §2.3 depends on. In `vercel.json` it is version-controlled and travels with the code.
+
+Two constraints worth knowing before changing it: the Hobby plan allows a **single** function region (Pro allows 5), and a deployment requesting more regions than the plan permits **fails before the build step**. `functionFailoverRegions` is Enterprise-only and is not used here. Because this is build-time configuration, editing `vercel.json` changes nothing until the next deployment.
 
 ### 2.3 Account ownership and transferability
 
@@ -645,7 +673,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. Triggers reject `UPDATE` and `DELETE`, so the log is append-only for the app and every client role. **Note the limit:** a table owner can disable the trigger, so this constrains the application, not someone with direct database access. Stage 8's RLS policies are what close the client-role path properly. |
 | Bulk roster export leaks member PII | Export is the largest PII egress point in the system. Gate it behind an authenticated session, log every export to `admin_audit` with the filter used and row count, and consider restricting it to the `admin` role. |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
-| Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. |
+| Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. **Verified July 2026** — check it by response behaviour rather than by the dashboard label: the production alias must return `200` while a per-deployment URL returns `302` to `vercel.com/sso-api`. If both return `200`, protection is Disabled and every preview is publicly writable. |
 | Admin privilege escalation | `admin_profiles` is not writable by any client role; officers are added via the Supabase dashboard or a seeded SQL script |
 
 **Threat model boundary:** this system protects against casual abuse and accidental data exposure. It is not designed to withstand a determined attacker, and it holds no financial or highly sensitive data. Scope the security work accordingly — the RLS policies matter far more than, say, elaborate bot detection.
