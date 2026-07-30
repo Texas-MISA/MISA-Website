@@ -1,8 +1,16 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.11
+**Version:** 1.12
 **Status:** Stages 0–1 complete; Stage 2 next
 **Last updated:** July 2026
+
+> **v1.12:** Org base permission is now `read` (§2.4 satisfied). Org-wide 2FA
+> was attempted and **refused by GitHub**, because the shared mailbox account
+> `TXMISA-JD` has no 2FA. The important consequence is recorded in §2.4:
+> enabling 2FA on that account is **gated on the §2.5 vault decision**, since
+> it is the recovery root for every other service and its recovery codes cannot
+> live inside itself. §2.5 is therefore a prerequisite for closing the org's
+> weakest link, not a Stage 9 nicety.
 
 > **v1.11:** §2.4 updated against the live org. The "keep two GitHub org
 > Owners" mitigation is **satisfied** — `Texas-MISA` has two Owners,
@@ -196,7 +204,8 @@ Every account the project depends on. "The shared login" is not an actionable ha
 **The MISA email is the single point of failure.** It is the password-reset address for everything else, so losing it is materially worse than losing any individual service. Two mitigations, both cheap:
 
 - **Keep at least two GitHub org Owners** — the MISA account plus one current officer's personal account. GitHub requires an owner to administer an org, and an org whose only owner is an inaccessible mailbox needs a slow manual support process to recover. ✅ **Satisfied July 2026:** `Texas-MISA` has two Owners, `TXMISA-JD` (the MISA email) and `cgonztx-gif` (an officer's personal account) — verified via `gh api /orgs/Texas-MISA/members?role=admin`. This was previously the one live single point of failure; it is now closed. Re-check at every officer turnover, since the graduating officer's personal account must be replaced, not merely removed.
-- **Require 2FA org-wide.** ⚠️ **Currently off** (`two_factor_requirement_enabled: false`, July 2026). Both Owners hold full admin over a public repo and the deploy pipeline, so a single reused password compromises the project. Enable it *after* confirming both accounts already have 2FA on — GitHub removes members who do not comply when the requirement is turned on.
+- **Require 2FA org-wide.** ⚠️ **Still off** (`two_factor_requirement_enabled: false`, July 2026). Enabling it was attempted and GitHub rejected it, because **`TXMISA-JD` — the shared mailbox account — has no 2FA**; `cgonztx-gif` does. GitHub refuses the org requirement while any member is non-compliant, which is a safe failure rather than a silent removal, but it does mean the requirement cannot be turned on until the mailbox account is fixed.
+- **Enabling 2FA on the shared mailbox account is gated on §2.5, not independent of it.** `TXMISA-JD` is the recovery root for Supabase, Vercel, and the registrar. Binding 2FA to it *without* storing the recovery codes in a durable, non-personal place makes the handoff strictly worse — that is precisely the failure mode §2.5 describes, where 2FA lives on a phone belonging to someone who graduates. And the codes cannot live inside the MISA Google account, because that account is the recovery path for everything else. **Therefore: choose the vault first, then enable 2FA and store the codes in the same pass.** This raises §2.5 from a Stage 9 nicety to a prerequisite for closing the org's weakest link.
 - **Store 2FA recovery codes wherever the passwords are stored.** The standard student-org failure is a shared account with 2FA bound to one person's phone, and that person graduates. Recovery codes are what make the account survivable; a password alone is not enough.
 
 ### 2.5 Credential storage — open decision
