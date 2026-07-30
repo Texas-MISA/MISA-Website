@@ -1,21 +1,28 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Poppins, Roboto_Slab } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Approximations of the existing txmisa.org type pairing (see
+// docs/existing-site-inventory.md): heavy slab serif display + geometric sans.
+const poppins = Poppins({
+  variable: "--font-poppins",
   subsets: ["latin"],
+  weight: ["400", "500", "600"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const robotoSlab = Roboto_Slab({
+  variable: "--font-roboto-slab",
   subsets: ["latin"],
+  weight: ["500", "700", "800"],
 });
 
 export const metadata: Metadata = {
-  title: "MISA",
+  title: {
+    default: "TEXAS MISA",
+    template: "%s — TEXAS MISA",
+  },
   description:
-    "MISA at The University of Texas at Austin — events, meetings, and member attendance.",
+    "Management Information Systems Association at The University of Texas at Austin — where analytics, innovation, and leadership converge.",
 };
 
 export default function RootLayout({
@@ -26,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${poppins.variable} ${robotoSlab.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

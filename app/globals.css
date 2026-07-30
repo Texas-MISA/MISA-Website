@@ -1,26 +1,48 @@
 @import "tailwindcss";
 
+/* Brand tokens approximating txmisa.org (docs/existing-site-inventory.md).
+   The existing site is light-only, so no dark scheme for now. */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #1c1c1c;
+  --misa-blue: #7286ab;
+  --misa-blue-dark: #5c6f93;
+  --misa-panel: #f4f4f2;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-misa-blue: var(--misa-blue);
+  --color-misa-blue-dark: var(--misa-blue-dark);
+  --color-misa-panel: var(--misa-panel);
+  --font-sans: var(--font-poppins);
+  --font-display: var(--font-roboto-slab);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
+}
+
+/* "TEXAS MISA" scrolling band on the home page. The track holds two copies
+   of the same content, so a -50% translate loops seamlessly. */
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 30s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
 }

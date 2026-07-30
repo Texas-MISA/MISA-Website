@@ -1,8 +1,19 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.16
+**Version:** 1.17
 **Status:** Stages 0–1 complete; Stage 2 in progress
 **Last updated:** July 2026
+
+> **v1.17:** Stage 2's scope is now **recreating the existing Squarespace site**
+> ([txmisa.org](https://www.txmisa.org/)) rather than writing a landing page
+> from scratch — six pages, similar UI, its real copy, as the starting point
+> for a later redesign. Surveyed into `docs/existing-site-inventory.md`, which
+> is the reference for what was reproduced and what was deliberately left as a
+> placeholder. This **widens §5's public route list**: `/about`, `/gallery`,
+> `/officers`, `/projects`, and `/contact` join the landing page, all static
+> content, none of them touching the database. The live upcoming-events section
+> stays on the home page and remains the Stage 2 exit criterion — the old site
+> has no equivalent, which is much of why this one exists.
 
 > **v1.16:** Stage 2 landing page is live-reading the schedule. One RLS policy
 > is **pulled forward from Stage 8**: `events_public_read` (migration
@@ -705,6 +716,11 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 
 ```
 /                      Landing page — org info, upcoming events, join CTA
+/about                 Org overview, mission, history, FAQ        (static)
+/gallery               Event photos                                (static)
+/officers              Officer roster with LinkedIn links          (static)
+/projects              Past and current client projects            (static)
+/contact               Contact details and form                    (static)
 /attend                Public check-in form
 /leaderboard           Public standings
 /lookup                Member self-service attendance history
@@ -783,13 +799,25 @@ Stages are ordered so that each one ends with something demonstrable. Effort est
 
 ---
 
-### Stage 2 — Public Landing Page
+### Stage 2 — Public Site
 **Goal:** Something worth showing people.
 
-- Org overview, mission, meeting cadence, contact/social links
-- Upcoming events pulled live from `events where status = 'published'`
-- Officer roster section (static content is fine)
+Scope settled in v1.17: **recreate the existing Squarespace site**
+([txmisa.org](https://www.txmisa.org/)) rather than invent a landing page, so
+the content problem is solved by carrying over copy that already exists and the
+design becomes an editing problem rather than a blank page. Full survey in
+`docs/existing-site-inventory.md`.
+
+- Six pages: landing, `/about`, `/gallery`, `/officers`, `/projects`, `/contact`
+- Shared header/footer chrome on the `(public)` route group
+- Upcoming events pulled live from `events where status = 'published'` — the one
+  section with no counterpart in the old site, and the reason this app exists
+- Officer roster (static content is fine)
 - Mobile-first responsive layout
+
+**Deferred deliberately:** photography and partner logos (real people's photos
+and trademarked logos don't go in a public repo without permission), and the
+contact form's backend — it renders disabled, with email as the working path.
 
 **Exit criteria:** a stranger understands what the org does and when it meets.
 **Effort:** 2–3 days, mostly content and design rather than logic.

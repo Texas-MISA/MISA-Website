@@ -144,18 +144,24 @@ Carried over from Stage 0; none blocked Stage 2, and all are now resolved. Kept 
 
 *Goal: something worth showing people. Exit: a stranger understands what the org does and when it meets. 2–3 days, mostly content and design rather than logic.*
 
-**Structure built 2026-07-30** at `app/(public)/page.tsx` (§10's route group, so later public routes share its conventions). What remains is real content.
+**Built 2026-07-30**, then immediately **rebuilt as a recreation of the existing site**, [txmisa.org](https://www.txmisa.org/) — all six of its pages, similar UI, real copy. Surveyed page-by-page into [`docs/existing-site-inventory.md`](docs/existing-site-inventory.md), which is the reference for what was reproduced and what was deliberately left out. Expected to be edited heavily later; this is a starting point, not a final design.
 
-- [ ] **Real copy** — mission, meeting cadence, officer names, contact/social links. Every placeholder is in square brackets, so a search for `[` in `app/(public)/page.tsx` finds them all. **Needs you; nothing else in Stage 2 does.**
+- [x] **Real copy** — no longer placeholder: mission, four pillars, MISA history, seven FAQs, both project write-ups, all 13 officers with roles and LinkedIn URLs, and the real emails/socials all came from the live site. `lib/site.ts` and `lib/officers.ts` hold the content; `docs/existing-site-inventory.md` records provenance.
+  - Still placeholders, on purpose: **photography** (officer headshots, gallery, project photos) and **partner logos**. Real photos of real people and trademarked logos don't belong in a public repo without permission — cards show initials, gallery/projects show sized tiles. Drop assets into `public/` and swap them in.
+  - The **contact form renders but is disabled** — the original posts to Squarespace and there's no replacement backend. Emails are the working path; wiring the form means a Server Action plus a delivery mechanism (§3), which is a later decision.
+
+**Pages** (original Squarespace slugs in parentheses): `/` , `/about` (`/about-us-1`), `/gallery`, `/officers`, `/projects` (`/general-2`), `/contact` (`/contact-us`). Shared chrome in `components/site-header.tsx` (sticky slate-blue bar, centred text wordmark, socials, active-link underline, mobile menu — a Client Component only for `usePathname` and the menu toggle) and `components/site-footer.tsx`. Brand tokens (`--misa-blue`, `--misa-panel`) and the marquee keyframes live in `app/globals.css`; fonts are Roboto Slab + Poppins, approximating the original's slab-serif/geometric-sans pairing.
 - [x] Upcoming events pulled live from `events where status = 'published'` and `starts_at > now()` — verified on the rendered page: `Fall Kickoff` appears; the draft `Fall Info Session`, the cancelled `Rained Out Tabling`, and past published events do not. Times render in **America/Chicago** via `Intl.DateTimeFormat` (the server runs in UTC — never format without an explicit zone).
   - This needed one RLS policy **pulled forward from Stage 8**: `20260730000009_events_public_read.sql` — anon/authenticated `select` where `status = 'published'`, which is exactly the §6 grant (doc v1.16). Verified at the PostgREST boundary with the anon key: 13 published rows, no draft, no cancelled. Everything else stays deny-all; all writes stay deny-all.
   - First use of the generated types: `Database` is now threaded through both `createServerClient` and `createBrowserClient`.
-- [x] Officer roster section — structure done, names are placeholders (covered by the copy item above)
-- [x] Mobile-first responsive layout — single-column, `max-w-2xl`, cards stack on phone; sets the conventions §1.2's 20-second check-in inherits
-- [x] Replace the `create-next-app` boilerplate — `app/page.tsx` deleted in favour of `app/(public)/page.tsx`, all five `public/*.svg` boilerplate assets dropped, root layout metadata now MISA
+- [x] Officer roster — all 13 real officers, `/officers` cards carry LinkedIn buttons, the home grid doesn't (matching the original)
+- [x] Mobile-first responsive layout — everything single-column first, grids widen at `sm`/`lg`, nav collapses to a hamburger below `lg`. Sets the conventions §1.2's 20-second check-in inherits.
+- [x] Replace the `create-next-app` boilerplate — `app/page.tsx` deleted in favour of `app/(public)/page.tsx`, all five `public/*.svg` boilerplate assets dropped, root layout metadata now TEXAS MISA with a title template
 - [x] Stage 0 scaffolding torn down: `app/db-check/` deleted; `_stage0_check` dropped in `20260730000010_drop_stage0_check.sql` (the original `00000000000000_stage0_check` migration stays so `db reset` replays cleanly)
 
-**Exit check when copy lands:** re-read the page as a stranger — org, meetings, how to join, all findable on a phone.
+**Verified 2026-07-30:** all six routes return 200 and were eyeballed in the browser; `Fall Kickoff` still shows on the home page and the draft still doesn't; `npm run lint` and `npm run build` both clean (`/` dynamic, the other five static).
+
+**Next on this page, when you want it:** real photos and partner logos; decide whether the contact form gets a backend; then the heavier redesign this is a starting point for.
 
 ## Later
 

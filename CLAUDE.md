@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–1 complete; Stage 2 (public landing page) in progress.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. The landing page (`app/(public)/page.tsx`) reads published upcoming events live; its static copy is bracketed placeholder text awaiting real content. Stage 0 scaffolding (`/db-check`, `_stage0_check`) is torn down. See `tasks.md`.
+**Stages 0–1 complete; Stage 2 (public site) in progress.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. `app/(public)/` recreates all six pages of the existing Squarespace site, [txmisa.org](https://www.txmisa.org/) — see `docs/existing-site-inventory.md` for what was reproduced and what was deliberately left as a placeholder (photography, partner logos, the contact form backend). The home page also reads published upcoming events live, which the original has no equivalent of. Stage 0 scaffolding (`/db-check`, `_stage0_check`) is torn down. See `tasks.md`.
+
+Content carried over from the old site lives in `lib/site.ts` (mission, pillars, socials, emails, partners) and `lib/officers.ts` (the 13-officer roster) — edit those rather than hardcoding copy into pages. The recreation is a starting point for a heavier redesign, not a final design.
 
 `docs/student-org-website-architecture.md` is the source of truth for this project: a student-org attendance system replacing spreadsheet tracking. Section references below (§) point into it. `tasks.md` is the short-horizon checklist.
 
@@ -87,16 +89,22 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 Per §10:
 
 ```
-app/(public)/           landing, /attend, /leaderboard, /lookup
+app/(public)/           landing, /about, /gallery, /officers, /projects, /contact,
+                        and later /attend, /leaderboard, /lookup. layout.tsx here
+                        holds the shared header/footer; _components/ holds
+                        page-private pieces (leading underscore = not a route)
 app/admin/              login, dashboard, events/, members/, attendance/, points/, audit/
 app/actions/            attendance.ts, events.ts, members.ts, points.ts, audit.ts
 lib/supabase/           server.ts (server client), client.ts (browser client)
 lib/types/database.ts   generated — do not hand-edit
+lib/site.ts             org copy, socials, emails, partners
+lib/officers.ts         officer roster
 lib/validation.ts       zod schemas
 lib/filters.ts          directory filter → SQL translation
 lib/export.ts           CSV / TSV / clipboard formatting
 supabase/migrations/    versioned SQL
 supabase/seed.sql
+components/             site-header.tsx, site-footer.tsx
 components/ui/          shared primitives
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()
