@@ -15,11 +15,18 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [x] Deployment Protection no longer SSO-gates production — it defaulted to "All Deployments" on import and now returns 200.
 - [ ] Confirm previews are still gated: Settings → Deployment Protection should read **Standard Protection**, not Disabled. Previews inherit production env vars, so an open preview URL is a second public check-in form writing to the real database (§6).
 - [ ] Confirm push-to-`main` deploys
-- [x] Create the Supabase project — done via the dashboard under the MISA account. Ref `sqgqaxegeawtlccaxdij`, URL `https://sqgqaxegeawtlccaxdij.supabase.co`. DB password held by the org account, not in the repo.
+- [x] Create the Supabase project — `misa-website`, ref **`gbxypeofjnhrhotlhyzs`**, region **us-east-2 (Ohio)**, under the MISA account. CLI is linked and `supabase/` is initialized, so migrations go through `db push`.
+  - Region chosen as the closest Supabase region to Austin (~1,700 km, vs us-east-1 ~2,000 and us-west-2 ~2,900). Neither AWS nor Vercel has a Texas region. **Regions are fixed at creation** — changing later means recreating the project.
+  - Replaces the original `sqgqaxegeawtlccaxdij` in us-west-2, created and discarded the same day.
+- [ ] **Delete the old `MISA Website` project** (ref `sqgqaxegeawtlccaxdij`, us-west-2) — it only ever held the scratch table. Frees a free-tier slot.
+- [ ] **Move the DB password out of `C:\Users\dadia\misa-supabase-db-password.txt`** into the org password manager, then delete the file. Needed for `db push` and direct connections.
 - [ ] **Promote `cgonztx-gif` to Owner in the Texas-MISA org** (org → People → role). It was invited as `member`; the repo transfer only worked because the org allows members to create repos. Owner is needed to manage org settings and add officers without logging into the MISA email each time.
 - [ ] Vercel import: connect the **Texas-MISA** org, not the personal account, so the deployment is org-owned too (§2.3). The repo is public, which sidesteps the Hobby-tier restriction on private org repos.
 - [x] `.env.local` written with `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the new `sb_publishable_…` key format; template committed as `.env.example`). Confirmed gitignored. Service role key unused so far — server-only when it is, never `NEXT_PUBLIC_`.
-- [ ] Same two env vars into the Vercel project at import time
+- [ ] **Update the two Vercel env vars to the us-east-2 project**, then redeploy (env changes don't apply to existing builds):
+  - `NEXT_PUBLIC_SUPABASE_URL` = `https://gbxypeofjnhrhotlhyzs.supabase.co`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = `sb_publishable_CnJ934Lcn_TSFLN02--J2Q_aPa_VEfZ`
+- [ ] **Set the Vercel function region to `cle1` (Cleveland)** — Settings → Functions. Currently `iad1`; `cle1` is both closest to Austin and ~230 km from the us-east-2 database.
 - [x] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10) — `@supabase/ssr` 0.12 pattern, async `cookies()`, lint/build clean
 - [x] Throwaway verification page `/db-check` written and **passing locally** (HTTP 200, row renders, RLS-gated via an explicit anon select policy)
 - [x] Confirm `/db-check` passes **on the deployed URL** — ✅ https://misa-website-beta.vercel.app/db-check returns 200 and renders the row. Verified request-time (timestamps differ across requests, `X-Vercel-Cache: MISS`), so the Vercel env vars are correct. **Stage 0 exit criteria met.**
@@ -65,6 +72,8 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 ## Next — Stage 1: Data Layer
 
 *Goal: the schema exists and enforces its own rules. Exit: invalid data is rejected by the database, verified by hand in the SQL editor. 1–2 days — don't rush this; schema changes get expensive once UI depends on them.*
+
+**Before starting:** `supabase db push` works without Docker, but `supabase db reset` (re-run migrations + seed locally) needs **Docker Desktop**, which isn't installed. Either install it for a local loop, or work against the remote and accept that a bad migration is corrected by a follow-up migration rather than a reset. Decide before writing `0001`.
 
 **Migrations** — numbered, one concern each, SQL copied from §4.1:
 
