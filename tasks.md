@@ -79,42 +79,46 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 **Before starting:** install **Docker Desktop** (decided 2026-07-29) so `supabase db reset` can wipe, re-run all migrations, and re-seed locally. Without it every mistake needs a corrective migration against the remote.
 
-**Migrations** — numbered, one concern each, SQL from §4.1:
+**✅ Stage 1 schema complete 2026-07-29.** Eight migrations applied to `gbxypeofjnhrhotlhyzs` and pushed. Files are named by concern rather than the numbering sketched here, because dependency order forced it: `terms` (defines `term_of`, `app_settings`, `current_term`) must precede `events`, which generates `term`, and `point_adjustments`, which defaults to `current_term()`.
 
-- [ ] `0001_members.sql` — including `normalized_student_id` (generated, unique) and `source`, plus the `lower(email)` unique index. Both are new in doc v1.6 and required by self-registration.
-- [ ] `0002_events.sql` — `valid_window` and `status` checks, plus `term` as a generated column. **`term_of()` must exist before this migration** (§4.7), so define it in `0001` or its own earlier file.
-- [ ] `0003_attendance.sql` — the `normalized_student_id` generated column, `present_requires_resolution`, and the partial unique index `attendance_one_per_event` (excludes `rejected` so a corrected re-entry is possible)
-- [ ] `0004_point_adjustments.sql` — `points <> 0`, `reason not null`, `void_is_complete`
-- [ ] `0005_admin_profiles.sql` and `app_settings` (single-row, holds `current_term`) — seed the initial term here
-- [ ] `0006_admin_audit.sql` — plus both indexes (`entity` and `actor`)
-- [ ] Overlap prevention for published events: decide between a Postgres exclusion constraint (`btree_gist` on the check-in window where `status = 'published'`) and an application-level check at publish time (§4.3). Prefer the constraint if it can be expressed cleanly — §7 Stage 3 calls for explicit test coverage either way.
+- [x] `20260730000001_terms.sql` — `term_of()`, `app_settings` (single row), `current_term()`
+- [x] `20260730000002_members.sql` — `normalized_student_id` generated + unique, `source`, `lower(email)` unique index, not-blank checks
+- [x] `20260730000003_events.sql` — `valid_window`, `valid_checkin_window`, generated `term`, `updated_at` trigger, and the overlap **exclusion constraint** (resolved in favour of the constraint over an app-level check; needs no `btree_gist`, since gist handles `tstzrange &&` natively)
+- [x] `20260730000004_attendance.sql` — generated `normalized_student_id`, `present_requires_resolution`, partial unique index excluding `rejected`
+- [x] `20260730000005_point_adjustments.sql` — `points <> 0`, non-blank `reason`, `void_is_complete`
+- [x] `20260730000006_admin.sql` — `admin_profiles`, `admin_audit` + both indexes + append-only triggers
+- [x] `20260730000007_resolution_functions.sql` — `open_event_at()`, `nearby_events()`
+- [x] `20260730000008_views.sql` — `leaderboard` (total only, anon-readable), `member_directory` (split retained, authenticated only)
+- [x] RLS enabled on every table (deny-all until Stage 8) — not in the original plan, but Supabase exposes public tables through PostgREST, so leaving it off would have opened a window with seed data in it
 
-**Functions and views** (§4.3–4.5):
+**Departures from the doc, all deliberate:**
 
-- [ ] `open_event_at(ts)` — at most one open published event at any instant
-- [ ] `nearby_events(ts, window_hours)` — ranked by gap; drives both the refuse/queue decision and the officer's suggestion list
-- [ ] `leaderboard` view — one row per active member for `app_settings.current_term`, `total_points` only, ties alphabetical; excludes `student_id` and `email`. Leave `security_invoker` at its default so the view stays the security boundary (§4.4).
-- [ ] `member_directory` view — keeps the `attendance_points`/`bonus_points` split (officer oversight moved here), plus `source`, `pending_count`, `last_seen_at`, `events_possible`. **Scope every aggregate to `current_term`, denominators included** — an all-time `events_possible` against a current-term numerator understates every rate and still looks plausible.
-- [x] ~~Decide whether `events.term` should be `not null`~~ — moot: it's generated from a `not null` column, so it can never be null or wrong (§4.7).
-- [ ] Ordering matters in the migration sequence: `term_of()` → `app_settings` → `current_term()` → `events` (needs `term_of`) → `point_adjustments` (defaults to `current_term()`). Getting this wrong fails the push rather than silently misbehaving, but it will fail.
+- **Check-in windows are half-open `[)`** in both the exclusion constraint and `open_event_at()`. The doc's inclusive `<=` would have made back-to-back events unpublishable — a 6–7 workshop and a 7–8 social collide at exactly 19:00. Verified that adjacent events now coexist.
+- Not-blank checks on required text, since `NOT NULL` alone accepts `''`.
+- An `updated_at` trigger on `events`; the column existed with nothing maintaining it.
 
 **Types and seed:**
 
-- [ ] Generate `lib/types/database.ts`
-- [ ] `supabase/seed.sql` — 30+ members (including some inactive, and student IDs with mixed casing/whitespace/hyphens), 10+ past events across categories and statuses, varied attendance including `pending` and `rejected` rows, and a few `point_adjustments` with one voided
+- [x] `lib/types/database.ts` generated — all nine relations and four functions present
+- [x] `supabase/seed.sql` — 32 members (3 inactive, 3 self-registered, IDs in mixed formats), 15 events across categories/statuses including one cancelled and two Fall, 208 attendance rows (202 present, 5 pending covering all three orphan shapes, 1 rejected), 6 adjustments including one voided and one negative, 2 audit rows. All identities fabricated on `example.edu` (RFC 2606, unresolvable) — **never replace with a real roster; this repo is public**
+- [x] `scripts/seed-remote.sh` — applies the seed without Docker. `supabase db query` reads only the first line of its SQL argument and Windows caps command lines near 8k, so the script strips full-line comments, flattens each `-- @chunk` to one line, and sends them separately. **seed.sql must therefore never use trailing inline comments.**
 
-**Verify each rejection by hand in the SQL editor** (this is the exit criteria, not a formality):
+**✅ Exit criteria met — every rejection verified against the live database by SQLSTATE, not by assumption:**
 
-- [ ] Two overlapping published events
-- [ ] Duplicate check-in on the same `(event_id, normalized_student_id)`
-- [ ] `ends_at` before `starts_at`
-- [ ] `status = 'present'` with a null `event_id` or null `member_id`
-- [ ] `point_adjustments` with `points = 0`, or with a null `reason`
-- [ ] `voided_at` set without `voided_by`
-- [ ] Two members whose student IDs differ only by case, spacing, or hyphens (`UT-123` vs `ut 123`) — must be rejected by `members_normalized_id`
-- [ ] Two members whose emails differ only by case — must be rejected by `members_email_lower`
-- [ ] Attempt to set `events.term` directly — must be rejected, it's generated
-- [ ] Term boundary values, by inserting events and reading back `term` (§4.7): Jul 31 23:59 → `Spring`, Aug 1 00:00 → `Fall`, Dec 31 23:59 → `Fall`, Jan 1 00:00 → `Spring`. Use America/Chicago local times, and include a 7pm-Central July 31 event, which is Aug 1 in UTC and would tag wrong if the anchoring is off.
+- [x] `23514` — `ends_at` before `starts_at`; `present` with either link null; `points = 0`; blank reason; incomplete void; blank student_id
+- [x] `23P01` — overlapping published check-in windows
+- [x] `23505` — duplicate check-in on `(event_id, normalized_student_id)`; members differing only by ID formatting or by email case
+- [x] `428C9` — writing the generated `term` column
+- [x] `P0001` — `UPDATE` or `DELETE` on `admin_audit`
+- [x] Term boundaries: Jul 31 23:59 → `Spring 2026`, Aug 1 00:00 → `Fall 2026`, Dec 31 23:59 → `Fall 2026`, Jan 1 00:00 → `Spring 2027`, and **Jul 31 7pm Central → `Spring 2026`** (the case a UTC anchor would have filed under Fall)
+- [x] Behaviours that must *work*: corrected re-entry after a rejection; back-to-back published events; cancelled events keeping attendance history while contributing no points; `open_event_at()` matching during a window and not after; `nearby_events()` returning a suggestion 2h out and **nothing in June**, so a summer submission is refused rather than queued
+
+**Known caveat:** the `admin_audit` append-only trigger does not stop a table owner — cleaning up test rows required disabling it. It blocks the app and every client role; the service-role and dashboard paths are governed by Stage 8's RLS work. §6 currently claims append-only slightly more strongly than the trigger alone delivers.
+
+**Remaining before Stage 2:**
+
+- [ ] Install WSL (`wsl --install`, needs a reboot) then Docker Desktop, so `supabase db reset` works. Everything above was done against the remote.
+- [ ] Drop the Stage 0 scaffolding once something real reads from the database: delete `app/db-check/`, and drop `_stage0_check` in a migration
 
 ---
 
