@@ -1,9 +1,16 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.5
+**Version:** 1.6
 **Status:** In progress — Stage 1
 **Last updated:** July 2026
 
+> **v1.6:** the five schema-affecting open decisions are resolved (§9) and §4
+> updated to match. Two are departures from what this doc previously assumed:
+> the roster **self-registers with no officer confirmation**, and `leaderboard`
+> is keyed on **(member, term)** rather than being a flat view or a
+> term-parameterized function. `members` gains `normalized_student_id` and
+> `source`.
+>
 > **v1.5:** §2.3 now covers Supabase account moves alongside Vercel's. Added
 > §2.4 (account inventory — what exists, who owns it, where credentials are)
 > and §2.5 (credential storage, an open decision for Stage 9). Flags the two
@@ -181,15 +188,27 @@ The Stage 9 handoff guide should amount to: §2.4 filled in, the vault handed ov
 ### 4.1 Tables
 
 ```sql
--- Roster of known members. Seeded by admins; not self-registration in v1.
+-- Roster. Seeded by admins, and also self-populating: an unrecognized student
+-- ID at check-in creates a member immediately, with no officer confirmation
+-- (Open Decision #2, resolved). See 4.2 for how typos are contained.
 create table members (
   id           uuid primary key default gen_random_uuid(),
-  student_id   text unique not null,
+  student_id   text not null,
+  normalized_student_id text generated always as
+                 (upper(regexp_replace(student_id, '\s|-', '', 'g'))) stored,
   full_name    text not null,
-  email        text unique not null,
+  email        text not null,
   active       boolean not null default true,
+  source       text not null default 'admin'
+                 check (source in ('admin','self_checkin')),
   joined_at    timestamptz not null default now()
 );
+
+-- Identity is the normalized ID, not the raw one, so 'ut-123', 'UT 123', and
+-- 'UT123' cannot become three members. Email is matched case-insensitively
+-- for the same reason.
+create unique index members_normalized_id on members (normalized_student_id);
+create unique index members_email_lower   on members (lower(email));
 
 -- The schedule. Created in advance, but editable at any time — see 4.6.
 create table events (
@@ -313,6 +332,9 @@ create table admin_profiles (
 - **Negative adjustments are allowed**, which makes this one mechanism for bonuses, penalties, and corrections rather than three.
 - **One audit table, not several.** `admin_audit` keys on `(entity_type, entity_id)` so event edits, point grants, and attendance overrides all land in the same place. This makes "show me everything this officer did last month" a single query.
 - **`checkin_opens_at` / `checkin_closes_at`** decouple the check-in window from the event's actual time — useful for a grace period for late arrivals. Widening these is the *preferred* fix for a systematically late crowd; manual override is for individuals.
+- **Self-registration is resolution order, not a separate flow.** A check-in resolves its member link by trying, in order: `normalized_student_id`, then `lower(email)`. Only if both miss is a new member created, with `source = 'self_checkin'`. Matching on email second is what contains the common failure — someone who typos their student ID is recognized by their email and linked to their existing record instead of becoming a duplicate person. A member created this way is immediately `active` and counts on the leaderboard; there is no approval step.
+- **`members.source`** distinguishes admin-seeded from self-registered rows. Officers filter the directory by it to review who the form has added, which is the cleanup path for junk rows. Self-registration writes no `admin_audit` row — there is no acting officer, and `source` plus `joined_at` already record it.
+- **The residual risk is a typo in *both* ID and email**, which creates a genuine duplicate person. Rare, visible in the directory, and merged by an officer. This was accepted deliberately in exchange for zero-friction check-in at recruiting events.
 
 ### 4.3 Event-window resolution
 
@@ -356,37 +378,60 @@ If `nearby_events()` returns nothing, the check-in is refused outright with a me
 
 Points now come from two sources, and the view keeps them separate rather than collapsing them into one number:
 
+The view is keyed on **`(member, term)`** — one row per member per term (Open Decision #4, resolved). Callers filter to a term for semester standings, or sum across terms for all-time, so no term-parameterized function is needed and no migration is required when the second semester starts:
+
 ```sql
 create or replace view leaderboard as
-with attendance_pts as (
-  select a.member_id,
+with terms as (
+  -- Every term a member could appear in, so someone with bonus points but no
+  -- attendance (or vice versa) still gets a row rather than vanishing.
+  select term from events where term is not null
+  union
+  select term from point_adjustments where term is not null
+),
+member_terms as (
+  select m.id as member_id, m.full_name, t.term
+  from members m cross join terms t
+  where m.active
+),
+attendance_pts as (
+  select a.member_id, e.term,
          count(*)                   as events_attended,
          coalesce(sum(e.points), 0) as pts
   from attendance a
   join events e on e.id = a.event_id
   where a.status = 'present'
     and e.status <> 'cancelled'
-  group by a.member_id
+  group by a.member_id, e.term
 ),
 bonus_pts as (
-  select member_id, coalesce(sum(points), 0) as pts
+  select member_id, term, coalesce(sum(points), 0) as pts
   from point_adjustments
   where voided_at is null
-  group by member_id
+  group by member_id, term
 )
 select
-  m.id,
-  m.full_name,
+  mt.member_id                                   as id,
+  mt.full_name,
+  mt.term,
   coalesce(ap.events_attended, 0)                as events_attended,
   coalesce(ap.pts, 0)                            as attendance_points,
   coalesce(bp.pts, 0)                            as bonus_points,
   coalesce(ap.pts, 0) + coalesce(bp.pts, 0)      as total_points
-from members m
-left join attendance_pts ap on ap.member_id = m.id
-left join bonus_pts      bp on bp.member_id = m.id
-where m.active
-order by total_points desc, events_attended desc;
+from member_terms mt
+left join attendance_pts ap
+       on ap.member_id = mt.member_id and ap.term = mt.term
+left join bonus_pts bp
+       on bp.member_id = mt.member_id and bp.term = mt.term;
 ```
+
+Ordering moves to the caller, since it differs by use (`order by total_points desc, events_attended desc` for a single term; a `sum(...) group by id` wrapper for all-time).
+
+**Three cases the migration has to get right**, all of them silent-wrong-answer bugs rather than errors:
+
+- **Zero-attendance members** must still appear with 0 in a term, which is why `member_terms` cross-joins rather than starting from `attendance`.
+- **Events or adjustments with `term is null`** are excluded from every term bucket. Either backfill `term` on all events, or treat null as its own bucket — decide in Stage 1 and enforce with a `not null` if the answer is "always set it."
+- **Attendance and bonus terms are independent.** A bonus awarded in S27 for work done in F26 counts in whichever `point_adjustments.term` says, not the event's.
 
 **Why the split columns matter:** a member looking at their total should be able to see how much of it came from showing up versus from discretionary grants, and an officer should be able to notice at a glance if the top of the leaderboard is driven by bonuses rather than attendance. Collapsing both into `total_points` hides exactly the thing worth watching.
 
@@ -419,7 +464,9 @@ from members m
 left join leaderboard l on l.id = m.id;
 ```
 
-`events_possible` enables an attendance-rate column (`events_attended::numeric / nullif(events_possible,0)`) without a second round trip. If the leaderboard resets per term, both this view and `leaderboard` take a `term` parameter and become functions instead.
+`events_possible` enables an attendance-rate column (`events_attended::numeric / nullif(events_possible,0)`) without a second round trip.
+
+Since `leaderboard` is now per `(member, term)`, this view must either take the same shape or aggregate across terms — pick one in Stage 1 and be consistent, because a directory silently showing one term's points while the leaderboard shows all-time is exactly the kind of discrepancy nobody notices until an award is decided. `events_possible` needs the same treatment: scoped to the term being displayed, not all events ever.
 
 ### 4.6 Event edit semantics
 
@@ -473,6 +520,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Check-in on behalf of someone else | Accepted risk for v1 — same as a paper sign-in sheet. Mitigate later with a rotating per-event code displayed at the venue. |
 | Attendance data enumeration | `/lookup` requires student ID **and** matching email before returning history |
 | Roster PII exposure | Emails and student IDs never returned to unauthenticated clients under any route |
+| Roster pollution via self-registration | The check-in form can create members (§4.2), so junk rows are reachable by anyone who can submit during an open window. Bounded by the window, honeypot, and rate limit; contained by matching on email before creating; visible via `members.source = 'self_checkin'` in the directory. Impact is cleanup, not data loss. |
 | Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. The log is append-only and not deletable from the app. |
 | Bulk roster export leaks member PII | Export is the largest PII egress point in the system. Gate it behind an authenticated session, log every export to `admin_audit` with the filter used and row count, and consider restricting it to the `admin` role. |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
@@ -725,15 +773,22 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 
 ## 9. Open Decisions
 
-Worth resolving before Stage 1 rather than mid-build:
+### Resolved before Stage 1 (2026-07-29)
+
+The five that affect the schema. Decided together; the schema in §4 reflects them.
+
+2. **Roster policy** — ✅ **Self-registering, no confirmation.** An unrecognized student ID at check-in creates an active member immediately. Resolution order is `normalized_student_id`, then `lower(email)`, then create; matching on email second contains the common typo case. `members.source` marks self-registered rows for review. Accepted residual risk: a typo in both ID *and* email creates a duplicate person, merged by an officer. Chosen for zero-friction check-in at recruiting events.
+3. **Points weighting** — ✅ **Per-event `points`, default 1.** Flat scoring in practice, weighting available without a migration.
+4. **Semester boundaries** — ✅ **Views keyed on `(member, term)`.** Callers filter to a term or sum across terms, so per-semester and all-time both work from one view and §4.5's function conversion is never needed.
+5. **Excused absences** — ✅ **Deferred to post-v1.** Attendance rate stays raw `attended / possible`. `point_adjustments` already handles the standing side with a required reason, so the gap is cosmetic rather than punitive.
+7. **Orphan grace window** — ✅ **48 hours**, as one exported constant feeding `nearby_events()`.
+
+### Still open
+
+Not schema-affecting, so they can wait — but #9 and #11 want answers before the leaderboard decides anything real.
 
 1. **Leaderboard visibility** — fully public, or behind the member lookup flow? Affects whether names appear on an indexable page.
-2. **Roster policy** — admin-seeded only, or can an unknown student ID self-register on first check-in as a pending member?
-3. **Points weighting** — flat one point per event, or per-event weights from day one?
-4. **Semester boundaries** — does the leaderboard reset each term? If so, add a `term` column in Stage 1, not later.
-5. **Excused absences** — does the model need them, and do they affect attendance rate?
 6. **Override authority** — can any officer approve a pending row, or only the `admin` role? Relevant if the leaderboard determines anything real.
-7. **Orphan grace window length** — 48 hours is a starting guess. Long enough that a member who forgets until the next morning is covered; short enough to stay meaningful.
 8. **Resolution deadline** — is there a point after which pending rows can no longer be approved, e.g. end of semester? Prevents retroactive standing changes after eligibility is decided.
 9. **Point grant caps** — should a single officer be able to award unlimited bonus points, or should grants above some threshold require the `admin` role? Worth deciding before the leaderboard determines anything with stakes.
 10. **Self-grants** — can an officer award points to themselves? Simplest defensible answer is yes but always visible in the ledger; the alternative is blocking it outright.

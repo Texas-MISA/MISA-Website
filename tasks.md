@@ -50,15 +50,15 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 §9 lists 11 open decisions. Below is a proposed default for each — **my recommendation, your call.** Most confirm the schema already written in §4, so migrations aren't blocked on a long discussion. Check off to accept, or strike through and write your own.
 
-**Must answer before writing migrations** — these change the schema:
+**✅ All five schema-affecting decisions resolved 2026-07-29.** Recorded in §9 with the schema in §4 updated to match.
 
-| # | Decision | Proposed default | |
-|---|---|---|---|
-| 2 | Roster policy | Admin-seeded only. An unknown student ID produces a `pending` row with `member_id` null for an officer to resolve — no self-registration. | [ ] |
-| 3 | Points weighting | Per-event `points` from day one, default 1. Already in the schema; costs nothing now, costs a migration later. | [ ] |
-| 4 | Semester boundaries | Keep the `term` columns on `events` and `point_adjustments`, but **no leaderboard reset in v1**. Views stay views; convert to term-parameterized functions only if a reset is actually wanted (§4.5). | [ ] |
-| 5 | Excused absences | Out of scope for v1. Attendance rate stays raw `attended / possible`. Adding an excuse mechanism means a new table and a rate-calculation change — defer until someone asks. | [ ] |
-| 7 | Orphan grace window | 48 hours, defined as a **single exported constant** (e.g. `ORPHAN_WINDOW_HOURS` in `lib/validation.ts`) passed into `nearby_events()`, so tuning it is a one-line change. | [ ] |
+| # | Decision | Resolution |
+|---|---|---|
+| 2 | Roster policy | **Self-registering, no confirmation.** Unknown ID → active member created immediately. Resolve by `normalized_student_id`, then `lower(email)`, then create with `source = 'self_checkin'`. |
+| 3 | Points weighting | Per-event `points`, default 1. |
+| 4 | Semester boundaries | **Views keyed on `(member, term)`** — filter for one term, sum for all-time. No function conversion ever needed. |
+| 5 | Excused absences | Deferred post-v1. Rate stays raw `attended / possible`. |
+| 7 | Orphan grace window | 48h as one exported constant (`ORPHAN_WINDOW_HOURS`) feeding `nearby_events()`. |
 
 **Can wait until Stage 4–5**, but decide before the leaderboard determines anything with stakes:
 
@@ -77,11 +77,11 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 *Goal: the schema exists and enforces its own rules. Exit: invalid data is rejected by the database, verified by hand in the SQL editor. 1–2 days — don't rush this; schema changes get expensive once UI depends on them.*
 
-**Before starting:** `supabase db push` works without Docker, but `supabase db reset` (re-run migrations + seed locally) needs **Docker Desktop**, which isn't installed. Either install it for a local loop, or work against the remote and accept that a bad migration is corrected by a follow-up migration rather than a reset. Decide before writing `0001`.
+**Before starting:** install **Docker Desktop** (decided 2026-07-29) so `supabase db reset` can wipe, re-run all migrations, and re-seed locally. Without it every mistake needs a corrective migration against the remote.
 
-**Migrations** — numbered, one concern each, SQL copied from §4.1:
+**Migrations** — numbered, one concern each, SQL from §4.1:
 
-- [ ] `0001_members.sql`
+- [ ] `0001_members.sql` — including `normalized_student_id` (generated, unique) and `source`, plus the `lower(email)` unique index. Both are new in doc v1.6 and required by self-registration.
 - [ ] `0002_events.sql` — including the `valid_window` check and the `status` check
 - [ ] `0003_attendance.sql` — the `normalized_student_id` generated column, `present_requires_resolution`, and the partial unique index `attendance_one_per_event` (excludes `rejected` so a corrected re-entry is possible)
 - [ ] `0004_point_adjustments.sql` — `points <> 0`, `reason not null`, `void_is_complete`
@@ -93,7 +93,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 - [ ] `open_event_at(ts)` — at most one open published event at any instant
 - [ ] `nearby_events(ts, window_hours)` — ranked by gap; drives both the refuse/queue decision and the officer's suggestion list
-- [ ] `leaderboard` view — `attendance_points` and `bonus_points` separate; excludes `student_id` and `email`
+- [ ] `leaderboard` view — keyed `(member, term)`; `attendance_points` and `bonus_points` separate; excludes `student_id` and `email`. Three silent-wrong-answer cases to get right (§4.4): zero-attendance members still need a row per term, `term is null` rows must be handled deliberately, and attendance terms are independent of adjustment terms.
 - [ ] `member_directory` view — pre-joined aggregates plus `pending_count`, `last_seen_at`, `events_possible`
 
 **Types and seed:**
@@ -109,6 +109,8 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [ ] `status = 'present'` with a null `event_id` or null `member_id`
 - [ ] `point_adjustments` with `points = 0`, or with a null `reason`
 - [ ] `voided_at` set without `voided_by`
+- [ ] Two members whose student IDs differ only by case, spacing, or hyphens (`UT-123` vs `ut 123`) — must be rejected by `members_normalized_id`
+- [ ] Two members whose emails differ only by case — must be rejected by `members_email_lower`
 
 ---
 
