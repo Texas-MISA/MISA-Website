@@ -64,7 +64,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 | 8 | Resolution deadline | None enforced in v1. The pending badge and oldest-first default sort are the mitigation for a rotting queue. | [ ] |
 | 9 | Point grant caps | No hard cap. Ledger visibility and the required reason are the control; a cap invites splitting a grant in two. | [ ] |
 | 10 | Self-grants | Allowed, but always visible in the ledger with the granting officer named. Blocking outright just moves it to a friend's account. | [ ] |
-| 11 | Bonus points publicly | Shown as a separate column, consistent with §4.4 and with the admin views. | [ ] |
+| 11 | Bonus points publicly | ⚠️ **This proposal is now stale and contradicts a settled invariant — don't build it as written.** It says "shown as a separate column, consistent with §4.4", but §4.4 was since resolved the other way: the public `leaderboard` shows a single `total_points`, and only the officer-facing `member_directory` keeps `attendance_points` and `bonus_points` split. Building the public split in Stage 7 would reverse that deliberately. Decide whether to strike this row or rewrite it to match §4.4. | [ ] |
 
 ---
 
