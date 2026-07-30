@@ -47,7 +47,7 @@ Three audiences, one codebase:
 |---|---|
 | Public — org info, upcoming events | none |
 | Members — check in, leaderboard, own history | none; identity-based (student ID + matching email), no accounts in v1 |
-| Officers — schedule, roster, attendance review, points | Supabase Auth session + a matching `admin_profiles` row, enforced by `middleware.ts` |
+| Officers — schedule, roster, attendance review, points | Supabase Auth session + a matching `admin_profiles` row, enforced by `proxy.ts` |
 
 Domain model: `members` ↔ `events` ↔ `attendance`, plus `point_adjustments`, `admin_profiles`, and one `admin_audit` log. Aggregates live in the `leaderboard` and `member_directory` views rather than in application code (§4). Routes are listed in §5.
 
@@ -84,7 +84,8 @@ lib/export.ts           CSV / TSV / clipboard formatting
 supabase/migrations/    versioned SQL
 supabase/seed.sql
 components/ui/          shared primitives
-middleware.ts           admin route protection
+proxy.ts                admin route protection — Next 16 renamed middleware.ts;
+                        the exported function is proxy(), not middleware()
 ```
 
 `app/actions/audit.ts` is the shared `admin_audit` writer — every other action calls it rather than inserting directly.

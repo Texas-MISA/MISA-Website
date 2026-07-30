@@ -1,8 +1,12 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.2
-**Status:** Planning
+**Version:** 1.3
+**Status:** In progress — Stage 0
 **Last updated:** July 2026
+
+> **v1.3:** the build landed on Next.js 16, which renames the `middleware.ts`
+> file convention to `proxy.ts` (exported function `proxy()`). References
+> updated in §5, §7, and §10. The gating logic is unchanged.
 
 ---
 
@@ -378,7 +382,7 @@ Every event edit writes an `admin_audit` row with the before/after JSON, which m
 /admin/audit           Full activity log across all entities
 ```
 
-Everything under `/admin/*` (except `/admin/login`) is gated by middleware that checks for a valid session and a matching `admin_profiles` row.
+Everything under `/admin/*` (except `/admin/login`) is gated by `proxy.ts` (Next 16's rename of `middleware.ts`), which checks for a valid session and a matching `admin_profiles` row.
 
 ---
 
@@ -476,7 +480,7 @@ Stages are ordered so that each one ends with something demonstrable. Effort est
 
 **Auth and shell**
 - Supabase Auth email/password sign-in at `/admin/login`
-- Middleware gating `/admin/*` against a valid session + `admin_profiles` row
+- `proxy.ts` gating `/admin/*` against a valid session + `admin_profiles` row
 - Persistent admin nav; dashboard with recent check-ins and a pending-review badge
 
 **Event management**
@@ -693,5 +697,5 @@ Worth resolving before Stage 1 rather than mid-build:
 /components
   /ui                        shared primitives
   ...
-middleware.ts                admin route protection
+proxy.ts                     admin route protection (Next 16 rename of middleware.ts)
 ```

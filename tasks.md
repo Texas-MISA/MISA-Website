@@ -12,9 +12,9 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [x] `npx create-next-app@latest` — TypeScript, Tailwind, App Router, ESLint, **no `src/` directory** (§10 puts `app/` and `lib/` at the root). Landed Next **16.2.12** + React 19.2.4 + Tailwind 4. `npm run lint` and `npm run build` both pass.
 - [x] Create the GitHub repo and push `main` — [cgonztx-gif/MISA-Website](https://github.com/cgonztx-gif/MISA-Website), private
 - [ ] Import the repo into Vercel; confirm push-to-`main` deploys to `*.vercel.app`
-- [ ] Create the Supabase project; note the region and save the DB password somewhere durable
-- [ ] Env vars in both `.env.local` and the Vercel project: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`. The service role key, if used at all, is server-only and never prefixed `NEXT_PUBLIC_`
-- [ ] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10)
+- [ ] Create the Supabase project — **under a dedicated org account, not a personal one** (decided 2026-07-29: the personal account's 2-free-project limit is full, and a dedicated account survives officer turnover). Log the CLI in with `npx supabase login --profile misa` so the personal login stays intact, then `npx supabase projects create misa-website --profile misa ...`. Note the region and save the DB password somewhere durable.
+- [ ] Env vars in both `.env.local` and the Vercel project: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (template committed as `.env.example`). The service role key, if used at all, is server-only and never prefixed `NEXT_PUBLIC_`
+- [x] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10) — `@supabase/ssr` 0.12 pattern, async `cookies()`, lint/build clean
 - [ ] Throwaway verification: a Server Component reads one row from a scratch table and renders it **on the deployed URL**, not just locally — then delete the page and the scratch table
 - [x] Update the Commands section of `CLAUDE.md` with the verified `dev` / `build` / `lint` invocations and drop the "not yet verified" caveat
 
@@ -23,6 +23,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - `npm audit` reports 12 high-severity advisories, all transitive dev/build-time deps of `eslint` and `next` (`brace-expansion`, `postcss`, `sharp`). **Never run `npm audit fix --force`** — npm's proposed "fix" downgrades Next to 9.3.3. Revisit when `eslint-config-next` supports eslint 10.
 - `create-next-app` generated `AGENTS.md` warning that Next 16 diverges from model training data, and a `CLAUDE.md` that was just `@AGENTS.md`. Merged: the project `CLAUDE.md` now imports `AGENTS.md` at the top. Read `node_modules/next/dist/docs/` before writing App Router / caching / Server Action code.
 - §10's layout predates Next 16. Where the doc and the framework disagree, the framework wins — record the divergence in the doc.
+- First divergence found and recorded (doc v1.3): **`middleware.ts` is deprecated in Next 16, renamed `proxy.ts`**, exported function `proxy()`. The Stage 4 admin gate builds on `proxy.ts`. Note the bundled docs call Proxy a last resort — when Stage 4 arrives, do the session-refresh in `proxy.ts` but keep the real authorization check in the admin layout/server code, not only at the proxy.
 
 ---
 
