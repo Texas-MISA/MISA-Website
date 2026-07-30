@@ -1,9 +1,15 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.4
-**Status:** In progress — Stage 0
+**Version:** 1.5
+**Status:** In progress — Stage 1
 **Last updated:** July 2026
 
+> **v1.5:** §2.3 now covers Supabase account moves alongside Vercel's. Added
+> §2.4 (account inventory — what exists, who owns it, where credentials are)
+> and §2.5 (credential storage, an open decision for Stage 9). Flags the two
+> live single points of failure: the MISA email as universal recovery
+> address, and a sole GitHub org Owner.
+>
 > **v1.4:** added §2.3 — account ownership and transferability. Services live
 > under a dedicated org identity; every service is also individually
 > transferable, and the database is disposable by design (schema as
@@ -92,7 +98,7 @@ The dedicated account itself may need to move someday — a compromised email, a
 | Service | Handoff via shared login | Transfer between accounts | Notes |
 |---|---|---|---|
 | GitHub | ✔ | ✔ Settings → Transfer ownership; history, issues, and redirects preserved | **Done:** the repo lives in the `Texas-MISA` org and is public. Handoff = add the next owner, remove the last; no transfer needed. Public also sidesteps Vercel Hobby's restriction on deploying *private* org-owned repos. Officers work through their own GitHub accounts as org members, so no shared GitHub login exists or is needed. |
-| Supabase | ✔ | ✔ Project Settings → General → Transfer project (receiving org needs a free-tier slot) | Or skip transfer entirely: the database is **disposable by design** — see below. |
+| Supabase | ✔ | ✔ Three ways, see below | Project `misa-website`, ref `gbxypeofjnhrhotlhyzs`, region us-east-2. Or skip transfer entirely: the database is **disposable by design** — see below. |
 | Vercel | ✔ | ✔ Three ways, see below | Currently the MISA email's personal **Hobby** account (`txmisa-jds-projects`) — Vercel Teams are Pro-only, so there is no org-level scope on the free tier. This is therefore a shared-login handoff, unlike GitHub. |
 | Domain | ✔ (registrar login) | ✔ Registrar transfer: unlock + auth code, takes days | Slowest to move; keep the registrar login in the shared credentials, or leave it and re-point DNS. |
 
@@ -102,11 +108,49 @@ The dedicated account itself may need to move someday — a compromised email, a
 2. **Transfer the project.** Project Settings → Advanced → Transfer Project. Clean when the destination is a Vercel *team*; personal-to-personal is the awkward case on the free tier, since Teams are Pro-only.
 3. **Re-import.** Always works. A successor imports the repo and recreates 6 environment variables (2 values × production/preview/development). Do it with the CLI, not the dashboard — see the env-var warning below. What is lost: deployment history, logs, analytics, and possibly the `*.vercel.app` subdomain if the name is contested. A custom domain moves by removing it from the old project and adding it to the new, with DNS unchanged.
 
+**Moving Supabase off a given email**, same shape as Vercel:
+
+1. **Change the email on the account** — Account Settings. Keeps the project, its ref, all keys, and the database untouched. Simplest when the mailbox is the only thing changing.
+2. **Transfer the project** — Project Settings → General → Transfer project. The receiving organization needs a free-tier slot available (the free tier allows 2 active projects per account, which is what forced the dedicated account in the first place).
+3. **Recreate from migrations** — see the disposable-database paragraph below. Always available, and the fallback if the other two are blocked.
+
+CLI access is separate from dashboard access: `supabase login` stores a token per profile (`--profile <name>` keeps multiple accounts side by side; the token itself lives in the OS keyring, not in the repo). A successor runs `supabase login` and `supabase link --project-ref <ref>` and is current — nothing about the CLI needs transferring.
+
 **Manage Vercel environment variables through the CLI, not the dashboard.** They are stored encrypted and cannot be read back — `vercel env pull` returns empty strings for them — so a dashboard edit is a blind write over state nobody can inspect. Use `vercel env rm` followed by `printf '%s' "$VALUE" | vercel env add NAME <env>`, which also avoids invisible characters from copy-paste. Note that `NEXT_PUBLIC_*` values are inlined at build time, so any change requires a redeploy, not a restart.
 
 **The database is disposable, and must stay that way.** Because the full schema lives in `supabase/migrations/` and `seed.sql` in the repo, a brand-new database is: create project → `supabase link` → `db push` → update two env vars. Past years' data is not operationally needed — export tables to CSV (or `pg_dump`) for the archive before decommissioning, and start clean. This is the escape hatch if a transfer is ever awkward, and it only works under one discipline: **never change the schema through the dashboard SQL editor without capturing the change as a migration file.** The moment the live database and `migrations/` drift, the database stops being recreatable. (Within a school year, prefer the `term` column for resets — a new database is for handoffs and fresh starts, not semesters.)
 
-The Stage 9 handoff guide should amount to: the shared login, where the domain lives, and a pointer to this section.
+### 2.4 Account inventory
+
+Every account the project depends on. "The shared login" is not an actionable handoff instruction unless this table is filled in and current.
+
+| Account | Identity | What it controls | Credentials live |
+|---|---|---|---|
+| MISA email | shared org mailbox | The recovery address for every account below — the root of the whole tree | *TBD (§2.5)* |
+| GitHub org `Texas-MISA` | owned by the MISA email; officers join as members with their own accounts | The repository | No shared login; membership only |
+| Supabase | MISA email | Project `misa-website` / `gbxypeofjnhrhotlhyzs`, us-east-2 | *TBD (§2.5)* |
+| Supabase database password | — | `db push`, direct Postgres connections | ⚠️ Currently a plaintext file on one officer's laptop. **Must move.** |
+| Vercel | MISA email, personal Hobby account `txmisa-jds-projects` | Hosting, env vars, domain binding | *TBD (§2.5)* |
+| Domain registrar | not yet purchased (Stage 9) | DNS | *TBD (§2.5)* |
+
+**The MISA email is the single point of failure.** It is the password-reset address for everything else, so losing it is materially worse than losing any individual service. Two mitigations, both cheap:
+
+- **Keep at least two GitHub org Owners** — the MISA account plus one current officer's personal account. GitHub requires an owner to administer an org, and an org whose only owner is an inaccessible mailbox needs a slow manual support process to recover. This is the one live single point of failure in the current setup.
+- **Store 2FA recovery codes wherever the passwords are stored.** The standard student-org failure is a shared account with 2FA bound to one person's phone, and that person graduates. Recovery codes are what make the account survivable; a password alone is not enough.
+
+### 2.5 Credential storage — open decision
+
+**Not yet decided.** The rules below hold regardless of which vault is chosen; pick the vault during Stage 9 and fill in §2.4.
+
+What must be stored, for each account: the login email, the password, the 2FA recovery codes, and a one-line note on what breaks if it is lost. Plus the Supabase database password, which is not recoverable from any dashboard — only resettable.
+
+What must **not** be stored there, because it is already in the repo or regenerable: the Supabase anon/publishable key (public by design, §6), the project ref, and anything in `.env.example`.
+
+Requirements the vault has to meet: survives one person graduating, is not tied to a personal device, and can be handed to a successor as a unit. A shared password manager (Bitwarden's free org tier, or 1Password's student-org plan) meets all three. Storing everything inside the MISA Google account is simpler but circular — that account is the recovery path for the others, so it cannot also be the place its own recovery codes live.
+
+Until this is resolved, the Supabase database password sits in a plaintext file on one laptop, which fails all three requirements.
+
+The Stage 9 handoff guide should amount to: §2.4 filled in, the vault handed over, and a pointer to this section.
 
 ---
 
@@ -673,6 +717,8 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 | Officer edits an event's points and silently changes past standings | Medium | Medium | Edit-impact warning with affected-member count before saving; before/after captured in `admin_audit` |
 | Bulk email copy grabs only the visible page | Medium | Low | Explicit "select all N matching" semantics with the count shown on the copy confirmation; covered by tests in Stage 6 |
 | Project has no maintainer after handoff | High | High | Written handoff doc, plain-vanilla stack, no exotic dependencies; all services under one dedicated, transferable org account and the database recreatable from the repo (§2.3) |
+| MISA email lost or inaccessible | Low | High | It is the password-reset address for every other account, so this is the worst single failure. Keep ≥2 GitHub org Owners, and store 2FA recovery codes outside the account they protect (§2.4, §2.5) |
+| Credentials live only on one officer's laptop | High | High | Currently true of the Supabase database password. Resolve §2.5 and fill in §2.4 before handoff — a password nobody else can reach is the same as a lost one |
 | Scope creep delays past the semester start | High | Medium | Stage 10 exists precisely so good ideas can be recorded and deferred |
 
 ---
