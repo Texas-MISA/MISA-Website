@@ -35,10 +35,13 @@ bash scripts/seed-remote.sh             # apply seed.sql to the remote (no Docke
 
 Regenerate `lib/types/database.ts` after **every** migration — the generated types are what make the schema type-safe end to end (§2).
 
-Two sharp edges in the Supabase CLI on this machine:
+Three sharp edges in the Supabase CLI on this machine:
 
 - **`db query` reads only the first line of its SQL argument.** Multi-line SQL silently truncates and fails with a confusing syntax error. Flatten to one line, and remember Windows caps a command line near 8k characters — `scripts/seed-remote.sh` exists to work around both.
-- **`db reset` needs Docker Desktop**, which needs WSL. Until that's installed, work against the remote and correct a bad migration with a follow-up migration rather than a reset.
+- **`db reset` needs Docker Desktop running.** WSL 2 and Docker Desktop are both installed (Docker at the *user-level* path `%LOCALAPPDATA%\Programs\DockerDesktop`, not `C:\Program Files\Docker` — a default-path check wrongly reports it missing). The engine is not a service: if `docker info` fails on `npipe:////./pipe/dockerDesktopLinuxEngine`, launch `Docker Desktop.exe` and wait for it. `wsl --list` showing no distributions is also a red herring — Docker Desktop supplies its own `docker-desktop` distro.
+- **`~/.supabase/profile` breaks every command that shells out to the legacy Go child.** A dangling active-profile pointer (a bare name, no extension) makes the child feed the path to viper, which fails with `failed to read profile: Unsupported Config Type ""` → `LegacyGoChildExitError`. `start` and `db query --linked` are unaffected, so it looks like a `db reset`-only fault. The file was deleted (it contained just `misa`, and there is no `profiles` subcommand or config file defining it). Don't recreate it; `--profile` does not work around it.
+
+`npx supabase start` applies every migration and runs `seed.sql` itself, so a fresh stack is already a full rebuild-from-repo check. Local `config.toml` pins `major_version = 17`, matching the remote's 17.6.
 
 No test framework is chosen yet. Stage 3 requires explicit test cases for event-window resolution (§7, Stage 3), so pick the framework there and document the single-test invocation in this file at that point.
 
@@ -97,7 +100,11 @@ supabase/seed.sql
 components/ui/          shared primitives
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()
+vercel.json             function region pinned to cle1 (us-east-2) — same AWS
+                        region as the database; in-repo, not a dashboard setting
 ```
+
+`vercel build` **cannot run locally on Windows** — it fails with `EPERM: operation not permitted, symlink …` when emitting the function output, since symlinks need admin or Developer Mode. It gets far enough to validate `vercel.json` and compile routes, so it is still useful as a config check. Vercel's own builders are Linux and unaffected. Use `npm run build` for ordinary local builds.
 
 `app/actions/audit.ts` is the shared `admin_audit` writer — every other action calls it rather than inserting directly.
 

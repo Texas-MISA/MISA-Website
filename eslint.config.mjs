@@ -12,6 +12,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Tooling scratch dirs. Both are gitignored, but flat config does not read
+    // .gitignore, so they must be listed here or `npm run lint` fails on
+    // vendored/minified code that is not ours:
+    // - supabase/.temp/ holds the edge-runtime entrypoint written by `supabase start`
+    // - .vercel/ holds output from `vercel pull` / `vercel build`
+    "supabase/.temp/**",
+    ".vercel/**",
   ]),
 ]);
 
