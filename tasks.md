@@ -1,10 +1,12 @@
 # Tasks
 
-Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Currently scoped through Stage 1 — refill **Later** as stages are reached.
+Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
+
+**Stages 0 and 1 are complete.** Stage 2 is next; carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
-## Now — Stage 0: Foundations
+## Done — Stage 0: Foundations
 
 *Goal: a deployed skeleton, so deployment is never the thing that blocks a feature. Exit: a live URL that reads one row from Postgres. ~half a day.*
 
@@ -13,16 +15,11 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 - [x] Create the GitHub repo and push `main` — now [Texas-MISA/MISA-Website](https://github.com/Texas-MISA/MISA-Website), **public**, owned by the org (transferred from the personal account 2026-07-29, per §2.3)
 - [x] Import the repo into Vercel — scope `txmisa-jds-projects` (the MISA email's personal **Hobby** account; Vercel Teams are Pro-only, so there is no Texas-MISA team). Connected to `Texas-MISA/MISA-Website`. Production alias **`misa-website-beta.vercel.app`** (`misa-website.vercel.app` is taken by someone else).
 - [x] Deployment Protection no longer SSO-gates production — it defaulted to "All Deployments" on import and now returns 200.
-- [ ] Confirm previews are still gated: Settings → Deployment Protection should read **Standard Protection**, not Disabled. Previews inherit production env vars, so an open preview URL is a second public check-in form writing to the real database (§6).
-- [ ] Confirm push-to-`main` deploys
+- [x] Confirm push-to-`main` deploys — every commit this session triggered a build
 - [x] Create the Supabase project — `misa-website`, ref **`gbxypeofjnhrhotlhyzs`**, region **us-east-2 (Ohio)**, under the MISA account. CLI is linked and `supabase/` is initialized, so migrations go through `db push`.
   - Region chosen as the closest Supabase region to Austin (~1,700 km, vs us-east-1 ~2,000 and us-west-2 ~2,900). Neither AWS nor Vercel has a Texas region. **Regions are fixed at creation** — changing later means recreating the project.
   - Replaces the original `sqgqaxegeawtlccaxdij` in us-west-2, created and discarded the same day.
 - [x] **Delete the old `MISA Website` project** (ref `sqgqaxegeawtlccaxdij`, us-west-2) — done; `projects list` now shows only `misa-website`.
-- [ ] **Move the DB password out of `C:\Users\dadia\misa-supabase-db-password.txt`.** It's not recoverable from any dashboard, only resettable, and right now it exists on exactly one laptop. Blocked on §2.5 (which vault) — until then, at minimum get a copy somewhere the org can reach.
-- [ ] **Add a second GitHub org Owner** to `Texas-MISA` (the MISA account plus one officer's personal account). A sole owner that is an inaccessible mailbox needs a slow manual GitHub support process to recover — the one live single point of failure today (§2.4).
-- [ ] **Before adding more officers to the Texas-MISA org, narrow base permissions.** They're currently `Admin`, so every org member automatically gets admin on every repo — including delete and visibility changes. Fine at one member; too broad once officers rotate through. Conventional setup is base `Read`, granting Write/Admin deliberately per person or team. (`cgonztx-gif` is a `member`, not an Owner, and does not need to be: base permissions already give it full repo admin. Owner only adds org-level member/settings/billing management, which the MISA account handles.)
-- [ ] Vercel import: connect the **Texas-MISA** org, not the personal account, so the deployment is org-owned too (§2.3). The repo is public, which sidesteps the Hobby-tier restriction on private org repos.
 - [x] `.env.local` written with `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the new `sb_publishable_…` key format; template committed as `.env.example`). Confirmed gitignored. Service role key unused so far — server-only when it is, never `NEXT_PUBLIC_`.
 - [x] **Update the two Vercel env vars to the us-east-2 project** — done in settings.
   - `NEXT_PUBLIC_SUPABASE_URL` = `https://gbxypeofjnhrhotlhyzs.supabase.co`
@@ -30,11 +27,9 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
   - ⚠️ **`NEXT_PUBLIC_*` values are inlined at build time**, so editing them in Vercel settings changes nothing until a rebuild. Changing an env var always needs a redeploy — a restart won't do it.
   - ⚠️ This cost ~45 minutes across three failed dashboard edits. Root cause: the vars are stored **Sensitive**, so `vercel env pull` returns empty strings and nobody — including the dashboard — can read back what's actually stored. Each edit layered onto invisible state. Symptoms along the way: values in each other's slots, then a stray `│` (U+2502) copied out of a rendered markdown table giving 48 chars instead of 46.
   - ✅ **Fix env vars via the CLI, not the dashboard.** `vercel env rm` all copies, then `printf '%s' "$VALUE" | vercel env add NAME <env>` — no clipboard, no invisible characters. Correct lengths: URL 40 chars, anon key 46 chars, both pure ASCII. `/db-check` prints both lengths, which is what finally made this diagnosable.
-- [ ] **Set the Vercel function region to `cle1` (Cleveland)** — Settings → Functions. Currently `iad1`; `cle1` is both closest to Austin and ~230 km from the us-east-2 database.
 - [x] `lib/supabase/server.ts` and `lib/supabase/client.ts` (§10) — `@supabase/ssr` 0.12 pattern, async `cookies()`, lint/build clean
 - [x] Throwaway verification page `/db-check` written and **passing locally** (HTTP 200, row renders, RLS-gated via an explicit anon select policy)
 - [x] Confirm `/db-check` passes **on the deployed URL** — ✅ https://misa-website-beta.vercel.app/db-check returns 200 and renders the row. Verified request-time (timestamps differ across requests, `X-Vercel-Cache: MISS`), so the Vercel env vars are correct. **Stage 0 exit criteria met.**
-- [ ] Then tear down: delete `app/db-check/` and `drop table public._stage0_check;`
 - [x] Update the Commands section of `CLAUDE.md` with the verified `dev` / `build` / `lint` invocations and drop the "not yet verified" caveat
 
 **Noted during the scaffold** — carry into later stages:
@@ -46,7 +41,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
-## Blocking decisions
+## Done — schema decisions
 
 §9 lists 11 open decisions. Below is a proposed default for each — **my recommendation, your call.** Most confirm the schema already written in §4, so migrations aren't blocked on a long discussion. Check off to accept, or strike through and write your own.
 
@@ -73,7 +68,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
-## Next — Stage 1: Data Layer
+## Done — Stage 1: Data Layer
 
 *Goal: the schema exists and enforces its own rules. Exit: invalid data is rejected by the database, verified by hand in the SQL editor. 1–2 days — don't rush this; schema changes get expensive once UI depends on them.*
 
@@ -115,18 +110,34 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 **Known caveat:** the `admin_audit` append-only trigger does not stop a table owner — cleaning up test rows required disabling it. It blocks the app and every client role; the service-role and dashboard paths are governed by Stage 8's RLS work. §6 currently claims append-only slightly more strongly than the trigger alone delivers.
 
-**Remaining before Stage 2:**
+## Loose ends
 
-- [ ] Install WSL (`wsl --install`, needs a reboot) then Docker Desktop, so `supabase db reset` works. Everything above was done against the remote.
-- [ ] Drop the Stage 0 scaffolding once something real reads from the database: delete `app/db-check/`, and drop `_stage0_check` in a migration
+Carried over from Stage 0. None block Stage 2.
 
----
+- [ ] **Install WSL** (`wsl --install`, needs a reboot) **then Docker Desktop**, so `supabase db reset` works. Everything so far ran against the remote.
+- [ ] **Set the Vercel function region to `cle1`** (Settings → Functions). Currently `iad1`; `cle1` is closest to Austin and ~230 km from the us-east-2 database.
+- [ ] **Confirm Deployment Protection reads Standard Protection**, not Disabled — previews inherit production env vars and would otherwise be a second public check-in form writing to the real database (§6).
+- [ ] **Move the DB password** out of the plaintext file in the home directory. Not recoverable from any dashboard, only resettable, and it exists on one laptop. Blocked on §2.5.
+- [ ] **Add a second GitHub org Owner** to `Texas-MISA` — a sole owner that is an inaccessible mailbox is the one live single point of failure (§2.4).
+- [ ] **Narrow org base permissions from Admin to Read** before more officers join, then grant per person or team (§2.4).
+
+## Now — Stage 2: Public landing page
+
+*Goal: something worth showing people. Exit: a stranger understands what the org does and when it meets. 2–3 days, mostly content and design rather than logic.*
+
+- [ ] Org overview, mission, meeting cadence, contact/social links — **needs real copy from you**; I can only put placeholders in
+- [ ] Upcoming events pulled live from `events where status = 'published'` and `starts_at > now()`. The seed has `Fall Kickoff` published and `Fall Info Session` as a draft, so the draft must *not* appear — that is the test.
+- [ ] Officer roster section (static content is fine for v1)
+- [ ] Mobile-first responsive layout — §1.2 targets a check-in in under 20 seconds on a phone, and this page sets the layout conventions the rest inherits
+- [ ] Replace the `create-next-app` boilerplate in `app/page.tsx` and drop the unused `public/*.svg` assets
+- [ ] Once the landing page reads events, tear down the Stage 0 scaffolding: delete `app/db-check/`, and drop `_stage0_check` in a migration
+
+**Watch for:** this is the first page to read Supabase in anger. `lib/supabase/server.ts` exists and is proven, but nothing has yet used the generated types — expect to import `Database` from `lib/types/database.ts` and thread it through `createClient()`.
 
 ## Later
 
 Placeholders — expand on arrival. Effort estimates from §7.
 
-- **Stage 2 — Public landing page** · 2–3 days · mostly content and design
 - **Stage 3 — Attendance capture** · 3–4 days · the core feature; budget most of it for the 7 explicit edge cases in §7, not the happy path. Pick the test framework here.
 - **Stage 4 — Admin foundation & event management** · 6–7 days · duplicate-event and recurring-series creation are what make it worth its size
 - **Stage 5 — Attendance review & point adjustments** · 5–6 days · until this ships, pending rows accumulate with no way to resolve them

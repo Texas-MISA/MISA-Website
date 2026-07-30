@@ -1,9 +1,17 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.8
-**Status:** In progress — Stage 1
+**Version:** 1.9
+**Status:** Stages 0–1 complete; Stage 2 next
 **Last updated:** July 2026
 
+> **v1.9:** §4 reconciled with the migrations that were actually built.
+> Check-in windows are **half-open** in both `open_event_at()` and a new
+> exclusion constraint, so back-to-back events are publishable;
+> `nearby_events()` gains a third `case` branch so a concurrent event has a
+> zero gap rather than a negative one. `supabase/migrations/` is now stated to
+> be the authority over §4.1. The §6 append-only claim is qualified: triggers
+> bind the app and client roles, not a table owner.
+>
 > **v1.8:** terms are **derived from dates, never typed** (§4.7).
 > `events.term` is a generated column producing `'Fall 2026'` / `'Spring 2027'`
 > from `starts_at`, anchored to America/Chicago, with half-open boundaries at
@@ -196,6 +204,15 @@ The Stage 9 handoff guide should amount to: §2.4 filled in, the vault handed ov
 
 ### 4.1 Tables
 
+> **`supabase/migrations/` is the authority; this section is the readable
+> version.** The schema below is implemented and verified. The migrations add
+> detail deliberately left out here to keep it legible: indexes supporting the
+> review queue and directory filters, not-blank checks on required text (a bare
+> `not null` accepts `''`), an `updated_at` trigger on `events`, append-only
+> triggers on `admin_audit`, and `enable row level security` on every table —
+> deny-all until the policies land in Stage 8. If the two ever disagree, the
+> migrations are right and this section is stale.
+
 ```sql
 -- Roster. Seeded by admins, and also self-populating: an unrecognized student
 -- ID at check-in creates a member immediately, with no officer confirmation
@@ -370,13 +387,27 @@ language sql stable as $$
   from events
   where status = 'published'
     and ts >= coalesce(checkin_opens_at, starts_at)
-    and ts <= coalesce(checkin_closes_at, ends_at)
+    and ts <  coalesce(checkin_closes_at, ends_at)
   order by starts_at desc
   limit 1;
 $$;
 ```
 
-Ambiguity is prevented by an exclusion constraint or an application-level check that rejects creating overlapping published events, so at most one event can be open at any instant.
+**Windows are half-open: `>= opens`, `< closes`.** Earlier drafts closed inclusively, which made adjacent events impossible to publish — a workshop ending at 19:00 and a social starting at 19:00 both claim that instant. Half-open lets them coexist, and 19:00 belongs to exactly one of them.
+
+Ambiguity is prevented by a **Postgres exclusion constraint** rather than an application check, so it holds regardless of which code path writes the event:
+
+```sql
+alter table events
+  add constraint events_no_overlapping_checkin
+  exclude using gist (
+    tstzrange(coalesce(checkin_opens_at, starts_at),
+              coalesce(checkin_closes_at, ends_at), '[)') with &&
+  )
+  where (status = 'published');
+```
+
+The range bounds `'[)'` must match `open_event_at()`; if one is inclusive and the other is not, either adjacent events become unpublishable or an instant matches two events. No `btree_gist` needed — gist handles `tstzrange &&` natively, and the `status` filter is a predicate rather than an indexed column.
 
 When no event is open, the submission is still accepted — but only within a bounded **orphan grace window**, so the form can't be used to manufacture attendance in the middle of summer:
 
@@ -384,15 +415,21 @@ When no event is open, the submission is still accepted — but only within a bo
 create or replace function nearby_events(ts timestamptz default now(), window_hours int default 48)
 returns table (event_id uuid, title text, starts_at timestamptz, ends_at timestamptz, gap interval)
 language sql stable as $$
-  select id, title, starts_at, ends_at,
-         case when ts > ends_at then ts - ends_at else starts_at - ts end
-  from events
-  where status = 'published'
-    and ts between starts_at - make_interval(hours => window_hours)
-                and ends_at   + make_interval(hours => window_hours)
-  order by 5 asc;
+  select e.id, e.title, e.starts_at, e.ends_at,
+         case
+           when ts > e.ends_at   then ts - e.ends_at
+           when ts < e.starts_at then e.starts_at - ts
+           else interval '0'
+         end as gap
+  from events e
+  where e.status = 'published'
+    and ts between e.starts_at - make_interval(hours => window_hours)
+               and e.ends_at   + make_interval(hours => window_hours)
+  order by gap asc;
 $$;
 ```
+
+The three-way `case` matters: a timestamp *inside* an event's run has a gap of zero, not a negative one. A two-branch version returns `starts_at - ts` for that case, which sorts genuinely-concurrent events *below* distant ones and puts the wrong suggestion at the top of the officer's list.
 
 If `nearby_events()` returns nothing, the check-in is refused outright with a message. If it returns rows, the submission is stored as `pending` and those rows become the ranked suggestions an officer sees in the review queue.
 
@@ -605,7 +642,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Attendance data enumeration | `/lookup` requires student ID **and** matching email before returning history |
 | Roster PII exposure | Emails and student IDs never returned to unauthenticated clients under any route |
 | Roster pollution via self-registration | The check-in form can create members (§4.2), so junk rows are reachable by anyone who can submit during an open window. Bounded by the window, honeypot, and rate limit; contained by matching on email before creating; visible via `members.source = 'self_checkin'` in the directory. Impact is cleanup, not data loss. |
-| Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. The log is append-only and not deletable from the app. |
+| Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. Triggers reject `UPDATE` and `DELETE`, so the log is append-only for the app and every client role. **Note the limit:** a table owner can disable the trigger, so this constrains the application, not someone with direct database access. Stage 8's RLS policies are what close the client-role path properly. |
 | Bulk roster export leaks member PII | Export is the largest PII egress point in the system. Gate it behind an authenticated session, log every export to `admin_audit` with the filter used and row count, and consider restricting it to the `admin` role. |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
 | Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. |
@@ -632,6 +669,8 @@ Stages are ordered so that each one ends with something demonstrable. Effort est
 **Exit criteria:** a live URL that reads one row from Postgres.
 **Effort:** ~half a day.
 
+**✅ Complete (2026-07-29).** Live at `misa-website-beta.vercel.app`, deploying from `Texas-MISA/MISA-Website` on push to `main`.
+
 ---
 
 ### Stage 1 — Data Layer
@@ -644,6 +683,8 @@ Stages are ordered so that each one ends with something demonstrable. Effort est
 
 **Exit criteria:** invalid data (overlapping events, duplicate check-ins, `ends_at` before `starts_at`) is rejected by the database, verified by hand in the SQL editor.
 **Effort:** 1–2 days. Do not rush this stage; schema changes get expensive once UI depends on them.
+
+**✅ Complete (2026-07-29).** Eight migrations, verified against the live project by attempting each violation and checking the SQLSTATE. Seeded with 32 members, 15 events, and 208 attendance rows covering pending, rejected, cancelled-event, and officer-entered cases. See `tasks.md` for the full result table.
 
 ---
 

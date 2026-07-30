@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stage 0, partly done.** Next.js is scaffolded and committed; Supabase is not yet created and there is no schema, no `lib/`, and no deployment. See `tasks.md` for exactly what remains in Stage 0.
+**Stages 0–1 complete; Stage 2 (public landing page) is next.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. No feature UI exists yet — `app/` holds the default landing page and a throwaway `/db-check` diagnostic. See `tasks.md`.
 
 `docs/student-org-website-architecture.md` is the source of truth for this project: a student-org attendance system replacing spreadsheet tracking. Section references below (§) point into it. `tasks.md` is the short-horizon checklist.
 
@@ -25,15 +25,20 @@ npm run start               # serve the production build
 npm run lint                # eslint (flat config in eslint.config.mjs)
 ```
 
-Not yet installed — these come with Stage 1:
-
 ```bash
-npx supabase db push        # apply migrations to the linked project
-npx supabase db reset       # re-run all migrations + seed.sql (destructive, local)
+npx supabase db push                    # apply pending migrations to the linked project
+npx supabase db reset                   # wipe, re-run migrations + seed.sql (local; needs Docker)
+npx supabase db query --linked "<sql>"  # ad-hoc SQL against the remote
 npx supabase gen types typescript --linked > lib/types/database.ts
+bash scripts/seed-remote.sh             # apply seed.sql to the remote (no Docker needed)
 ```
 
 Regenerate `lib/types/database.ts` after **every** migration — the generated types are what make the schema type-safe end to end (§2).
+
+Two sharp edges in the Supabase CLI on this machine:
+
+- **`db query` reads only the first line of its SQL argument.** Multi-line SQL silently truncates and fails with a confusing syntax error. Flatten to one line, and remember Windows caps a command line near 8k characters — `scripts/seed-remote.sh` exists to work around both.
+- **`db reset` needs Docker Desktop**, which needs WSL. Until that's installed, work against the remote and correct a bad migration with a follow-up migration rather than a reset.
 
 No test framework is chosen yet. Stage 3 requires explicit test cases for event-window resolution (§7, Stage 3), so pick the framework there and document the single-test invocation in this file at that point.
 
@@ -70,6 +75,9 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **Don't auto-resolve near-misses.** A submission five minutes past the window is probably legitimate, but auto-approving it just moves the boundary. Keep the human in the loop and make the human's job fast instead. (§7, Stage 5)
 - **"Select all N matching this filter" is not "select the 25 rows on this page."** Conflating them silently produces partial email lists — the classic bug in this kind of screen. (§7, Stage 6)
 - **The database must stay disposable.** Every schema change is a file in `supabase/migrations/` — never applied only through the dashboard SQL editor. The whole handoff/transfer story (§2.3) rests on `create project → link → db push` recreating the database from the repo alone; drift between the live schema and `migrations/` breaks it silently. (§2.3)
+- **Check-in window bounds are half-open (`>= opens`, `< closes`) in three places that must agree:** the `events_no_overlapping_checkin` exclusion constraint, `open_event_at()`, and any application-side window logic. Making one inclusive either blocks back-to-back events from being published or lets one instant match two events. (§4.3)
+- **RLS is enabled with no policies on every table** — deny-all until Stage 8 writes them. New tables must do the same in their own migration. Reads reach clients only through `leaderboard` and `member_directory`, which run as owner and are the security boundary. (§4.4)
+- **`seed.sql` must not use trailing inline comments.** `scripts/seed-remote.sh` flattens each chunk onto one line, so a `--` after code would comment out everything following it. Full-line comments are stripped and safe.
 
 ## Layout
 
