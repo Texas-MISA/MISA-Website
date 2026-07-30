@@ -8,8 +8,7 @@ import type { Database } from "@/lib/types/database";
  *
  * Uses the anon key: every query made through this client is subject to RLS,
  * which assumes the anon role is hostile (architecture doc §3, §6). Officer
- * sessions ride along via auth cookies once Supabase Auth is wired up in
- * Stage 4.
+ * sessions ride along via the auth cookies this client reads.
  *
  * Call per request — never cache the returned client across requests.
  */
@@ -30,9 +29,13 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // cookies() is read-only during Server Component rendering.
-            // Session refresh happens in proxy.ts instead (Stage 4), so
-            // swallowing the write here is safe.
+            // cookies() is read-only during Server Component rendering, but
+            // writable in Server Actions and Route Handlers — so sign-in
+            // persists its cookies fine and only render-time refreshes land
+            // here. Those are covered by proxy.ts, which runs on every /admin
+            // request and is where token refresh actually sticks. Swallowing
+            // the write is only safe because proxy.ts exists; see its comment
+            // for what breaks otherwise.
           }
         },
       },

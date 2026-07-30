@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
+**Stages 0–4 complete.** Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row. Stage 5 (attendance review) is next.
+
 **Stages 0–1 complete; Stage 2 (public site) in progress; Stage 3 (attendance capture) built and tested.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. `app/(public)/` recreates all six pages of the existing Squarespace site, [txmisa.org](https://www.txmisa.org/) — see `docs/existing-site-inventory.md` for what was reproduced and what was deliberately left as a placeholder (photography, partner logos, the contact form backend). The home page reads published upcoming events live, and `/attend` is the public check-in form backed by the `submitCheckin` Server Action (needs `SUPABASE_SERVICE_ROLE_KEY` in the environment). See `tasks.md`.
 
 Content carried over from the old site lives in `lib/site.ts` (mission, pillars, socials, emails, partners) and `lib/officers.ts` (the 13-officer roster) — edit those rather than hardcoding copy into pages. The recreation is a starting point for a heavier redesign, not a final design.
@@ -35,6 +37,15 @@ npx supabase gen types typescript --linked > lib/types/database.ts
 bash scripts/seed-remote.sh             # apply seed.sql to the remote (no Docker needed)
 ```
 
+```bash
+# Officer accounts (§2.3, §6). Password comes from stdin or OFFICER_PASSWORD,
+# never argv. `db reset` wipes local auth.users, so re-run --local after one.
+node scripts/create-officer.mjs --local --email dev@example.edu --role admin
+node --env-file=.env.local scripts/create-officer.mjs --email you@utexas.edu --role admin
+node --env-file=.env.local scripts/create-officer.mjs --email you@utexas.edu --reset-password
+node --env-file=.env.local scripts/create-officer.mjs --email them@utexas.edu --revoke
+```
+
 Regenerate `lib/types/database.ts` after **every** migration — the generated types are what make the schema type-safe end to end (§2).
 
 Three sharp edges in the Supabase CLI on this machine:
@@ -42,6 +53,7 @@ Three sharp edges in the Supabase CLI on this machine:
 - **`db query` reads only the first line of its SQL argument.** Multi-line SQL silently truncates and fails with a confusing syntax error. Flatten to one line, and remember Windows caps a command line near 8k characters — `scripts/seed-remote.sh` exists to work around both.
 - **`db reset` needs Docker Desktop running.** WSL 2 and Docker Desktop are both installed (Docker at the *user-level* path `%LOCALAPPDATA%\Programs\DockerDesktop`, not `C:\Program Files\Docker` — a default-path check wrongly reports it missing). The engine is not a service: if `docker info` fails on `npipe:////./pipe/dockerDesktopLinuxEngine`, launch `Docker Desktop.exe` and wait for it. `wsl --list` showing no distributions is also a red herring — Docker Desktop supplies its own `docker-desktop` distro.
 - **Newer stacks don't auto-grant table privileges to the API roles.** A fresh local stack gives anon/authenticated/service_role only `TRUNCATE/REFERENCES/TRIGGER` on new tables — every API read/write fails with 42501 no matter what RLS says. The remote project predates the change, which is why production worked while local tests couldn't insert as service_role. Migration `20260730000012_api_role_grants.sql` codifies the classic grants (plus default privileges for future tables); RLS remains the actual security boundary.
+- **`db reset` does not re-read `config.toml`.** Container environment is baked at `supabase start`, so `db reset` replays migrations against containers still holding the old settings. A changed `jwt_expiry` (or any other `[auth]` value) needs a full `stop` + `start`. The symptom is a config change that appears to do nothing; confirm with `docker inspect supabase_auth_MISA-Website --format '{{range .Config.Env}}{{println .}}{{end}}' | grep GOTRUE_`.
 - **`~/.supabase/profile` breaks every command that shells out to the legacy Go child.** A dangling active-profile pointer (a bare name, no extension) makes the child feed the path to viper, which fails with `failed to read profile: Unsupported Config Type ""` → `LegacyGoChildExitError`. `start` and `db query --linked` are unaffected, so it looks like a `db reset`-only fault. The file was deleted (it contained just `misa`, and there is no `profiles` subcommand or config file defining it). Don't recreate it; `--profile` does not work around it.
 
 `npx supabase start` applies every migration and runs `seed.sql` itself, so a fresh stack is already a full rebuild-from-repo check. Local `config.toml` pins `major_version = 17`, matching the remote's 17.6.
@@ -53,6 +65,10 @@ npm test                                              # all tests (needs: Docker
 npm run test:watch                                    # watch mode
 npx vitest run tests/checkin.test.ts -t "<test name>" # single test
 ```
+
+Stage 4 added `tests/events.test.ts` (pure — DST, half-open windows, edit-impact maths; no database) and `tests/event-actions.test.ts` (integration — 23P01 batch atomicity, the `updated_at` compare-and-set, append-only `admin_audit`, `term_of`). `vitest.config.ts` aliases `server-only` to `tests/stubs/server-only.ts`, because that marker package throws outside a Server Component and the tests need to import `lib/supabase/admin.ts` and `app/actions/audit.ts`.
+
+`tests/helpers.ts`'s `getTestOfficer()` creates one officer and **never deletes it**: `admin_audit` rows can't be deleted (P0001 from the append-only trigger), `admin_audit.actor_id` has no cascade, so an officer who has written any audit row is undeletable. Audit rows are likewise left behind by `cleanup()`. That is safe only because the local stack is disposable and `global-setup.ts` refuses any non-local URL.
 
 Test identities are obviously fake (`T3-…` IDs, `example.edu`); fixture events live in 2030, each test in its own 7-day slot so no 48-hour orphan window reaches a neighbour's events.
 
@@ -81,6 +97,11 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **`present_requires_resolution` is load-bearing.** `status = 'present'` guarantees both `event_id` and `member_id` are non-null, so leaderboard queries can trust the status alone. Never work around it in application code. (§4.1)
 - **Match and dedupe on `normalized_student_id`**, the generated column, never the raw `submitted_student_id`. `ut-12345`, `UT 12345`, and `UT12345` are the same person. (§4.2)
 - **Every officer mutation writes an `admin_audit` row** — actor, timestamp, before/after JSON, reason. One audit table keyed `(entity_type, entity_id)`; do not add per-entity audit tables. Append-only: no client role may update or delete a row. (§4.2, §6)
+- **Authorization lives in `lib/auth.ts`, not in `proxy.ts`.** Proxy refreshes the session and does an optimistic redirect only — no database query, because it runs on prefetches. Every admin page and layout calls `requireOfficer()`; every admin Server Action starts with `getOfficer()` and returns `{status:"unauthorized"}`. Actions must not call `requireOfficer()`: `redirect()` throws `NEXT_REDIRECT`, and the house try/catch would swallow it. For the same reason **every `redirect()` goes outside the try/catch**. (§5, doc v1.19)
+- **`app/actions/audit.ts` must never gain a `"use server"` directive.** Every export of such a module is a public endpoint, and a client-callable `writeAudit(actorId, …)` would let anyone forge audit rows under any officer's name. It is a plain `server-only` module.
+- **Carry `updated_at` as the raw PostgREST string.** It has microsecond precision; a JS `Date` round trip truncates to milliseconds, and the edit compare-and-set then never matches, reporting a phantom conflict on every save.
+- **React 19 resets an uncontrolled `<form action={…}>` once the action resolves.** Any admin form that re-renders with server state (validation errors, the §4.6 confirmation) must echo the submitted values back in that state and drive every `defaultValue` from them — otherwise the officer's edits silently revert and a confirmation saves the old values.
+- **Never build a timestamp with `new Date("2026-09-01T18:00")`.** The server runs in UTC. Wall-clock times go through `centralWallTimeToInstant()` in `lib/events.ts`, which iterates civil dates and attaches the zone last — the only thing that keeps a weekly 6pm meeting at 6pm across the November DST change.
 - **Point adjustments require a `reason`, are voided rather than deleted, and may be negative.** A void is itself a recorded action with its own reason. (§4.2)
 - **The public `leaderboard` shows a single `total_points`; `member_directory` keeps `attendance_points` and `bonus_points` split.** This asymmetry is deliberate (§4.4) — the officer-facing directory and the `/admin/points` ledger are where discretionary grants stay visible, since the public board no longer reveals them. Don't "fix" the inconsistency by collapsing the directory columns too.
 - **Both views are scoped to `current_term()`.** Any new aggregate must use the same scope, denominators included — an all-time `events_possible` against a current-term `events_attended` understates every rate and still looks plausible. (§4.4, §4.5)
@@ -104,8 +125,19 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         and later /attend, /leaderboard, /lookup. layout.tsx here
                         holds the shared header/footer; _components/ holds
                         page-private pieces (leading underscore = not a route)
-app/admin/              login, dashboard, events/, members/, attendance/, points/, audit/
-app/actions/            attendance.ts (submitCheckin — live); later events.ts, members.ts, points.ts, audit.ts
+app/admin/login/        officer sign-in — deliberately OUTSIDE the (shell) group,
+                        whose layout calls requireOfficer(); inside it, signing
+                        in would be impossible
+app/admin/(shell)/      authed chrome + dashboard, events/; later members/,
+                        attendance/, points/, audit/. Route groups don't appear
+                        in URLs, so §5's route table is unchanged
+app/actions/            attendance.ts (submitCheckin), auth.ts, events.ts,
+                        audit.ts (shared writer, no "use server" — see Invariants);
+                        later members.ts, points.ts
+lib/auth.ts             getOfficer / requireOfficer — the authorization boundary
+lib/events.ts           event domain core: Central wall-clock conversion, window
+                        helpers, expandSeries, previewEventEdit — no next/* imports
+scripts/create-officer.mjs  officer bootstrap / password reset / revoke
 lib/supabase/           server.ts (anon server client), client.ts (browser client),
                         admin.ts (service-role client, `server-only`-guarded)
 lib/types/database.ts   generated — do not hand-edit

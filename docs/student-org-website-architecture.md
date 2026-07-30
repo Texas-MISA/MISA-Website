@@ -1,9 +1,64 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.18
-**Status:** Stages 0–1 complete; Stage 2 in progress; Stage 3 built and tested
+**Version:** 1.19
+**Status:** Stages 0–3 complete; Stage 4 (admin foundation & event management) built and tested
 **Last updated:** July 2026
 
+> **v1.19: Stage 4 is built and verified end-to-end against the local stack.**
+> Officers sign in at `/admin/login`, run the whole schedule from `/admin/events`,
+> and every mutation writes an `admin_audit` row. 97 tests across 6 files.
+> Decisions made and now normative:
+>
+> - **Authorization is a Data Access Layer, not the proxy.** §5 said `proxy.ts`
+>   checks the session *and* a matching `admin_profiles` row. Next 16's own
+>   docs say Proxy "should not be used as a full session management or
+>   authorization solution" and warn against database queries there, because it
+>   runs on prefetches. **Resolution:** `proxy.ts` refreshes the session and
+>   does an optimistic no-session redirect; `lib/auth.ts` (`getOfficer` /
+>   `requireOfficer`) is the real check and runs in the shell layout, in every
+>   page, and at the top of every Server Action. Server Actions POST to the
+>   route they are rendered on, so a matcher change would otherwise silently
+>   drop coverage — the per-action check is not belt-and-braces.
+> - **`redirect()` must live outside the house try/catch.** It signals by
+>   throwing `NEXT_REDIRECT`, which the standard action shape would otherwise
+>   swallow into `{status:"error"}`. For the same reason admin actions call
+>   `getOfficer()` and return an `unauthorized` state rather than
+>   `requireOfficer()`.
+> - **`app/actions/audit.ts` carries no `"use server"` directive.** Every export
+>   of a `"use server"` module is a publicly callable endpoint, so a
+>   client-reachable `writeAudit(actorId, …)` would let anyone forge audit rows
+>   under any officer's name — inverting the §6 control. It is a plain module
+>   guarded by `server-only`, at the path CLAUDE.md specifies.
+> - **Audit writes are not atomic with their mutation, deliberately.**
+>   PostgREST cannot transact across statements. On an audit-insert failure the
+>   action logs loudly and still reports success, because the mutation really
+>   did happen and reporting failure invites a duplicate retry. Recorded in §8;
+>   the eventual fix is one plpgsql RPC per mutation.
+> - **`/admin/login` sits outside an `app/admin/(shell)/` route group** whose
+>   layout calls `requireOfficer()` — otherwise signing in is impossible. Route
+>   groups do not appear in URLs, so §5's route table is unchanged.
+> - **Officers are bootstrapped by `scripts/create-officer.mjs`**, not by a
+>   seeded SQL script as §6 suggested: `supabase/seed.sql` is applied to the
+>   *remote* by `scripts/seed-remote.sh` and this repository is public, so any
+>   password there would be a published production credential. The script also
+>   carries `--reset-password` (the v1 recovery path — self-serve reset needs
+>   SMTP that does not exist) and `--revoke`, which deletes the
+>   `admin_profiles` row but keeps the auth user, since `admin_audit.actor_id`
+>   references it with no cascade. Revoking preserves history; deleting would
+>   fail or erase it.
+> - **The edit-impact confirmation is also optimistic concurrency.** The token
+>   binds the proposed values to the row's `updated_at`, and that same raw
+>   string backs the write as a compare-and-set. `updated_at` has microsecond
+>   precision and must never be round-tripped through a JS `Date` — truncating
+>   to milliseconds makes the CAS never match and every save report a phantom
+>   conflict.
+> - **Series publish is all-or-nothing, with a pre-flight.** One `UPDATE` is
+>   one transaction, so a single collision rejects the whole batch — correct,
+>   but opaque. `findWindowConflicts()` names the colliding occurrence before
+>   the attempt, and the officer chooses between fixing it and publishing the
+>   rest. The pre-flight is a UX affordance; the exclusion constraint remains
+>   the guarantee.
+>
 > **v1.18: Stage 3 (attendance capture) is built, tested, and verified
 > end-to-end locally.** `/attend` + the `submitCheckin` Server Action resolve
 > submissions per §4.2/§4.3; all three §7 exit criteria were exercised through
@@ -1068,6 +1123,9 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 | MISA email lost or inaccessible | Low | High | It is the password-reset address for every other account, so this is the worst single failure. Keep ≥2 GitHub org Owners, and store 2FA recovery codes outside the account they protect (§2.4, §2.5) |
 | Credentials live only on one officer's laptop | High | High | Currently true of the Supabase database password. Resolve §2.5 and fill in §2.4 before handoff — a password nobody else can reach is the same as a lost one |
 | Scope creep delays past the semester start | High | Medium | Stage 10 exists precisely so good ideas can be recorded and deferred |
+| A mutation succeeds but its `admin_audit` row does not | Low | Medium | **Accepted for v1 (Stage 4).** PostgREST cannot transact across statements, so the mutation and the audit insert are two round trips. The action logs the failure and still reports success, because the change really happened and reporting failure would invite a duplicate retry. Controls: every mutation's audit row is asserted in the Vitest suite, and the fix — one plpgsql RPC per mutation doing both in one transaction — is a post-v1 item |
+| No officer can sign in because nobody can reset a password | Medium | High | There is no self-serve password reset: it needs SMTP, and the built-in sender is capped at 2 emails/hour and not for production. The v1 path is `scripts/create-officer.mjs --reset-password` run by another officer, or the Supabase dashboard. Keep ≥2 officers with `admin_profiles` rows so this is never one person's problem (§2.4) |
+| A recurring series silently shifts an hour after the November clock change | Low | Medium | Series expansion iterates Central civil dates and attaches wall time last, never adding 7×24h to a UTC instant. Locked down by fixtures either side of the 2026-11-01 transition |
 
 ---
 

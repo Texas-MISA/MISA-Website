@@ -1,0 +1,256 @@
+"use client";
+
+import Link from "next/link";
+import { useActionState } from "react";
+
+import { createSeries, type SeriesFormState } from "@/app/actions/events";
+import {
+  EVENT_CATEGORIES,
+  formatCategory,
+  MAX_SERIES_EVENTS,
+} from "@/lib/events";
+
+// Client Component for useActionState. Weekdays are checkboxes sharing one
+// name, so they arrive as a repeated form field and the action reads them with
+// formData.getAll.
+
+const INITIAL: SeriesFormState = { status: "idle" };
+
+const inputClass =
+  "border border-black/70 bg-misa-panel px-3 py-2 text-base w-full";
+
+const WEEKDAYS = [
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+] as const;
+
+export function SeriesForm({ defaultDate }: { defaultDate: string }) {
+  const [state, formAction, pending] = useActionState(createSeries, INITIAL);
+
+  const fieldErrors =
+    state.status === "invalid" ? state.fieldErrors : undefined;
+
+  if (state.status === "created") {
+    return (
+      <div
+        role="status"
+        className="border-l-4 border-green-800 bg-misa-panel px-6 py-6"
+      >
+        <h2 className="font-display text-xl font-bold">
+          {state.count} draft {state.count === 1 ? "event" : "events"} created
+        </h2>
+        <p className="mt-2 leading-6 text-foreground/85">
+          They share one series and none of them are public yet. Review the
+          schedule, then publish the whole series at once.
+        </p>
+        <Link
+          href={`/admin/events?series=${state.seriesId}&term=all`}
+          className="mt-4 inline-block rounded-full bg-misa-blue px-8 py-2.5 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
+        >
+          REVIEW THE SERIES
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <form action={formAction} className="flex flex-col gap-6" noValidate>
+      {(state.status === "error" || state.status === "unauthorized") && (
+        <p
+          role="alert"
+          className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+        >
+          {state.status === "unauthorized"
+            ? "Your session expired — sign in again and resubmit."
+            : "Something went wrong creating the series. Nothing was saved."}
+        </p>
+      )}
+
+      <Field label="Title" error={fieldErrors?.title}>
+        <input
+          type="text"
+          name="title"
+          required
+          placeholder="General Meeting"
+          className={inputClass}
+        />
+      </Field>
+
+      <Field label="Description" error={fieldErrors?.description}>
+        <textarea name="description" rows={2} className={inputClass} />
+      </Field>
+
+      <Field label="Location" error={fieldErrors?.location}>
+        <input type="text" name="location" className={inputClass} />
+      </Field>
+
+      <fieldset className="border border-black/20 px-4 py-4">
+        <legend className="px-2 text-sm font-medium">Repeats on</legend>
+        {fieldErrors?.weekdays && (
+          <span role="alert" className="text-xs text-red-700">
+            {fieldErrors.weekdays[0]}
+          </span>
+        )}
+        <div className="mt-2 flex flex-wrap gap-4">
+          {WEEKDAYS.map((day) => (
+            <label key={day.value} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="weekdays"
+                value={day.value}
+                defaultChecked={day.value === 2}
+              />
+              {day.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Field label="First date (Central)" error={fieldErrors?.date}>
+          <input
+            type="date"
+            name="date"
+            required
+            defaultValue={defaultDate}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Repeat until (inclusive)" error={fieldErrors?.untilDate}>
+          <input
+            type="date"
+            name="untilDate"
+            required
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Field label="Starts" error={fieldErrors?.startTime}>
+          <input
+            type="time"
+            name="startTime"
+            required
+            defaultValue="18:00"
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Ends" error={fieldErrors?.endTime}>
+          <input
+            type="time"
+            name="endTime"
+            required
+            defaultValue="19:00"
+            className={inputClass}
+          />
+        </Field>
+      </div>
+
+      <fieldset className="border border-black/20 px-4 py-4">
+        <legend className="px-2 text-sm font-medium">Check-in window</legend>
+        <div className="mt-2 grid gap-6 sm:grid-cols-2">
+          <Field label="Opens early (minutes)">
+            <input
+              type="number"
+              name="openEarlyMinutes"
+              min={0}
+              max={1440}
+              defaultValue={15}
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Closes late (minutes)">
+            <input
+              type="number"
+              name="closeLateMinutes"
+              min={0}
+              max={1440}
+              defaultValue={15}
+              className={inputClass}
+            />
+          </Field>
+        </div>
+      </fieldset>
+
+      <div className="grid gap-6 sm:grid-cols-2">
+        <Field label="Points per occurrence" error={fieldErrors?.points}>
+          <input
+            type="number"
+            name="points"
+            min={0}
+            max={100}
+            required
+            defaultValue={1}
+            className={inputClass}
+          />
+        </Field>
+        <Field label="Category" error={fieldErrors?.category}>
+          <select
+            name="category"
+            defaultValue="general_meeting"
+            className={inputClass}
+          >
+            <option value="">None</option>
+            {EVENT_CATEGORIES.map((category) => (
+              <option key={category} value={category}>
+                {formatCategory(category)}
+              </option>
+            ))}
+          </select>
+        </Field>
+      </div>
+
+      {/* Series are always generated as drafts; the action ignores anything
+          else, and publishing is a separate, deliberate step. */}
+      <input type="hidden" name="status" value="draft" />
+
+      <p className="text-xs text-foreground/60">
+        At most {MAX_SERIES_EVENTS} events per series.
+      </p>
+
+      <div className="flex items-center gap-4">
+        <button
+          type="submit"
+          disabled={pending}
+          className="w-fit rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
+        >
+          {pending ? "CREATING…" : "CREATE SERIES"}
+        </button>
+        <Link
+          href="/admin/events"
+          className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+        >
+          Cancel
+        </Link>
+      </div>
+    </form>
+  );
+}
+
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string[];
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      {label}
+      {children}
+      {error && (
+        <span role="alert" className="text-xs text-red-700">
+          {error[0]}
+        </span>
+      )}
+    </label>
+  );
+}

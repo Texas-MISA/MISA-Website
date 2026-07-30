@@ -33,11 +33,21 @@ delete from auth.users where id = '00000000-0000-4000-8000-5eed00000001'::uuid;
 
 -- A stand-in officer, so point_adjustments.awarded_by and admin_audit.actor_id
 -- have something to reference. Not a usable login: the password hash is junk.
-insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at)
+--
+-- The eight token/change columns must be '' rather than left NULL. GoTrue
+-- deserializes them into non-nullable Go strings, so a NULL anywhere in
+-- auth.users makes the whole admin listUsers endpoint fail with a 500 and an
+-- empty error body — which breaks scripts/create-officer.mjs and any test
+-- helper that looks an officer up by email, with no hint as to why.
+insert into auth.users (id, instance_id, aud, role, email, encrypted_password, created_at, updated_at,
+                        confirmation_token, email_change, email_change_token_current,
+                        email_change_token_new, phone_change, phone_change_token,
+                        reauthentication_token, recovery_token)
 values ('00000000-0000-4000-8000-5eed00000001',
         '00000000-0000-0000-0000-000000000000',
         'authenticated', 'authenticated',
-        'seed.officer@example.edu', 'not-a-real-hash', now(), now());
+        'seed.officer@example.edu', 'not-a-real-hash', now(), now(),
+        '', '', '', '', '', '', '', '');
 
 insert into admin_profiles (user_id, display_name, role)
 values ('00000000-0000-4000-8000-5eed00000001', 'Seed Officer', 'admin');

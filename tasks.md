@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0 and 1 are complete.** Stage 2 is next; carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–4 are complete.** Stage 5 (attendance review) is next; carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -189,11 +189,31 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 **§7 exit criteria met in production and locally; Stage 3 complete.** Next: Stage 4 (admin foundation & event management) — until Stage 5 ships, pending orphans accumulate with no UI to resolve them, which is by design for now.
 
+## Done — Stage 4: Admin foundation & event management (2026-07-30, verified locally)
+
+*Officers run the schedule from the UI; every mutation is audited. Doc v1.19. 97 tests across 6 files.*
+
+- [x] **Auth end to end.** `proxy.ts` (session refresh + optimistic redirect), `lib/auth.ts` DAL (`getOfficer`/`requireOfficer`), `app/actions/auth.ts`, `/admin/login`, and `app/admin/(shell)/` carrying the authed chrome.
+  - **Session refresh was verified deliberately**, not assumed: `jwt_expiry` dropped to 10s locally, then the token chain checked across several navigations — each request's outgoing cookie became the next request's incoming one, unbroken past three expiries. Restored to 3600 afterwards.
+  - 🪤 **`supabase db reset` does NOT re-read `config.toml`.** Container env is baked at `supabase start`, so a changed `jwt_expiry` needs a full `stop` + `start`. Half an hour went into a "session keeps dying" hunt that was really a 10-second token lifetime still live in the auth container. Check `docker inspect supabase_auth_… | grep GOTRUE_JWT_EXP` before believing a config change took.
+- [x] **Officer bootstrap** — `scripts/create-officer.mjs` (`--local`, `--reset-password`, `--revoke`). Password comes from stdin or `OFFICER_PASSWORD`, never argv. Only a local dev officer was created; **the production officer is yours to create.**
+  - 🪤 **Fixed a latent seed bug:** the stand-in officer in `seed.sql` left eight `auth.users` token/change columns NULL. GoTrue deserializes them into non-nullable Go strings, so `auth.admin.listUsers()` failed with a bare 500 — breaking any lookup-by-email. They are now `''`.
+- [x] **Read-only screens** — dashboard (recent check-ins, pending-review badge) and `/admin/events` with term/status/category/series filters, defaulting to `current_term()`. Officers see drafts; the public site still doesn't.
+- [x] **`lib/events.ts`** — the pure core: Central wall-clock conversion, half-open window helpers, `expandSeries`, `duplicateDraft`, `previewEventEdit`, `impactToken`, `findWindowConflicts`. No `next/*` imports.
+- [x] **Single-event CRUD + lifecycle + audit** — create, edit, publish/unpublish/cancel, duplicate, delete-blocked-with-attendance. `app/actions/audit.ts` is the shared writer.
+- [x] **Edit-impact warnings (§4.6)** — points, times moved, term crossed, window narrowed; two-step confirm whose token doubles as an `updated_at` compare-and-set.
+  - 🪤 **React 19 resets an uncontrolled `<form action>` after the action resolves.** The first build silently reverted the officer's edits when the warnings rendered, so "save anyway" would have saved the *old* values. Fixed by echoing the submitted values back in the action's state and driving every `defaultValue` from them. Worth remembering for every future admin form.
+- [x] **Recurring series + duplicate** — `createSeries`, `publishSeries` with the conflict pre-flight and "publish the rest", `setSeriesStatus`, `duplicateEvent`.
+- [x] **Vitest**: `tests/events.test.ts` (pure: DST, half-open windows, impact maths) and `tests/event-actions.test.ts` (integration: 23P01 atomicity, CAS, append-only audit, `term_of`). `vitest.config.ts` aliases `server-only` to a stub so server modules are importable under test.
+
+**Verified against the local stack:** a 12-week Tuesday series spanning the 2026-11-01 DST change generated 12 drafts all reading 18:00 Central while UTC shifted 23:00→00:00; publishing with one deliberate collision named the exact occurrence and refused, then "publish the rest" published 11 and left that week a draft; editing a seeded meeting to 3 points and August warned "19 members' totals change by +2 each (+38 overall)" and "Spring 2026 → Fall 2026" before saving, and the `admin_audit` before/after matched. Lint and build clean.
+
+**Still to do for Stage 4:** create the real production officer (`node --env-file=.env.local scripts/create-officer.mjs --email … --role admin`) and deploy. No new env vars and no migrations are needed.
+
 ## Later
 
 Placeholders — expand on arrival. Effort estimates from §7.
 
-- **Stage 4 — Admin foundation & event management** · 6–7 days · duplicate-event and recurring-series creation are what make it worth its size
 - **Stage 5 — Attendance review & point adjustments** · 5–6 days · until this ships, pending rows accumulate with no way to resolve them
 - **Stage 6 — Member directory** · 4–5 days · the screen officers will live in; select-all-matching semantics need real tests
 - **Stage 7 — Member-facing views** · 3 days · `/leaderboard` and `/lookup`
