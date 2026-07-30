@@ -34,8 +34,8 @@ export default async function NewEventPage() {
       </div>
 
       <p className="mt-3 text-foreground/80">
-        Times are Central. New events start as drafts — nothing is public until
-        you publish.
+        Times are Central. Save as a draft to keep it officer-only, or publish
+        it straight to the public schedule.
       </p>
 
       <div className="mt-8">

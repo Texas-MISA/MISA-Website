@@ -42,6 +42,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
   const fieldErrors =
     state.status === "invalid" ? state.fieldErrors : undefined;
   const needsConfirmation = state.status === "needs_confirmation";
+  const isCreate = !initial.id;
 
   // React 19 resets an uncontrolled form once its action resolves, so every
   // defaultValue below has to come from the values the server echoed back —
@@ -194,7 +195,9 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
         </div>
       </fieldset>
 
-      <div className="grid gap-6 sm:grid-cols-3">
+      <div
+        className={`grid gap-6 ${isCreate ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}
+      >
         <Field label="Points" error={fieldErrors?.points}>
           <input
             type="number"
@@ -220,35 +223,66 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
             ))}
           </select>
         </Field>
-        <Field label="Status" error={fieldErrors?.status}>
-          <select
-            name="status"
-            defaultValue={v.status}
-            className={inputClass}
-          >
-            {EVENT_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {/* On create, status is chosen by which button you press. On an
+            existing event it stays a field, because editing is where you might
+            change several things at once — and the lifecycle buttons above are
+            the quick path for status alone. */}
+        {!isCreate && (
+          <Field label="Status" error={fieldErrors?.status}>
+            <select
+              name="status"
+              defaultValue={v.status}
+              className={inputClass}
+            >
+              {EVENT_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
       </div>
 
-      <div className="flex items-center gap-4">
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-fit rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
-        >
-          {pending
-            ? "SAVING…"
-            : needsConfirmation
-              ? "SAVE ANYWAY"
-              : initial.id
-                ? "SAVE CHANGES"
-                : "CREATE EVENT"}
-        </button>
+      <div className="flex flex-wrap items-center gap-4">
+        {isCreate ? (
+          <>
+            {/* Two submitters sharing one name: the browser sends only the
+                one that was pressed, so the button IS the status choice. Draft
+                comes first, so it is what the Enter key does — publishing
+                should take a deliberate click. */}
+            <button
+              type="submit"
+              name="status"
+              value="draft"
+              disabled={pending}
+              className="w-fit rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
+            >
+              {pending ? "SAVING…" : "SAVE AS DRAFT"}
+            </button>
+            <button
+              type="submit"
+              name="status"
+              value="published"
+              disabled={pending}
+              className="w-fit rounded-full border border-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-misa-blue transition hover:bg-misa-blue hover:text-white disabled:opacity-60"
+            >
+              {pending ? "SAVING…" : "PUBLISH NOW"}
+            </button>
+          </>
+        ) : (
+          <button
+            type="submit"
+            disabled={pending}
+            className="w-fit rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
+          >
+            {pending
+              ? "SAVING…"
+              : needsConfirmation
+                ? "SAVE ANYWAY"
+                : "SAVE CHANGES"}
+          </button>
+        )}
         <Link
           href="/admin/events"
           className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
@@ -256,6 +290,14 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
           Cancel
         </Link>
       </div>
+
+      {isCreate && (
+        <p className="-mt-2 text-xs text-foreground/60">
+          A draft is visible only to officers. Publishing puts the event on the
+          public schedule straight away and opens its check-in window at the
+          time set above.
+        </p>
+      )}
     </form>
   );
 }
