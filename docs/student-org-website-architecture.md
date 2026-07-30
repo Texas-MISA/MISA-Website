@@ -1,8 +1,16 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.10
+**Version:** 1.11
 **Status:** Stages 0–1 complete; Stage 2 next
 **Last updated:** July 2026
+
+> **v1.11:** §2.4 updated against the live org. The "keep two GitHub org
+> Owners" mitigation is **satisfied** — `Texas-MISA` has two Owners,
+> `TXMISA-JD` and `cgonztx-gif` — so the single-point-of-failure §2.4 called
+> out is closed. Adds a third mitigation in its place: **org-wide 2FA is
+> currently off**, which matters more now that two accounts hold admin over a
+> public repo and the deploy pipeline. Note the ordering trap — enabling the
+> org requirement removes members who do not already have 2FA on.
 
 > **v1.10:** Records the function-region decision now implemented (§2, new
 > §2.6): Vercel Functions are pinned to `cle1`, which *is* AWS us-east-2 — the
@@ -179,7 +187,7 @@ Every account the project depends on. "The shared login" is not an actionable ha
 | Account | Identity | What it controls | Credentials live |
 |---|---|---|---|
 | MISA email | shared org mailbox | The recovery address for every account below — the root of the whole tree | *TBD (§2.5)* |
-| GitHub org `Texas-MISA` | owned by the MISA email; officers join as members with their own accounts | The repository | No shared login; membership only |
+| GitHub org `Texas-MISA` | two Owners: `TXMISA-JD` (MISA email) and `cgonztx-gif` (officer personal account); further officers join as members with their own accounts | The repository | No shared login; membership only |
 | Supabase | MISA email | Project `misa-website` / `gbxypeofjnhrhotlhyzs`, us-east-2 | *TBD (§2.5)* |
 | Supabase database password | — | `db push`, direct Postgres connections | ⚠️ Currently a plaintext file on one officer's laptop. **Must move.** |
 | Vercel | MISA email, personal Hobby account `txmisa-jds-projects` | Hosting, env vars, domain binding | *TBD (§2.5)* |
@@ -187,7 +195,8 @@ Every account the project depends on. "The shared login" is not an actionable ha
 
 **The MISA email is the single point of failure.** It is the password-reset address for everything else, so losing it is materially worse than losing any individual service. Two mitigations, both cheap:
 
-- **Keep at least two GitHub org Owners** — the MISA account plus one current officer's personal account. GitHub requires an owner to administer an org, and an org whose only owner is an inaccessible mailbox needs a slow manual support process to recover. This is the one live single point of failure in the current setup.
+- **Keep at least two GitHub org Owners** — the MISA account plus one current officer's personal account. GitHub requires an owner to administer an org, and an org whose only owner is an inaccessible mailbox needs a slow manual support process to recover. ✅ **Satisfied July 2026:** `Texas-MISA` has two Owners, `TXMISA-JD` (the MISA email) and `cgonztx-gif` (an officer's personal account) — verified via `gh api /orgs/Texas-MISA/members?role=admin`. This was previously the one live single point of failure; it is now closed. Re-check at every officer turnover, since the graduating officer's personal account must be replaced, not merely removed.
+- **Require 2FA org-wide.** ⚠️ **Currently off** (`two_factor_requirement_enabled: false`, July 2026). Both Owners hold full admin over a public repo and the deploy pipeline, so a single reused password compromises the project. Enable it *after* confirming both accounts already have 2FA on — GitHub removes members who do not comply when the requirement is turned on.
 - **Store 2FA recovery codes wherever the passwords are stored.** The standard student-org failure is a shared account with 2FA bound to one person's phone, and that person graduates. Recovery codes are what make the account survivable; a password alone is not enough.
 
 ### 2.5 Credential storage — open decision

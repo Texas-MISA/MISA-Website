@@ -125,8 +125,21 @@ Carried over from Stage 0. None block Stage 2.
 - [x] **Confirm Deployment Protection reads Standard Protection**, not Disabled — ✅ confirmed 2026-07-29 **empirically rather than by reading the dashboard label**, which is stronger: the production alias `misa-website-beta.vercel.app` returns **200**, while per-deployment URLs return **302 → `vercel.com/sso-api`**. That pair is the unique signature of Standard Protection — under Disabled the per-deployment URLs would be 200, under "All Deployments" the alias would gate too. No change needed.
   - Worth knowing: **all 22 deployments to date are `Production`, and zero are `Preview`** — verified across both pages of `vercel ls`, since every commit has gone straight to `main`. No preview has ever existed, so the §6 preview exposure is still theoretical — but it becomes real the first time anyone pushes a branch, and the gate above is what will contain it.
 - [ ] **Move the DB password** out of the plaintext file in the home directory. Not recoverable from any dashboard, only resettable, and it exists on one laptop. Blocked on §2.5 — **needs your decision**: Bitwarden free org tier vs 1Password student-org plan. Not something I can pick or provision; §2.5 also rules out storing it in the MISA Google account, since that account is the recovery path for the others.
-- [ ] **Add a second GitHub org Owner** to `Texas-MISA` — a sole owner that is an inaccessible mailbox is the one live single point of failure (§2.4). **Blocked twice over:** needs a person named (your call), and the local `gh` token lacks `admin:org` (scopes are `gist, read:org, repo, workflow`).
-- [ ] **Narrow org base permissions from Admin to Read** before more officers join, then grant per person or team (§2.4). **Blocked on the same missing `admin:org` scope.** To unblock both, run `gh auth refresh -h github.com -s admin:org` — note the active `gh` account is the personal `cgonztx-gif`, so it must actually hold Owner on `Texas-MISA` for the re-auth to grant anything.
+- [x] **Add a second GitHub org Owner** to `Texas-MISA` — ✅ **done and verified 2026-07-30.** `gh api /orgs/Texas-MISA/members?role=admin` returns exactly two Owners: **`TXMISA-JD`** (the MISA email) and **`cgonztx-gif`** (officer personal account). They are also the org's only two members. This closes what §2.4 called the one live single point of failure. Re-check at every turnover — a graduating officer's personal account must be *replaced*, not just removed, or the org drops back to a single owner.
+- [ ] **Narrow org base permissions from Admin to Read** before more officers join, then grant per person or team (§2.4). **Confirmed still outstanding:** `default_repository_permission` reads `admin` as of 2026-07-30.
+  - **You need to run this** — I was blocked from writing org settings, and the local `gh` token lacks `admin:org` anyway (scopes: `gist, read:org, repo, workflow`). Since `cgonztx-gif` *is* an Owner, refreshing the scope will grant real authority:
+
+    ```bash
+    gh auth refresh -h github.com -s admin:org
+    gh api -X PATCH /orgs/Texas-MISA -f default_repository_permission=read
+    ```
+
+  - Zero impact on current access: Owners always hold admin regardless of the base permission, and the org's only two members are both Owners. This is purely preparation for the next officer who joins as a plain member.
+- [ ] **Require 2FA org-wide** — ⚠️ new finding 2026-07-30: `two_factor_requirement_enabled` is **`false`**. Both Owners have full admin over a public repo and the deploy pipeline, so one reused password compromises the project. **Turn 2FA on for both accounts first** — GitHub *removes* non-compliant members when the org requirement is enabled. Same `admin:org` scope as above:
+
+    ```bash
+    gh api -X PATCH /orgs/Texas-MISA -F two_factor_requirement_enabled=true
+    ```
 
 **Fixed in passing (2026-07-29):** `npm run lint` started failing with 154 errors in minified code after `supabase start` ran — it writes `supabase/.temp/start-secrets/.../main/index.ts` (the edge-runtime entrypoint), and ESLint flat config does **not** read `.gitignore`, so a gitignored path is still linted. Added `supabase/.temp/**` and `.vercel/**` to `globalIgnores` in `eslint.config.mjs`. This would have hit every officer who runs the local stack. Do not "fix" such errors with `--fix`; the code is vendored, not ours.
 
