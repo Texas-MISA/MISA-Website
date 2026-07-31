@@ -223,14 +223,18 @@ from members m where m.full_name = 'Wren Abbott';
 
 -- @chunk audit
 -- A few audit rows so the activity log is not empty on first look.
+-- Action strings must match the AuditAction union in app/actions/audit.ts.
+-- The vocabulary is closed in TypeScript because the audit screen filters on
+-- it, and a typo'd action silently disappears from the one screen that exists
+-- to answer "who changed this".
 insert into admin_audit (entity_type, entity_id, actor_id, action, before, after, note)
-select 'attendance', a.id, '00000000-0000-4000-8000-5eed00000001', 'reject',
+select 'attendance', a.id, '00000000-0000-4000-8000-5eed00000001', 'attendance.rejected',
        jsonb_build_object('status','pending'), jsonb_build_object('status','rejected'),
        'Duplicate submission'
 from attendance a where a.status = 'rejected';
 
 insert into admin_audit (entity_type, entity_id, actor_id, action, before, after, note)
-select 'point_adjustment', p.id, '00000000-0000-4000-8000-5eed00000001', 'void',
+select 'point_adjustment', p.id, '00000000-0000-4000-8000-5eed00000001', 'points.voided',
        jsonb_build_object('voided_at', null), jsonb_build_object('voided_at', p.voided_at),
        p.void_reason
 from point_adjustments p where p.voided_at is not null;

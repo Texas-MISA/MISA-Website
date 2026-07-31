@@ -2,7 +2,32 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–4 are complete.** Stage 5 (attendance review) is next; carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–4 are complete. Stage 5 (attendance review) is in progress — phases 1 and 2 of 5 built.** Carry-over chores from Stage 0 are collected under Loose ends.
+
+---
+
+## 🔖 Picking this up cold (as of 2026-07-31)
+
+Read this before touching anything; it is the state no file can tell you on its own.
+
+| | |
+|---|---|
+| **Branch** | `stage-5-attendance-review` — **not merged.** `main` is still Stage 4. |
+| **Production** | Still Stage 4. `/admin/attendance` 404s there, by design. |
+| **Database** | Migration 13 is applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); history in sync. The schema is ahead of what `main` deploys, which is safe — 13 is additive with a default. |
+| **Next task** | **Phase 4 — `/admin/points`.** Phases 1–3 are built and browser-verified as of 2026-07-31. |
+| **Local database** | Carries the phase-3 walkthrough's mutations (an approved row, a reopened one, two bulk assigns, a manual entry, one extra fixture row). `npx supabase db reset` restores the documented seed. |
+
+**Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
+
+🪤 **`.env.local` points at the REMOTE project, so `npm run dev` reads production by default.** That is correct for `vercel env pull` and for builds, and completely wrong for a local walkthrough — you get a working admin UI full of real data and no signal that anything is off, because the remote carries the same seed. `.env.development.local` (gitignored via `.env*.local`, created 2026-07-31) pins dev to `http://127.0.0.1:54321` with the CLI's published local keys; Next loads it ahead of `.env.local` in dev, and the dev server prints `Environments: .env.development.local, .env.local` when it is working. **Check that line before trusting anything you see at localhost:3000.** Delete the file to point dev back at the remote.
+
+**Four things that will waste your time if you don't know them:**
+
+- **`npm test` needs `fileParallelism: false`**, already set in `vitest.config.ts`. Don't "optimize" it back on — see the note in `CLAUDE.md`.
+- **`supabase gen types --local` omits the `__InternalSupabase` block** that `--linked` emits. Restore it by hand or the diff looks like a regression.
+- **Only `npm run build` works locally on Windows**; `vercel build` fails with `EPERM … symlink`.
+- **A stale dev server survives an env change.** Env files are read at process start, so adding `.env.development.local` does nothing until you restart — and the old process keeps serving production. Kill it by port rather than trusting that `npm run dev` grabbed 3000; it silently falls back to 3001 and leaves the original running.
 
 ---
 
@@ -43,7 +68,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ## Done — schema decisions
 
-§9 lists 11 open decisions. Below is a proposed default for each — **my recommendation, your call.** Most confirm the schema already written in §4, so migrations aren't blocked on a long discussion. Check off to accept, or strike through and write your own.
+§9 listed 11 open decisions. **All eleven are now resolved** — five before Stage 1, the other six on 2026-07-31. Kept in full rather than collapsed to a summary, because the reasoning is what a future officer needs when one of them stops fitting.
 
 **✅ All five schema-affecting decisions resolved 2026-07-29.** Recorded in §9 with the schema in §4 updated to match.
 
@@ -55,16 +80,18 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 | 5 | Excused absences | Deferred post-v1. Rate stays raw `attended / possible`. |
 | 7 | Orphan grace window | 48h as one exported constant (`ORPHAN_WINDOW_HOURS`) feeding `nearby_events()`. |
 
-**Can wait until Stage 4–5**, but decide before the leaderboard determines anything with stakes:
+**✅ The remaining six resolved 2026-07-31** — #6, #8, #9, #10 while building Stage 5, and #1 and #11 alongside them. **All eleven §9 decisions are now closed.** New questions belong in Stage 10's backlog rather than here.
+
+The first four share one premise, and the consistency matters more than any single one: **the audit log and the ledger are the control, not a gate.** Revisit all four together if points ever decide something material — officer eligibility, a funded trip, a leadership slot — because that premise is what would change, not the individual arguments.
 
 | # | Decision | Proposed default | |
 |---|---|---|---|
-| 1 | Leaderboard visibility | Fully public. Full name + points only; no student IDs or emails, per the §4.4 privacy note. Add an opt-out or display-name field if a member objects. | [ ] |
-| 6 | Override authority | Any officer may approve a pending row. The audit log is the control, not a role gate — a gate just funnels every correction through one person. | [ ] |
-| 8 | Resolution deadline | None enforced in v1. The pending badge and oldest-first default sort are the mitigation for a rotting queue. | [ ] |
-| 9 | Point grant caps | No hard cap. Ledger visibility and the required reason are the control; a cap invites splitting a grant in two. | [ ] |
-| 10 | Self-grants | Allowed, but always visible in the ledger with the granting officer named. Blocking outright just moves it to a friend's account. | [ ] |
-| 11 | Bonus points publicly | ⚠️ **This proposal is now stale and contradicts a settled invariant — don't build it as written.** It says "shown as a separate column, consistent with §4.4", but §4.4 was since resolved the other way: the public `leaderboard` shows a single `total_points`, and only the officer-facing `member_directory` keeps `attendance_points` and `bonus_points` split. Building the public split in Stage 7 would reverse that deliberately. Decide whether to strike this row or rewrite it to match §4.4. | [ ] |
+| 1 | Leaderboard visibility | **✅ Resolved 2026-07-31 — public, but never indexed.** Full name + points only; no student IDs or emails. `/leaderboard` must set `robots: { index: false, follow: false }` — copy the pattern from `app/admin/(shell)/layout.tsx`. A search cache outlives the deploy that filled it, so this is the one part that can't be walked back. Display-name field or opt-out is the escalation if someone objects. | [x] |
+| 6 | Override authority | **✅ Resolved 2026-07-31 — any officer may approve.** The audit log is the control, not a role gate; a gate funnels every correction through whoever is busiest, and the misuse it guards against shows up in `admin_audit` either way. | [x] |
+| 8 | Resolution deadline | **✅ Resolved 2026-07-31 — none enforced in v1.** The dashboard pending badge and the oldest-first default sort (both built in phase 1) are the mitigation. A hard deadline would destroy credit for someone who did attend, which is the one outcome §4.2 exists to prevent. | [x] |
+| 9 | Point grant caps | **✅ Resolved 2026-07-31 — no restrictions.** Any officer, any amount, no `admin` threshold. A cap invites splitting a grant in two: same total, less readable ledger. `MAX_POINTS_PER_GRANT = 500` in `lib/points.ts` stays a fat-finger guard and is **not** this policy — don't let it drift into being cited as one. | [x] |
+| 10 | Self-grants | **✅ Resolved 2026-07-31 — allowed**, always visible in the ledger with the granting officer named. Blocking relocates it to "could you grant me these", which is harder to audit. `grantPoints` carries no self-grant check, and no officer↔member linkage is needed. | [x] |
+| 11 | Bonus points publicly | **✅ Resolved 2026-07-31 — a single total, attendance and bonus added silently.** This confirms §4.4 rather than changing it, and closes the contradiction the row carried since v1.16 (it was written expecting a separate public column). The split stays officer-only, in `member_directory` and the `/admin/points` ledger. Accepted cost: a member sees a number and can't tell which part was granted. | [x] |
 
 ---
 
@@ -210,11 +237,91 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 **Deployed 2026-07-30** (`ebe3233`, plus `64d29e2` making draft-vs-publish an explicit button on the create form). No new env vars and no migrations were needed. The production officer account is registered and `/admin/login` is live; admin routes return 307 to it when signed out, including paths that don't exist, so the gate leaks no route names. **Stage 4 complete.**
 
+## Now — Stage 5: Attendance review & manual adjustments
+
+*Officers can see every submission, correct any of them, and award points that never came from a check-in (§7 Stage 5). 5–6 days, shipped in five phases so each ends with something demonstrable. Branch: `stage-5-attendance-review`.*
+
+### ✅ Phase 1 — schema, pure core, read-only queue (2026-07-31, `de352a1`)
+
+- [x] **Migration 13** — `attendance.updated_at` + trigger reusing `set_updated_at()`, and `point_adjustments.void_requires_reason`. **Applied to both local and the remote** (`gbxypeofjnhrhotlhyzs`); migration history in sync. Types regenerated.
+  - Checked the remote for violating rows *before* pushing (`(voided_at is null) <> (void_reason is null)` → 0). A constraint that fails mid-migration is a bad way to find out.
+  - ⚠️ `supabase gen types --local` omits the `__InternalSupabase` block that `--linked` emits. Restore it by hand or the diff looks like a regression.
+- [x] **`lib/attendance.ts`** — interval parsing, `describeGap`, member-candidate scoring with bounded Damerau-Levenshtein, `diffStudentId`, `previewResolution`, `canApprove`. Pure, same contract as `lib/events.ts`.
+- [x] **`lib/points.ts`**, six zod schemas, `AuditAction` extended by seven verbs, `seed.sql` audit actions aligned to the union.
+- [x] **`/admin/attendance`** — read-only queue, URL-driven filters (status / event / date range / sort), pending + oldest-first by default. Nav unlocked; dashboard badge links in; `StatusPill` extracted for its third caller.
+- [x] **59 new tests** (156 total), lint and build clean, verified in a real browser against the local stack: 5 pending rows covering all three orphan shapes, 208 on `status=all` matching the documented seed exactly.
+
+**Two traps found, both now recorded as invariants:**
+
+- 🪤 **Date-range filters must be Central-anchored and half-open.** `to=2026-04-07` has to include the seed's 8:15 PM CT orphans, which are `01:15` **UTC the next day**. A bare `.lte("submitted_at", "2026-04-07")` returns zero rows and looks entirely reasonable.
+- 🪤 **`Intl.DateTimeFormat` in a Client Component is a hydration mismatch.** Node and Chrome ship different ICU data for the space before "PM", so React's diff shows two apparently identical strings. Server Components own date formatting.
+
+**And one that predated Stage 5:** `npm test` was failing intermittently at roughly a 50% rate — a different test each run, always a Kong 502 under parallel workers sharing the one local stack. `fileParallelism: false` fixes it; 0 failures across repeated runs, still ~4s.
+
+### ✅ Phase 2 — submission detail (read-only) · verified in the browser 2026-07-31
+
+- [x] `/admin/attendance/[id]` — raw form data as typed, timestamp to the minute in Central, current links, `previewResolution()` warnings
+- [x] Ranked event suggestions from `nearby_events()` with the window-relative headline and the event-relative number beside it
+- [x] Ranked member candidates with the first differing ID character marked; nothing preselected, empty state says so
+- [x] `lib/admin-profiles.ts` → `fetchOfficerNames()`, and the shared `AuditTrail` with a computed before/after diff
+- [x] **Verified in the browser** against the local stack, one seeded row per shape (ids are local-only and change on every `db reset` — re-query with `select id, submitted_name from attendance where status <> 'present' order by submitted_at;`):
+  - `Luca Moretti` — orphan, member linked, no event ⇒ one suggestion, `General Meeting #6`, "check-in closed 1 hour 15 minutes before this submission (event ended 1 hour 15 minutes before)", `CLOSEST` badge, member section correctly hidden
+  - `Rowan Pike` `UT-100999` / `Sage Delacroix` `ut 100998` — event linked, unknown ID ⇒ member suggestions, event section hidden
+  - `Toby Vance` — neither link ⇒ the only row rendering **both** sections; `Interview Prep` at 14 hours past close
+  - `Bela Kovacs` on the cancelled `Rained Out Tabling` ⇒ the warnings block, "This event is cancelled, so approving here credits nobody"
+  - `Mira Petrova` rejected ⇒ the only attendance row with history: "Rejected by **Seed Officer**", note, and the diff `status: pending → rejected` — `fetchOfficerNames()` and `AuditTrail`'s `Diff` both confirmed
+  - edges: unknown id ⇒ 404; signed out ⇒ 307 to `/admin/login` with `next` preserved; the Event link reaches the real `/admin/events/[id]`
+- [x] 🪤 **Fixed: the near-miss highlight marked the formatting, not the digit.** `diffStudentId` compared the **raw** ID strings, so `ut 100998` vs `UT100028` "first differed" at index 0 — the case of the `u` — and the page rendered `roster `**`U`**`T100028`. The seed stores IDs in four formats precisely because members type them four ways, so this fired on most real pairs and pointed the officer at the one character that carries no information. Now compared on `normalizeStudentId()` with the index mapped back onto the raw string, and null when the two ids are the same person's in different formats. Five tests added; the old ones all used same-format IDs, which is exactly why it survived phase 1. **160 tests** (the "156" recorded earlier was one over the real 155).
+- [ ] **Deferred to phase 3:** the independent all-status event picker. `nearby_events()` is published-only and returns nothing beyond 48h, so suggestions alone cannot express every assignment — but the picker is a form control, so it belongs with the mutations rather than on a read-only page.
+
+**Two findings left open at the time — both closed in phase 3:**
+
+- ✅ **Member suggestions surfaced unrelated people at exactly the score floor.** `Rowan Pike` `UT-100999`, on no roster at all, was offered `Dara Nolan`, `Farid Haddad`, and `Omar Silva` (IDs ending `…019`, `…009`, `…029`), each scoring exactly `MIN_SUGGESTION_SCORE` on `id_near_miss` distance 2 alone. Six-digit IDs issued in sequence put three members within distance 2 of *any* number, so that similarity is a coincidence rather than a signal. Distance 2 now scores below the floor and needs corroboration; distance 1 still stands alone. Rowan Pike renders the empty state.
+- ✅ **The queue's filters are no longer lost on the round trip** — see phase 3.
+
+**Confirmed as correct, not a bug:** the window-relative and event-relative gap numbers read identically on every seeded row. `describeGap` separates them on purpose, but no seeded event sets `checkin_opens_at`/`checkin_closes_at`, so `effectiveWindow` falls back to `starts_at`/`ends_at` and the two genuinely coincide. Set a late close on an event to see them diverge.
+
+### ✅ Phase 3 — mutations (2026-07-31, browser-verified)
+
+- [x] `app/actions/attendance-review.ts` — `saveSubmission` (one save per officer intent: edit the typed fields, set both links, and approve in a single write and a single `attendance.approved` audit row), `rejectSubmission`, `reopenSubmission`, `bulkAssignEvent`, `createManualAttendance`. CAS on `updated_at` for every single-row mutation; `redirect()` outside the try/catch throughout.
+- [x] Approve disabled until both links are set, with a `title` naming the missing one; `canApprove()` re-checked server-side and `present_requires_resolution` still the guarantee
+- [x] Bulk assign — explicit selection only, `planBulkAssign()` in `lib/attendance.ts` does the deduping, two statements, auto-approve opt-in and never default, partial success reported with a reason per skipped row
+- [x] Manual entry at `/admin/attendance/new` (`source = 'admin_manual'`) — **this also fixed a live 404**: the queue has linked to that route since phase 1 and nothing was there
+- [x] The all-status event picker deferred out of phase 2, now `lib/event-options.ts` and shared by the queue filter, the resolution form, and manual entry
+- [x] Queue filters survive the round trip — row links, the back-link, and the post-mutation redirect all carry the `searchParams`. Approve and reject return to the *filtered* queue (the drain loop); a plain save stays on the row.
+- [x] `createCurrentTermEvent()` and `Tracker.attendanceIds` closed — see below
+- [x] **182 tests** (10 new pure, 12 new integration in `tests/attendance-review.test.ts`), lint and build clean
+
+**Verified in the browser against the local stack**, every one a real write: assign + approve in one click wrote exactly one `attendance.approved` row whose before/after showed `member_id` null → set and `pending` → `present`, and returned to the filtered queue with the row drained; a bulk assign of two submissions from the same person assigned one and reported *"Toby Vance — the same person as another row you selected; the earlier submission was kept"* with no 23505; manual entry for Spring Kickoff at 6:15 PM Central stored `2026-01-28 00:15Z` (CST, correctly); reopening a rejected row put it back in the queue.
+
+**Three defects found and fixed during that walkthrough** — none would have been caught by the tests:
+
+- 🪤 **APPROVE stayed disabled after picking an event.** Its enabled state was derived from the server's copy of the row rather than the live `<select>`, so the officer had to SAVE, wait for the round trip, and only then approve — two writes for one intent, defeating the entire one-save design. The link values are now tracked in component state.
+- 🪤 **The bulk bar's count outlived its checkboxes.** React resets the form when the action resolves, so after an assign the bar read "2 selected" above six empty boxes. Cleared on completion by resetting state during render.
+- 🪤 **Every ordinary officer was credited as "a former officer".** `create-officer.mjs` left `admin_profiles.display_name` null unless `--display-name` was passed, and `fetchOfficerNames` dropped nameless rows — collapsing "current officer, no display name" into "profile deleted, i.e. revoked". In the one log that exists to say who did what (§6), that is the exact opposite of the truth. The map now distinguishes absent from null, the trail says "an officer" for the middle case, and the script defaults the name to the email's local part.
+
+**One doc correction:** the note that the seed's `Mira Petrova` row is the live 23505-on-reopen case is **wrong**. `seed.sql` inserts that rejected row only `where not exists` a non-rejected row for the same member and event, so its slot is by construction free and it reopens cleanly. The collision is real and covered by `tests/attendance-review.test.ts`, which builds the contested pair explicitly — but it cannot be reproduced from seed data.
+
+### Phase 4 — `/admin/points`
+
+- [x] ~~Decide §9 #9 and #10 first~~ — both resolved 2026-07-31: no grant restrictions, self-grants allowed. So `grantPoints` needs **no** role check and **no** self-grant check.
+- [ ] Grant (multi-member, one atomic insert, `term` read back never sent), ledger with filters, void-with-reason
+- [ ] Member picker carrying selection in the URL (`?q=…&sel=…`) — forms can't nest, so a search is a navigation and hidden inputs would drop every pick from a previous query
+
+### Phase 5 — docs
+
+- [x] Architecture doc → **v1.20**, `CLAUDE.md` invariants, this file
+- [ ] Final pass once phases 2–4 land
+
+**✅ Both test-harness gaps closed in phase 3** — each would have made green tests that prove nothing:
+
+- **The 2030 fixtures cannot exercise the views.** `helpers.ts` puts fixture events in 2030, so `events.term` is `"Spring 2030"`, and both views filter `e.term = current_term()`; every leaderboard assertion would have passed vacuously at zero. `createCurrentTermEvent()` now places the event a few hours in the past, reads back the generated `term`, compares it to `current_term()`, and throws if they differ — so a run straddling Aug 1 / Jan 1 fails loudly rather than silently asserting nothing. Both values come from the database; no term string is typed (§4.7).
+- **`cleanup()` leaked attendance rows with neither link** — it deleted only by `event_id` or `member_id`, and that is the queue's most important fixture shape. `Tracker.attendanceIds` plus a `createTestAttendance()` helper closes it; a full run is now member-neutral (verified 33 → 33). (`point_adjustments` needs no pass: `member_id` cascades.)
+
 ## Later
 
 Placeholders — expand on arrival. Effort estimates from §7.
 
-- **Stage 5 — Attendance review & point adjustments** · 5–6 days · until this ships, pending rows accumulate with no way to resolve them
 - **Stage 6 — Member directory** · 4–5 days · the screen officers will live in; select-all-matching semantics need real tests
 - **Stage 7 — Member-facing views** · 3 days · `/leaderboard` and `/lookup`
 - **Stage 8 — Hardening & data integrity** · 3–4 days · every RLS policy tested with the anon key; historically the stage most likely to be skipped and most likely to be regretted

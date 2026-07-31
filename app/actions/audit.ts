@@ -32,6 +32,20 @@ export type AuditEntityType =
  *
  * Series operations write one row per event: admin_audit.entity_type has no
  * 'series' value and entity_id is a uuid, so the series id goes in `note`.
+ *
+ * Granularity follows officer intent, not columns. Assigning an event and
+ * linking a member happen in one click and write one `attendance.updated` row;
+ * `before`/`after` already say precisely which columns moved, so splitting
+ * them into two actions would add rows without adding information. Bulk
+ * operations reuse the single-row verbs and carry their batch context in
+ * `note`, so a row's history reads the same whether the change came from the
+ * detail page or the queue.
+ *
+ * ⚠️ Readers must tolerate values outside this union. The column is `text` in
+ * SQL, this union constrains only what *we* write, and two pre-Stage-5 rows on
+ * the production database carry the older bare verbs `reject` and `void`. They
+ * can never be corrected: the append-only trigger raises P0001 on UPDATE and
+ * DELETE alike, which is the property that makes the log worth having.
  */
 export type AuditAction =
   | "event.created"
@@ -42,7 +56,15 @@ export type AuditAction =
   | "event.deleted"
   | "series.created"
   | "series.published"
-  | "series.cancelled";
+  | "series.cancelled"
+  | "attendance.created"
+  | "attendance.updated"
+  | "attendance.approved"
+  | "attendance.rejected"
+  | "attendance.reopened"
+  // No points.updated: an adjustment is immutable except for voiding.
+  | "points.granted"
+  | "points.voided";
 
 export type AuditEntry = {
   entityType: AuditEntityType;

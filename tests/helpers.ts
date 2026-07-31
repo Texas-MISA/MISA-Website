@@ -45,10 +45,20 @@ export type Tracker = {
   eventIds: string[];
   memberIds: string[];
   studentIds: string[];
+  /**
+   * Attendance rows to delete by id.
+   *
+   * cleanup() otherwise removes attendance only via `event_id` or `member_id`,
+   * which misses a row with **neither** link — and that is the review queue's
+   * most important fixture shape, the orphan from someone who is on no roster.
+   * Those rows would survive teardown and accumulate in every later run's
+   * queries.
+   */
+  attendanceIds: string[];
 };
 
 export function newTracker(): Tracker {
-  return { eventIds: [], memberIds: [], studentIds: [] };
+  return { eventIds: [], memberIds: [], studentIds: [], attendanceIds: [] };
 }
 
 export async function createTestEvent(
@@ -85,6 +95,66 @@ export async function createTestEvent(
   if (error) throw new Error(`fixture event insert failed: ${error.message}`);
   track.eventIds.push(data.id);
   return data;
+}
+
+let currentTermSlot = 0;
+
+/**
+ * A published event inside whatever `current_term()` currently is.
+ *
+ * The 2030 fixtures everything else uses cannot exercise `leaderboard` or
+ * `member_directory`: both views filter `e.term = current_term()`, and a 2030
+ * event's generated term is `"Spring 2030"`, so every aggregate assertion would
+ * read zero and pass for the wrong reason. That is worse than no test.
+ *
+ * Placed a few hours in the past — recent enough to be in the current term,
+ * past enough that it never appears on the public upcoming-events list — and
+ * then **checked**: the generated `term` is read back and compared against
+ * `current_term()`, so a run that straddles Aug 1 or Jan 1 fails loudly instead
+ * of silently asserting nothing. The comparison is between two values the
+ * database produced; no term string is ever typed here (§4.7).
+ */
+export async function createCurrentTermEvent(
+  db: SupabaseClient<Database>,
+  track: Tracker,
+  opts: { points?: number; title?: string } = {}
+): Promise<{ id: string; title: string; term: string }> {
+  // Each call takes its own three-hour slot going backwards, so two of these
+  // in one run cannot collide on the published-window exclusion constraint.
+  const hoursBack = 3 + currentTermSlot++ * 3;
+  const starts = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+  const ends = new Date(starts.getTime() + 60 * 60 * 1000);
+
+  const title = opts.title ?? `TEST current ${crypto.randomUUID().slice(0, 8)}`;
+  const { data, error } = await db
+    .from("events")
+    .insert({
+      title,
+      starts_at: starts.toISOString(),
+      ends_at: ends.toISOString(),
+      status: "published",
+      points: opts.points ?? 1,
+    })
+    .select("id, title, term")
+    .single();
+  if (error) {
+    throw new Error(`current-term fixture insert failed: ${error.message}`);
+  }
+  track.eventIds.push(data.id);
+
+  const { data: currentTerm, error: termError } = await db.rpc("current_term");
+  if (termError) {
+    throw new Error(`current_term() failed: ${termError.message}`);
+  }
+  if (data.term !== currentTerm) {
+    throw new Error(
+      `fixture event landed in ${data.term} but current_term() is ${currentTerm} — ` +
+        "a term boundary was crossed, and any leaderboard assertion here would " +
+        "have passed at zero. Re-run, or pin app_settings.current_term."
+    );
+  }
+
+  return { id: data.id, title: data.title, term: data.term! };
 }
 
 // --- officer fixtures (Stage 4) -------------------------------------------
@@ -230,6 +300,10 @@ export async function cleanup(
   db: SupabaseClient<Database>,
   track: Tracker
 ): Promise<void> {
+  // By id first: a row with neither link is reachable no other way.
+  if (track.attendanceIds.length > 0) {
+    await db.from("attendance").delete().in("id", track.attendanceIds);
+  }
   if (track.eventIds.length > 0) {
     await db.from("attendance").delete().in("event_id", track.eventIds);
   }
@@ -240,6 +314,45 @@ export async function cleanup(
   if (track.eventIds.length > 0) {
     await db.from("events").delete().in("id", track.eventIds);
   }
+}
+
+/**
+ * An attendance row that cleanup() can always find, whatever its links.
+ *
+ * Use this rather than a bare insert for anything the review-queue tests
+ * create — an unlinked orphan is invisible to the event_id/member_id passes.
+ */
+export async function createTestAttendance(
+  db: SupabaseClient<Database>,
+  track: Tracker,
+  row: {
+    eventId?: string | null;
+    memberId?: string | null;
+    submittedName: string;
+    submittedStudentId: string;
+    submittedEmail: string;
+    submittedAt: Date;
+    status?: string;
+    source?: string;
+  }
+): Promise<{ id: string; updated_at: string }> {
+  const { data, error } = await db
+    .from("attendance")
+    .insert({
+      event_id: row.eventId ?? null,
+      member_id: row.memberId ?? null,
+      submitted_name: row.submittedName,
+      submitted_student_id: row.submittedStudentId,
+      submitted_email: row.submittedEmail,
+      submitted_at: row.submittedAt.toISOString(),
+      status: row.status ?? "pending",
+      source: row.source ?? "self_checkin",
+    })
+    .select("id, updated_at")
+    .single();
+  if (error) throw new Error(`fixture attendance insert failed: ${error.message}`);
+  track.attendanceIds.push(data.id);
+  return data;
 }
 
 /**
