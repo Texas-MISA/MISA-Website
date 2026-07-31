@@ -1,3 +1,4 @@
+import { normalizeStudentId } from "@/lib/checkin";
 import { effectiveWindow, type EventWindowRow } from "@/lib/events";
 
 // Attendance-resolution core (§4.2, §4.3, §7 Stage 5). Like lib/events.ts and
@@ -373,18 +374,56 @@ export function rankMemberSuggestions(
  * Where two student IDs first diverge, so the UI can highlight the character
  * instead of leaving the officer to compare them by eye — the "near-miss ID
  * shown for comparison" the review screen calls for.
+ *
+ * Compared on the **normalized** forms, for the same reason everything else in
+ * §4.2 is: `ut 100998` and `UT100028` differ at index 0 as raw strings — the
+ * case of the `u` — and highlighting that tells the officer nothing. The index
+ * returned is mapped back onto the raw `member` string, because the raw string
+ * is what's on screen.
+ *
+ * `firstDifferenceAt` is null when the two ids are the same person's (any
+ * formatting), and also when `member` is the shorter of the two and has no
+ * character at the divergence point. Both mean "nothing to highlight".
  */
 export function diffStudentId(
   submitted: string,
   member: string
 ): { submitted: string; member: string; firstDifferenceAt: number | null } {
-  if (submitted === member) {
+  const submittedNormalized = normalizeStudentId(submitted);
+  const memberNormalized = normalizeStudentId(member);
+  if (submittedNormalized === memberNormalized) {
     return { submitted, member, firstDifferenceAt: null };
   }
-  const shortest = Math.min(submitted.length, member.length);
+
+  const shortest = Math.min(
+    submittedNormalized.length,
+    memberNormalized.length
+  );
   let index = 0;
-  while (index < shortest && submitted[index] === member[index]) index++;
-  return { submitted, member, firstDifferenceAt: index };
+  while (
+    index < shortest &&
+    submittedNormalized[index] === memberNormalized[index]
+  ) {
+    index++;
+  }
+  return { submitted, member, firstDifferenceAt: rawIndexOf(member, index) };
+}
+
+/**
+ * Translate an index into `normalizeStudentId(raw)` back into an index into
+ * `raw`. Normalization only ever uppercases and deletes, never reorders or
+ * inserts, so the normalized string is a subsequence of the raw one and the
+ * mapping is a single walk skipping the dropped characters.
+ */
+function rawIndexOf(raw: string, normalizedIndex: number): number | null {
+  let kept = 0;
+  for (let i = 0; i < raw.length; i++) {
+    // The characters normalizeStudentId strips.
+    if (/[\s-]/.test(raw[i])) continue;
+    if (kept === normalizedIndex) return i;
+    kept++;
+  }
+  return null;
 }
 
 // --- resolution warnings ----------------------------------------------------

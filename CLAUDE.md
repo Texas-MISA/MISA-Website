@@ -31,6 +31,8 @@ npm run start               # serve the production build
 npm run lint                # eslint (flat config in eslint.config.mjs)
 ```
 
+🪤 **`.env.local` points at the remote project, so `npm run dev` reads production unless you stop it.** That is right for builds and for `vercel env pull`, and wrong for any local walkthrough — and it fails silently, because the remote carries the same seed data, so the admin UI looks exactly as it should while you browse production. `.env.development.local` (gitignored via `.env*.local`) pins dev to `http://127.0.0.1:54321`; Next loads it ahead of `.env.local` in dev. **Confirm the `Environments: .env.development.local, .env.local` line in the dev server's banner before trusting what you see.** Env files are read once at process start, so an already-running server keeps serving the old target — and `npm run dev` quietly falls back to port 3001 rather than displacing it.
+
 ```bash
 npx supabase db push                    # apply pending migrations to the linked project
 npx supabase db reset                   # wipe, re-run migrations + seed.sql (local; needs Docker)

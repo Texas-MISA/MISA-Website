@@ -15,17 +15,18 @@ Read this before touching anything; it is the state no file can tell you on its 
 | **Branch** | `stage-5-attendance-review` — **not merged.** `main` is still Stage 4. |
 | **Production** | Still Stage 4. `/admin/attendance` 404s there, by design. |
 | **Database** | Migration 13 is applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); history in sync. The schema is ahead of what `main` deploys, which is safe — 13 is additive with a default. |
-| **Next task** | Verify phase 2 in the browser, then build phase 3. |
+| **Next task** | **Phase 3 — mutations.** Phase 2 is verified in the browser as of 2026-07-31. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
 
-**Three things that will waste your time if you don't know them:**
+🪤 **`.env.local` points at the REMOTE project, so `npm run dev` reads production by default.** That is correct for `vercel env pull` and for builds, and completely wrong for a local walkthrough — you get a working admin UI full of real data and no signal that anything is off, because the remote carries the same seed. `.env.development.local` (gitignored via `.env*.local`, created 2026-07-31) pins dev to `http://127.0.0.1:54321` with the CLI's published local keys; Next loads it ahead of `.env.local` in dev, and the dev server prints `Environments: .env.development.local, .env.local` when it is working. **Check that line before trusting anything you see at localhost:3000.** Delete the file to point dev back at the remote.
+
+**Four things that will waste your time if you don't know them:**
 
 - **`npm test` needs `fileParallelism: false`**, already set in `vitest.config.ts`. Don't "optimize" it back on — see the note in `CLAUDE.md`.
 - **`supabase gen types --local` omits the `__InternalSupabase` block** that `--linked` emits. Restore it by hand or the diff looks like a regression.
 - **Only `npm run build` works locally on Windows**; `vercel build` fails with `EPERM … symlink`.
-
-**Still unverified end-to-end:** everything in phase 2. Lint and build pass, but no page has been seen rendering.
+- **A stale dev server survives an env change.** Env files are read at process start, so adding `.env.development.local` does nothing until you restart — and the old process keeps serving production. Kill it by port rather than trusting that `npm run dev` grabbed 3000; it silently falls back to 3001 and leaves the original running.
 
 ---
 
@@ -256,19 +257,28 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 **And one that predated Stage 5:** `npm test` was failing intermittently at roughly a 50% rate — a different test each run, always a Kong 502 under parallel workers sharing the one local stack. `fileParallelism: false` fixes it; 0 failures across repeated runs, still ~4s.
 
-### 🔨 Phase 2 — submission detail (read-only) · code-complete, **not yet browser-verified**
-
-⚠️ **Start the next session here.** Lint and build are clean and `/admin/attendance/[id]` compiles as a dynamic route, but the browser walkthrough was cut short when the local session expired. Nothing below has been seen rendering against real data.
+### ✅ Phase 2 — submission detail (read-only) · verified in the browser 2026-07-31
 
 - [x] `/admin/attendance/[id]` — raw form data as typed, timestamp to the minute in Central, current links, `previewResolution()` warnings
 - [x] Ranked event suggestions from `nearby_events()` with the window-relative headline and the event-relative number beside it
 - [x] Ranked member candidates with the first differing ID character marked; nothing preselected, empty state says so
 - [x] `lib/admin-profiles.ts` → `fetchOfficerNames()`, and the shared `AuditTrail` with a computed before/after diff
-- [ ] **Verify in the browser.** Two seeded rows are the interesting ones (ids are local-only and change on every `db reset` — re-query if stale):
-  - orphan with a member but no event ⇒ event suggestions + gap sentences (`Luca Moretti`, `Hana Sato`)
-  - event linked but an unknown student ID ⇒ member suggestions + near-miss highlight (`Rowan Pike` `UT-100999`, `Sage Delacroix` `ut 100998`)
-  - `select id, submitted_name from attendance where status = 'pending' order by submitted_at;`
+- [x] **Verified in the browser** against the local stack, one seeded row per shape (ids are local-only and change on every `db reset` — re-query with `select id, submitted_name from attendance where status <> 'present' order by submitted_at;`):
+  - `Luca Moretti` — orphan, member linked, no event ⇒ one suggestion, `General Meeting #6`, "check-in closed 1 hour 15 minutes before this submission (event ended 1 hour 15 minutes before)", `CLOSEST` badge, member section correctly hidden
+  - `Rowan Pike` `UT-100999` / `Sage Delacroix` `ut 100998` — event linked, unknown ID ⇒ member suggestions, event section hidden
+  - `Toby Vance` — neither link ⇒ the only row rendering **both** sections; `Interview Prep` at 14 hours past close
+  - `Bela Kovacs` on the cancelled `Rained Out Tabling` ⇒ the warnings block, "This event is cancelled, so approving here credits nobody"
+  - `Mira Petrova` rejected ⇒ the only attendance row with history: "Rejected by **Seed Officer**", note, and the diff `status: pending → rejected` — `fetchOfficerNames()` and `AuditTrail`'s `Diff` both confirmed
+  - edges: unknown id ⇒ 404; signed out ⇒ 307 to `/admin/login` with `next` preserved; the Event link reaches the real `/admin/events/[id]`
+- [x] 🪤 **Fixed: the near-miss highlight marked the formatting, not the digit.** `diffStudentId` compared the **raw** ID strings, so `ut 100998` vs `UT100028` "first differed" at index 0 — the case of the `u` — and the page rendered `roster `**`U`**`T100028`. The seed stores IDs in four formats precisely because members type them four ways, so this fired on most real pairs and pointed the officer at the one character that carries no information. Now compared on `normalizeStudentId()` with the index mapped back onto the raw string, and null when the two ids are the same person's in different formats. Five tests added; the old ones all used same-format IDs, which is exactly why it survived phase 1. **160 tests** (the "156" recorded earlier was one over the real 155).
 - [ ] **Deferred to phase 3:** the independent all-status event picker. `nearby_events()` is published-only and returns nothing beyond 48h, so suggestions alone cannot express every assignment — but the picker is a form control, so it belongs with the mutations rather than on a read-only page.
+
+**Two findings left open, both deliberately not fixed in phase 2:**
+
+- ⚠️ **Member suggestions surface unrelated people at exactly the score floor.** `Rowan Pike` `UT-100999` — who is on no roster at all — is offered `Dara Nolan`, `Farid Haddad`, and `Omar Silva`, whose IDs end `…019`, `…009`, `…029`. Every one scores exactly `MIN_SUGGESTION_SCORE` (25) on `id_near_miss` distance 2 alone, with no name or email signal. That is the ranking working as written, and three plausible-looking wrong answers is arguably worse than the empty state the module goes out of its way to allow. Decide before the phase-3 assign control makes them one click from a write: either raise the floor above a bare distance-2 ID match, or require a second corroborating reason for a distance-2 match to qualify. Changing weights touches bulk assign too, which is why it is not a phase-2 edit.
+- ⚠️ **The queue's filters are lost on the round trip.** Row links are a bare `/admin/attendance/{id}` and the detail's back-link a bare `/admin/attendance`, so an officer working a filtered queue lands back at the unfiltered default on every row. Worth fixing *with* phase 3 rather than before it, since the post-mutation redirect needs the same carried state — do it once.
+
+**Confirmed as correct, not a bug:** the window-relative and event-relative gap numbers read identically on every seeded row. `describeGap` separates them on purpose, but no seeded event sets `checkin_opens_at`/`checkin_closes_at`, so `effectiveWindow` falls back to `starts_at`/`ends_at` and the two genuinely coincide. Set a late close on an event to see them diverge.
 
 ### Phase 3 — mutations
 

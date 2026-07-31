@@ -360,6 +360,33 @@ describe("diffStudentId", () => {
   it("handles a length difference", () => {
     expect(diffStudentId("UT100", "UT100999").firstDifferenceAt).toBe(5);
   });
+
+  // The seed stores student IDs in four formats on purpose, so the two sides
+  // of a suggestion routinely disagree on punctuation and case. Comparing raw
+  // strings made every such pair "differ" at the formatting character and the
+  // UI highlighted that instead of the digit — visible on /admin/attendance
+  // as `roster UT100028` with the U marked.
+  it("ignores formatting differences and marks the digit that moved", () => {
+    // ut 100998 vs UT100028 — normalized, they diverge at index 5.
+    expect(diffStudentId("ut 100998", "UT100028").firstDifferenceAt).toBe(5);
+    // UT-100999 vs UT100019 — the hyphen must not count as the difference.
+    expect(diffStudentId("UT-100999", "UT100019").firstDifferenceAt).toBe(5);
+  });
+
+  it("maps the index onto the raw member string, not the normalized one", () => {
+    // Normalized index 5, but the hyphen pushes it to 6 in `UT-100019`.
+    const diff = diffStudentId("UT100999", "UT-100019");
+    expect(diff.firstDifferenceAt).toBe(6);
+    expect(diff.member[diff.firstDifferenceAt!]).toBe("0");
+  });
+
+  it("treats the same id in two formats as no difference at all", () => {
+    expect(diffStudentId("ut 100017", "UT-100017").firstDifferenceAt).toBeNull();
+  });
+
+  it("returns null when the member id runs out before the difference", () => {
+    expect(diffStudentId("UT1009991", "UT100").firstDifferenceAt).toBeNull();
+  });
 });
 
 describe("previewResolution", () => {
