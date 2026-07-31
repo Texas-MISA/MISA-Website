@@ -319,6 +319,18 @@ later stage; pick it up between stages or when someone hands over the assets.
 - **The 2030 fixtures cannot exercise the views.** `helpers.ts` puts fixture events in 2030, so `events.term` is `"Spring 2030"`, and both views filter `e.term = current_term()`; every leaderboard assertion would have passed vacuously at zero. `createCurrentTermEvent()` now places the event a few hours in the past, reads back the generated `term`, compares it to `current_term()`, and throws if they differ — so a run straddling Aug 1 / Jan 1 fails loudly rather than silently asserting nothing. Both values come from the database; no term string is typed (§4.7).
 - **`cleanup()` leaked attendance rows with neither link** — it deleted only by `event_id` or `member_id`, and that is the queue's most important fixture shape. `Tracker.attendanceIds` plus a `createTestAttendance()` helper closes it; a full run is now member-neutral (verified 33 → 33). (`point_adjustments` needs no pass: `member_id` cascades.)
 
+## Designed, approved, not built — `/attend` first-time checkbox
+
+Spec: [`docs/attend-confirmation-flow.md`](docs/attend-confirmation-flow.md). Decided 2026-07-31; implement straight from it.
+
+A check-in optionally declares "this is my first time". A returning member whose details match is written immediately and sees the same success screen as today — the fast path is unchanged. An unmatched submission from someone who did **not** tick the box is **re-prompted and not written at all**; a first-timer gets a review screen and is written only on confirm.
+
+Three things not to rediscover the hard way:
+
+- **This narrows the "nothing is ever dropped on the floor" invariant**, and the amendment must land in the same commit as `lib/checkin.ts`. The note is already parked under that invariant in `CLAUDE.md`.
+- **It needs no migration** — nothing is persisted between steps, which is what makes it much smaller than it sounds.
+- **The membership oracle is accepted**, deliberately and against the stance §6 takes for the officer login. The reasoning is in the spec; don't "fix" it.
+
 ## Later
 
 Placeholders — expand on arrival. Effort estimates from §7.
