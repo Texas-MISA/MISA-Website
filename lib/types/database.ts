@@ -129,6 +129,7 @@ export type Database = {
           submitted_email: string
           submitted_name: string
           submitted_student_id: string
+          updated_at: string
         }
         Insert: {
           event_id?: string | null
@@ -144,6 +145,7 @@ export type Database = {
           submitted_email: string
           submitted_name: string
           submitted_student_id: string
+          updated_at?: string
         }
         Update: {
           event_id?: string | null
@@ -159,6 +161,7 @@ export type Database = {
           submitted_email?: string
           submitted_name?: string
           submitted_student_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -578,3 +581,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

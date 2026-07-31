@@ -1,3 +1,4 @@
+import { StatusPill } from "@/app/admin/(shell)/_components/status-pill";
 import { formatInstant } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -93,19 +94,3 @@ export async function RecentCheckins() {
   );
 }
 
-export function StatusPill({ status }: { status: string }) {
-  const tone =
-    status === "present"
-      ? "border-green-800/40 text-green-900"
-      : status === "pending"
-        ? "border-amber-800/50 text-amber-900"
-        : "border-black/30 text-foreground/60";
-
-  return (
-    <span
-      className={`border px-2 py-0.5 text-[0.7rem] uppercase tracking-wider ${tone}`}
-    >
-      {status}
-    </span>
-  );
-}

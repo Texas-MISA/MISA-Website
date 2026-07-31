@@ -14,7 +14,7 @@ import { Wordmark } from "@/components/ui/wordmark";
 const NAV = [
   { href: "/admin", label: "Dashboard", ready: true },
   { href: "/admin/events", label: "Events", ready: true },
-  { href: "/admin/attendance", label: "Attendance", ready: false },
+  { href: "/admin/attendance", label: "Attendance", ready: true },
   { href: "/admin/members", label: "Members", ready: false },
   { href: "/admin/points", label: "Points", ready: false },
   { href: "/admin/audit", label: "Audit", ready: false },

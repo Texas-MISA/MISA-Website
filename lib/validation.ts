@@ -1,11 +1,17 @@
 import { z } from "zod";
 
+import { MAX_BULK_ASSIGN } from "@/lib/attendance";
 import { normalizeStudentId } from "@/lib/checkin";
 import {
   EVENT_CATEGORIES,
   EVENT_STATUSES,
   MAX_SERIES_EVENTS,
 } from "@/lib/events";
+import {
+  MAX_GRANT_MEMBERS,
+  MAX_POINTS_PER_GRANT,
+  POINT_CATEGORIES,
+} from "@/lib/points";
 
 // Zod schemas (§10). App-side validation is the only email-format check in
 // the system — the attendance table requires submitted_email to be non-null
@@ -150,3 +156,114 @@ export const seriesSchema = z
   );
 
 export type SeriesFields = z.infer<typeof seriesSchema>;
+
+// Attendance review and point adjustments (§4.2, §7 Stage 5).
+//
+// Each schema below deliberately shadows a database constraint rather than
+// trusting it: the constraint is the guarantee, this is what turns a violation
+// into a field-level message the officer can act on. Same relationship as
+// endAfterStart and valid_window above.
+
+/** An empty <select> means "not set", which is NULL — the FK columns are
+ * nullable and a pending row is precisely one that hasn't got them yet. */
+const optionalUuid = (label: string) =>
+  z
+    .union([z.literal(""), z.uuid(`Pick a valid ${label}`)])
+    .transform((v) => (v === "" ? null : v));
+
+const resolutionNote = optionalText(1000, "Note");
+
+export const attendanceEditSchema = z.object({
+  // The submitted_* fields stay editable — an officer fixing an obvious typo
+  // is the point of the screen — so they carry the same rules the public form
+  // applied, including the normalization floor that stops "-" collapsing every
+  // such submission into one phantom identity.
+  submittedName: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(120, "Name is too long"),
+  submittedStudentId: z
+    .string()
+    .trim()
+    .min(1, "Student ID is required")
+    .max(32, "Student ID is too long")
+    .refine((v) => normalizeStudentId(v).length >= 2, "Enter a valid student ID"),
+  submittedEmail: z
+    .string()
+    .trim()
+    .max(254, "Email is too long")
+    .pipe(z.email("Enter a valid email address")),
+  eventId: optionalUuid("event"),
+  memberId: optionalUuid("member"),
+  resolutionNote,
+});
+
+export type AttendanceEditFields = z.infer<typeof attendanceEditSchema>;
+
+/** Rejecting prompts for a note but does not require one (§7 Stage 5). */
+export const attendanceRejectSchema = z.object({
+  id: z.uuid(),
+  resolutionNote,
+});
+
+export const manualAttendanceSchema = z.object({
+  // Both links required: a manually created row is `present` from the start,
+  // which present_requires_resolution would refuse with either one missing.
+  eventId: z.uuid("Pick an event"),
+  memberId: z.uuid("Pick a member"),
+  date: civilDate,
+  time: civilTime,
+  resolutionNote,
+});
+
+export type ManualAttendanceFields = z.infer<typeof manualAttendanceSchema>;
+
+export const bulkAssignSchema = z.object({
+  eventId: z.uuid("Pick an event"),
+  // Explicitly checked ids only — never "everything matching this filter".
+  ids: z
+    .array(z.uuid())
+    .min(1, "Select at least one submission")
+    .max(MAX_BULK_ASSIGN, `Select at most ${MAX_BULK_ASSIGN} at a time`),
+  approve: z.boolean(),
+});
+
+export const pointGrantSchema = z.object({
+  memberIds: z
+    .array(z.uuid())
+    .min(1, "Pick at least one member")
+    .max(MAX_GRANT_MEMBERS, `Pick at most ${MAX_GRANT_MEMBERS} members at once`),
+  points: z.coerce
+    .number()
+    .int("Points must be a whole number")
+    .min(-MAX_POINTS_PER_GRANT, "That is larger than a single grant allows")
+    .max(MAX_POINTS_PER_GRANT, "That is larger than a single grant allows")
+    // Mirrors check (points <> 0). Zero is not a grant.
+    .refine((v) => v !== 0, "Points can't be zero"),
+  // Mirrors reason_not_blank. §4.2: an unexplained grant is what turns a
+  // leaderboard from a record into a rumor, so no UI path may skip it.
+  reason: z
+    .string()
+    .trim()
+    .min(1, "A reason is required")
+    .max(500, "Reason is too long"),
+  category: z.enum(POINT_CATEGORIES),
+  eventId: optionalUuid("event"),
+  // No `term` field, deliberately. point_adjustments.term defaults to
+  // current_term() and a literal term string anywhere in application code is a
+  // bug (§4.7). If overriding ever ships it must come from a picker fed by the
+  // distinct terms in the database, never from typed text.
+});
+
+export type PointGrantFields = z.infer<typeof pointGrantSchema>;
+
+/** Mirrors the void_requires_reason constraint added in migration 13. */
+export const pointVoidSchema = z.object({
+  id: z.uuid(),
+  voidReason: z
+    .string()
+    .trim()
+    .min(1, "A reason is required")
+    .max(500, "Reason is too long"),
+});

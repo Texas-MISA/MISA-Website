@@ -27,5 +27,20 @@ export default defineConfig({
     // Integration tests round-trip the local stack; generous but bounded.
     testTimeout: 15000,
     hookTimeout: 30000,
+    // One test file at a time.
+    //
+    // Every integration file shares the single local Supabase stack, and its
+    // Kong gateway starts returning 502s ("An invalid response was received
+    // from the upstream server") once several worker threads hit PostgREST at
+    // once. The symptom is the nasty kind: a different test fails on each run
+    // and each one passes in isolation, so it reads as a flaky assertion
+    // rather than as saturation. Measured at roughly a 50% per-run failure
+    // rate with parallelism on, and 0 across repeated serial runs.
+    //
+    // The whole suite takes about four seconds serially, so this costs nothing
+    // worth having. Revisit only if a future stack gets its own database per
+    // worker — the fixtures already isolate by 7-day slot, so the collision is
+    // in the gateway, not in the data.
+    fileParallelism: false,
   },
 });
