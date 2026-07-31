@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–4 complete; Stage 5 (attendance review) in progress on branch `stage-5-attendance-review` — phases 1–3 of 5 built, not merged to `main`.** Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row.
+**Stages 0–4 complete; Stage 5 (attendance review) in progress — phases 1–3 of 5 built, merged to `main`, and live in production.** Work continues on branch `stage-5-attendance-review`; it was merged early, on purpose, rather than at the end of the stage. Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row.
 
 Stage 5 so far: migration 13 (`attendance.updated_at` + trigger, `point_adjustments.void_requires_reason`, **applied to local and remote**), the pure core in `lib/attendance.ts` and `lib/points.ts`, six zod schemas, seven new `AuditAction` verbs, the queue at `/admin/attendance`, the submission detail at `/admin/attendance/[id]` with ranked event and member suggestions, and every review mutation in `app/actions/attendance-review.ts` — resolve, approve, reject, reopen, bulk assign, and manual entry at `/admin/attendance/new`. Phases 1–3 are browser-verified against the local stack; **phase 4 (`/admin/points`) is next**. No new migration is needed for it. `tasks.md` has the full handoff state.
 

@@ -12,9 +12,10 @@ Read this before touching anything; it is the state no file can tell you on its 
 
 | | |
 |---|---|
-| **Branch** | `stage-5-attendance-review` — **not merged.** `main` is still Stage 4. |
-| **Production** | Still Stage 4. `/admin/attendance` 404s there, by design. |
-| **Database** | Migration 13 is applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); history in sync. The schema is ahead of what `main` deploys, which is safe — 13 is additive with a default. |
+| **Branch** | `stage-5-attendance-review` **merged to `main` 2026-07-31** (`a9b10ac`) and pushed. Both branches exist on the remote; keep working on the branch and merge again at the end of each phase. |
+| **Production** | **Stage 5 phases 1–3 are live** on https://misa-website-beta.vercel.app. `/admin/attendance` and `/admin/attendance/new` return 307 to `/admin/login` when signed out (verified). `/admin/points` does **not** exist yet — the nav entry is disabled. |
+| **Database** | All 14 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); `migration list --linked` verified in sync before the merge. Phase 4 needs no new migration. |
+| ⚠️ **Merged mid-stage** | Stage 5 is 3 of 5 phases done. This was merged early, deliberately, so the work is visible in production — not because the stage is finished. Officers using `/admin/attendance` in production can resolve and approve attendance but cannot yet grant points. |
 | **Next task** | **Phase 4 — `/admin/points`.** Phases 1–3 are built and browser-verified as of 2026-07-31. |
 | **Local database** | Carries the phase-3 walkthrough's mutations (an approved row, a reopened one, two bulk assigns, a manual entry, one extra fixture row). `npx supabase db reset` restores the documented seed. |
 
@@ -150,7 +151,7 @@ Carried over from Stage 0; none blocked Stage 2, and all are now resolved. Kept 
   - Hobby allows a **single** function region, which is what this is; multi-region is Pro+ and `functionFailoverRegions` is Enterprise-only, so neither was used. Over-plan region counts fail *before* the build step — `vercel build` got well past that and emitted all functions, so the config is accepted.
   - ✅ **Live in production.** Confirmed by `vercel inspect` on the deployment holding the `misa-website-beta.vercel.app` alias: every function is built into `[cle1]`. Like any build-time setting it took effect only on the next deploy, so a future change to `vercel.json` needs a redeploy too.
 - [x] **Confirm Deployment Protection reads Standard Protection**, not Disabled — ✅ confirmed 2026-07-29 **empirically rather than by reading the dashboard label**, which is stronger: the production alias `misa-website-beta.vercel.app` returns **200**, while per-deployment URLs return **302 → `vercel.com/sso-api`**. That pair is the unique signature of Standard Protection — under Disabled the per-deployment URLs would be 200, under "All Deployments" the alias would gate too. No change needed.
-  - Worth knowing: **all 22 deployments to date are `Production`, and zero are `Preview`** — verified across both pages of `vercel ls`, since every commit has gone straight to `main`. No preview has ever existed, so the §6 preview exposure is still theoretical — but it becomes real the first time anyone pushes a branch, and the gate above is what will contain it.
+  - ~~Worth knowing: **all 22 deployments to date are `Production`, and zero are `Preview`**~~ — **stale as of 2026-07-31.** Preview deployments now exist (the `stage-5-attendance-review` branch has been pushed several times), so the §6 preview exposure is real rather than theoretical. Standard Protection is what contains it: per-deployment URLs return 302 → `vercel.com/sso-api`, so a preview is reachable only by someone signed into the Vercel account. Re-verify that gate before ever sharing a preview URL.
 - [x] **Move the DB password** out of the plaintext file in the home directory — **§2.5 resolved 2026-07-30: Bitwarden.** The vault holds the GitHub 2FA recovery codes and the Supabase database password, and §2.4's inventory is filled in. Two follow-ups below; neither is verifiable from this machine, so both are on you.
   - [x] **Original plaintext file deleted.** Copying into the vault was only half of "move"; the original is gone.
   - [x] **Vault is a Bitwarden *organization*, not a personal account** — two users, shared collections, so it satisfies §2.5's "survives one person graduating" and "hand to a successor as a unit."
