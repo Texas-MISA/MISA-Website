@@ -1,9 +1,89 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.19
-**Status:** Stages 0–3 complete; Stage 4 (admin foundation & event management) built and tested
+**Version:** 1.20
+**Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phase 1 of 5 built
 **Last updated:** July 2026
 
+> **v1.20: Stage 5 is under way.** Phase 1 — the schema groundwork, the pure
+> resolution core, and a read-only review queue at `/admin/attendance` — is built
+> and verified against the local stack. Phases 2–5 (submission detail,
+> mutations, `/admin/points`, docs) follow. 156 tests across 8 files.
+> Decisions made and now normative:
+>
+> - **`attendance` gains `updated_at`** (migration `…000013`), with a trigger
+>   reusing the schema-wide `set_updated_at()`. The review actions need the same
+>   compare-and-set anchor the event editor uses: without one, two officers
+>   assigning *different* events to the same still-pending row both succeed and
+>   the later write silently wins. `resolved_at` cannot serve — it is null for
+>   exactly the rows that need guarding.
+> - **Concurrency is anchored differently for single rows and for batches.**
+>   Single-row attendance mutations compare-and-set on `updated_at`. Bulk
+>   operations scope on `status = 'pending'` and report the difference between
+>   rows requested and rows updated as skipped — carrying two hundred
+>   `updated_at` strings through a form buys nothing.
+> - **`point_adjustments` deliberately has no `updated_at`.** An adjustment is
+>   immutable except for voiding, and voiding is a one-way transition, so
+>   `.is("voided_at", null)` on the `UPDATE` is already a complete guard: zero
+>   rows back means someone voided it first. The asymmetry with `attendance` is
+>   intentional, not an oversight.
+> - **`void_requires_reason`** (same migration): `(voided_at is null) =
+>   (void_reason is null)`. §4.2 already argued that a void is a recorded action
+>   carrying its own reason, but `void_is_complete` only paired `voided_at` with
+>   `voided_by` — the reason was enforced in application code alone.
+> - **A draft event's attendance counts on the public leaderboard.** The
+>   `leaderboard` view excludes only `cancelled`, not unpublished. This is
+>   defensible (build a schedule, backfill, publish later) but was undocumented,
+>   and it means approving a submission against a draft moves public standings.
+>   Surfaced as a warning at resolution time rather than changed.
+> - **`leaderboard` filters `where m.active`; `member_directory` does not.**
+>   Approving for an inactive member changes the officer directory and produces
+>   no public change at all. Also surfaced as a resolution warning.
+> - **`nearby_events().gap` is event-relative, not window-relative.** It measures
+>   against `starts_at`/`ends_at`, but the *check-in window* is what refused the
+>   submission, and with a late close configured those are different numbers. The
+>   officer-facing sentence leads with the window ("check-in closed 26 minutes
+>   before this submission") and keeps the event number beside it as the ranking
+>   basis. Ranking itself stays in SQL; JavaScript annotates and never reorders.
+> - **`nearby_events()` is published-only and returns nothing beyond 48 hours**,
+>   which is the ordinary state of an orphan that sat in the queue for a week.
+>   The assign control therefore needs an independent all-status event picker;
+>   the suggestion list ranks, it does not enumerate the options.
+> - **Member candidates are scanned, not probed.** The canonical near-miss is
+>   `Jon` vs `John`, and `ilike '%jon%'` cannot match `John` — a probe-based
+>   candidate set structurally excludes the row the officer wants. Under
+>   `MEMBER_SCAN_LIMIT` (400) the active roster is fetched and scored in
+>   JavaScript, which is also what makes the ranking unit-testable. `pg_trgm` is
+>   the growth path, deliberately not enabled at this size.
+> - **Nothing is ever preselected.** Suggestion lists render with nothing
+>   checked, and `rankMemberSuggestions` returns an empty list rather than a
+>   weak guess when nothing clears the score threshold. This is §7's
+>   "don't auto-resolve near-misses" carried into the UI, where a stray
+>   `defaultChecked` is the easiest way to violate it by accident.
+> - **Date-range filters are Central-anchored and half-open.** A bare
+>   `.lte("submitted_at", "2026-04-07")` is read as UTC midnight and silently
+>   drops the last five or six hours of a Central day. Same class of bug as
+>   `new Date("2026-09-01T18:00")`, and it fails plausibly rather than loudly.
+> - **Server Components own date formatting.** `Intl.DateTimeFormat` inside a
+>   Client Component runs on both sides of hydration, and Node and Chrome ship
+>   different ICU data for the space before "PM" — a mismatch whose React diff
+>   shows two apparently identical strings. Formatted labels are passed down as
+>   props.
+> - **`admin_audit.action` is a closed union in TypeScript and free text in
+>   SQL, and readers must tolerate values outside the union.** Two pre-Stage-5
+>   rows on the production database carry the bare verbs `reject` and `void`,
+>   and they can never be corrected: the append-only trigger raises P0001 on
+>   `UPDATE` and `DELETE` alike, which is exactly the property that makes the
+>   log worth having.
+> - **Officer attendance mutations live in `app/actions/attendance-review.ts`,
+>   apart from the public `app/actions/attendance.ts`.** That module holds
+>   `submitCheckin`, the one unauthenticated write path in the system; keeping
+>   it a single-export file makes "what can an anonymous user POST to" a
+>   one-file answer. A divergence from §10's original layout list.
+> - **§9 #6 and #8 are resolved** as proposed: any officer may approve a pending
+>   row, with the audit log rather than a role gate as the control; and no
+>   resolution deadline is enforced, with the pending badge and the oldest-first
+>   default sort as the mitigation.
+>
 > **v1.19: Stage 4 is built and verified end-to-end against the local stack.**
 > Officers sign in at `/admin/login`, run the whole schedule from `/admin/events`,
 > and every mutation writes an `admin_audit` row. 97 tests across 6 files.
@@ -491,11 +571,22 @@ create table attendance (
   resolution_note      text,
   resolved_by          uuid references auth.users(id),
   resolved_at          timestamptz,
+  -- Concurrency anchor for the review screens, not a fact about the
+  -- submission — submitted_at and resolved_at are the facts. Two officers can
+  -- have the same pending row open; without this, both assigning a different
+  -- event succeeds and the later write silently wins. resolved_at can't serve
+  -- the purpose: it is null for exactly the rows that need guarding.
+  updated_at           timestamptz not null default now(),
   -- A row may only count toward the leaderboard once both links are resolved.
   constraint present_requires_resolution check (
     status <> 'present' or (event_id is not null and member_id is not null)
   )
 );
+
+-- Reuses the schema-wide trigger function defined with events.
+create trigger attendance_set_updated_at
+  before update on attendance
+  for each row execute function set_updated_at();
 
 -- Prevents double credit for the same person at the same event, including when
 -- an officer manually assigns an orphan to an event the member already attended.
@@ -525,8 +616,19 @@ create table point_adjustments (
   constraint void_is_complete check (
     (voided_at is null and voided_by is null) or
     (voided_at is not null and voided_by is not null)
+  ),
+  -- 4.2 argues a void is itself a recorded action with its own reason, but
+  -- void_is_complete only pairs voided_at with voided_by. Written as an
+  -- equality of null-ness so it also rejects a reason left on a live row.
+  constraint void_requires_reason check (
+    (voided_at is null) = (void_reason is null)
   )
 );
+
+-- No updated_at here, deliberately. An adjustment is immutable except for
+-- voiding, and voiding is one-way, so `.is("voided_at", null)` on the UPDATE is
+-- already a complete concurrency guard: zero rows back means someone voided it
+-- first. The asymmetry with attendance is intentional.
 
 -- Single append-only audit log across every entity an officer can modify.
 -- Replaces the attendance-specific table from v1.1: event edits and point
@@ -645,6 +747,11 @@ The three-way `case` matters: a timestamp *inside* an event's run has a gap of z
 
 If `nearby_events()` returns nothing, the check-in is refused outright with a message. If it returns rows, the submission is stored as `pending` and those rows become the ranked suggestions an officer sees in the review queue.
 
+Two properties of this function shape the review screen, and both are easy to get wrong (v1.20):
+
+- **`gap` is event-relative, not window-relative.** It measures against `starts_at`/`ends_at`, but the *check-in window* is what accepted or refused the submission. For an event with a 15-minute late close, a submission 41 minutes past `ends_at` is only 26 minutes past the window that actually rejected it. The officer-facing sentence therefore leads with the window number — "check-in closed 26 minutes before this submission" — and keeps the event number beside it, since that is what the ordering was computed from. `nearby_events()` does not return the window columns, so the detail page reads them separately and uses `effectiveWindow()`. **Ranking stays in SQL**; the application annotates and never reorders, which is the §4.3 three-places invariant applied to suggestions.
+- **It is published-only, and returns nothing at all beyond the window bound.** That is the ordinary state of an orphan that sat in the queue for a week, and an officer must still be able to file a submission against a draft or cancelled event. So the assign control is an independent all-status event picker; the suggestion list is a ranking aid, not the vocabulary of what may be assigned. The empty-suggestions state has to say so rather than look broken.
+
 ### 4.4 Leaderboard view
 
 Points now come from two sources, and the view keeps them separate rather than collapsing them into one number:
@@ -694,6 +801,13 @@ The one rough edge is early August, when the new term is live but has no events 
 **Anon reaches this view, not the tables under it.** Postgres views run as their owner by default (`security_invoker = false`), which is what lets the anon role read aggregated standings while RLS still denies it direct access to `members`, `attendance`, `events`, and `app_settings`. The view *is* the security boundary — do not set `security_invoker = true` on it without re-checking §6.
 
 **Privacy note:** the view deliberately excludes `student_id` and `email`. A public leaderboard should never expose identifiers that are used elsewhere as credentials. Consider offering members an opt-out or a display-name field before making it fully public.
+
+**Two filters here surprise people, and both matter when an officer approves a submission** (found and documented in v1.20):
+
+- **The attendance leg excludes only `cancelled`, not unpublished** — so **a draft event's attendance counts publicly.** That is defensible on purpose: an officer can build a schedule, backfill attendance, and publish afterwards without the numbers vanishing in between. But it means approving a submission against a draft event moves the public board immediately, which is not what "draft" suggests. The review screen warns rather than blocks.
+- **`where m.active` has no counterpart in `member_directory`.** Approving attendance for an inactive member therefore changes the officer directory and produces *no public change at all*. Without a warning that reads as a bug in the approval.
+
+Neither is worth changing — the behaviours are individually right — but both need saying out loud, because the failure mode is an officer who does not believe the screen.
 
 ### 4.5 Member directory view
 
@@ -977,8 +1091,22 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 5 — Attendance Review & Manual Adjustments
+### Stage 5 — Attendance Review & Manual Adjustments 🔨 phase 1 of 5 built (v1.20)
 **Goal:** Officers can see every submission, correct any of them, and award points that didn't come from a check-in. Until this ships, pending rows accumulate with no way to resolve them.
+
+**Shipped in five demonstrable phases**, because the stage is 5–6 days and splits cleanly at the read/write boundary:
+
+| Phase | Scope | State |
+|---|---|---|
+| 1 | Migration 13, `lib/attendance.ts`, `lib/points.ts`, zod schemas, audit vocabulary, read-only `/admin/attendance` | ✅ built |
+| 2 | `/admin/attendance/[id]` — raw submission, ranked suggestions, audit trail; still read-only | pending |
+| 3 | Mutations: resolve, approve, reject, reopen, bulk assign, manual entry | pending |
+| 4 | `/admin/points` — grant, ledger, void | pending |
+| 5 | Docs, invariants, `tasks.md` | pending |
+
+**Bulk assign is explicit-selection-only and partial-success.** Stage 5 introduces the first bulk action in the system, so Stage 6's select-all rule is pulled forward here: only checked IDs are ever operated on, never "everything matching this filter." The pre-flight must also dedupe *within* the selection — two selected rows can be the same person — and the operation splits into two statements, because rows with no member link cannot become `present` without violating `present_requires_resolution`. Auto-approve is an opt-in checkbox rather than implied by choosing an event; silently approving forty rows because an officer picked an event from a dropdown is precisely the boundary-moving the design note below warns against.
+
+**Audit granularity follows officer intent, not columns.** Assigning an event and linking a member happen in one click and write one `attendance.updated` row; `before`/`after` already record exactly which columns moved, so splitting them into separate actions adds rows without adding information. Bulk operations reuse the single-row verbs and carry their batch context in `note`, so a row's history reads identically whether the change came from the detail page or the queue.
 
 **Review queue (`/admin/attendance`)**
 - Table of all submissions: submitted name, ID, email, exact timestamp, resolved event, status
@@ -1126,6 +1254,8 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 | A mutation succeeds but its `admin_audit` row does not | Low | Medium | **Accepted for v1 (Stage 4).** PostgREST cannot transact across statements, so the mutation and the audit insert are two round trips. The action logs the failure and still reports success, because the change really happened and reporting failure would invite a duplicate retry. Controls: every mutation's audit row is asserted in the Vitest suite, and the fix — one plpgsql RPC per mutation doing both in one transaction — is a post-v1 item |
 | No officer can sign in because nobody can reset a password | Medium | High | There is no self-serve password reset: it needs SMTP, and the built-in sender is capped at 2 emails/hour and not for production. The v1 path is `scripts/create-officer.mjs --reset-password` run by another officer, or the Supabase dashboard. Keep ≥2 officers with `admin_profiles` rows so this is never one person's problem (§2.4) |
 | A recurring series silently shifts an hour after the November clock change | Low | Medium | Series expansion iterates Central civil dates and attaches wall time last, never adding 7×24h to a UTC instant. Locked down by fixtures either side of the 2026-11-01 transition |
+| Test suite fails intermittently and the failures get dismissed as flaky | Medium | High | **Found and fixed in Stage 5 (v1.20), and it predated Stage 5.** Vitest ran test files in parallel while every integration file shared the one local Supabase stack; its Kong gateway returns 502s (`An invalid response was received from the upstream server`) under concurrent workers. A *different* test failed on each run and each passed in isolation, so it read as a bad assertion rather than as saturation — roughly a 50% per-run failure rate. `fileParallelism: false` in `vitest.config.ts` fixes it: 0 failures across repeated runs, whole suite still ~4s. The danger was never the flake itself but the habit it teaches — a suite that cries wolf is one whose real failures get re-run instead of read |
+| Officer distrusts a correct screen because a view filter is invisible | Medium | Medium | Approving against a draft event moves the public board (the `leaderboard` view excludes only `cancelled`), and approving for an inactive member moves nothing public (the view filters `m.active`). Both are correct and both look wrong. `previewResolution()` surfaces each as a named warning at resolution time (§4.4) |
 
 ---
 
@@ -1141,16 +1271,21 @@ The five that affect the schema. Decided together; the schema in §4 reflects th
 5. **Excused absences** — ✅ **Deferred to post-v1.** Attendance rate stays raw `attended / possible`. `point_adjustments` already handles the standing side with a required reason, so the gap is cosmetic rather than punitive.
 7. **Orphan grace window** — ✅ **48 hours**, as one exported constant feeding `nearby_events()`.
 
+### Resolved at Stage 5 (2026-07-31)
+
+Both land in the review queue, and building it decides them either way — so they were decided explicitly rather than by default.
+
+6. **Override authority** — ✅ **Any officer may approve a pending row.** The audit log is the control, not a role gate. A gate funnels every correction through one person, which in a student org means corrections wait for whoever is busiest; and the failure it guards against (an officer approving something they shouldn't) is visible in `admin_audit` either way. Revisit only if the leaderboard starts determining something with real stakes.
+8. **Resolution deadline** — ✅ **None enforced in v1.** The mitigations are the dashboard pending badge and the oldest-first default sort on `/admin/attendance`, both built in phase 1. A hard deadline would silently destroy credit for a member who did attend, which is the one failure mode §4.2 is built to make impossible.
+
 ### Still open
 
-Not schema-affecting, so they can wait — but #9 and #11 want answers before the leaderboard decides anything real.
+Not schema-affecting, so they can wait — but **#9 and #10 need answering before `/admin/points` ships in Stage 5 phase 4**: #9 sets the magnitude bound on the grant form and #10 decides whether `grantPoints` needs a self-grant check.
 
 1. **Leaderboard visibility** — fully public, or behind the member lookup flow? Affects whether names appear on an indexable page.
-6. **Override authority** — can any officer approve a pending row, or only the `admin` role? Relevant if the leaderboard determines anything real.
-8. **Resolution deadline** — is there a point after which pending rows can no longer be approved, e.g. end of semester? Prevents retroactive standing changes after eligibility is decided.
-9. **Point grant caps** — should a single officer be able to award unlimited bonus points, or should grants above some threshold require the `admin` role? Worth deciding before the leaderboard determines anything with stakes.
-10. **Self-grants** — can an officer award points to themselves? Simplest defensible answer is yes but always visible in the ledger; the alternative is blocking it outright.
-11. **Bonus points in public standings** — shown as a separate column, folded into the total silently, or excluded from the public leaderboard entirely?
+9. **Point grant caps** — should a single officer be able to award unlimited bonus points, or should grants above some threshold require the `admin` role? The proposed default is no cap, on the reasoning that a cap invites splitting a grant in two. Note that `lib/points.ts` already carries `MAX_POINTS_PER_GRANT = 500` — that is an input-sanity guard against a fat-fingered 5000, explicitly **not** the policy cap this decision is about.
+10. **Self-grants** — can an officer award points to themselves? Simplest defensible answer is yes but always visible in the ledger with the granting officer named; the alternative is blocking it outright, which just moves it to a friend's account.
+11. **Bonus points in public standings** — ⚠️ **stale as written; do not build it.** It asks whether bonus points appear "as a separate column, consistent with §4.4", but §4.4 was subsequently resolved the other way: the public `leaderboard` shows a single `total_points` and only the officer-facing `member_directory` keeps the split. Building the public split would silently reverse a settled decision. Either strike this row or rewrite it as "should §4.4 be revisited?" — but it is no longer an open question about Stage 7.
 
 ---
 
@@ -1170,17 +1305,24 @@ Not schema-affecting, so they can wait — but #9 and #11 want answers before th
     /members/...
     /attendance/...
   /actions
-    attendance.ts            server actions
+    attendance.ts            submitCheckin ONLY — see note below
+    attendance-review.ts     officer resolution mutations
     events.ts
     members.ts
     points.ts
-    audit.ts                 shared admin_audit writer
+    audit.ts                 shared admin_audit writer (no "use server")
 /lib
   supabase/
     server.ts                server client
     client.ts                browser client
   types/database.ts          generated types
   validation.ts              zod schemas
+  attendance.ts              resolution core: interval parsing, gap
+                             description, member scoring, previewResolution
+  points.ts                  point categories, formatting, grant bounds
+  events.ts                  event domain core
+  checkin.ts                 check-in resolution core
+  auth.ts                    getOfficer / requireOfficer
   filters.ts                 directory filter → SQL translation
   export.ts                  CSV / TSV / clipboard formatting
 /supabase
@@ -1191,3 +1333,7 @@ Not schema-affecting, so they can wait — but #9 and #11 want answers before th
   ...
 proxy.ts                     admin route protection (Next 16 rename of middleware.ts)
 ```
+
+**Why officer attendance mutations live apart from `app/actions/attendance.ts`** (v1.20): that module holds `submitCheckin`, the single unauthenticated write path in the whole system and what §6 calls the main attack surface. Every export of a `"use server"` module is a publicly callable endpoint, so keeping it a one-export file makes "what can an anonymous user POST to" a one-file answer — and removes the chance of someone adding an unguarded export next to a guarded one. Officer mutations go in `attendance-review.ts`, where every export opens with `getOfficer()`.
+
+**`lib/` modules ending in a domain name are pure** — no `next/*` imports, no `server-only` guard — so Vitest calls them directly with injected clients and timestamps. `events.ts`, `checkin.ts`, `attendance.ts`, and `points.ts` all follow this. Anything request-shaped belongs in `app/actions/`. This is what keeps the resolution logic testable without a running Next server.

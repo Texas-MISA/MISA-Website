@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–4 are complete.** Stage 5 (attendance review) is next; carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–4 are complete. Stage 5 (attendance review) is in progress — phase 1 of 5 built.** Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -60,10 +60,10 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 | # | Decision | Proposed default | |
 |---|---|---|---|
 | 1 | Leaderboard visibility | Fully public. Full name + points only; no student IDs or emails, per the §4.4 privacy note. Add an opt-out or display-name field if a member objects. | [ ] |
-| 6 | Override authority | Any officer may approve a pending row. The audit log is the control, not a role gate — a gate just funnels every correction through one person. | [ ] |
-| 8 | Resolution deadline | None enforced in v1. The pending badge and oldest-first default sort are the mitigation for a rotting queue. | [ ] |
-| 9 | Point grant caps | No hard cap. Ledger visibility and the required reason are the control; a cap invites splitting a grant in two. | [ ] |
-| 10 | Self-grants | Allowed, but always visible in the ledger with the granting officer named. Blocking outright just moves it to a friend's account. | [ ] |
+| 6 | Override authority | **✅ Resolved 2026-07-31 — any officer may approve.** The audit log is the control, not a role gate; a gate funnels every correction through whoever is busiest, and the misuse it guards against shows up in `admin_audit` either way. | [x] |
+| 8 | Resolution deadline | **✅ Resolved 2026-07-31 — none enforced in v1.** The dashboard pending badge and the oldest-first default sort (both built in phase 1) are the mitigation. A hard deadline would destroy credit for someone who did attend, which is the one outcome §4.2 exists to prevent. | [x] |
+| 9 | Point grant caps | No hard cap. Ledger visibility and the required reason are the control; a cap invites splitting a grant in two. ⏰ **Needed before phase 4** — it sets the bound on the grant form. Note `lib/points.ts` already has `MAX_POINTS_PER_GRANT = 500` as a fat-finger guard, which is *not* this policy decision. | [ ] |
+| 10 | Self-grants | Allowed, but always visible in the ledger with the granting officer named. Blocking outright just moves it to a friend's account. ⏰ **Needed before phase 4** — it decides whether `grantPoints` carries a self-grant check. | [ ] |
 | 11 | Bonus points publicly | ⚠️ **This proposal is now stale and contradicts a settled invariant — don't build it as written.** It says "shown as a separate column, consistent with §4.4", but §4.4 was since resolved the other way: the public `leaderboard` shows a single `total_points`, and only the officer-facing `member_directory` keeps `attendance_points` and `bonus_points` split. Building the public split in Stage 7 would reverse that deliberately. Decide whether to strike this row or rewrite it to match §4.4. | [ ] |
 
 ---
@@ -210,11 +210,64 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 **Deployed 2026-07-30** (`ebe3233`, plus `64d29e2` making draft-vs-publish an explicit button on the create form). No new env vars and no migrations were needed. The production officer account is registered and `/admin/login` is live; admin routes return 307 to it when signed out, including paths that don't exist, so the gate leaks no route names. **Stage 4 complete.**
 
+## Now — Stage 5: Attendance review & manual adjustments
+
+*Officers can see every submission, correct any of them, and award points that never came from a check-in (§7 Stage 5). 5–6 days, shipped in five phases so each ends with something demonstrable. Branch: `stage-5-attendance-review`.*
+
+### ✅ Phase 1 — schema, pure core, read-only queue (2026-07-31, `de352a1`)
+
+- [x] **Migration 13** — `attendance.updated_at` + trigger reusing `set_updated_at()`, and `point_adjustments.void_requires_reason`. **Applied to both local and the remote** (`gbxypeofjnhrhotlhyzs`); migration history in sync. Types regenerated.
+  - Checked the remote for violating rows *before* pushing (`(voided_at is null) <> (void_reason is null)` → 0). A constraint that fails mid-migration is a bad way to find out.
+  - ⚠️ `supabase gen types --local` omits the `__InternalSupabase` block that `--linked` emits. Restore it by hand or the diff looks like a regression.
+- [x] **`lib/attendance.ts`** — interval parsing, `describeGap`, member-candidate scoring with bounded Damerau-Levenshtein, `diffStudentId`, `previewResolution`, `canApprove`. Pure, same contract as `lib/events.ts`.
+- [x] **`lib/points.ts`**, six zod schemas, `AuditAction` extended by seven verbs, `seed.sql` audit actions aligned to the union.
+- [x] **`/admin/attendance`** — read-only queue, URL-driven filters (status / event / date range / sort), pending + oldest-first by default. Nav unlocked; dashboard badge links in; `StatusPill` extracted for its third caller.
+- [x] **59 new tests** (156 total), lint and build clean, verified in a real browser against the local stack: 5 pending rows covering all three orphan shapes, 208 on `status=all` matching the documented seed exactly.
+
+**Two traps found, both now recorded as invariants:**
+
+- 🪤 **Date-range filters must be Central-anchored and half-open.** `to=2026-04-07` has to include the seed's 8:15 PM CT orphans, which are `01:15` **UTC the next day**. A bare `.lte("submitted_at", "2026-04-07")` returns zero rows and looks entirely reasonable.
+- 🪤 **`Intl.DateTimeFormat` in a Client Component is a hydration mismatch.** Node and Chrome ship different ICU data for the space before "PM", so React's diff shows two apparently identical strings. Server Components own date formatting.
+
+**And one that predated Stage 5:** `npm test` was failing intermittently at roughly a 50% rate — a different test each run, always a Kong 502 under parallel workers sharing the one local stack. `fileParallelism: false` fixes it; 0 failures across repeated runs, still ~4s.
+
+### Phase 2 — submission detail (read-only)
+
+- [ ] `/admin/attendance/[id]` — raw form data as typed, timestamp to the minute in Central
+- [ ] Ranked event suggestions from `nearby_events()` with the window-relative gap sentence; **plus an independent all-status event picker**, since the function is published-only and returns nothing beyond 48h
+- [ ] Ranked member candidates with the near-miss ID diffed; nothing preselected, empty when nothing clears the threshold
+- [ ] `previewResolution()` warnings — draft event, cancelled event, inactive member, outside window
+- [ ] Shared `AuditTrail` component; officer names need a second query (`actor_id` → `auth.users` has no PostgREST path to `admin_profiles`)
+
+### Phase 3 — mutations
+
+- [ ] `app/actions/attendance-review.ts` — resolve/approve/reject/reopen, one save per officer intent, CAS on `updated_at`
+- [ ] Approve disabled until both links set, with a `title` explaining why; `present_requires_resolution` is still the guarantee
+- [ ] Bulk assign — explicit selection only, dedupe within the selection, two statements (rows with no member can't go `present`), auto-approve opt-in, partial success reported
+- [ ] Manual entry (`source = 'admin_manual'`)
+- [ ] ⚠️ Reopening a rejected row can 23505 — the partial index excludes rejected rows, so a corrected entry may hold the slot (the seed's Mira Petrova case)
+- [ ] Integration tests, incl. `createCurrentTermEvent()` and `Tracker.attendanceIds` — see the two helper gaps below
+
+### Phase 4 — `/admin/points`
+
+- [ ] ⏰ **Decide §9 #9 and #10 first** — they change the schema bound and the self-grant check
+- [ ] Grant (multi-member, one atomic insert, `term` read back never sent), ledger with filters, void-with-reason
+- [ ] Member picker carrying selection in the URL (`?q=…&sel=…`) — forms can't nest, so a search is a navigation and hidden inputs would drop every pick from a previous query
+
+### Phase 5 — docs
+
+- [x] Architecture doc → **v1.20**, `CLAUDE.md` invariants, this file
+- [ ] Final pass once phases 2–4 land
+
+**Two test-harness gaps to close in phase 3** — both would make green tests that prove nothing:
+
+- **The 2030 fixtures cannot exercise the views.** `helpers.ts` puts fixture events in 2030, so `events.term` is `"Spring 2030"`, and both views filter `e.term = current_term()`. Every leaderboard assertion in the exit criteria would pass vacuously at zero. Needs `createCurrentTermEvent()` asserting the term matches so a run straddling Aug 1 / Jan 1 fails loudly.
+- **`cleanup()` leaks attendance rows with neither link** — it deletes only by `event_id` or `member_id`, and that is the queue's most important fixture shape. Needs `Tracker.attendanceIds`. (`point_adjustments` needs no pass: `member_id` cascades.)
+
 ## Later
 
 Placeholders — expand on arrival. Effort estimates from §7.
 
-- **Stage 5 — Attendance review & point adjustments** · 5–6 days · until this ships, pending rows accumulate with no way to resolve them
 - **Stage 6 — Member directory** · 4–5 days · the screen officers will live in; select-all-matching semantics need real tests
 - **Stage 7 — Member-facing views** · 3 days · `/leaderboard` and `/lookup`
 - **Stage 8 — Hardening & data integrity** · 3–4 days · every RLS policy tested with the anon key; historically the stage most likely to be skipped and most likely to be regretted

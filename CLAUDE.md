@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–4 complete.** Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row. Stage 5 (attendance review) is next.
+**Stages 0–4 complete; Stage 5 (attendance review) in progress — phase 1 of 5 built.** Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row. Stage 5 phase 1 added migration 13 (`attendance.updated_at`, `point_adjustments.void_requires_reason`), the pure core in `lib/attendance.ts` and `lib/points.ts`, six zod schemas, the extended `AuditAction` vocabulary, and a **read-only** review queue at `/admin/attendance`. Phases 2–5 are the submission detail page, the mutations, `/admin/points`, and doc updates — see `tasks.md`.
 
 **Stages 0–1 complete; Stage 2 (public site) in progress; Stage 3 (attendance capture) built and tested.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. `app/(public)/` recreates all six pages of the existing Squarespace site, [txmisa.org](https://www.txmisa.org/) — see `docs/existing-site-inventory.md` for what was reproduced and what was deliberately left as a placeholder (photography, partner logos, the contact form backend). The home page reads published upcoming events live, and `/attend` is the public check-in form backed by the `submitCheckin` Server Action (needs `SUPABASE_SERVICE_ROLE_KEY` in the environment). See `tasks.md`.
 
@@ -66,6 +66,8 @@ npm run test:watch                                    # watch mode
 npx vitest run tests/checkin.test.ts -t "<test name>" # single test
 ```
 
+🪤 **`fileParallelism: false` is load-bearing, not a preference.** Every integration file shares the one local Supabase stack, and its Kong gateway starts returning 502s — `An invalid response was received from the upstream server` — once several worker threads hit PostgREST at once. The symptom is the expensive kind: a *different* test fails on each run and every one of them passes in isolation, so it reads as a flaky assertion rather than as saturation. Measured at roughly a 50% per-run failure rate with parallelism on, 0 across repeated serial runs. The suite takes about four seconds serially, so there is nothing to reclaim by turning it back on. Fixtures already isolate by 7-day slot — the collision is in the gateway, not the data.
+
 Stage 4 added `tests/events.test.ts` (pure — DST, half-open windows, edit-impact maths; no database) and `tests/event-actions.test.ts` (integration — 23P01 batch atomicity, the `updated_at` compare-and-set, append-only `admin_audit`, `term_of`). `vitest.config.ts` aliases `server-only` to `tests/stubs/server-only.ts`, because that marker package throws outside a Server Component and the tests need to import `lib/supabase/admin.ts` and `app/actions/audit.ts`.
 
 `tests/helpers.ts`'s `getTestOfficer()` creates one officer and **never deletes it**: `admin_audit` rows can't be deleted (P0001 from the append-only trigger), `admin_audit.actor_id` has no cascade, so an officer who has written any audit row is undeletable. Audit rows are likewise left behind by `cleanup()`. That is safe only because the local stack is disposable and `global-setup.ts` refuses any non-local URL.
@@ -99,7 +101,14 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **Every officer mutation writes an `admin_audit` row** — actor, timestamp, before/after JSON, reason. One audit table keyed `(entity_type, entity_id)`; do not add per-entity audit tables. Append-only: no client role may update or delete a row. (§4.2, §6)
 - **Authorization lives in `lib/auth.ts`, not in `proxy.ts`.** Proxy refreshes the session and does an optimistic redirect only — no database query, because it runs on prefetches. Every admin page and layout calls `requireOfficer()`; every admin Server Action starts with `getOfficer()` and returns `{status:"unauthorized"}`. Actions must not call `requireOfficer()`: `redirect()` throws `NEXT_REDIRECT`, and the house try/catch would swallow it. For the same reason **every `redirect()` goes outside the try/catch**. (§5, doc v1.19)
 - **`app/actions/audit.ts` must never gain a `"use server"` directive.** Every export of such a module is a public endpoint, and a client-callable `writeAudit(actorId, …)` would let anyone forge audit rows under any officer's name. It is a plain `server-only` module.
-- **Carry `updated_at` as the raw PostgREST string.** It has microsecond precision; a JS `Date` round trip truncates to milliseconds, and the edit compare-and-set then never matches, reporting a phantom conflict on every save.
+- **Carry `updated_at` as the raw PostgREST string.** It has microsecond precision; a JS `Date` round trip truncates to milliseconds, and the edit compare-and-set then never matches, reporting a phantom conflict on every save. This covers `attendance` as well as `events` — both carry the column and the same trigger.
+- **Single-row attendance mutations compare-and-set on `updated_at`; bulk operations scope on `status = 'pending'` instead** and report requested-minus-updated as skipped. Status-scoping alone would not catch two officers assigning *different* events to a row that stays pending, and catches nothing at all for a field edit or a note — but carrying 200 `updated_at` strings through a form buys nothing.
+- **A point adjustment is never updated except to void it, and never deleted.** No edit UI, no `updated_at`, no CAS token: voiding is a one-way transition, so `.is("voided_at", null)` on the UPDATE is already a complete guard, and zero rows back means someone voided it first. The asymmetry with `attendance` is deliberate. (§4.2)
+- **Suggestions are ranked by the database and never reordered in JavaScript**, and nothing is ever preselected. `nearby_events()` is the authority on proximity, `ORPHAN_WINDOW_HOURS` is always passed explicitly, and the app only annotates. Suggestion lists render with nothing checked, and the member ranker returns an empty list rather than a weak guess — this is "don't auto-resolve near-misses" carried into the UI, where a stray `defaultChecked` is the easiest way to break it by accident.
+- **Bulk actions operate on explicitly checked IDs only, and report partial success** rather than failing wholesale. Pulled forward from Stage 6 because Stage 5 introduces the first bulk action, which is when the mistake gets made. The pre-flight must dedupe *within* the selection too — two selected rows can be the same person.
+- **`admin_audit.action` is a closed union in TypeScript and free text in SQL; readers must tolerate unknown values.** Two pre-Stage-5 rows on the production database carry the bare verbs `reject` and `void` and are permanently uncorrectable — the append-only trigger raises P0001 on `UPDATE` and `DELETE` alike. Format with a fallback to the raw string.
+- **Date-range filters are Central-anchored and half-open:** `.gte(centralWallTimeToInstant(from, "00:00"))` … `.lt(centralWallTimeToInstant(addCivilDays(to, 1), "00:00"))`. A bare `.lte("submitted_at", "2026-04-07")` is a UTC-midnight cut that silently drops five to six hours of a Central day — the same class of bug as `new Date("2026-09-01T18:00")`, and it fails plausibly.
+- **Server Components own date formatting.** `Intl.DateTimeFormat` inside a Client Component runs on both sides of hydration, and Node and Chrome ship different ICU data for the space before "PM". The resulting React diff shows two strings that look character-for-character identical. Pass formatted labels down as props.
 - **React 19 resets an uncontrolled `<form action={…}>` once the action resolves.** Any admin form that re-renders with server state (validation errors, the §4.6 confirmation) must echo the submitted values back in that state and drive every `defaultValue` from them — otherwise the officer's edits silently revert and a confirmation saves the old values.
 - **Never build a timestamp with `new Date("2026-09-01T18:00")`.** The server runs in UTC. Wall-clock times go through `centralWallTimeToInstant()` in `lib/events.ts`, which iterates civil dates and attaches the zone last — the only thing that keeps a weekly 6pm meeting at 6pm across the November DST change.
 - **Point adjustments require a `reason`, are voided rather than deleted, and may be negative.** A void is itself a recorded action with its own reason. (§4.2)
@@ -131,7 +140,11 @@ app/admin/login/        officer sign-in — deliberately OUTSIDE the (shell) gro
 app/admin/(shell)/      authed chrome + dashboard, events/; later members/,
                         attendance/, points/, audit/. Route groups don't appear
                         in URLs, so §5's route table is unchanged
-app/actions/            attendance.ts (submitCheckin), auth.ts, events.ts,
+app/actions/            attendance.ts (submitCheckin ONLY — the one
+                        unauthenticated write path, kept a single-export file
+                        so the §6 attack surface is a one-file answer),
+                        attendance-review.ts (officer resolution mutations),
+                        auth.ts, events.ts,
                         audit.ts (shared writer, no "use server" — see Invariants);
                         later members.ts, points.ts
 lib/auth.ts             getOfficer / requireOfficer — the authorization boundary
@@ -143,6 +156,10 @@ lib/supabase/           server.ts (anon server client), client.ts (browser clien
 lib/types/database.ts   generated — do not hand-edit
 lib/checkin.ts          check-in resolution core + ORPHAN_WINDOW_HOURS + rate limit —
                         no next/* imports, so tests can inject clients and timestamps
+lib/attendance.ts       resolution core: Postgres interval parsing, gap
+                        description, member-candidate scoring, previewResolution,
+                        canApprove — pure, same contract as lib/events.ts
+lib/points.ts           point categories, signed formatting, grant bounds
 lib/site.ts             org copy, socials, emails, partners
 lib/officers.ts         officer roster
 lib/validation.ts       zod schemas
