@@ -959,6 +959,8 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 
 Everything under `/admin/*` (except `/admin/login`) is gated by `proxy.ts` (Next 16's rename of `middleware.ts`), which checks for a valid session and a matching `admin_profiles` row.
 
+**`/admin/audit` is not built by Stage 5** (v1.20). The per-entity history an officer actually reaches for — "what happened to *this* submission" — is a shared `AuditTrail` component on the detail surfaces, which is where the question gets asked. The global cross-entity log remains worth building for the "show me everything this officer did last month" query §4.2 describes, but it is a later stage and the nav entry stays disabled until then.
+
 ---
 
 ## 6. Security Model
@@ -1098,11 +1100,15 @@ contact form's backend — it renders disabled, with email as the working path.
 
 | Phase | Scope | State |
 |---|---|---|
-| 1 | Migration 13, `lib/attendance.ts`, `lib/points.ts`, zod schemas, audit vocabulary, read-only `/admin/attendance` | ✅ built |
-| 2 | `/admin/attendance/[id]` — raw submission, ranked suggestions, audit trail; still read-only | pending |
-| 3 | Mutations: resolve, approve, reject, reopen, bulk assign, manual entry | pending |
+| 1 | Migration 13, `lib/attendance.ts`, `lib/points.ts`, zod schemas, audit vocabulary, read-only `/admin/attendance` | ✅ built & verified |
+| 2 | `/admin/attendance/[id]` — raw submission, ranked suggestions, audit trail; still read-only | 🔨 built, browser verification outstanding |
+| 3 | Mutations: resolve, approve, reject, reopen, bulk assign, manual entry, all-status event picker | pending |
 | 4 | `/admin/points` — grant, ledger, void | pending |
 | 5 | Docs, invariants, `tasks.md` | pending |
+
+**Everything through phase 2 is read-only**, which is deliberate: the queue and the detail page are worth having on their own — an officer can at least *see* what is unresolved and why — and shipping the reads first means the suggestion ranking gets exercised against real data before any mutation depends on it being right.
+
+**The all-status event picker moved from phase 2 to phase 3.** `nearby_events()` is published-only and returns nothing beyond the grace window, so suggestions alone cannot express every legitimate assignment — but a picker is a form control, and phase 2 has no forms.
 
 **Bulk assign is explicit-selection-only and partial-success.** Stage 5 introduces the first bulk action in the system, so Stage 6's select-all rule is pulled forward here: only checked IDs are ever operated on, never "everything matching this filter." The pre-flight must also dedupe *within* the selection — two selected rows can be the same person — and the operation splits into two statements, because rows with no member link cannot become `present` without violating `present_requires_resolution`. Auto-approve is an opt-in checkbox rather than implied by choosing an event; silently approving forty rows because an officer picked an event from a dropdown is precisely the boundary-moving the design note below warns against.
 
@@ -1273,18 +1279,22 @@ The five that affect the schema. Decided together; the schema in §4 reflects th
 
 ### Resolved at Stage 5 (2026-07-31)
 
-Both land in the review queue, and building it decides them either way — so they were decided explicitly rather than by default.
+All four land in the review queue or the points ledger, and building either one decides them by default — so they were decided explicitly instead.
 
-6. **Override authority** — ✅ **Any officer may approve a pending row.** The audit log is the control, not a role gate. A gate funnels every correction through one person, which in a student org means corrections wait for whoever is busiest; and the failure it guards against (an officer approving something they shouldn't) is visible in `admin_audit` either way. Revisit only if the leaderboard starts determining something with real stakes.
-8. **Resolution deadline** — ✅ **None enforced in v1.** The mitigations are the dashboard pending badge and the oldest-first default sort on `/admin/attendance`, both built in phase 1. A hard deadline would silently destroy credit for a member who did attend, which is the one failure mode §4.2 is built to make impossible.
+They share a premise, and the consistency is the point: **the audit log and the ledger are the control, not a gate.** A system that gates point grants but not attendance approvals teaches officers that the gates are arbitrary, which is worse than having none.
+
+6. **Override authority** — ✅ **Any officer may approve a pending row.** A gate funnels every correction through one person, which in a student org means corrections wait for whoever is busiest; and the failure it guards against is visible in `admin_audit` either way.
+8. **Resolution deadline** — ✅ **None enforced in v1.** The mitigations are the dashboard pending badge and the oldest-first default sort on `/admin/attendance`, both built in phase 1. A hard deadline would silently destroy credit for a member who did attend, which is the one failure mode §4.2 exists to make impossible.
+9. **Point grant caps** — ✅ **No restrictions.** Any officer may grant any amount; no `admin`-role threshold. A cap invites splitting a grant in two, which leaves the total unchanged and the ledger *less* readable. The required reason and the ledger are the control. `lib/points.ts` carries `MAX_POINTS_PER_GRANT = 500`, which is an input-sanity guard against a fat-fingered 5000 and explicitly **not** this policy — do not let it drift into being cited as one.
+10. **Self-grants** — ✅ **Allowed**, always visible in the ledger with the granting officer named. Blocking it outright doesn't prevent the behaviour, it relocates it to "could you grant me these" — after which the ledger shows a grant from someone with no visible stake, which is harder to audit rather than easier. `grantPoints` therefore carries no self-grant check, and no officer↔member linkage is needed (there is no FK between `auth.users` and `members`, so such a check would have to match on email or student ID — an inference this decision makes unnecessary).
+
+**Revisit all four together if points ever decide something material** — officer eligibility, a funded trip, a leadership slot. Every one of them is defensible because standings are currently social rather than consequential; that premise is what changes, not the individual arguments.
 
 ### Still open
 
-Not schema-affecting, so they can wait — but **#9 and #10 need answering before `/admin/points` ships in Stage 5 phase 4**: #9 sets the magnitude bound on the grant form and #10 decides whether `grantPoints` needs a self-grant check.
+Neither is schema-affecting and neither blocks Stage 5.
 
-1. **Leaderboard visibility** — fully public, or behind the member lookup flow? Affects whether names appear on an indexable page.
-9. **Point grant caps** — should a single officer be able to award unlimited bonus points, or should grants above some threshold require the `admin` role? The proposed default is no cap, on the reasoning that a cap invites splitting a grant in two. Note that `lib/points.ts` already carries `MAX_POINTS_PER_GRANT = 500` — that is an input-sanity guard against a fat-fingered 5000, explicitly **not** the policy cap this decision is about.
-10. **Self-grants** — can an officer award points to themselves? Simplest defensible answer is yes but always visible in the ledger with the granting officer named; the alternative is blocking it outright, which just moves it to a friend's account.
+1. **Leaderboard visibility** — fully public, or behind the member lookup flow? Affects whether names appear on an indexable page. Wanted before Stage 7.
 11. **Bonus points in public standings** — ⚠️ **stale as written; do not build it.** It asks whether bonus points appear "as a separate column, consistent with §4.4", but §4.4 was subsequently resolved the other way: the public `leaderboard` shows a single `total_points` and only the officer-facing `member_directory` keeps the split. Building the public split would silently reverse a settled decision. Either strike this row or rewrite it as "should §4.4 be revisited?" — but it is no longer an open question about Stage 7.
 
 ---

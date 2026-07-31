@@ -6,7 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–4 complete; Stage 5 (attendance review) in progress — phase 1 of 5 built.** Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row. Stage 5 phase 1 added migration 13 (`attendance.updated_at`, `point_adjustments.void_requires_reason`), the pure core in `lib/attendance.ts` and `lib/points.ts`, six zod schemas, the extended `AuditAction` vocabulary, and a **read-only** review queue at `/admin/attendance`. Phases 2–5 are the submission detail page, the mutations, `/admin/points`, and doc updates — see `tasks.md`.
+**Stages 0–4 complete; Stage 5 (attendance review) in progress on branch `stage-5-attendance-review` — phases 1–2 of 5 built, not merged to `main`.** Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row.
+
+Stage 5 so far: migration 13 (`attendance.updated_at` + trigger, `point_adjustments.void_requires_reason`, **applied to local and remote**), the pure core in `lib/attendance.ts` and `lib/points.ts`, six zod schemas, seven new `AuditAction` verbs, a read-only queue at `/admin/attendance`, and a read-only submission detail at `/admin/attendance/[id]` with ranked event and member suggestions. **Everything so far is read-only** — the mutations are phase 3. Phase 2 is code-complete but not yet browser-verified. `tasks.md` has the full handoff state and the remaining phases.
 
 **Stages 0–1 complete; Stage 2 (public site) in progress; Stage 3 (attendance capture) built and tested.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. `app/(public)/` recreates all six pages of the existing Squarespace site, [txmisa.org](https://www.txmisa.org/) — see `docs/existing-site-inventory.md` for what was reproduced and what was deliberately left as a placeholder (photography, partner logos, the contact form backend). The home page reads published upcoming events live, and `/attend` is the public check-in form backed by the `submitCheckin` Server Action (needs `SUPABASE_SERVICE_ROLE_KEY` in the environment). See `tasks.md`.
 
@@ -137,9 +139,12 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
 app/admin/login/        officer sign-in — deliberately OUTSIDE the (shell) group,
                         whose layout calls requireOfficer(); inside it, signing
                         in would be impossible
-app/admin/(shell)/      authed chrome + dashboard, events/; later members/,
-                        attendance/, points/, audit/. Route groups don't appear
-                        in URLs, so §5's route table is unchanged
+app/admin/(shell)/      authed chrome + dashboard, events/, attendance/;
+                        later members/, points/, audit/. Route groups don't
+                        appear in URLs, so §5's route table is unchanged.
+                        _components/ holds the shell-wide pieces —
+                        status-pill.tsx and audit-trail.tsx are shared by more
+                        than one route subtree and live here rather than in one
 app/actions/            attendance.ts (submitCheckin ONLY — the one
                         unauthenticated write path, kept a single-export file
                         so the §6 attack surface is a one-file answer),
@@ -160,6 +165,9 @@ lib/attendance.ts       resolution core: Postgres interval parsing, gap
                         description, member-candidate scoring, previewResolution,
                         canApprove — pure, same contract as lib/events.ts
 lib/points.ts           point categories, signed formatting, grant bounds
+lib/admin-profiles.ts   fetchOfficerNames — actor_id/awarded_by/resolved_by all
+                        FK auth.users, which has no PostgREST path to
+                        admin_profiles, so "who did this" is a second query
 lib/site.ts             org copy, socials, emails, partners
 lib/officers.ts         officer roster
 lib/validation.ts       zod schemas

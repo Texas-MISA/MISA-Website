@@ -2,7 +2,30 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–4 are complete. Stage 5 (attendance review) is in progress — phase 1 of 5 built.** Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–4 are complete. Stage 5 (attendance review) is in progress — phases 1 and 2 of 5 built.** Carry-over chores from Stage 0 are collected under Loose ends.
+
+---
+
+## 🔖 Picking this up cold (as of 2026-07-31)
+
+Read this before touching anything; it is the state no file can tell you on its own.
+
+| | |
+|---|---|
+| **Branch** | `stage-5-attendance-review` — **not merged.** `main` is still Stage 4. |
+| **Production** | Still Stage 4. `/admin/attendance` 404s there, by design. |
+| **Database** | Migration 13 is applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); history in sync. The schema is ahead of what `main` deploys, which is safe — 13 is additive with a default. |
+| **Next task** | Verify phase 2 in the browser, then build phase 3. |
+
+**Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
+
+**Three things that will waste your time if you don't know them:**
+
+- **`npm test` needs `fileParallelism: false`**, already set in `vitest.config.ts`. Don't "optimize" it back on — see the note in `CLAUDE.md`.
+- **`supabase gen types --local` omits the `__InternalSupabase` block** that `--linked` emits. Restore it by hand or the diff looks like a regression.
+- **Only `npm run build` works locally on Windows**; `vercel build` fails with `EPERM … symlink`.
+
+**Still unverified end-to-end:** everything in phase 2. Lint and build pass, but no page has been seen rendering.
 
 ---
 
@@ -62,8 +85,8 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 | 1 | Leaderboard visibility | Fully public. Full name + points only; no student IDs or emails, per the §4.4 privacy note. Add an opt-out or display-name field if a member objects. | [ ] |
 | 6 | Override authority | **✅ Resolved 2026-07-31 — any officer may approve.** The audit log is the control, not a role gate; a gate funnels every correction through whoever is busiest, and the misuse it guards against shows up in `admin_audit` either way. | [x] |
 | 8 | Resolution deadline | **✅ Resolved 2026-07-31 — none enforced in v1.** The dashboard pending badge and the oldest-first default sort (both built in phase 1) are the mitigation. A hard deadline would destroy credit for someone who did attend, which is the one outcome §4.2 exists to prevent. | [x] |
-| 9 | Point grant caps | No hard cap. Ledger visibility and the required reason are the control; a cap invites splitting a grant in two. ⏰ **Needed before phase 4** — it sets the bound on the grant form. Note `lib/points.ts` already has `MAX_POINTS_PER_GRANT = 500` as a fat-finger guard, which is *not* this policy decision. | [ ] |
-| 10 | Self-grants | Allowed, but always visible in the ledger with the granting officer named. Blocking outright just moves it to a friend's account. ⏰ **Needed before phase 4** — it decides whether `grantPoints` carries a self-grant check. | [ ] |
+| 9 | Point grant caps | **✅ Resolved 2026-07-31 — no restrictions.** Any officer, any amount, no `admin` threshold. A cap invites splitting a grant in two: same total, less readable ledger. `MAX_POINTS_PER_GRANT = 500` in `lib/points.ts` stays a fat-finger guard and is **not** this policy — don't let it drift into being cited as one. | [x] |
+| 10 | Self-grants | **✅ Resolved 2026-07-31 — allowed**, always visible in the ledger with the granting officer named. Blocking relocates it to "could you grant me these", which is harder to audit. `grantPoints` carries no self-grant check, and no officer↔member linkage is needed. | [x] |
 | 11 | Bonus points publicly | ⚠️ **This proposal is now stale and contradicts a settled invariant — don't build it as written.** It says "shown as a separate column, consistent with §4.4", but §4.4 was since resolved the other way: the public `leaderboard` shows a single `total_points`, and only the officer-facing `member_directory` keeps `attendance_points` and `bonus_points` split. Building the public split in Stage 7 would reverse that deliberately. Decide whether to strike this row or rewrite it to match §4.4. | [ ] |
 
 ---
@@ -231,13 +254,19 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 **And one that predated Stage 5:** `npm test` was failing intermittently at roughly a 50% rate — a different test each run, always a Kong 502 under parallel workers sharing the one local stack. `fileParallelism: false` fixes it; 0 failures across repeated runs, still ~4s.
 
-### Phase 2 — submission detail (read-only)
+### 🔨 Phase 2 — submission detail (read-only) · code-complete, **not yet browser-verified**
 
-- [ ] `/admin/attendance/[id]` — raw form data as typed, timestamp to the minute in Central
-- [ ] Ranked event suggestions from `nearby_events()` with the window-relative gap sentence; **plus an independent all-status event picker**, since the function is published-only and returns nothing beyond 48h
-- [ ] Ranked member candidates with the near-miss ID diffed; nothing preselected, empty when nothing clears the threshold
-- [ ] `previewResolution()` warnings — draft event, cancelled event, inactive member, outside window
-- [ ] Shared `AuditTrail` component; officer names need a second query (`actor_id` → `auth.users` has no PostgREST path to `admin_profiles`)
+⚠️ **Start the next session here.** Lint and build are clean and `/admin/attendance/[id]` compiles as a dynamic route, but the browser walkthrough was cut short when the local session expired. Nothing below has been seen rendering against real data.
+
+- [x] `/admin/attendance/[id]` — raw form data as typed, timestamp to the minute in Central, current links, `previewResolution()` warnings
+- [x] Ranked event suggestions from `nearby_events()` with the window-relative headline and the event-relative number beside it
+- [x] Ranked member candidates with the first differing ID character marked; nothing preselected, empty state says so
+- [x] `lib/admin-profiles.ts` → `fetchOfficerNames()`, and the shared `AuditTrail` with a computed before/after diff
+- [ ] **Verify in the browser.** Two seeded rows are the interesting ones (ids are local-only and change on every `db reset` — re-query if stale):
+  - orphan with a member but no event ⇒ event suggestions + gap sentences (`Luca Moretti`, `Hana Sato`)
+  - event linked but an unknown student ID ⇒ member suggestions + near-miss highlight (`Rowan Pike` `UT-100999`, `Sage Delacroix` `ut 100998`)
+  - `select id, submitted_name from attendance where status = 'pending' order by submitted_at;`
+- [ ] **Deferred to phase 3:** the independent all-status event picker. `nearby_events()` is published-only and returns nothing beyond 48h, so suggestions alone cannot express every assignment — but the picker is a form control, so it belongs with the mutations rather than on a read-only page.
 
 ### Phase 3 — mutations
 
@@ -250,7 +279,7 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 ### Phase 4 — `/admin/points`
 
-- [ ] ⏰ **Decide §9 #9 and #10 first** — they change the schema bound and the self-grant check
+- [x] ~~Decide §9 #9 and #10 first~~ — both resolved 2026-07-31: no grant restrictions, self-grants allowed. So `grantPoints` needs **no** role check and **no** self-grant check.
 - [ ] Grant (multi-member, one atomic insert, `term` read back never sent), ledger with filters, void-with-reason
 - [ ] Member picker carrying selection in the URL (`?q=…&sel=…`) — forms can't nest, so a search is a navigation and hidden inputs would drop every pick from a previous query
 
