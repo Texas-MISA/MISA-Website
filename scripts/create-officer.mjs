@@ -88,10 +88,17 @@ async function createOfficer() {
     console.log("auth user created");
   }
 
+  // Default to the email's local part rather than null. admin_audit renders
+  // the display name, and a nameless officer used to show up on every screen
+  // as "an officer" with no way to tell which one — in a log whose entire job
+  // is saying who did what (§6). A real name is better; this is the floor.
+  const displayName =
+    args["display-name"] ?? args.email.split("@")[0] ?? null;
+
   const { error: profileError } = await db
     .from("admin_profiles")
     .upsert(
-      { user_id: userId, display_name: args["display-name"] ?? null, role },
+      { user_id: userId, display_name: displayName, role },
       { onConflict: "user_id" }
     );
   if (profileError) {

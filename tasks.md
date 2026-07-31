@@ -15,7 +15,8 @@ Read this before touching anything; it is the state no file can tell you on its 
 | **Branch** | `stage-5-attendance-review` — **not merged.** `main` is still Stage 4. |
 | **Production** | Still Stage 4. `/admin/attendance` 404s there, by design. |
 | **Database** | Migration 13 is applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); history in sync. The schema is ahead of what `main` deploys, which is safe — 13 is additive with a default. |
-| **Next task** | **Phase 3 — mutations.** Phase 2 is verified in the browser as of 2026-07-31. |
+| **Next task** | **Phase 4 — `/admin/points`.** Phases 1–3 are built and browser-verified as of 2026-07-31. |
+| **Local database** | Carries the phase-3 walkthrough's mutations (an approved row, a reopened one, two bulk assigns, a manual entry, one extra fixture row). `npx supabase db reset` restores the documented seed. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
 
@@ -273,21 +274,33 @@ later stage; pick it up between stages or when someone hands over the assets.
 - [x] 🪤 **Fixed: the near-miss highlight marked the formatting, not the digit.** `diffStudentId` compared the **raw** ID strings, so `ut 100998` vs `UT100028` "first differed" at index 0 — the case of the `u` — and the page rendered `roster `**`U`**`T100028`. The seed stores IDs in four formats precisely because members type them four ways, so this fired on most real pairs and pointed the officer at the one character that carries no information. Now compared on `normalizeStudentId()` with the index mapped back onto the raw string, and null when the two ids are the same person's in different formats. Five tests added; the old ones all used same-format IDs, which is exactly why it survived phase 1. **160 tests** (the "156" recorded earlier was one over the real 155).
 - [ ] **Deferred to phase 3:** the independent all-status event picker. `nearby_events()` is published-only and returns nothing beyond 48h, so suggestions alone cannot express every assignment — but the picker is a form control, so it belongs with the mutations rather than on a read-only page.
 
-**Two findings left open, both deliberately not fixed in phase 2:**
+**Two findings left open at the time — both closed in phase 3:**
 
-- ⚠️ **Member suggestions surface unrelated people at exactly the score floor.** `Rowan Pike` `UT-100999` — who is on no roster at all — is offered `Dara Nolan`, `Farid Haddad`, and `Omar Silva`, whose IDs end `…019`, `…009`, `…029`. Every one scores exactly `MIN_SUGGESTION_SCORE` (25) on `id_near_miss` distance 2 alone, with no name or email signal. That is the ranking working as written, and three plausible-looking wrong answers is arguably worse than the empty state the module goes out of its way to allow. Decide before the phase-3 assign control makes them one click from a write: either raise the floor above a bare distance-2 ID match, or require a second corroborating reason for a distance-2 match to qualify. Changing weights touches bulk assign too, which is why it is not a phase-2 edit.
-- ⚠️ **The queue's filters are lost on the round trip.** Row links are a bare `/admin/attendance/{id}` and the detail's back-link a bare `/admin/attendance`, so an officer working a filtered queue lands back at the unfiltered default on every row. Worth fixing *with* phase 3 rather than before it, since the post-mutation redirect needs the same carried state — do it once.
+- ✅ **Member suggestions surfaced unrelated people at exactly the score floor.** `Rowan Pike` `UT-100999`, on no roster at all, was offered `Dara Nolan`, `Farid Haddad`, and `Omar Silva` (IDs ending `…019`, `…009`, `…029`), each scoring exactly `MIN_SUGGESTION_SCORE` on `id_near_miss` distance 2 alone. Six-digit IDs issued in sequence put three members within distance 2 of *any* number, so that similarity is a coincidence rather than a signal. Distance 2 now scores below the floor and needs corroboration; distance 1 still stands alone. Rowan Pike renders the empty state.
+- ✅ **The queue's filters are no longer lost on the round trip** — see phase 3.
 
 **Confirmed as correct, not a bug:** the window-relative and event-relative gap numbers read identically on every seeded row. `describeGap` separates them on purpose, but no seeded event sets `checkin_opens_at`/`checkin_closes_at`, so `effectiveWindow` falls back to `starts_at`/`ends_at` and the two genuinely coincide. Set a late close on an event to see them diverge.
 
-### Phase 3 — mutations
+### ✅ Phase 3 — mutations (2026-07-31, browser-verified)
 
-- [ ] `app/actions/attendance-review.ts` — resolve/approve/reject/reopen, one save per officer intent, CAS on `updated_at`
-- [ ] Approve disabled until both links set, with a `title` explaining why; `present_requires_resolution` is still the guarantee
-- [ ] Bulk assign — explicit selection only, dedupe within the selection, two statements (rows with no member can't go `present`), auto-approve opt-in, partial success reported
-- [ ] Manual entry (`source = 'admin_manual'`)
-- [ ] ⚠️ Reopening a rejected row can 23505 — the partial index excludes rejected rows, so a corrected entry may hold the slot (the seed's Mira Petrova case)
-- [ ] Integration tests, incl. `createCurrentTermEvent()` and `Tracker.attendanceIds` — see the two helper gaps below
+- [x] `app/actions/attendance-review.ts` — `saveSubmission` (one save per officer intent: edit the typed fields, set both links, and approve in a single write and a single `attendance.approved` audit row), `rejectSubmission`, `reopenSubmission`, `bulkAssignEvent`, `createManualAttendance`. CAS on `updated_at` for every single-row mutation; `redirect()` outside the try/catch throughout.
+- [x] Approve disabled until both links are set, with a `title` naming the missing one; `canApprove()` re-checked server-side and `present_requires_resolution` still the guarantee
+- [x] Bulk assign — explicit selection only, `planBulkAssign()` in `lib/attendance.ts` does the deduping, two statements, auto-approve opt-in and never default, partial success reported with a reason per skipped row
+- [x] Manual entry at `/admin/attendance/new` (`source = 'admin_manual'`) — **this also fixed a live 404**: the queue has linked to that route since phase 1 and nothing was there
+- [x] The all-status event picker deferred out of phase 2, now `lib/event-options.ts` and shared by the queue filter, the resolution form, and manual entry
+- [x] Queue filters survive the round trip — row links, the back-link, and the post-mutation redirect all carry the `searchParams`. Approve and reject return to the *filtered* queue (the drain loop); a plain save stays on the row.
+- [x] `createCurrentTermEvent()` and `Tracker.attendanceIds` closed — see below
+- [x] **182 tests** (10 new pure, 12 new integration in `tests/attendance-review.test.ts`), lint and build clean
+
+**Verified in the browser against the local stack**, every one a real write: assign + approve in one click wrote exactly one `attendance.approved` row whose before/after showed `member_id` null → set and `pending` → `present`, and returned to the filtered queue with the row drained; a bulk assign of two submissions from the same person assigned one and reported *"Toby Vance — the same person as another row you selected; the earlier submission was kept"* with no 23505; manual entry for Spring Kickoff at 6:15 PM Central stored `2026-01-28 00:15Z` (CST, correctly); reopening a rejected row put it back in the queue.
+
+**Three defects found and fixed during that walkthrough** — none would have been caught by the tests:
+
+- 🪤 **APPROVE stayed disabled after picking an event.** Its enabled state was derived from the server's copy of the row rather than the live `<select>`, so the officer had to SAVE, wait for the round trip, and only then approve — two writes for one intent, defeating the entire one-save design. The link values are now tracked in component state.
+- 🪤 **The bulk bar's count outlived its checkboxes.** React resets the form when the action resolves, so after an assign the bar read "2 selected" above six empty boxes. Cleared on completion by resetting state during render.
+- 🪤 **Every ordinary officer was credited as "a former officer".** `create-officer.mjs` left `admin_profiles.display_name` null unless `--display-name` was passed, and `fetchOfficerNames` dropped nameless rows — collapsing "current officer, no display name" into "profile deleted, i.e. revoked". In the one log that exists to say who did what (§6), that is the exact opposite of the truth. The map now distinguishes absent from null, the trail says "an officer" for the middle case, and the script defaults the name to the email's local part.
+
+**One doc correction:** the note that the seed's `Mira Petrova` row is the live 23505-on-reopen case is **wrong**. `seed.sql` inserts that rejected row only `where not exists` a non-rejected row for the same member and event, so its slot is by construction free and it reopens cleanly. The collision is real and covered by `tests/attendance-review.test.ts`, which builds the contested pair explicitly — but it cannot be reproduced from seed data.
 
 ### Phase 4 — `/admin/points`
 
@@ -300,10 +313,10 @@ later stage; pick it up between stages or when someone hands over the assets.
 - [x] Architecture doc → **v1.20**, `CLAUDE.md` invariants, this file
 - [ ] Final pass once phases 2–4 land
 
-**Two test-harness gaps to close in phase 3** — both would make green tests that prove nothing:
+**✅ Both test-harness gaps closed in phase 3** — each would have made green tests that prove nothing:
 
-- **The 2030 fixtures cannot exercise the views.** `helpers.ts` puts fixture events in 2030, so `events.term` is `"Spring 2030"`, and both views filter `e.term = current_term()`. Every leaderboard assertion in the exit criteria would pass vacuously at zero. Needs `createCurrentTermEvent()` asserting the term matches so a run straddling Aug 1 / Jan 1 fails loudly.
-- **`cleanup()` leaks attendance rows with neither link** — it deletes only by `event_id` or `member_id`, and that is the queue's most important fixture shape. Needs `Tracker.attendanceIds`. (`point_adjustments` needs no pass: `member_id` cascades.)
+- **The 2030 fixtures cannot exercise the views.** `helpers.ts` puts fixture events in 2030, so `events.term` is `"Spring 2030"`, and both views filter `e.term = current_term()`; every leaderboard assertion would have passed vacuously at zero. `createCurrentTermEvent()` now places the event a few hours in the past, reads back the generated `term`, compares it to `current_term()`, and throws if they differ — so a run straddling Aug 1 / Jan 1 fails loudly rather than silently asserting nothing. Both values come from the database; no term string is typed (§4.7).
+- **`cleanup()` leaked attendance rows with neither link** — it deleted only by `event_id` or `member_id`, and that is the queue's most important fixture shape. `Tracker.attendanceIds` plus a `createTestAttendance()` helper closes it; a full run is now member-neutral (verified 33 → 33). (`point_adjustments` needs no pass: `member_id` cascades.)
 
 ## Later
 

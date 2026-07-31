@@ -9,6 +9,7 @@ import {
   MIN_SUGGESTION_SCORE,
   nameTokens,
   parseInterval,
+  planBulkAssign,
   previewResolution,
   rankMemberSuggestions,
   scoreMemberMatch,
@@ -320,6 +321,68 @@ describe("member suggestions", () => {
     ).toBeLessThan(MIN_SUGGESTION_SCORE);
   });
 
+  // Found on screen in phase 2: Rowan Pike, on no roster at all, was offered
+  // three strangers. Six-digit IDs issued in sequence put three members within
+  // distance 2 of any number, so distance 2 alone is a coincidence, not a
+  // signal.
+  it("will not suggest on a two-character ID distance alone", () => {
+    const stranger = candidate({
+      fullName: "Dara Nolan",
+      email: "dara.nolan@example.edu",
+      normalizedStudentId: "UT100019",
+    });
+
+    const ranked = rankMemberSuggestions(
+      submission({
+        fullName: "Rowan Pike",
+        email: "rowan.pike@example.edu",
+        studentId: "UT-100999",
+      }),
+      [stranger]
+    );
+    expect(ranked).toEqual([]);
+  });
+
+  it("still suggests a two-character distance with corroboration", () => {
+    const sameSurname = candidate({
+      fullName: "Rowan Pike",
+      email: "r.pike@other.example.edu",
+      normalizedStudentId: "UT100019",
+    });
+
+    const ranked = rankMemberSuggestions(
+      submission({
+        fullName: "Rowan Pike",
+        email: "rowan.pike@example.edu",
+        studentId: "UT-100999",
+      }),
+      [sameSurname]
+    );
+    expect(ranked).toHaveLength(1);
+    expect(ranked[0].reasons).toContainEqual({
+      kind: "id_near_miss",
+      distance: 2,
+    });
+  });
+
+  it("keeps a one-character distance standing on its own", () => {
+    const typo = candidate({
+      fullName: "Someone Unrelated",
+      email: "someone.unrelated@example.edu",
+      normalizedStudentId: "UT100998",
+    });
+
+    const ranked = rankMemberSuggestions(
+      submission({
+        fullName: "Rowan Pike",
+        email: "rowan.pike@example.edu",
+        studentId: "UT-100999",
+      }),
+      [typo]
+    );
+    expect(ranked).toHaveLength(1);
+  });
+
   it("breaks ties alphabetically", () => {
     const zane = candidate({
       fullName: "Zane Okonkwo",
@@ -496,5 +559,141 @@ describe("canApprove", () => {
     expect(canApprove({ event_id: "e", member_id: null })).toBe(false);
     expect(canApprove({ event_id: null, member_id: "m" })).toBe(false);
     expect(canApprove({ event_id: null, member_id: null })).toBe(false);
+  });
+});
+
+describe("planBulkAssign", () => {
+  const row = (over: Partial<Parameters<typeof planBulkAssign>[0]["selected"][number]>) => ({
+    id: crypto.randomUUID(),
+    submittedName: "Hana Sato",
+    submittedAt: "2026-04-07T20:15:00Z",
+    status: "pending",
+    normalizedStudentId: "UT100027",
+    memberId: null,
+    ...over,
+  });
+
+  it("assigns and approves only the rows that have a member", () => {
+    const withMember = row({ memberId: "m1", normalizedStudentId: "UT1" });
+    const without = row({ memberId: null, normalizedStudentId: "UT2" });
+
+    const plan = planBulkAssign({
+      selected: [withMember, without],
+      existingOnEvent: [],
+      approve: true,
+    });
+
+    // present_requires_resolution would reject the second one, so it takes the
+    // event link and stays pending. That is why the caller writes two
+    // statements rather than one.
+    expect(plan.assignAndApprove).toEqual([withMember.id]);
+    expect(plan.assignOnly).toEqual([without.id]);
+    expect(plan.skipped).toEqual([]);
+  });
+
+  it("keeps everything pending when approve is off", () => {
+    const withMember = row({ memberId: "m1" });
+    const plan = planBulkAssign({
+      selected: [withMember],
+      existingOnEvent: [],
+      approve: false,
+    });
+    expect(plan.assignAndApprove).toEqual([]);
+    expect(plan.assignOnly).toEqual([withMember.id]);
+  });
+
+  // The bug this function exists for: two checked rows are the same person,
+  // which is exactly why they are both sitting in the queue. Unhandled, the
+  // partial unique index takes the first and 23505s the second, failing a batch
+  // the officer thought was fine.
+  it("dedupes two selected rows that are the same student ID", () => {
+    const first = row({ submittedAt: "2026-04-07T18:00:00Z" });
+    const second = row({ submittedAt: "2026-04-07T20:15:00Z" });
+
+    const plan = planBulkAssign({
+      selected: [second, first],
+      existingOnEvent: [],
+      approve: false,
+    });
+
+    // Oldest wins, whatever order the selection arrived in.
+    expect(plan.assignOnly).toEqual([first.id]);
+    expect(plan.skipped).toEqual([
+      {
+        id: second.id,
+        submittedName: second.submittedName,
+        reason: "duplicate_in_selection",
+        keptId: first.id,
+      },
+    ]);
+  });
+
+  it("dedupes the same member reached through two raw student IDs", () => {
+    // `ut 100027` and `UT-100027` normalize alike, but two *different* raw IDs
+    // can also resolve to one member — the app-level half of the §4.2 duplicate
+    // rule, which the unique index alone does not cover.
+    const a = row({ normalizedStudentId: "UT100027", memberId: "same" });
+    const b = row({ normalizedStudentId: "UT999999", memberId: "same" });
+
+    const plan = planBulkAssign({
+      selected: [a, b],
+      existingOnEvent: [],
+      approve: true,
+    });
+
+    expect(plan.assignAndApprove).toEqual([a.id]);
+    expect(plan.skipped[0]).toMatchObject({
+      id: b.id,
+      reason: "duplicate_in_selection",
+    });
+  });
+
+  it("skips someone already on the target event", () => {
+    const already = row({ normalizedStudentId: "UT100027" });
+    const plan = planBulkAssign({
+      selected: [already],
+      existingOnEvent: [
+        { normalizedStudentId: "UT100027", memberId: null },
+      ],
+      approve: false,
+    });
+
+    expect(plan.assignOnly).toEqual([]);
+    expect(plan.skipped[0]).toMatchObject({ reason: "already_on_event" });
+  });
+
+  it("skips a row someone else already resolved", () => {
+    const resolved = row({ status: "present" });
+    const plan = planBulkAssign({
+      selected: [resolved],
+      existingOnEvent: [],
+      approve: false,
+    });
+    expect(plan.skipped[0]).toMatchObject({ reason: "not_pending" });
+  });
+
+  it("accounts for every id it was given", () => {
+    const rows = [
+      row({ normalizedStudentId: "UT1", memberId: "m1" }),
+      row({ normalizedStudentId: "UT1", memberId: "m2" }),
+      row({ normalizedStudentId: "UT3", status: "rejected" }),
+      row({ normalizedStudentId: "UT4" }),
+    ];
+
+    const plan = planBulkAssign({
+      selected: rows,
+      existingOnEvent: [],
+      approve: true,
+    });
+
+    // Nothing is dropped on the floor here either — every selected id comes
+    // back in exactly one bucket, which is what lets the action report partial
+    // success instead of a count the officer has to trust.
+    const seen = [
+      ...plan.assignOnly,
+      ...plan.assignAndApprove,
+      ...plan.skipped.map((s) => s.id),
+    ];
+    expect(seen.sort()).toEqual(rows.map((r) => r.id).sort());
   });
 });

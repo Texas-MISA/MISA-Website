@@ -49,11 +49,29 @@ function formatAuditAction(action: string): string {
   return LABELS[action] ?? action;
 }
 
+/**
+ * Who did this.
+ *
+ * Three distinguishable cases, and the middle one is the common one:
+ * a named officer, a current officer with no display name set
+ * (create-officer.mjs leaves it null by default), and someone whose profile is
+ * gone because they were revoked. Calling the second "a former officer" — as
+ * this did until phase 3 — libels every officer who never set a name.
+ */
+function describeActor(
+  names: Map<string, string | null>,
+  actorId: string
+): string {
+  if (!names.has(actorId)) return "a former officer";
+  return names.get(actorId) ?? "an officer";
+}
+
 async function fetchTrail(
   entityType: string,
   entityId: string
 ): Promise<
-  { kind: "ok"; rows: AuditRow[]; names: Map<string, string> } | { kind: "error" }
+  | { kind: "ok"; rows: AuditRow[]; names: Map<string, string | null> }
+  | { kind: "error" }
 > {
   const db = createAdminClient();
   const { data, error } = await db
@@ -109,7 +127,7 @@ export async function AuditTrail({
           <p className="text-sm">
             <strong>{formatAuditAction(row.action)}</strong>{" "}
             <span className="text-foreground/70">
-              by {result.names.get(row.actor_id) ?? "a former officer"} on{" "}
+              by {describeActor(result.names, row.actor_id)} on{" "}
               {formatInstant(row.acted_at)} CT
             </span>
           </p>

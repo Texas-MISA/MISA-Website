@@ -2,21 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { requireOfficer } from "@/lib/auth";
+import { fetchEventOptions } from "@/lib/event-options";
 import {
   addCivilDays,
   centralWallTimeToInstant,
-  formatEventRange,
+  formatInstant,
 } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-import {
-  AttendanceFilters,
-  type EventOption,
-} from "./_components/attendance-filters";
-import {
-  AttendanceTable,
-  type SubmissionRow,
-} from "./_components/attendance-table";
+import { AttendanceFilters } from "./_components/attendance-filters";
+import type { SubmissionRow } from "./_components/attendance-table";
+import { ReviewQueue } from "./_components/review-queue";
 
 // The review queue (§5, §7 Stage 5). Every submission the check-in form has
 // ever produced, resolved or not — this is the screen that makes "nothing is
@@ -36,26 +32,9 @@ type Filters = {
   sort: "oldest" | "newest";
 };
 
-async function fetchEventOptions(): Promise<EventOption[]> {
-  const db = createAdminClient();
-  const { data, error } = await db
-    .from("events")
-    .select("id, title, starts_at, ends_at")
-    .order("starts_at", { ascending: false })
-    .limit(100);
-
-  if (error) {
-    console.error("event options query failed:", error.message);
-    return [];
-  }
-  // Label rendered here rather than in the Client Component: Intl.DateTimeFormat
-  // would otherwise run on both sides of hydration, and Node and Chrome disagree
-  // on the space before "PM".
-  return data.map((event) => ({
-    id: event.id,
-    label: `${event.title} — ${formatEventRange(event.starts_at, event.ends_at)}`,
-  }));
-}
+type RawSubmission = Omit<SubmissionRow, "submittedLabel"> & {
+  submitted_at: string;
+};
 
 async function fetchSubmissions(
   filters: Filters
@@ -102,11 +81,28 @@ async function fetchSubmissions(
     console.error("submissions query failed:", error.message);
     return { kind: "error" };
   }
-  return {
-    kind: "ok",
-    rows: data as unknown as SubmissionRow[],
-    total: count ?? data.length,
-  };
+  // `submitted_at` is deliberately dropped on the way out rather than passed
+  // along: the table is a Client Component, and a raw timestamp sitting in its
+  // props is an invitation to format it there, which is the hydration trap.
+  const rows: SubmissionRow[] = (data as unknown as RawSubmission[]).map(
+    ({ submitted_at, ...row }) => ({
+      ...row,
+      submittedLabel: formatInstant(submitted_at),
+    })
+  );
+
+  return { kind: "ok", rows, total: count ?? data.length };
+}
+
+/** The active filters as a query string, so opening a submission and coming
+ * back lands on the same view rather than the unfiltered default. */
+function filterSuffix(params: Record<string, string | undefined>): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value) query.set(key, value);
+  }
+  const encoded = query.toString();
+  return encoded ? `?${encoded}` : "";
 }
 
 export default async function AdminAttendancePage({
@@ -149,9 +145,11 @@ export default async function AdminAttendancePage({
   };
 
   const [events, result] = await Promise.all([
-    fetchEventOptions(),
+    fetchEventOptions(createAdminClient()),
     fetchSubmissions(filters),
   ]);
+
+  const suffix = filterSuffix(params);
 
   return (
     <div>
@@ -160,7 +158,7 @@ export default async function AdminAttendancePage({
           Attendance
         </h1>
         <Link
-          href="/admin/attendance/new"
+          href={`/admin/attendance/new${suffix}`}
           className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
         >
           ADD A CHECK-IN
@@ -200,7 +198,11 @@ export default async function AdminAttendancePage({
                   ? `Showing the first ${result.rows.length} of ${result.total} matching submissions.`
                   : `${result.total} matching submission${result.total === 1 ? "" : "s"}.`}
             </p>
-            <AttendanceTable rows={result.rows} />
+            <ReviewQueue
+              rows={result.rows}
+              events={events}
+              hrefSuffix={suffix}
+            />
           </>
         )}
       </div>

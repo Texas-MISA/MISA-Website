@@ -18,15 +18,25 @@ type Client = SupabaseClient<Database>;
 /**
  * Map officer user ids to a display name.
  *
- * Ids with no `admin_profiles` row are simply absent from the map rather than
- * mapped to a placeholder: a revoked officer keeps their auth user but loses
- * the profile (`create-officer.mjs --revoke`), and their past actions must
- * still render. Callers decide what an unknown actor looks like.
+ * **Absence and a null value mean different things, and conflating them is a
+ * bug the audit trail cannot afford.**
+ *
+ *   - *absent* — no `admin_profiles` row. A revoked officer keeps their auth
+ *     user but loses the profile (`create-officer.mjs --revoke`), and their
+ *     past actions must still render.
+ *   - *present, value null* — a current officer who simply has no display name
+ *     set. `create-officer.mjs` leaves it null unless `--display-name` is
+ *     passed, so this is the common case, not an edge one.
+ *
+ * Filtering the nameless out used to collapse the second case into the first,
+ * which made the review screen credit every ordinary officer's work to "a
+ * former officer" — precisely inverting the accountability the log exists for
+ * (§6). Callers decide how each case reads.
  */
 export async function fetchOfficerNames(
   db: Client,
   userIds: string[]
-): Promise<Map<string, string>> {
+): Promise<Map<string, string | null>> {
   const unique = [...new Set(userIds.filter(Boolean))];
   if (unique.length === 0) return new Map();
 
@@ -42,9 +52,5 @@ export async function fetchOfficerNames(
     return new Map();
   }
 
-  return new Map(
-    data
-      .filter((row) => row.display_name)
-      .map((row) => [row.user_id, row.display_name as string])
-  );
+  return new Map(data.map((row) => [row.user_id, row.display_name]));
 }

@@ -1,8 +1,38 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.20
-**Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phase 1 of 5 built
+**Version:** 1.21
+**Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phases 1–3 of 5 built
 **Last updated:** July 2026
+
+> **v1.21: Stage 5 phases 2 and 3.** The submission detail screen and every
+> review mutation — resolve, approve, reject, reopen, bulk assign, manual entry
+> — are built and verified in a browser against the local stack. 182 tests
+> across 9 files. Decisions made and now normative:
+>
+> - **A near-miss student ID needs corroboration at distance 2.** The member
+>   ranker scored a two-character edit distance at exactly the suggestion floor,
+>   which meant a submission from someone on no roster at all was offered three
+>   confident-looking strangers. Student IDs issued in sequence put roughly three
+>   members within distance 2 of *any* six-digit number, so at that distance the
+>   similarity carries no information. Distance 2 now scores below the floor and
+>   must be joined by a second reason (email, a shared name token, a matching
+>   surname); distance 1 still stands on its own, because that is a typo rather
+>   than a coincidence. This is the "don't auto-resolve near-misses" rule applied
+>   to the ranker itself: an empty list is a valid, and often the correct, answer.
+> - **Approving or rejecting returns the officer to the filtered queue; a plain
+>   save does not.** Approve and reject remove a row from the pending view, so
+>   the officer's next action is on the next row — the queue is a work list being
+>   drained, and dropping them back on a resolved row costs a navigation every
+>   time. A save leaves them in place because they are still working that row.
+>   The queue's filters ride through the whole trip in the query string, so the
+>   view they return to is the view they left.
+> - **Officer attribution distinguishes "no display name" from "no profile".**
+>   `admin_profiles.display_name` is null unless `create-officer.mjs --display-name`
+>   is passed, and treating a nameless profile the same as a missing one credited
+>   every ordinary officer's work to "a former officer" — inverting the
+>   accountability §6 rests on. A missing profile means revoked; a null name
+>   means a current officer who has not set one, and reads as "an officer". The
+>   bootstrap script now defaults the name to the email's local part.
 
 > **v1.20: Stage 5 is under way.** Phase 1 — the schema groundwork, the pure
 > resolution core, and a read-only review queue at `/admin/attendance` — is built
@@ -1101,7 +1131,7 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 5 — Attendance Review & Manual Adjustments 🔨 phase 1 of 5 built (v1.20)
+### Stage 5 — Attendance Review & Manual Adjustments 🔨 phases 1–3 of 5 built (v1.21)
 **Goal:** Officers can see every submission, correct any of them, and award points that didn't come from a check-in. Until this ships, pending rows accumulate with no way to resolve them.
 
 **Shipped in five demonstrable phases**, because the stage is 5–6 days and splits cleanly at the read/write boundary:
@@ -1109,14 +1139,16 @@ contact form's backend — it renders disabled, with email as the working path.
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Migration 13, `lib/attendance.ts`, `lib/points.ts`, zod schemas, audit vocabulary, read-only `/admin/attendance` | ✅ built & verified |
-| 2 | `/admin/attendance/[id]` — raw submission, ranked suggestions, audit trail; still read-only | 🔨 built, browser verification outstanding |
-| 3 | Mutations: resolve, approve, reject, reopen, bulk assign, manual entry, all-status event picker | pending |
+| 2 | `/admin/attendance/[id]` — raw submission, ranked suggestions, audit trail; still read-only | ✅ built & verified |
+| 3 | Mutations: resolve, approve, reject, reopen, bulk assign, manual entry, all-status event picker | ✅ built & verified |
 | 4 | `/admin/points` — grant, ledger, void | pending |
 | 5 | Docs, invariants, `tasks.md` | pending |
 
-**Everything through phase 2 is read-only**, which is deliberate: the queue and the detail page are worth having on their own — an officer can at least *see* what is unresolved and why — and shipping the reads first means the suggestion ranking gets exercised against real data before any mutation depends on it being right.
+**Everything through phase 2 is read-only**, which is deliberate: the queue and the detail page are worth having on their own — an officer can at least *see* what is unresolved and why — and shipping the reads first means the suggestion ranking gets exercised against real data before any mutation depends on it being right. That paid for itself twice: the ranker's distance-2 problem and a highlight that marked punctuation instead of the differing digit were both found by looking at real rows, while nothing was yet writable.
 
 **The all-status event picker moved from phase 2 to phase 3.** `nearby_events()` is published-only and returns nothing beyond the grace window, so suggestions alone cannot express every legitimate assignment — but a picker is a form control, and phase 2 has no forms.
+
+**Resolution is one save per officer intent** (v1.21). An officer fixing a submission typically has to correct a typo, set an event, link a member, and approve — and the natural implementation makes that four writes and four audit rows. It is one: the detail form submits the corrected fields together with both links, and the APPROVE button carries `intent=approve` so the same statement also sets `status = 'present'`. The first build got this wrong in a way worth recording, because it was invisible to the tests — the button's enabled state was derived from the server's copy of the row rather than the live `<select>`, so picking an event left APPROVE greyed out and the officer had to save, wait, and approve separately. The design was intact and the experience was the thing it was meant to prevent.
 
 **Bulk assign is explicit-selection-only and partial-success.** Stage 5 introduces the first bulk action in the system, so Stage 6's select-all rule is pulled forward here: only checked IDs are ever operated on, never "everything matching this filter." The pre-flight must also dedupe *within* the selection — two selected rows can be the same person — and the operation splits into two statements, because rows with no member link cannot become `present` without violating `present_requires_resolution`. Auto-approve is an opt-in checkbox rather than implied by choosing an event; silently approving forty rows because an officer picked an event from a dropdown is precisely the boundary-moving the design note below warns against.
 

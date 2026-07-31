@@ -303,7 +303,14 @@ export function scoreMemberMatch(
       score += 45;
       reasons.push({ kind: "id_near_miss", distance });
     } else if (distance === 2) {
-      score += 25;
+      // Deliberately below MIN_SUGGESTION_SCORE, so two digits of similarity
+      // is corroboration and never a suggestion on its own. Six-digit IDs
+      // issued in sequence mean a roster of 30 people contains three members
+      // within distance 2 of *any* number, so before this the review screen
+      // offered three confident-looking strangers for a submission from
+      // someone who was on no roster at all. Distance 1 still stands alone —
+      // that is a typo, not a coincidence.
+      score += 15;
       reasons.push({ kind: "id_near_miss", distance });
     }
     // A missing "UT" prefix is a containment, not an edit-distance, match.
@@ -498,4 +505,138 @@ export function canApprove(row: {
   member_id: string | null;
 }): boolean {
   return row.event_id !== null && row.member_id !== null;
+}
+
+// --- bulk assignment --------------------------------------------------------
+
+export type BulkCandidate = {
+  id: string;
+  submittedName: string;
+  submittedAt: string;
+  status: string;
+  normalizedStudentId: string | null;
+  memberId: string | null;
+};
+
+export type BulkSkipReason =
+  | "not_pending"
+  | "duplicate_in_selection"
+  | "already_on_event";
+
+export type BulkSkip = {
+  id: string;
+  submittedName: string;
+  reason: BulkSkipReason;
+  /** For `duplicate_in_selection`, the row kept in its place. */
+  keptId?: string;
+};
+
+export type BulkPlan = {
+  /** Take the event link and stay `pending`. */
+  assignOnly: string[];
+  /** Take the event link and go `present` — only ever rows with a member. */
+  assignAndApprove: string[];
+  skipped: BulkSkip[];
+};
+
+/**
+ * Decide what a bulk assign should actually write.
+ *
+ * Pure, and separate from the action, because this is the part with the bugs
+ * in it. Three things it exists to get right:
+ *
+ *   1. **Dedupe within the selection.** Two checked rows can be the same
+ *      person — that is the whole reason they are both sitting in the queue —
+ *      and the `(event_id, normalized_student_id)` partial index would take the
+ *      first and 23505 the second, failing a batch the officer thought was
+ *      fine. Deduped on *both* keys the §4.2 duplicate rule names: the
+ *      normalized student ID, and the resolved `member_id` (the same member
+ *      reached through two differently-typed raw IDs).
+ *   2. **A row with no member cannot go `present`**, whatever the officer
+ *      ticked — `present_requires_resolution` would reject it. Those rows take
+ *      the event link and stay pending, which is why the caller writes two
+ *      statements rather than one.
+ *   3. **Nothing is silently dropped.** Every id that came in either lands in a
+ *      write list or comes back in `skipped` with a reason, so the action can
+ *      report partial success instead of a count the officer has to trust.
+ *
+ * Oldest-first, matching the queue's default sort, so which of a duplicate pair
+ * survives is deterministic and is the one the member submitted first.
+ */
+export function planBulkAssign(input: {
+  selected: BulkCandidate[];
+  /** Rows already attached to the target event — pending or present, since the
+   *  partial unique index ignores only `rejected`. */
+  existingOnEvent: {
+    normalizedStudentId: string | null;
+    memberId: string | null;
+  }[];
+  approve: boolean;
+}): BulkPlan {
+  const claimedIds = new Set<string>();
+  const claimedMembers = new Set<string>();
+  for (const row of input.existingOnEvent) {
+    if (row.normalizedStudentId) claimedIds.add(row.normalizedStudentId);
+    if (row.memberId) claimedMembers.add(row.memberId);
+  }
+
+  // Which row claimed a key, so a duplicate can name the one that displaced it.
+  const claimedBy = new Map<string, string>();
+
+  const plan: BulkPlan = { assignOnly: [], assignAndApprove: [], skipped: [] };
+
+  const ordered = [...input.selected].sort((a, b) =>
+    a.submittedAt.localeCompare(b.submittedAt)
+  );
+
+  for (const row of ordered) {
+    // Bulk operations scope on status rather than carrying 200 updated_at
+    // strings, so a row someone else resolved mid-selection is skipped here as
+    // well as by the UPDATE's own `status = 'pending'` filter.
+    if (row.status !== "pending") {
+      plan.skipped.push({
+        id: row.id,
+        submittedName: row.submittedName,
+        reason: "not_pending",
+      });
+      continue;
+    }
+
+    const keys = [
+      row.normalizedStudentId && `sid:${row.normalizedStudentId}`,
+      row.memberId && `member:${row.memberId}`,
+    ].filter((key): key is string => Boolean(key));
+
+    const takenByExisting = keys.some(
+      (key) =>
+        (key.startsWith("sid:") && claimedIds.has(key.slice(4))) ||
+        (key.startsWith("member:") && claimedMembers.has(key.slice(7)))
+    );
+    if (takenByExisting) {
+      plan.skipped.push({
+        id: row.id,
+        submittedName: row.submittedName,
+        reason: "already_on_event",
+      });
+      continue;
+    }
+
+    const clash = keys.find((key) => claimedBy.has(key));
+    if (clash) {
+      plan.skipped.push({
+        id: row.id,
+        submittedName: row.submittedName,
+        reason: "duplicate_in_selection",
+        keptId: claimedBy.get(clash),
+      });
+      continue;
+    }
+
+    for (const key of keys) claimedBy.set(key, row.id);
+
+    if (input.approve && row.memberId) plan.assignAndApprove.push(row.id);
+    else plan.assignOnly.push(row.id);
+  }
+
+  return plan;
 }

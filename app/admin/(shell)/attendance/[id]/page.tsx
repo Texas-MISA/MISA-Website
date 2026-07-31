@@ -15,9 +15,14 @@ import {
 } from "@/lib/attendance";
 import { requireOfficer } from "@/lib/auth";
 import { normalizeStudentId, ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
+import { fetchEventOptions } from "@/lib/event-options";
 import { formatInstant } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import {
+  ResolutionForm,
+  type MemberOption,
+} from "./_components/resolution-form";
 import {
   buildEventSuggestions,
   EventSuggestions,
@@ -169,11 +174,38 @@ async function fetchMemberSuggestions(
   );
 }
 
+/** Every active member, plus whoever is currently linked even if they have been
+ * deactivated since — dropping them from the list would silently unlink them on
+ * the next save. */
+async function fetchMemberOptions(
+  linkedId: string | null
+): Promise<MemberOption[]> {
+  const db = createAdminClient();
+  const { data, error } = await db
+    .from("members")
+    .select("id, full_name, student_id, active")
+    .or(linkedId ? `active.eq.true,id.eq.${linkedId}` : "active.eq.true")
+    .order("full_name")
+    .limit(MEMBER_SCAN_LIMIT);
+
+  if (error) {
+    console.error("member options query failed:", error.message);
+    return [];
+  }
+  return data.map((member) => ({
+    id: member.id,
+    label: `${member.full_name} (${member.student_id})${member.active ? "" : " — inactive"}`,
+    active: member.active,
+  }));
+}
+
 export default async function SubmissionDetailPage({
   params,
+  searchParams,
 }: {
   // Promise in Next 16 — await before reading.
   params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requireOfficer();
   const { id } = await params;
@@ -181,10 +213,22 @@ export default async function SubmissionDetailPage({
   const submission = await fetchSubmission(id);
   if (!submission) notFound();
 
-  const [eventSuggestions, memberSuggestions] = await Promise.all([
-    fetchEventSuggestions(submission.submitted_at),
-    fetchMemberSuggestions(submission),
-  ]);
+  // The queue's filters, carried through so acting on a row returns to the
+  // view the officer was working rather than the unfiltered default.
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(await searchParams)) {
+    if (typeof value === "string" && value) query.set(key, value);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  const backToQueue = `/admin/attendance${suffix}`;
+
+  const [eventSuggestions, memberSuggestions, eventOptions, memberOptions] =
+    await Promise.all([
+      fetchEventSuggestions(submission.submitted_at),
+      fetchMemberSuggestions(submission),
+      fetchEventOptions(createAdminClient()),
+      fetchMemberOptions(submission.member_id),
+    ]);
 
   const warnings = previewResolution({
     event: submission.events,
@@ -202,7 +246,7 @@ export default async function SubmissionDetailPage({
       </div>
 
       <p className="mt-3 text-sm">
-        <Link href="/admin/attendance" className="underline">
+        <Link href={backToQueue} className="underline">
           ← Back to the queue
         </Link>
       </p>
@@ -326,10 +370,30 @@ export default async function SubmissionDetailPage({
 
       <section className="mt-12 max-w-3xl">
         <h2 className="font-display text-xl font-bold">Resolving this</h2>
-        <p className="mt-2 border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
-          The assign, approve, and reject controls land in the next phase. Until
-          then this row stays exactly as it is — nothing has been lost.
+        <p className="mt-2 text-sm text-foreground/70">
+          Correct whatever the member mistyped, set both links, and approve —
+          one save. Nothing above is preselected; the choice is yours.
         </p>
+        <div className="mt-6">
+          <ResolutionForm
+            id={submission.id}
+            // The raw PostgREST string. A Date round trip truncates its
+            // microseconds and the compare-and-set then never matches.
+            updatedAt={submission.updated_at}
+            status={submission.status}
+            returnTo={backToQueue}
+            events={eventOptions}
+            members={memberOptions}
+            current={{
+              submittedName: submission.submitted_name,
+              submittedStudentId: submission.submitted_student_id,
+              submittedEmail: submission.submitted_email,
+              eventId: submission.event_id ?? "",
+              memberId: submission.member_id ?? "",
+              resolutionNote: submission.resolution_note ?? "",
+            }}
+          />
+        </div>
       </section>
 
       <section className="mt-12 max-w-3xl">
