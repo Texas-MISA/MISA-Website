@@ -323,7 +323,10 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 Placeholders — expand on arrival. Effort estimates from §7.
 
-- **Stage 6 — Member directory** · 4–5 days · the screen officers will live in; select-all-matching semantics need real tests
+- **Stage 6 — Member directory** · 4–5 days *plus a merge tool* · the screen officers will live in; select-all-matching semantics need real tests
+  - 🪤 **Duplicate members accumulate and nothing merges them.** Check-in matches on `normalized_student_id`, then `lower(email)`, then creates — so someone who mistypes **both** is indistinguishable from a new person and gets a new row. Deliberate (a wrong fuzzy match silently credits one member's attendance to another; a spurious member is only cleanup), but the cleanup has no home yet. Ghosts are findable via `members.source = 'self_checkin'`. A merge must repoint `attendance.member_id` and `point_adjustments.member_id` and can hit `attendance_one_per_event` when both identities attended the same event — a real conflict to decide, not to swallow. Preview-and-confirm, one audit row naming both sides.
+  - 🪤 **A valid-but-wrong student ID silently credits the wrong member.** The ID lookup runs before the email lookup, so mistyping into *another member's* real ID records you as them even though your own email would have matched. The one path where exact matching attributes attendance to the wrong human with nothing surfaced. Reordering just trades one silent mis-credit for another, so this is recorded rather than fixed — but merge tooling should assume mis-credits exist, and flagging a submitted-vs-matched email mismatch at check-in is the cheap partial mitigation.
+  - Both are consequences of §4.2's exact-match design rather than defects in it; the reasoning is written up in the doc's Stage 6 section (v1.21).
 - **Stage 7 — Member-facing views** · 3 days · `/leaderboard` and `/lookup`
 - **Stage 8 — Hardening & data integrity** · 3–4 days · every RLS policy tested with the anon key; historically the stage most likely to be skipped and most likely to be regretted
 - **Stage 9 — Launch** · 1–2 days + spreadsheet migration · soft launch with a paper backup sheet on hand

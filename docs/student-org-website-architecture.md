@@ -1214,9 +1214,16 @@ contact form's backend — it renders disabled, with email as the working path.
 - CSV roster import with a preview-and-confirm step, duplicate detection on `normalized_student_id`, and a dry-run row count before committing
 - Member detail page: full attendance history, point adjustment history, officer notes
 - Exports logged to `admin_audit` per §6
+- **Merging duplicate members** — see below; this is the piece with real domain logic in it
+
+**Two consequences of §4.2's exact-match check-in land here** (recorded v1.21, while building Stage 5). Neither is a defect in the check-in path — both are the deliberate design's bill, and the directory is where it comes due.
+
+**1. Duplicate members accumulate, and nothing merges them.** `resolveMember` matches on `normalized_student_id`, then `lower(email)`, then *creates*. A member who mistypes **both** their ID and their email is indistinguishable from a genuinely new person — the two are the same insert — so a new row appears. That is the right call at check-in time (a wrong fuzzy match silently credits one member's attendance to another, which corrupts real data; a spurious member is roster pollution, i.e. cleanup rather than loss) but it means ghosts accrue, and someone who mistypes repeatedly can leave several. They are findable: `members.source = 'self_checkin'` marks every auto-created row. What is missing is the merge itself, and it is not trivial — merging must repoint `attendance.member_id` and `point_adjustments.member_id`, and can hit `attendance_one_per_event` when both identities attended the same event, which is a real conflict needing a decision (keep one, reject the other) rather than a silent drop. Expect a preview-and-confirm flow like the CSV import, and one `admin_audit` row naming both sides.
+
+**2. A valid-but-wrong student ID silently credits the wrong member.** The ID lookup runs *before* the email lookup, so someone who mistypes into **another member's** real student ID is recorded as that person, even though their own email was correct and would have matched. It is rare and it is not obviously fixable by reordering — people mistype and share emails too, so email-first trades one silent mis-credit for another — but it is the one path where the exact-match design attributes attendance to the wrong human with nothing surfaced to anyone. The directory is where it would be noticed ("why does this member have an event they didn't attend?"), so the member detail page should make a member's attendance easy to scan, and any merge tooling should assume mis-credits exist. Revisit if it ever actually happens; a cheap partial mitigation is to flag, at check-in, when the matched member's email differs from the submitted one.
 
 **Exit criteria:** an officer filters to members who attended fewer than three events this term, sees an accurate count, clicks copy-emails, and pastes a complete list into an email client — with the list containing every matching member, not just the visible page.
-**Effort:** 4–5 days. Mostly query and UI-state work rather than new domain logic, but the select-all-matching semantics and the import preview deserve real test coverage.
+**Effort:** 4–5 days, plus whatever the merge tool costs — that one *is* new domain logic and the estimate below does not cover it. Otherwise mostly query and UI-state work, but the select-all-matching semantics, the import preview, and any merge deserve real test coverage.
 
 ---
 
