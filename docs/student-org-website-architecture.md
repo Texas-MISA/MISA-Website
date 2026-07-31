@@ -79,10 +79,16 @@
 >   `submitCheckin`, the one unauthenticated write path in the system; keeping
 >   it a single-export file makes "what can an anonymous user POST to" a
 >   one-file answer. A divergence from §10's original layout list.
-> - **§9 #6 and #8 are resolved** as proposed: any officer may approve a pending
->   row, with the audit log rather than a role gate as the control; and no
->   resolution deadline is enforced, with the pending badge and the oldest-first
->   default sort as the mitigation.
+> - **§9 is fully resolved — all eleven decisions.** #6 any officer may approve;
+>   #8 no enforced resolution deadline; #9 no restrictions on grant size or
+>   authority; #10 self-grants allowed and visible. The first four share one
+>   premise, and the consistency is the point: **the audit log and the ledger
+>   are the control, not a gate.** Then #1 the leaderboard is public but carries
+>   `robots: { index: false, follow: false }`, because a search cache outlives
+>   the deploy that filled it; and #11 public standings are a single total with
+>   attendance and bonus added silently — which **confirms §4.4 and closes the
+>   contradiction that row had carried since v1.16**, when it still expected a
+>   separate public column.
 >
 > **v1.19: Stage 4 is built and verified end-to-end against the local stack.**
 > Officers sign in at `/admin/login`, run the whole schedule from `/admin/events`,
@@ -800,7 +806,9 @@ The one rough edge is early August, when the new term is live but has no events 
 
 **Anon reaches this view, not the tables under it.** Postgres views run as their owner by default (`security_invoker = false`), which is what lets the anon role read aggregated standings while RLS still denies it direct access to `members`, `attendance`, `events`, and `app_settings`. The view *is* the security boundary — do not set `security_invoker = true` on it without re-checking §6.
 
-**Privacy note:** the view deliberately excludes `student_id` and `email`. A public leaderboard should never expose identifiers that are used elsewhere as credentials. Consider offering members an opt-out or a display-name field before making it fully public.
+**Privacy note:** the view deliberately excludes `student_id` and `email`. A public leaderboard should never expose identifiers that are used elsewhere as credentials.
+
+**Public, but never indexed** (§9 #1, resolved 2026-07-31). The remaining exposure after dropping IDs and emails is real names against point totals on a crawlable page — low-stakes in itself, but a search engine's cache outlives the deploy that created it, so it is not a decision that can be undone later. `/leaderboard` is therefore reachable by anyone with the link and carries `robots: { index: false, follow: false }`. That keeps the board doing its actual job — a member glances at where they stand, an officer screenshots it for the group chat — without putting students into a permanent public index. A display-name field or per-member opt-out is the escalation if someone objects; both are view changes with no migration.
 
 **Two filters here surprise people, and both matter when an officer approves a submission** (found and documented in v1.20):
 
@@ -1184,6 +1192,7 @@ contact form's backend — it renders disabled, with email as the working path.
 **Goal:** Members can answer their own questions.
 
 - `/leaderboard` — one row per member for the current term, ranked on `total_points`, ties alphabetical (§4.4)
+- **`/leaderboard` must set `robots: { index: false, follow: false }`** (§9 #1, resolved). The page is reachable by anyone with the link; it must not be crawlable. `app/admin/(shell)/layout.tsx` already does exactly this and is the pattern to copy. Getting this wrong is not a bug you can fix afterwards — once students' names are indexed against their point totals, the cache outlives the deploy that caused it
 - **The active term shown prominently on the page.** It is officer-set with no automatic rollover, so a stale term must be visible rather than silently assumed correct
 - `/lookup` — student ID + email, returns per-event attended/missed summary
 - Any point adjustments shown with their reason. The public board is a bare total, so this is the *only* place a member can see why their total exceeds their attendance count — which makes it more important here, not less
@@ -1290,12 +1299,14 @@ They share a premise, and the consistency is the point: **the audit log and the 
 
 **Revisit all four together if points ever decide something material** — officer eligibility, a funded trip, a leadership slot. Every one of them is defensible because standings are currently social rather than consequential; that premise is what changes, not the individual arguments.
 
+The two member-facing decisions were settled in the same pass:
+
+1. **Leaderboard visibility** — ✅ **Public, but never indexed.** Reachable by anyone with the link; `robots: { index: false, follow: false }` on the route. The board has to be glanceable to be worth building, but a search cache outlives the deploy that filled it, so indexing real names against point totals is the one part of this that cannot be walked back. See §4.4 and the Stage 7 checklist.
+11. **Bonus points in public standings** — ✅ **A single total, attendance and bonus added silently.** This confirms §4.4 rather than changing it, and closes the contradiction the row had carried since v1.16: it was written expecting a separate public column, which §4.4 later resolved against. The doc is now self-consistent, and the split stays officer-only in `member_directory` and the `/admin/points` ledger. Accepted cost, stated plainly: a member sees a number and cannot tell that five of their thirteen points were granted rather than earned. The underlying data is unchanged, so restoring a split later is a view change with no migration.
+
 ### Still open
 
-Neither is schema-affecting and neither blocks Stage 5.
-
-1. **Leaderboard visibility** — fully public, or behind the member lookup flow? Affects whether names appear on an indexable page. Wanted before Stage 7.
-11. **Bonus points in public standings** — ⚠️ **stale as written; do not build it.** It asks whether bonus points appear "as a separate column, consistent with §4.4", but §4.4 was subsequently resolved the other way: the public `leaderboard` shows a single `total_points` and only the officer-facing `member_directory` keeps the split. Building the public split would silently reverse a settled decision. Either strike this row or rewrite it as "should §4.4 be revisited?" — but it is no longer an open question about Stage 7.
+**None.** All eleven are resolved. Anything new belongs in §7 Stage 10 as backlog rather than being appended here — this section is the record of what was decided, not a running inbox.
 
 ---
 
