@@ -118,10 +118,16 @@ is the worst possible moment to lose them.
 
 - **A member who cannot get their details right gets no attendance and leaves no
   trace.** No row, no queue entry, nothing for an officer to find later.
-  - *Operational mitigation, worth telling officers:* Stage 5 phase 3 shipped
-    manual entry at `/admin/attendance/new`. Someone stuck at the door is added
-    by an officer in a few seconds. That is now the recovery path, and it only
-    works if officers know it exists.
+  - *Operational mitigation:* Stage 5 phase 3 shipped manual entry at
+    `/admin/attendance/new`. Someone stuck at the door is added by an officer in
+    a few seconds. **Corrected after implementation:** this originally read
+    "it only works if officers know it exists", which was wrong — the queue at
+    `/admin/attendance` has carried an ADD A CHECK-IN button to that route since
+    phase 1, so officers already have it in front of them. What is genuinely new
+    is not the page but the *trigger*: an unrecognized submission used to leave a
+    queue row an officer would find on their own, and now it leaves nothing, so
+    the only signal is a member saying out loud that the form won't take their
+    details. That is a sentence at a meeting, not a discoverability problem.
 - **A window that closes mid-correction changes the outcome.** Because nothing
   is written until success, the event is resolved at the moment of the *final*
   submit — so a member correcting a typo across a window boundary can land as an
