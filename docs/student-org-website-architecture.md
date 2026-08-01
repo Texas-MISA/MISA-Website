@@ -1066,6 +1066,8 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 /admin/members         Roster directory — sort, filter, select, copy, export
 /admin/members/[id]    Member detail — full history, adjustments, notes
 /admin/points          Point adjustment ledger — every grant, filterable by officer
+/admin/points/new      Grant points to one or more members in a single action
+/admin/points/[id]     Adjustment detail — void it with a reason, and its history
 /admin/attendance      Review queue — all submissions, filterable by status
 /admin/attendance/[id] Submission detail: raw form data, suggestions, override actions
 /admin/audit           Full activity log across all entities
@@ -1218,8 +1220,8 @@ contact form's backend — it renders disabled, with email as the working path.
 | 1 | Migration 13, `lib/attendance.ts`, `lib/points.ts`, zod schemas, audit vocabulary, read-only `/admin/attendance` | ✅ built & verified |
 | 2 | `/admin/attendance/[id]` — raw submission, ranked suggestions, audit trail; still read-only | ✅ built & verified |
 | 3 | Mutations: resolve, approve, reject, reopen, bulk assign, manual entry, all-status event picker | ✅ built & verified |
-| 4 | `/admin/points` — grant, ledger, void | pending |
-| 5 | Docs, invariants, `tasks.md` | pending |
+| 4 | `/admin/points` — grant, ledger, void | ✅ built & verified |
+| 5 | Docs, invariants, `tasks.md` | in progress |
 
 **Everything through phase 2 is read-only**, which is deliberate: the queue and the detail page are worth having on their own — an officer can at least *see* what is unresolved and why — and shipping the reads first means the suggestion ranking gets exercised against real data before any mutation depends on it being right. That paid for itself twice: the ranker's distance-2 problem and a highlight that marked punctuation instead of the differing digit were both found by looking at real rows, while nothing was yet writable.
 
