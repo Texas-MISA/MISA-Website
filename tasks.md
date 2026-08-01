@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–5 are complete. Stage 6 (member directory) is next.** Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–5 are complete. Stage 6 (member directory) is next and is broken into six phases below — nothing is built yet.** Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -12,11 +12,11 @@ Read this before touching anything; it is the state no file can tell you on its 
 
 | | |
 |---|---|
-| **Branch** | `stage-5-attendance-review` merged to `main` again **2026-08-01** (`0fe85d2`, phase 4) and deployed. Both branches exist on the remote; keep working on the branch and merge at the end of each phase. |
+| **Branch** | `main` is current and clean — Stage 5 closed with the phase-5 read-through (`2292bbc`, 2026-08-01) and both it and `stage-5-attendance-review` are pushed. **Stage 6 starts on a new branch, `stage-6-member-directory`, off `main`**; merge at the end of each phase, as Stage 5 did. |
 | **Production** | **All of Stage 5 is live** on https://misa-website-beta.vercel.app. `/admin/points`, `/admin/points/new`, and `/admin/points/[id]` are all in the deployed build (confirmed in the build log, not from the 307 — the proxy redirects *any* `/admin/*` path including ones that don't exist, so a 307 proves nothing about whether a route shipped). The Points nav entry is live. |
-| **Database** | All 14 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); `migration list --linked` verified in sync before the merge. Phase 4 needed no new migration, so nothing has changed here since. |
+| **Database** | All 14 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); `migration list --linked` re-verified in sync during the phase-5 read-through. Stage 6 phase 1 adds migration 15, the first schema change since 2026-07-31. |
 | ⚠️ **Merged mid-stage** | Merged at the end of each phase rather than at the end of the stage, deliberately, so the work is visible in production. It worked — the queue was resolving real submissions while `/admin/points` was still being written. Do the same in Stage 6. |
-| **Next task** | **Stage 6 — Member directory.** Stage 5 is closed: the phase-5 read-through ran 2026-08-01 and the doc is at **v1.24**. Nothing of Stage 5 is outstanding. |
+| **Next task** | **Stage 6 phase 1 — migration 15, `lib/filters.ts`, read-only `/admin/members`.** Stage 5 is closed (doc **v1.24**) and nothing of it is outstanding. Stage 6 is broken into six phases below; **read the four-schema-gaps note before writing code** — the rate column, `members.notes`, and the audit shape for exports are all cheaper now than after the UI depends on them. |
 | **Local database** | **Freshly reset 2026-08-01** and back to the documented seed exactly: 32 members, 15 events, 208 attendance, 6 adjustments, 2 audit rows, 29 leaderboard rows, `current_term()` = Spring 2026. ⚠️ The reset wiped local `auth.users`, so **re-create the dev officer before signing in to `/admin`** — see the command below. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
@@ -356,16 +356,85 @@ Three things not to rediscover the hard way:
 - **It needed no migration** — nothing is persisted between steps, which is what made it much smaller than it sounded.
 - **The membership oracle is accepted**, deliberately and against the stance §6 takes for the officer login. The reasoning is in the spec; don't "fix" it.
 
+## Now — Stage 6: Member directory
+
+*The screen officers will actually live in (§7 Stage 6). 4–5 days **plus** the merge tool, which carries its own estimate. Six phases, same shape as Stage 5: each ends in something demonstrable, and each merges to `main` as it lands rather than waiting for the stage. Branch: `stage-6-member-directory` off current `main`.*
+
+**Exit criterion, and the thing to build toward:** an officer filters to members who attended fewer than three events this term, sees an accurate count, clicks copy-emails, and pastes a complete list — **every** matching member, not just the visible page. That is reachable at the end of phase 2; phases 3–6 are the rest of the screen.
+
+### Before writing any code — four things the schema does not have yet
+
+Found by reading `20260730000008_views.sql` and `20260730000002_members.sql` against §7's feature list, not by guessing. Each one is cheap now and expensive after the UI depends on it (§7's "don't rush Stage 1" applies again here).
+
+- **`member_directory` has no `attendance_rate` column**, only `events_attended` and `events_possible`. PostgREST cannot filter or sort on a computed expression, so "attendance-rate threshold" and a sortable rate column are impossible until the rate exists *in the view*. Add `attendance_rate` as `events_attended::numeric / nullif(events_possible, 0)` — nullable by construction, since a term with no completed events has no rate, and that must render as "—" rather than 0%.
+- **`members` has no `notes` column**, and §7 puts officer notes on the member detail page.
+- **`admin_audit` has no natural row shape for an export.** `entity_id` is `uuid not null` and the `entity_type` check is `('attendance','event','member','point_adjustment')` — but an export spans N members and is not an entity. §6 nevertheless calls export the largest PII egress point in the system and requires it logged with the filter used and the row count. **Decide this in phase 1, don't discover it in phase 2.** Recommendation: widen the check with `'roster'` and give each export its own generated uuid as a receipt id, which keeps `entity_id` non-null and the `(entity_type, entity_id, acted_at)` index meaningful; the filter and count go in `before`/`after` and `note`.
+- **`AuditAction` has no `member.*` verbs at all.** Stage 6 adds roughly `member.created`, `member.updated`, `member.deactivated`, `member.merged`, `member.imported`, `roster.exported` — and the SQL column is free text, so the union is the only thing enforcing them. Extend it in the same commit as the first mutation that uses one.
+
+**One inconsistency to decide rather than inherit:** `pending_count` and `last_seen_at` in `member_directory` are **not** term-scoped, while every column beside them is. That is defensible — a pending row from last term still needs review, and "last seen" is a genuinely all-time question — but a "not seen since October" filter sitting next to term-scoped point columns will be read as term-scoped by whoever uses it. Pick one, and label the column in the UI to match.
+
+### Phase 1 — schema, `lib/filters.ts`, read-only `/admin/members`
+
+- [ ] **Migration 15** — `attendance_rate` on `member_directory` (`create or replace view`, so re-run the whole definition), `members.notes`, the `admin_audit` export decision above. Regenerate `lib/types/database.ts`; push to local **and** remote and confirm `migration list --linked` is in sync before merging.
+- [ ] **`lib/filters.ts`** — pure, no `next/*`, testable directly. This is the load-bearing module of the stage: `searchParams` → a typed `MemberFilter` object → a PostgREST query. **One serializable filter representation, applied by exactly one function**, because the directory query and the export must be provably the same query — see the phase 2 trap.
+- [ ] **`/admin/members`** read-only: server-side sort on every column, pagination, and the filters that live on the view (active, point range, events-attended range, rate threshold, joined-in-range, source). Reuse the queue's URL-driven filter pattern from `/admin/attendance`.
+- [ ] Nav entry unlocked in the same commit as the page (Stage 5's habit — a live nav link to a 404 is how the `/admin/attendance/new` bug shipped).
+
+### Phase 2 — selection and extraction · **exit criteria met here**
+
+- [ ] Row checkboxes plus **"select all N matching this filter"**, visibly distinct from "the 25 rows on this page"
+- [ ] Copy emails (comma-separated, ready for a To: field), copy names, copy TSV, download CSV — `lib/export.ts`, pure formatting
+- [ ] Every export writes an `admin_audit` row carrying the filter and the row count (§6)
+- [ ] Confirmation states the count that was actually copied, not the count that was selected
+
+### Phase 3 — the relational filters and `/admin/members/[id]`
+
+- [ ] **Attended *or* missed a specific event** — the query officers ask most often, and the one filter that cannot be expressed on `member_directory` at all: it needs an `attendance` subquery against a chosen `event_id`. Design `MemberFilter` in phase 1 knowing this is coming.
+- [ ] Has-pending-submissions, not-seen-since, free-text across name / ID / email
+- [ ] **`/admin/members/[id]`** — full attendance history, point-adjustment history, officer notes, and the shared `AuditTrail`. Make the attendance list easy to scan: this is where a mis-credited event gets noticed (see the traps below).
+
+### Phase 4 — saved presets and CSV import
+
+- [ ] Saved filter presets, shared across officers ("award eligible", "missed last 3 meetings") — a new table, so a second migration, and RLS deny-all in its own migration like every other table
+- [ ] CSV roster import: preview-and-confirm, duplicate detection on `normalized_student_id`, a dry-run row count before committing. Same preview-then-write shape as the event edit-impact confirm.
+
+### Phase 5 — the merge tool
+
+*Explicitly allowed to follow the directory rather than gate it (§7, v1.22). Its own estimate; the 4–5 days above does not cover it.*
+
+- [ ] Preview-and-confirm, one `admin_audit` row naming both sides
+- [ ] Repoints `attendance.member_id` **and** `point_adjustments.member_id`
+- [ ] **Handles the `attendance_one_per_event` collision as a decision, not a silent drop** — when both identities attended the same event, the officer chooses which row survives
+
+### Phase 6 — docs
+
+- [ ] Architecture doc version bump, `CLAUDE.md` invariants, this file
+- [ ] Final read-through of the whole stage — Stage 5's found four pieces of drift in one pass, all in docs nobody had reread
+
+### 🪤 Traps specific to this stage
+
+- **The select-all bug is invisible against the seed.** The roster is **32 members, 29 active** — smaller than two pages at any sensible page size, so "copy emails" will look perfectly correct while silently returning one page. Either seed enough members to exceed the page size or drop the page size in the test; asserting 60 addresses from a 60-row filter across a 25-row page is the whole point of the coverage §7 asks for.
+- **A row cap can truncate an export silently, and local and hosted may not agree.** `config.toml` sets no `max_rows`, but the hosted project applies its own — so an export that is complete locally can come back short in production, which is the same partial-list failure wearing a different hat. Verify the effective cap on **both**, and page through explicitly rather than trusting one request.
+- **Don't reuse `fetchMemberOptions` for the directory query.** It is an active-only bounded scan built for pickers (`MEMBER_SCAN_LIMIT`, and the reason it is a scan and not an `ilike` probe is recorded on that constant). The directory needs its own paginated query over `member_directory`, including inactive members.
+- **Date filters stay Central-anchored and half-open** — `joined_at` and `last_seen_at` both. The existing `centralWallTimeToInstant` / `addCivilDays` pattern is the one to copy; a bare `.lte(date)` is a UTC-midnight cut that drops five hours and looks reasonable.
+- **Server Components own the date formatting** for `joined_at` and `last_seen_at`. Pass formatted labels down as props.
+- **Admin pages read through `createAdminClient()` behind `requireOfficer()`**, as every existing admin screen does. `member_directory` is granted to `authenticated` only and carries emails and student IDs — never read it from a Client Component with the anon key, and never loosen that grant to make one work.
+- **Whether export should be `admin`-role-only is still open.** §6 says "consider restricting it"; §9 #6 decided any officer may *approve*, which is a different question. Decide it in phase 2 and write down which way and why.
+
+### Carried in from earlier stages — the three §4.2 consequences this screen inherits
+
+All three are the deliberate exact-match design's bill coming due, not defects. Reasoning is in the doc's Stage 6 section (v1.21, revised v1.22).
+
+- 🪤 **Duplicate members still accumulate and nothing merges them — but far fewer of them** (revised v1.22). The main source of ghosts is gone: a double typo used to create a member silently, and now it is refused and re-prompted. What remains is someone who ticks "this is my first MISA event" *and* types badly, which is a narrower and mostly one-shot failure. Ghosts are still findable via `members.source = 'self_checkin'`. A merge must repoint `attendance.member_id` and `point_adjustments.member_id` and can hit `attendance_one_per_event` when both identities attended the same event — a real conflict to decide, not to swallow. Preview-and-confirm, one audit row naming both sides. Smaller in expectation, so it can follow the directory rather than gate it.
+- 🪤 **A valid-but-wrong student ID silently credits the wrong member — and got slightly *more* likely** (v1.22). The ID lookup runs before the email lookup, so mistyping into *another member's* real ID records you as them even though your own email would have matched. The one path where exact matching attributes attendance to the wrong human with nothing surfaced, and a confident typo that happens to hit a real ID now sails straight through as a matched member. Reordering just trades one silent mis-credit for another, so this is recorded rather than fixed — but merge tooling should assume mis-credits exist, and flagging a submitted-vs-matched email mismatch at check-in is the cheap partial mitigation. **This is the one the member detail page in phase 3 is the mitigation for** — it is where someone finally asks "why does this member have an event they didn't attend?"
+- 🪤 **A confirmed first-timer can leave a member row with no attendance.** If an officer already queued a manual row carrying that student ID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check against the "three checks, not one" invariant. Another `source = 'self_checkin'` row for the directory to surface — a member with zero attendance and a self-registered source is the shape to look for.
+
 ## Later
 
 Placeholders — expand on arrival. Effort estimates from §7.
 
-- **Stage 6 — Member directory** · 4–5 days *plus a merge tool* · the screen officers will live in; select-all-matching semantics need real tests
-  - 🪤 **Duplicate members still accumulate and nothing merges them — but far fewer of them** (revised v1.22). The main source of ghosts is gone: a double typo used to create a member silently, and now it is refused and re-prompted. What remains is someone who ticks "this is my first MISA event" *and* types badly, which is a narrower and mostly one-shot failure. Ghosts are still findable via `members.source = 'self_checkin'`. A merge must repoint `attendance.member_id` and `point_adjustments.member_id` and can hit `attendance_one_per_event` when both identities attended the same event — a real conflict to decide, not to swallow. Preview-and-confirm, one audit row naming both sides. Smaller in expectation, so it can follow the directory rather than gate it.
-  - 🪤 **A valid-but-wrong student ID silently credits the wrong member — and got slightly *more* likely** (v1.22). The ID lookup runs before the email lookup, so mistyping into *another member's* real ID records you as them even though your own email would have matched. The one path where exact matching attributes attendance to the wrong human with nothing surfaced, and a confident typo that happens to hit a real ID now sails straight through as a matched member. Reordering just trades one silent mis-credit for another, so this is recorded rather than fixed — but merge tooling should assume mis-credits exist, and flagging a submitted-vs-matched email mismatch at check-in is the cheap partial mitigation.
-  - 🪤 **A confirmed first-timer can leave a member row with no attendance.** If an officer already queued a manual row carrying that student ID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check against the "three checks, not one" invariant. Another `source = 'self_checkin'` row for the directory to surface.
-  - All three are consequences of §4.2's exact-match design rather than defects in it; the reasoning is written up in the doc's Stage 6 section (v1.21) and revised in v1.22.
 - **Stage 7 — Member-facing views** · 3 days · `/leaderboard` and `/lookup`
+  - 🪤 **Add the `/leaderboard` path to `revalidatePoints`** the day the route ships — see the carry-forward note at the end of Stage 5, and the doc's Stage 7 section.
 - **Stage 8 — Hardening & data integrity** · 3–4 days · every RLS policy tested with the anon key; historically the stage most likely to be skipped and most likely to be regretted
 - **Stage 9 — Launch** · 1–2 days + spreadsheet migration · soft launch with a paper backup sheet on hand
 - **Stage 10 — Post-v1 backlog** · parking lot, see §7
