@@ -1,11 +1,36 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.23
-**Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phases 1–4 of 5 built
-**Last updated:** July 2026
+**Version:** 1.24
+**Status:** Stages 0–5 complete; Stage 6 (member directory) is next
+**Last updated:** August 2026
+
+> **v1.24: Stage 5 closed.** Phase 5's final read-through, which is the last
+> item in the stage. No code changed and no decision moved; what changed is that
+> the claims are now checked rather than asserted. Verified against the running
+> system: 208 tests across 10 files pass, lint and build are clean, all 14
+> migrations are identical local and remote, and every Stage 5 route is in the
+> production build. Three things the read-through corrected, all drift rather
+> than error:
+>
+> - **The Stage 5 heading in §7 still read "phases 1–3 of 5 built"** and this
+>   status line still said "in progress", two versions after phase 4 shipped. A
+>   status line nobody updates is worse than none, because it is believed.
+> - **§5's route table was missing `/admin/events/series`** and §10's layout was
+>   missing six modules that exist — `/admin/points`, `app/actions/auth.ts`,
+>   `lib/event-options.ts`, `lib/member-options.ts`, `lib/admin-profiles.ts`,
+>   and `lib/supabase/admin.ts`. §10 is the map a new officer reads first.
+> - **The Stage 7 carry-forward lived only in `tasks.md`.** `revalidatePoints`
+>   cannot revalidate `/leaderboard` because the route does not exist yet, and
+>   granting or voiding both move public standings. That path must be added the
+>   day `/leaderboard` ships, so it now sits in Stage 7's checklist where it will
+>   be read, not in a stage section that gets archived.
+>
+> Stage 5's exit criteria are met at the level the built surfaces allow — see
+> the note under them, which records what is verified through a UI and what is
+> verified against the views until Stages 6 and 7 ship the screens.
 
 > **v1.23: `/admin/points` — granting, the ledger, and voiding.** Stage 5 phase 4,
-> the last functional piece of the stage; only the doc pass remains. Needed no
+> the last functional piece of the stage. Needed no
 > migration: §4.2's `point_adjustments` and migration 13's `void_requires_reason`
 > already carried everything. 208 tests across 10 files. Decisions now normative:
 >
@@ -1061,7 +1086,8 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 /admin/login           Officer sign-in
 /admin                 Dashboard — recent check-ins, pending review count
 /admin/events          Schedule list — filter by term, status, category
-/admin/events/new      Create event, optionally as a recurring series
+/admin/events/new      Create one event, as a draft or published
+/admin/events/series   Create a recurring series — expanded to one draft per date
 /admin/events/[id]     Edit event, view its attendance, duplicate, cancel
 /admin/members         Roster directory — sort, filter, select, copy, export
 /admin/members/[id]    Member detail — full history, adjustments, notes
@@ -1210,7 +1236,7 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 5 — Attendance Review & Manual Adjustments 🔨 phases 1–3 of 5 built (v1.21)
+### Stage 5 — Attendance Review & Manual Adjustments ✅ complete (v1.24)
 **Goal:** Officers can see every submission, correct any of them, and award points that didn't come from a check-in. Until this ships, pending rows accumulate with no way to resolve them.
 
 **Shipped in five demonstrable phases**, because the stage is 5–6 days and splits cleanly at the read/write boundary:
@@ -1221,7 +1247,9 @@ contact form's backend — it renders disabled, with email as the working path.
 | 2 | `/admin/attendance/[id]` — raw submission, ranked suggestions, audit trail; still read-only | ✅ built & verified |
 | 3 | Mutations: resolve, approve, reject, reopen, bulk assign, manual entry, all-status event picker | ✅ built & verified |
 | 4 | `/admin/points` — grant, ledger, void | ✅ built & verified |
-| 5 | Docs, invariants, `tasks.md` | in progress |
+| 5 | Docs, invariants, `tasks.md`, final read-through | ✅ done (v1.24) |
+
+**Phases 1–4 were each merged to `main` and deployed as they finished**, rather than the whole stage landing at once. Worth repeating for the next stage: the queue was resolving real submissions in production while `/admin/points` was still being built, and production `admin_audit` shows officer activity dated against each phase as it went live.
 
 **Everything through phase 2 is read-only**, which is deliberate: the queue and the detail page are worth having on their own — an officer can at least *see* what is unresolved and why — and shipping the reads first means the suggestion ranking gets exercised against real data before any mutation depends on it being right. That paid for itself twice: the ranker's distance-2 problem and a highlight that marked punctuation instead of the differing digit were both found by looking at real rows, while nothing was yet writable.
 
@@ -1260,6 +1288,9 @@ contact form's backend — it renders disabled, with email as the working path.
 - Void with a reason rather than delete; voided rows stay visible, struck through, and stop counting immediately
 
 **Exit criteria:** an officer takes a submission that arrived 40 minutes after an event closed, assigns it to the correct event, approves it, sees the member's leaderboard count increase, and can later see exactly who made that change and when. Separately, an officer awards 5 bonus points to three members at once with a reason, sees those points in the `bonus_points` column of the admin directory distinct from attendance points, and sees the members' public leaderboard totals rise by 5 with no breakdown shown.
+
+**Met — with one honest qualification about *where* it was seen** (v1.24). Everything an officer does is verified through the UI: assign-and-approve in one click, one `attendance.approved` audit row with the right before/after, the multi-member grant, and the void. But the two "sees the result" clauses name screens Stage 5 does not build — the admin directory is Stage 6 and `/leaderboard` is Stage 7 — so those were verified against the views themselves. On the seeded roster, `member_directory` keeps the split while `leaderboard` publishes one total that equals `attendance_points + bonus_points`, a negative adjustment reduces it, and a voided one contributes nothing. That is §4.4 and §9 #11 behaving as written; what remains unproven until Stage 6 and Stage 7 is only that a screen renders those columns. Recorded rather than quietly counted as met, because a stage marked complete against criteria it could not fully test is how a gap survives to launch.
+
 **Effort:** 5–6 days. The suggestion ranking is what turns the review queue from a tedious data-entry screen into a two-click operation — worth the extra time.
 
 **Design note:** resist the urge to auto-resolve near-misses. A submission five minutes past the window is *probably* legitimate, but auto-approving it just moves the boundary and invites the same problem five minutes later. Keep the human in the loop and make the human's job fast instead.
@@ -1318,6 +1349,8 @@ contact form's backend — it renders disabled, with email as the working path.
 - Any point adjustments shown with their reason. The public board is a bare total, so this is the *only* place a member can see why their total exceeds their attendance count — which makes it more important here, not less
 - Pending submissions shown distinctly from confirmed ones, so a member who checked in late knows their form was received and is awaiting review rather than assuming it vanished
 - Attendance-rate calculation and a visual summary of the semester
+
+**🪤 Carried forward from Stage 5 — add the `/leaderboard` revalidation the day the route ships.** `revalidatePoints` in `app/actions/points.ts` revalidates the ledger and the adjustment detail, and deliberately does not revalidate `/admin` (nothing on the dashboard aggregates points). It cannot yet revalidate `/leaderboard`, because there is no such route. Granting and voiding both move public standings, so a board that silently serves a stale cache is the failure mode — and it would be found three stages after the code that caused it. The comment in `revalidatePoints` says the same thing; this is the copy that will actually be read while building this stage.
 
 **Exit criteria:** a member can determine their own standing, why it is what it is, which specific events they missed, and whether anything of theirs is still pending — without asking an officer.
 **Effort:** 3 days.
@@ -1436,26 +1469,32 @@ The two member-facing decisions were settled in the same pass:
 /app
   /(public)
     page.tsx                 landing
+    /about, /gallery, /officers, /projects, /contact
     /attend/page.tsx
-    /leaderboard/page.tsx
-    /lookup/page.tsx
+    /leaderboard/page.tsx    Stage 7
+    /lookup/page.tsx         Stage 7
   /admin
-    /login/page.tsx
-    page.tsx
-    /events/...
-    /members/...
-    /attendance/...
+    /login/page.tsx          outside the (shell) group — see the note below
+    /(shell)                 authed chrome; route groups don't appear in URLs
+      page.tsx
+      /events/...
+      /attendance/...
+      /points/...
+      /members/...           Stage 6
   /actions
     attendance.ts            submitCheckin ONLY — see note below
     attendance-review.ts     officer resolution mutations
     events.ts
-    members.ts
-    points.ts
+    points.ts                grantPoints, voidAdjustment — and nothing else
+    auth.ts                  sign in / sign out
+    members.ts               Stage 6
     audit.ts                 shared admin_audit writer (no "use server")
 /lib
   supabase/
-    server.ts                server client
+    server.ts                anon server client
     client.ts                browser client
+    admin.ts                 service-role client, `server-only`-guarded —
+                             the only place it is constructed (§6)
   types/database.ts          generated types
   validation.ts              zod schemas
   attendance.ts              resolution core: interval parsing, gap
@@ -1464,8 +1503,15 @@ The two member-facing decisions were settled in the same pass:
   events.ts                  event domain core
   checkin.ts                 check-in resolution core
   auth.ts                    getOfficer / requireOfficer
-  filters.ts                 directory filter → SQL translation
-  export.ts                  CSV / TSV / clipboard formatting
+  event-options.ts           all-status event list, shared by queue filter,
+                             resolution form, manual entry
+  member-options.ts          bounded active-roster scan, shared by the
+                             resolution form, manual entry, grant picker
+  admin-profiles.ts          fetchOfficerNames — actor_id FKs auth.users,
+                             which has no PostgREST path to admin_profiles
+  site.ts / officers.ts      org copy and the officer roster
+  filters.ts                 directory filter → SQL translation (Stage 6)
+  export.ts                  CSV / TSV / clipboard formatting (Stage 6)
 /supabase
   /migrations                versioned SQL
   seed.sql
@@ -1477,4 +1523,8 @@ proxy.ts                     admin route protection (Next 16 rename of middlewar
 
 **Why officer attendance mutations live apart from `app/actions/attendance.ts`** (v1.20): that module holds `submitCheckin`, the single unauthenticated write path in the whole system and what §6 calls the main attack surface. Every export of a `"use server"` module is a publicly callable endpoint, so keeping it a one-export file makes "what can an anonymous user POST to" a one-file answer — and removes the chance of someone adding an unguarded export next to a guarded one. Officer mutations go in `attendance-review.ts`, where every export opens with `getOfficer()`.
 
+**`/admin/login` sits outside the `(shell)` route group deliberately.** The shell's `layout.tsx` calls `requireOfficer()`, so a login page inside it could never be reached by anyone who needed it — the page would redirect to itself. Route groups don't appear in URLs, so the route table in §5 is unaffected by the grouping.
+
 **`lib/` modules ending in a domain name are pure** — no `next/*` imports, no `server-only` guard — so Vitest calls them directly with injected clients and timestamps. `events.ts`, `checkin.ts`, `attendance.ts`, and `points.ts` all follow this. Anything request-shaped belongs in `app/actions/`. This is what keeps the resolution logic testable without a running Next server.
+
+**The `*-options.ts` modules are a different thing and shouldn't be mistaken for domain cores.** `event-options.ts`, `member-options.ts`, and `admin-profiles.ts` are shared *fetches* — each takes a client and returns a list a page renders. They exist because three call sites needed the same query and the copies had already drifted once. They format their labels server-side, which is not incidental: `Intl.DateTimeFormat` inside a Client Component is a hydration mismatch, so a picker's option text has to arrive as a prop.

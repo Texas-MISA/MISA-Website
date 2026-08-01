@@ -6,11 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–4 complete; Stage 5 (attendance review) functionally complete — all four build phases merged to `main` and live in production as of 2026-08-01; only a final doc read-through remains.** Work continues on branch `stage-5-attendance-review`; it was merged early, on purpose, rather than at the end of the stage. Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row.
+**Stages 0–5 complete as of 2026-08-01; Stage 6 (member directory) is next.** Stage 5's four build phases were each merged to `main` and deployed as they finished rather than at the end of the stage, and the phase-5 read-through closed it (doc v1.24). Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row.
 
-Stage 5 so far: migration 13 (`attendance.updated_at` + trigger, `point_adjustments.void_requires_reason`, **applied to local and remote**), the pure core in `lib/attendance.ts` and `lib/points.ts`, six zod schemas, seven new `AuditAction` verbs, the queue at `/admin/attendance`, the submission detail at `/admin/attendance/[id]` with ranked event and member suggestions, and every review mutation in `app/actions/attendance-review.ts` — resolve, approve, reject, reopen, bulk assign, and manual entry at `/admin/attendance/new`. **Phase 4 added `/admin/points`** — the ledger with officer/category/member/date/state filters, the multi-member grant at `/admin/points/new`, and void-with-reason on `/admin/points/[id]` — plus `app/actions/points.ts` and `lib/member-options.ts`. It needed **no migration**. `tasks.md` has the full handoff state; **Stage 6 (member directory) is next**.
+Stage 5 shipped: migration 13 (`attendance.updated_at` + trigger, `point_adjustments.void_requires_reason`, **applied to local and remote**), the pure core in `lib/attendance.ts` and `lib/points.ts`, six zod schemas, seven new `AuditAction` verbs, the queue at `/admin/attendance`, the submission detail at `/admin/attendance/[id]` with ranked event and member suggestions, and every review mutation in `app/actions/attendance-review.ts` — resolve, approve, reject, reopen, bulk assign, and manual entry at `/admin/attendance/new`. **Phase 4 added `/admin/points`** — the ledger with officer/category/member/date/state filters, the multi-member grant at `/admin/points/new`, and void-with-reason on `/admin/points/[id]` — plus `app/actions/points.ts` and `lib/member-options.ts`. It needed **no migration**. `tasks.md` has the full handoff state; **Stage 6 (member directory) is next**.
 
-**Stages 0–1 complete; Stage 2 (public site) in progress; Stage 3 (attendance capture) built and tested.** Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. `app/(public)/` recreates all six pages of the existing Squarespace site, [txmisa.org](https://www.txmisa.org/) — see `docs/existing-site-inventory.md` for what was reproduced and what was deliberately left as a placeholder (photography, partner logos, the contact form backend). The home page reads published upcoming events live, and `/attend` is the public check-in form backed by the `submitCheckin` Server Action (needs `SUPABASE_SERVICE_ROLE_KEY` in the environment). `/attend` carries a "this is my first MISA event" checkbox and a two-step confirmation for anyone the roster doesn't recognize (doc v1.22, spec `docs/attend-confirmation-flow.md`); a returning member's path is unchanged and still one submit. See `tasks.md`.
+Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app. The Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, fully migrated, and seeded with a semester of fake data. `app/(public)/` recreates all six pages of the existing Squarespace site, [txmisa.org](https://www.txmisa.org/) — see `docs/existing-site-inventory.md` for what was reproduced and what was deliberately left as a placeholder (photography, partner logos, the contact form backend). The home page reads published upcoming events live, and `/attend` is the public check-in form backed by the `submitCheckin` Server Action (needs `SUPABASE_SERVICE_ROLE_KEY` in the environment). `/attend` carries a "this is my first MISA event" checkbox and a two-step confirmation for anyone the roster doesn't recognize (doc v1.22, spec `docs/attend-confirmation-flow.md`); a returning member's path is unchanged and still one submit. See `tasks.md`.
 
 Content carried over from the old site lives in `lib/site.ts` (mission, pillars, socials, emails, partners) and `lib/officers.ts` (the 13-officer roster) — edit those rather than hardcoding copy into pages. The recreation is a starting point for a heavier redesign, not a final design.
 
@@ -146,8 +146,9 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 Per §10:
 
 ```
-app/(public)/           landing, /about, /gallery, /officers, /projects, /contact,
-                        and later /attend, /leaderboard, /lookup. layout.tsx here
+app/(public)/           landing, /about, /gallery, /officers, /projects,
+                        /contact, /attend; later /leaderboard, /lookup (Stage 7).
+                        layout.tsx here
                         holds the shared header/footer; _components/ holds
                         page-private pieces (leading underscore = not a route)
 app/admin/login/        officer sign-in — deliberately OUTSIDE the (shell) group,
@@ -201,8 +202,8 @@ lib/site.ts             org copy, socials, emails, partners
 lib/officers.ts         officer roster
 lib/validation.ts       zod schemas
 tests/                  Vitest suite — integration tests against the local stack
-lib/filters.ts          directory filter → SQL translation
-lib/export.ts           CSV / TSV / clipboard formatting
+lib/filters.ts          Stage 6, not built — directory filter → SQL translation
+lib/export.ts           Stage 6, not built — CSV / TSV / clipboard formatting
 supabase/migrations/    versioned SQL
 supabase/seed.sql
 components/             site-header.tsx, site-footer.tsx
