@@ -7,6 +7,11 @@ import {
   type CheckinState,
   type SubmittedValues,
 } from "@/app/actions/attendance";
+// The refused copy quotes the grace window, so it reads it from the same
+// constant the server decides with — a hardcoded "48 hours" would start
+// lying the moment ORPHAN_WINDOW_HOURS changed. lib/checkin.ts is free of
+// next/* and server-only imports, so a Client Component can import it.
+import { ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 
 // Client Component for useActionState only — the form posts to the Server
 // Action via <form action>, so it works before hydration too (submissions
@@ -65,12 +70,19 @@ export function CheckinForm() {
             : "We already have your check-in — it's awaiting officer review. You don't need to submit again."}
         </ResultPanel>
       );
+    // The `&nbsp;` is deliberate, and so is the absence of any comment inside
+    // the prose below. JSX drops the space where a text run meets an embedded
+    // expression or comment: a plain space rendered "48hours", and a comment
+    // placed mid-sentence rendered "eventwithin". Keep the sentence one
+    // unbroken run of text.
     case "refused":
       return (
-        <ResultPanel heading="No event right now">
-          Check-ins are only open around event times, and there&apos;s no MISA
-          event within the check-in window at the moment. Check the schedule on
-          the home page and come back during the event.
+        <ResultPanel heading="No event around this time">
+          Check-in opens around event times, and there&apos;s no MISA event
+          within {ORPHAN_WINDOW_HOURS}&nbsp;hours of right now — nothing
+          running, and nothing that just ended or is about to start. Check the
+          home page for the next one. If you&apos;re at a MISA event as you read
+          this, tell an officer — it may not be published yet.
         </ResultPanel>
       );
 
