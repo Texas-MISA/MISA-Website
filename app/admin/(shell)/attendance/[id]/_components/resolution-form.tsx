@@ -11,6 +11,7 @@ import {
   type SubmittedResolutionValues,
 } from "@/app/actions/attendance-review";
 import type { EventOption } from "@/lib/event-options";
+import type { MemberOption } from "@/lib/member-options";
 
 // The resolution controls (§7 Stage 5). Everything an officer can do to one
 // submission, in one form and one submit.
@@ -25,12 +26,6 @@ import type { EventOption } from "@/lib/event-options";
 // Nothing here is preselected from a suggestion. The ranked lists above are
 // inert; a stray defaultChecked is the easiest way to turn "don't auto-resolve
 // near-misses" into "auto-resolve near-misses".
-
-export type MemberOption = {
-  id: string;
-  label: string;
-  active: boolean;
-};
 
 const initial: ResolutionState = { status: "idle" };
 const initialAction: ReviewActionState = { status: "idle" };
