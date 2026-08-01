@@ -12,12 +12,12 @@ Read this before touching anything; it is the state no file can tell you on its 
 
 | | |
 |---|---|
-| **Branch** | `stage-5-attendance-review` **merged to `main` 2026-07-31** (`a9b10ac`) and pushed. Both branches exist on the remote; keep working on the branch and merge again at the end of each phase. |
-| **Production** | **Stage 5 phases 1–3 are live** on https://misa-website-beta.vercel.app. **Phase 4 is built and browser-verified locally but NOT yet merged or deployed** — production still has the Points nav entry disabled and no `/admin/points`. |
+| **Branch** | `stage-5-attendance-review` merged to `main` again **2026-08-01** (`0fe85d2`, phase 4) and deployed. Both branches exist on the remote; keep working on the branch and merge at the end of each phase. |
+| **Production** | **Stage 5 phases 1–4 are live** on https://misa-website-beta.vercel.app. `/admin/points`, `/admin/points/new`, and `/admin/points/[id]` are all in the deployed build (confirmed in the build log, not from the 307 — the proxy redirects *any* `/admin/*` path including ones that don't exist, so a 307 proves nothing about whether a route shipped). The Points nav entry is live. |
 | **Database** | All 14 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); `migration list --linked` verified in sync before the merge. Phase 4 needed no new migration, so nothing has changed here since. |
-| ⚠️ **Merged mid-stage** | Phases 1–3 were merged early, deliberately, so the work is visible in production — not because the stage was finished. Officers using `/admin/attendance` in production can resolve and approve attendance but **cannot yet grant points**: phase 4 is on the branch, unmerged. |
-| **Next task** | **Phase 5 — the doc pass**, then merge the branch and deploy. Phase 4 (`/admin/points`) is built, tested, and browser-verified as of 2026-07-31. |
-| **Local database** | Carries the phase-3 walkthrough's mutations (an approved row, a reopened one, two bulk assigns, a manual entry, one extra fixture row) **and phase 4's** (three adjustments granted to Amara Osei, Chen Wu, and Tomas Novak, all three since voided). Adjustments are back to 6 live + 3 voided; members and attendance are unchanged. `npx supabase db reset` restores the documented seed. |
+| ⚠️ **Merged mid-stage** | Merged at the end of each phase rather than at the end of the stage, deliberately, so the work is visible in production. All of Stage 5's *functionality* is now live; only the phase-5 read-through is outstanding. |
+| **Next task** | **Stage 6 — Member directory.** Stage 5 is functionally complete, documented, merged, and deployed as of 2026-08-01; all that remains of phase 5 is a final read-through of the stage whenever you next touch it. |
+| **Local database** | **Freshly reset 2026-08-01** and back to the documented seed exactly: 32 members, 15 events, 208 attendance, 6 adjustments, 2 audit rows, 29 leaderboard rows, `current_term()` = Spring 2026. ⚠️ The reset wiped local `auth.users`, so **re-create the dev officer before signing in to `/admin`** — see the command below. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
 
@@ -327,7 +327,10 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 - [x] Architecture doc → **v1.20**, `CLAUDE.md` invariants, this file
 - [x] Architecture doc → **v1.23** and the `CLAUDE.md` amendments for phase 4 — the atomic-grant exception to the partial-success invariant, the audit-column-symmetry invariant, and the client-side picker superseding `?q=&sel=`
-- [ ] Final read-through of the whole stage, then merge
+- [x] README replaced — it was still `create-next-app` boilerplate on a **public** repo, telling visitors to edit `app/page.tsx`, which Stage 2 deleted
+- [x] Route table and phase table in the architecture doc; two stale `tasks.md` headings (Stage 2 marked "Now"; the `/attend` checkbox filed as "not built")
+- [x] **Merged to `main` and deployed 2026-08-01** (`0fe85d2`)
+- [ ] Final read-through of the whole stage, whenever you next touch it
 
 **Carry into Stage 7:** `revalidatePoints` in `app/actions/points.ts` deliberately does **not** revalidate `/admin` (nothing on the dashboard aggregates points) and cannot yet revalidate `/leaderboard` (the route doesn't exist). Granting and voiding both move public standings, so **that path must be added the day `/leaderboard` ships** — otherwise it is a stale-cache bug discovered three stages later.
 
