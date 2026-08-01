@@ -23,6 +23,28 @@ const track = newTracker();
 
 afterAll(() => cleanup(db, track));
 
+type Identity = { fullName: string; studentId: string; email: string };
+
+// The three ways a submission can arrive, spelled out at every call site.
+// Deliberately local rather than folded into testIdentity(): that helper is
+// shared with the other suites, and a default would make `declaredNew: false`
+// invisible boilerplate at exactly the call sites whose meaning depends on it.
+
+/** Box unchecked — "I've been here before". The overwhelmingly common case. */
+function returning(identity: Identity) {
+  return { ...identity, declaredNew: false, confirmed: false };
+}
+
+/** Ticked "this is my first MISA event", first pass. */
+function asNew(identity: Identity) {
+  return { ...identity, declaredNew: true, confirmed: false };
+}
+
+/** ...and confirmed on the review screen. The only path that can create. */
+function confirmedNew(identity: Identity) {
+  return { ...identity, declaredNew: true, confirmed: true };
+}
+
 async function attendanceRows(filter: {
   eventId?: string | null;
   memberId?: string;
@@ -40,6 +62,19 @@ async function attendanceRows(filter: {
   return data;
 }
 
+/**
+ * Whole-table counts. Test files never run concurrently (fileParallelism is
+ * false) and `it`s within a file are serial, so these are stable — which makes
+ * "nothing was written anywhere" an assertion rather than an inference.
+ */
+async function countRows(table: "attendance" | "members"): Promise<number> {
+  const { count, error } = await db
+    .from(table)
+    .select("id", { count: "exact", head: true });
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
 describe("window resolution", () => {
   it("during the window with a known member → present on the correct event", async () => {
     const slot = claimSlot();
@@ -50,7 +85,7 @@ describe("window resolution", () => {
     const identity = testIdentity();
     const memberId = await createTestMember(db, track, identity);
 
-    const result = await resolveCheckin(db, identity, at(slot, 18.5));
+    const result = await resolveCheckin(db, returning(identity), at(slot, 18.5));
 
     expect(result).toEqual({ status: "present", eventTitle: event.title });
     const rows = await attendanceRows({ eventId: event.id });
@@ -68,7 +103,7 @@ describe("window resolution", () => {
     const identity = testIdentity();
     const memberId = await createTestMember(db, track, identity);
 
-    const result = await resolveCheckin(db, identity, at(slot, 17));
+    const result = await resolveCheckin(db, returning(identity), at(slot, 17));
 
     expect(result).toEqual({ status: "pending" });
     const rows = await attendanceRows({ memberId });
@@ -86,7 +121,7 @@ describe("window resolution", () => {
     const identity = testIdentity();
     await createTestMember(db, track, identity);
 
-    const result = await resolveCheckin(db, identity, at(slot, 18));
+    const result = await resolveCheckin(db, returning(identity), at(slot, 18));
 
     expect(result).toEqual({ status: "present", eventTitle: event.title });
   });
@@ -100,7 +135,7 @@ describe("window resolution", () => {
     const identity = testIdentity();
     const memberId = await createTestMember(db, track, identity);
 
-    const result = await resolveCheckin(db, identity, at(slot, 19));
+    const result = await resolveCheckin(db, returning(identity), at(slot, 19));
 
     // No open event at 19:00 sharp, but well within the grace window.
     expect(result).toEqual({ status: "pending" });
@@ -117,7 +152,7 @@ describe("window resolution", () => {
     const identity = testIdentity();
     await createTestMember(db, track, identity);
 
-    const result = await resolveCheckin(db, identity, at(slot, 20));
+    const result = await resolveCheckin(db, returning(identity), at(slot, 20));
 
     expect(result).toEqual({ status: "pending" });
   });
@@ -132,13 +167,13 @@ describe("window resolution", () => {
     const memberId = await createTestMember(db, track, identity);
 
     // ends 19:00 + 47h59m → still inside the grace window.
-    const inside = await resolveCheckin(db, identity, at(slot, 19 + 47.98));
+    const inside = await resolveCheckin(db, returning(identity), at(slot, 19 + 47.98));
     expect(inside).toEqual({ status: "pending" });
 
     // ends + 49h → outside: refused, and nothing written — same person, so
     // a regression that still inserted would show up in the row count.
     const before = await attendanceRows({ memberId });
-    const outside = await resolveCheckin(db, identity, at(slot, 19 + 49));
+    const outside = await resolveCheckin(db, returning(identity), at(slot, 19 + 49));
     expect(outside).toEqual({ status: "refused" });
     const after = await attendanceRows({ memberId });
     expect(after).toHaveLength(before.length);
@@ -159,14 +194,18 @@ describe("window resolution", () => {
 
     const atBoundary = testIdentity();
     await createTestMember(db, track, atBoundary);
-    const boundaryResult = await resolveCheckin(db, atBoundary, at(slot, 19));
+    const boundaryResult = await resolveCheckin(
+      db,
+      returning(atBoundary),
+      at(slot, 19)
+    );
     expect(boundaryResult).toEqual({ status: "present", eventTitle: b.title });
 
     const beforeBoundary = testIdentity();
     await createTestMember(db, track, beforeBoundary);
     const justBefore = await resolveCheckin(
       db,
-      beforeBoundary,
+      returning(beforeBoundary),
       new Date(at(slot, 19).getTime() - 1000)
     );
     expect(justBefore).toEqual({ status: "present", eventTitle: a.title });
@@ -188,10 +227,10 @@ describe("duplicates", () => {
     const identity = testIdentity();
     await createTestMember(db, track, identity);
 
-    const first = await resolveCheckin(db, identity, at(slot, 18.2));
+    const first = await resolveCheckin(db, returning(identity), at(slot, 18.2));
     expect(first.status).toBe("present");
 
-    const second = await resolveCheckin(db, identity, at(slot, 18.4));
+    const second = await resolveCheckin(db, returning(identity), at(slot, 18.4));
     expect(second).toEqual({ status: "duplicate", prior: "present" });
 
     expect(await attendanceRows({ eventId: event.id })).toHaveLength(1);
@@ -207,7 +246,10 @@ describe("duplicates", () => {
       starts: at(slot, 18),
       ends: at(slot, 19),
     });
+    // On the roster: check-in no longer creates members on the returning
+    // path, and this test is about the index, not about member resolution.
     const identity = testIdentity();
+    await createTestMember(db, track, identity);
 
     const direct = await db.from("attendance").insert({
       event_id: event.id,
@@ -221,9 +263,8 @@ describe("duplicates", () => {
     });
     expect(direct.error).toBeNull();
 
-    const result = await resolveCheckin(db, identity, at(slot, 18.5));
+    const result = await resolveCheckin(db, returning(identity), at(slot, 18.5));
     expect(result).toEqual({ status: "duplicate", prior: "pending" });
-    await adoptMemberByNormalizedId(db, track, normalizeStudentId(identity.studentId));
 
     expect(await attendanceRows({ eventId: event.id })).toHaveLength(1);
   });
@@ -237,10 +278,10 @@ describe("duplicates", () => {
     const identity = testIdentity();
     const memberId = await createTestMember(db, track, identity);
 
-    const first = await resolveCheckin(db, identity, at(slot, 20));
+    const first = await resolveCheckin(db, returning(identity), at(slot, 20));
     expect(first).toEqual({ status: "pending" });
 
-    const second = await resolveCheckin(db, identity, at(slot, 20.1));
+    const second = await resolveCheckin(db, returning(identity), at(slot, 20.1));
     expect(second).toEqual({ status: "duplicate", prior: "pending" });
 
     expect(await attendanceRows({ memberId })).toHaveLength(1);
@@ -256,12 +297,12 @@ describe("duplicates", () => {
     const memberId = await createTestMember(db, track, identity);
 
     // Too early → orphan queued.
-    const orphan = await resolveCheckin(db, identity, at(slot, 16));
+    const orphan = await resolveCheckin(db, returning(identity), at(slot, 16));
     expect(orphan).toEqual({ status: "pending" });
 
     // During the window → present; the orphan must survive untouched
     // (never auto-resolved, §7 Stage 5 invariant).
-    const present = await resolveCheckin(db, identity, at(slot, 18.5));
+    const present = await resolveCheckin(db, returning(identity), at(slot, 18.5));
     expect(present).toEqual({ status: "present", eventTitle: event.title });
 
     const rows = await attendanceRows({ memberId });
@@ -281,16 +322,19 @@ describe("duplicates", () => {
     const memberId = await createTestMember(db, track, identity);
 
     // Typo'd ID, correct email → email match links to the existing member.
+    // This also guards the ordering `unmatched` could break: the email
+    // fallback has to run before any miss is reported, or this becomes
+    // `unmatched` and the member is turned away instead of recognized.
     const typo = await resolveCheckin(
       db,
-      { ...identity, studentId: `${identity.studentId}9` },
+      returning({ ...identity, studentId: `${identity.studentId}9` }),
       at(slot, 18.2)
     );
     expect(typo.status).toBe("present");
 
     // Correct ID now → different normalized ID, same member. The unique
     // index can't see this one; the (event_id, member_id) guard must.
-    const correct = await resolveCheckin(db, identity, at(slot, 18.4));
+    const correct = await resolveCheckin(db, returning(identity), at(slot, 18.4));
     expect(correct).toEqual({ status: "duplicate", prior: "present" });
 
     const rows = await attendanceRows({ eventId: event.id });
@@ -300,32 +344,6 @@ describe("duplicates", () => {
 });
 
 describe("member resolution", () => {
-  it("unknown ID during a window → member self-registered and present", async () => {
-    const slot = claimSlot();
-    const event = await createTestEvent(db, track, {
-      starts: at(slot, 18),
-      ends: at(slot, 19),
-    });
-    const identity = testIdentity(); // never inserted as a member
-
-    const result = await resolveCheckin(db, identity, at(slot, 18.5));
-    expect(result).toEqual({ status: "present", eventTitle: event.title });
-
-    const normalized = normalizeStudentId(identity.studentId);
-    const { data: member } = await db
-      .from("members")
-      .select("id, source, active, full_name")
-      .eq("normalized_student_id", normalized)
-      .single();
-    await adoptMemberByNormalizedId(db, track, normalized);
-
-    expect(member?.source).toBe("self_checkin");
-    expect(member?.active).toBe(true);
-
-    const rows = await attendanceRows({ eventId: event.id });
-    expect(rows[0].member_id).toBe(member!.id);
-  });
-
   it("typo'd ID with a known email links to the existing member", async () => {
     const slot = claimSlot();
     const event = await createTestEvent(db, track, {
@@ -340,7 +358,7 @@ describe("member resolution", () => {
       studentId: `${identity.studentId}7`, // wrong ID
       email: identity.email.toUpperCase(), // and case-mangled email
     };
-    const result = await resolveCheckin(db, submitted, at(slot, 18.5));
+    const result = await resolveCheckin(db, returning(submitted), at(slot, 18.5));
     expect(result.status).toBe("present");
 
     // Linked to the existing member — no duplicate person created.
@@ -369,9 +387,13 @@ describe("member resolution", () => {
       ` t3-${digits} `,
     ];
 
+    // The literal email is safe only because every call here is `returning()`
+    // and matches by ID — nothing is created. Never reuse it on a confirmed
+    // path: members_email_lower is unique and the local database is not reset
+    // between runs, so one created row would poison every later run.
     const first = await resolveCheckin(
       db,
-      { ...identity, studentId: variants[0], email: "other@example.edu" },
+      returning({ ...identity, studentId: variants[0], email: "other@example.edu" }),
       at(slot, 18.2)
     );
     expect(first.status).toBe("present");
@@ -382,10 +404,266 @@ describe("member resolution", () => {
     for (const variant of variants.slice(1)) {
       const result = await resolveCheckin(
         db,
-        { ...identity, studentId: variant, email: "other@example.edu" },
+        returning({ ...identity, studentId: variant, email: "other@example.edu" }),
         at(slot, 18.5)
       );
       expect(result).toEqual({ status: "duplicate", prior: "present" });
     }
   });
+
+  it("a lookup outage is an error, never `unmatched`", async () => {
+    // The single most damaging way this refactor could go wrong: reporting a
+    // transient database fault as "we don't have that info on file" would
+    // turn a whole room away with no attendance and no trace. `unmatched` has
+    // to mean "definitely not on the roster", not "we couldn't tell".
+    const slot = claimSlot();
+    await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+    const identity = testIdentity();
+    await createTestMember(db, track, identity);
+
+    const result = await resolveCheckin(
+      brokenMemberLookup(),
+      returning(identity),
+      at(slot, 18.5)
+    );
+    expect(result).toEqual({ status: "error" });
+  });
 });
+
+describe("first-time confirmation (§4.2, docs/attend-confirmation-flow.md)", () => {
+  it("no roster match, box unchecked → unmatched, and NOTHING is written", async () => {
+    const slot = claimSlot();
+    await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+    const identity = testIdentity(); // on no roster, by either key
+
+    const attendanceBefore = await countRows("attendance");
+    const membersBefore = await countRows("members");
+
+    const result = await resolveCheckin(db, returning(identity), at(slot, 18.5));
+    expect(result).toEqual({ status: "unmatched" });
+
+    // The assertion that matters most. Checking only the returned status
+    // would pass while the roster quietly grew a row per typo.
+    expect(await countRows("attendance")).toBe(attendanceBefore);
+    expect(await countRows("members")).toBe(membersBefore);
+  });
+
+  it("re-prompting forever still writes nothing", async () => {
+    const slot = claimSlot();
+    await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+
+    const attendanceBefore = await countRows("attendance");
+    const membersBefore = await countRows("members");
+
+    // Someone who cannot get their details right gets no attendance and
+    // leaves no trace — accepted, with officer manual entry as the recovery
+    // path. There is no two-strikes fallback.
+    for (let i = 0; i < 3; i++) {
+      const result = await resolveCheckin(
+        db,
+        returning(testIdentity()),
+        at(slot, 18.5)
+      );
+      expect(result).toEqual({ status: "unmatched" });
+    }
+
+    expect(await countRows("attendance")).toBe(attendanceBefore);
+    expect(await countRows("members")).toBe(membersBefore);
+  });
+
+  it("box checked, unknown → confirmation first, writing nothing", async () => {
+    const slot = claimSlot();
+    await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+    const identity = testIdentity();
+
+    const attendanceBefore = await countRows("attendance");
+    const membersBefore = await countRows("members");
+
+    const result = await resolveCheckin(db, asNew(identity), at(slot, 18.5));
+    expect(result).toEqual({ status: "needs_confirmation", existing: false });
+
+    // Closing the tab at the review screen means it did not happen.
+    expect(await countRows("attendance")).toBe(attendanceBefore);
+    expect(await countRows("members")).toBe(membersBefore);
+  });
+
+  it("box checked, unknown, confirmed → creates the member with exactly the typed values", async () => {
+    const slot = claimSlot();
+    const event = await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+    const identity = testIdentity();
+
+    const result = await resolveCheckin(db, confirmedNew(identity), at(slot, 18.5));
+    expect(result).toEqual({ status: "present", eventTitle: event.title });
+
+    const normalized = normalizeStudentId(identity.studentId);
+    const { data: member } = await db
+      .from("members")
+      .select("id, source, active, full_name, student_id, email")
+      .eq("normalized_student_id", normalized)
+      .single();
+    await adoptMemberByNormalizedId(db, track, normalized);
+
+    expect(member?.source).toBe("self_checkin");
+    expect(member?.active).toBe(true);
+    expect(member?.full_name).toBe(identity.fullName);
+    expect(member?.student_id).toBe(identity.studentId);
+    expect(member?.email).toBe(identity.email);
+
+    const rows = await attendanceRows({ eventId: event.id });
+    expect(rows[0].member_id).toBe(member!.id);
+  });
+
+  it("box checked by an existing member → confirmation says so, then links", async () => {
+    const slot = claimSlot();
+    const event = await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+    const identity = testIdentity();
+    const memberId = await createTestMember(db, track, identity);
+
+    const preview = await resolveCheckin(db, asNew(identity), at(slot, 18.4));
+    expect(preview).toEqual({ status: "needs_confirmation", existing: true });
+
+    const membersBefore = await countRows("members");
+    const confirmed = await resolveCheckin(
+      db,
+      confirmedNew(identity),
+      at(slot, 18.5)
+    );
+    expect(confirmed).toEqual({ status: "present", eventTitle: event.title });
+
+    // The checkbox is a hint, not an instruction: ticking it when you already
+    // exist links you to yourself and must never create a second person.
+    expect(await countRows("members")).toBe(membersBefore);
+    const rows = await attendanceRows({ eventId: event.id });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].member_id).toBe(memberId);
+  });
+
+  it("box checked, matched only by email → still links, never duplicates", async () => {
+    const slot = claimSlot();
+    const event = await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+    const identity = testIdentity();
+    const memberId = await createTestMember(db, track, identity);
+
+    // Right email, ID they've never used here — the email fallback has to be
+    // consulted before the confirmed path is allowed to create.
+    const submitted = { ...identity, studentId: `${identity.studentId}4` };
+    const membersBefore = await countRows("members");
+
+    const preview = await resolveCheckin(db, asNew(submitted), at(slot, 18.4));
+    expect(preview).toEqual({ status: "needs_confirmation", existing: true });
+
+    const confirmed = await resolveCheckin(
+      db,
+      confirmedNew(submitted),
+      at(slot, 18.5)
+    );
+    expect(confirmed).toEqual({ status: "present", eventTitle: event.title });
+
+    expect(await countRows("members")).toBe(membersBefore);
+    const rows = await attendanceRows({ eventId: event.id });
+    expect(rows[0].member_id).toBe(memberId);
+  });
+
+  it("a confirmed first-timer outside a window still queues as an orphan", async () => {
+    const slot = claimSlot();
+    await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+    const identity = testIdentity();
+
+    const result = await resolveCheckin(db, confirmedNew(identity), at(slot, 20));
+    expect(result).toEqual({ status: "pending" });
+
+    const normalized = normalizeStudentId(identity.studentId);
+    await adoptMemberByNormalizedId(db, track, normalized);
+    const { data: member } = await db
+      .from("members")
+      .select("id")
+      .eq("normalized_student_id", normalized)
+      .single();
+
+    const rows = await attendanceRows({ memberId: member!.id });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].event_id).toBeNull();
+  });
+
+  it("refusal wins over both new states — the oracle is closed off-season", async () => {
+    const slot = claimSlot();
+    await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+    });
+
+    const membersBefore = await countRows("members");
+
+    // Outside the grace window there is no event to attend, so neither a
+    // re-prompt nor a review screen is reachable — and a probe learns nothing
+    // about who is on the roster.
+    const far = at(slot, 19 + 49);
+    expect(await resolveCheckin(db, returning(testIdentity()), far)).toEqual({
+      status: "refused",
+    });
+    expect(await resolveCheckin(db, asNew(testIdentity()), far)).toEqual({
+      status: "refused",
+    });
+    expect(await resolveCheckin(db, confirmedNew(testIdentity()), far)).toEqual({
+      status: "refused",
+    });
+
+    expect(await countRows("members")).toBe(membersBefore);
+  });
+});
+
+type BrokenBuilder = {
+  select: () => BrokenBuilder;
+  eq: () => BrokenBuilder;
+  ilike: () => BrokenBuilder;
+  maybeSingle: () => Promise<{ data: null; error: { message: string } }>;
+};
+
+/**
+ * The real client with `from("members")` replaced by a builder that always
+ * errors. Everything else — the event RPCs, the attendance table — still
+ * reaches the local stack, so the failure is isolated to the member lookup.
+ */
+function brokenMemberLookup(): typeof db {
+  const broken: BrokenBuilder = {
+    select: () => broken,
+    eq: () => broken,
+    ilike: () => broken,
+    maybeSingle: async () => ({
+      data: null,
+      error: { message: "simulated members outage" },
+    }),
+  };
+
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (prop !== "from") return Reflect.get(target, prop, receiver);
+      return (table: string) =>
+        table === "members" ? broken : target.from(table as "attendance");
+    },
+  }) as typeof db;
+}

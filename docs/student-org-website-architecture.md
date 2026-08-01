@@ -1,8 +1,39 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.21
+**Version:** 1.22
 **Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phases 1–3 of 5 built
 **Last updated:** July 2026
+
+> **v1.22: `/attend` asks whether you're new.** Check-in resolved a member by
+> exact match and then *created* one, which made someone who mistyped both their
+> ID and their email literally the same insert as a genuinely new person. Typos
+> became roster rows, and §7's Stage 6 notes record that nothing merges them. The
+> form now carries one checkbox — "this is my first MISA event" — which supplies
+> the one bit of information the system cannot derive, and the system stops
+> guessing on its own. 190 tests across 9 files. Decisions now normative:
+>
+> - **Member lookup and member creation are separate operations.** `resolveCheckin`
+>   only ever looks a member up. Creating one happens behind an explicit
+>   confirmation, and is the single unauthenticated `members` insert in the system.
+> - **An unmatched submission is discarded, not queued**, however many times it
+>   fails. There is no two-strikes fallback. This narrows §4.2's "nothing is ever
+>   dropped on the floor" to submissions resolving to a *known* member — see the
+>   note below, and the accepted cost.
+> - **The checkbox is a hint, not an instruction.** Ticking it when you already
+>   exist links you to yourself; the lookup always runs first and a duplicate is
+>   never created.
+> - **The membership oracle is accepted, and it contradicts §6's login stance on
+>   purpose.** The re-prompt says "we don't have that info on file", so anyone can
+>   probe a student ID for roster membership. Officer sign-in deliberately returns
+>   one identical failure for "wrong password" and "no such user"; the two look
+>   inconsistent unless the difference is written down. The roster is a club list,
+>   not a security boundary, and UT student IDs are semi-public. Event resolution
+>   runs first, so the oracle is closed entirely outside check-in windows.
+> - **`RATE_LIMIT_MAX` 30 → 90.** A first-timer now spends two slots and the
+>   re-prompt invites retries; at a recruiting event behind one venue NAT the old
+>   number would have admitted barely fifteen people.
+>
+> Full spec, decision table, and consequences: `docs/attend-confirmation-flow.md`.
 
 > **v1.21: Stage 5 phases 2 and 3.** The submission detail screen and every
 > review mutation — resolve, approve, reject, reopen, bulk assign, manual entry
@@ -708,7 +739,8 @@ create table admin_profiles (
 
 ### 4.2 Design notes
 
-- **Nothing is ever dropped on the floor.** `attendance` stores the raw submission *and* the resolved links separately. A member who forgets to check in during the window, typos their ID, or isn't on the roster yet still produces a row — it just arrives as `pending` instead of `present`. A member who showed up and got no credit is the failure mode that erodes trust in the whole system, so the schema is built to make that outcome impossible.
+- **Nothing that resolves to a known member is ever dropped on the floor.** `attendance` stores the raw submission *and* the resolved links separately. A member who forgets to check in during the window, or typos an ID the email lookup still recognizes, produces a row — it just arrives as `pending` instead of `present`. A member who showed up and got no credit is the failure mode that erodes trust in the whole system, so the schema is built to make that outcome impossible.
+  - **Narrowed in v1.22 for the member half.** Someone the roster does not recognize *at all*, who did not tick "first time", produces nothing — see the self-registration bullet below. The event half is unchanged: an unresolved event link is always queued.
 - **Two independent failure modes, one status.** A pending row is missing an event link, a member link, or both. The admin UI distinguishes them; the database doesn't need to, because `present_requires_resolution` guarantees a row can't count until both are filled in.
 - **`present_requires_resolution` is the load-bearing constraint.** It means the leaderboard query can trust `status = 'present'` without re-checking for nulls, and an officer cannot approve a half-resolved row by mistake.
 - **`normalized_student_id`** is a generated column stripping whitespace, hyphens, and casing. Duplicate detection and roster matching both key off it, so `ut-12345`, `UT 12345`, and `UT12345` are the same person.
@@ -721,9 +753,22 @@ create table admin_profiles (
 - **Negative adjustments are allowed**, which makes this one mechanism for bonuses, penalties, and corrections rather than three.
 - **One audit table, not several.** `admin_audit` keys on `(entity_type, entity_id)` so event edits, point grants, and attendance overrides all land in the same place. This makes "show me everything this officer did last month" a single query.
 - **`checkin_opens_at` / `checkin_closes_at`** decouple the check-in window from the event's actual time — useful for a grace period for late arrivals. Widening these is the *preferred* fix for a systematically late crowd; manual override is for individuals.
-- **Self-registration is resolution order, not a separate flow.** A check-in resolves its member link by trying, in order: `normalized_student_id`, then `lower(email)`. Only if both miss is a new member created, with `source = 'self_checkin'`. Matching on email second is what contains the common failure — someone who typos their student ID is recognized by their email and linked to their existing record instead of becoming a duplicate person. A member created this way is immediately `active` and counts on the leaderboard; there is no approval step.
+- **Member lookup is resolution order; creating a member is a separate, confirmed step** (v1.22). A check-in resolves its member link by trying, in order: `normalized_student_id`, then `lower(email)`. Matching on email second is what contains the common failure — someone who typos their student ID is recognized by their email and linked to their existing record instead of becoming a duplicate person.
+
+  What happens when *both* miss depends on one checkbox on the form, "this is my first MISA event":
+
+  | Member lookup | First-time box | Written? | Screen |
+  |---|---|---|---|
+  | Matched by `normalized_student_id` | unchecked | yes, immediately | Success |
+  | Matched by `lower(email)` | unchecked | yes, immediately | Success |
+  | No match | unchecked | **nothing** | "We don't have that info on file" + re-prompt |
+  | Matched (either key) | checked | not yet | Review → confirm **links** the existing member |
+  | No match | checked | not yet | Review → confirm **creates** the member + writes |
+
+  Earlier versions created a member unconditionally on a double miss, which made a double typo indistinguishable from a new person — they were literally the same insert. The checkbox supplies the one bit the system cannot derive, so it only has to guess when the claim and the roster disagree, and it no longer guesses silently. A member created this way is still immediately `active` with `source = 'self_checkin'`; there is no approval step. Nothing is persisted between the two passes — the confirm step re-derives the whole outcome from its payload rather than trusting a token, which is why this needed no migration.
 - **`members.source`** distinguishes admin-seeded from self-registered rows. Officers filter the directory by it to review who the form has added, which is the cleanup path for junk rows. Self-registration writes no `admin_audit` row — there is no acting officer, and `source` plus `joined_at` already record it.
-- **The residual risk is a typo in *both* ID and email**, which creates a genuine duplicate person. Rare, visible in the directory, and merged by an officer. This was accepted deliberately in exchange for zero-friction check-in at recruiting events.
+- **The residual risk moved** (v1.22). A typo in *both* ID and email no longer creates a duplicate person — it is refused and re-prompted. The cost is on the other side: **someone who never gets their details right gets no attendance and leaves no trace.** No row, no queue entry, nothing for an officer to find later. The recovery path is officer manual entry at `/admin/attendance/new` (§7 Stage 5 phase 3), and it only works if officers are told it exists. A duplicate is still reachable by ticking "first time" *and* typing badly, so Stage 6's merge tool is smaller in expectation but not unnecessary.
+- **A window that closes mid-correction changes the outcome.** Nothing is written until the submission succeeds, so the event is resolved at the moment of the *final* submit. Someone correcting a typo across a window boundary can land as an orphan, or be refused. Accepted, and recorded rather than discovered.
 
 ### 4.3 Event-window resolution
 
@@ -782,6 +827,8 @@ $$;
 The three-way `case` matters: a timestamp *inside* an event's run has a gap of zero, not a negative one. A two-branch version returns `starts_at - ts` for that case, which sorts genuinely-concurrent events *below* distant ones and puts the wrong suggestion at the top of the officer's list.
 
 If `nearby_events()` returns nothing, the check-in is refused outright with a message. If it returns rows, the submission is stored as `pending` and those rows become the ranked suggestions an officer sees in the review queue.
+
+**Event resolution runs before member resolution, and refusal short-circuits it** (v1.22). Nothing about the submitter is looked up until an event or a grace window has been established, which is worth stating because it is load-bearing twice over: a refused submission touches the roster not at all, and the membership oracle §6 accepts (§4.2's re-prompt tells you whether an ID is on the roster) is closed entirely outside check-in windows. Someone probing student IDs in July learns only that there is no event on.
 
 Two properties of this function shape the review screen, and both are easy to get wrong (v1.20):
 
@@ -1012,7 +1059,8 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Check-in on behalf of someone else | Accepted risk for v1 — same as a paper sign-in sheet. Mitigate later with a rotating per-event code displayed at the venue. |
 | Attendance data enumeration | `/lookup` requires student ID **and** matching email before returning history |
 | Roster PII exposure | Emails and student IDs never returned to unauthenticated clients under any route |
-| Roster pollution via self-registration | The check-in form can create members (§4.2), so junk rows are reachable by anyone who can submit during an open window. Bounded by the window, honeypot, and rate limit; contained by matching on email before creating; visible via `members.source = 'self_checkin'` in the directory. Impact is cleanup, not data loss. |
+| Roster pollution via self-registration | The check-in form can create members (§4.2), so junk rows are reachable by anyone who can submit during an open window. Bounded by the window, honeypot, and rate limit; contained by matching on ID and then email before creating, and since v1.22 by requiring an explicit "this is my first MISA event" claim plus a confirmation pass. Visible via `members.source = 'self_checkin'` in the directory. Impact is cleanup, not data loss. **Note what the confirmation is:** a guard against honest typos, not a control. A scripted POST carrying `step=confirm` creates a member in one request without the review screen ever rendering — correct, because the server re-derives the whole outcome rather than trusting the previewed payload, but it means the throttle is still the only thing standing in an attacker's way. |
+| Roster membership is probeable | **Accepted, and it contradicts the officer-login row on purpose** (v1.22). §4.2's re-prompt says "we don't have that info on file", so anyone submitting during a check-in window learns whether a given student ID is on the roster. Officer sign-in deliberately does the opposite — one identical failure for "wrong password" and "no such user" — and the two will read as an inconsistency to whoever finds them next unless the difference is written down. The roster is a club list, not a security boundary, and UT student IDs are semi-public; the alternative was an indistinguishable failure that gives a member with a typo no way to tell what went wrong. Bounded three ways: event resolution runs first, so the oracle is closed outside check-in windows entirely; the per-IP throttle applies to both passes; and the answer is a bare boolean — no name, email, or ID of the matched member ever reaches the client, including on the confirmation screen. |
 | Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. Triggers reject `UPDATE` and `DELETE`, so the log is append-only for the app and every client role. **Note the limit:** a table owner can disable the trigger, so this constrains the application, not someone with direct database access. Stage 8's RLS policies are what close the client-role path properly. |
 | Bulk roster export leaks member PII | Export is the largest PII egress point in the system. Gate it behind an authenticated session, log every export to `admin_audit` with the filter used and row count, and consider restricting it to the `admin` role. |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
@@ -1089,7 +1137,7 @@ contact form's backend — it renders disabled, with email as the working path.
 
 - `/attend` form: name, student ID, email — live, linked from the nav and the home page's events section
 - Server Action `submitCheckin` (`app/actions/attendance.ts`) resolving via `open_event_at()`; the testable core is `resolveCheckin` in `lib/checkin.ts`, using the service-role client (`lib/supabase/admin.ts`, guarded by `server-only`)
-- Both links resolved → `present`. Because self-registration always resolves a member, the only pending rows this action produces are **orphans** (no event link); the member sees the received-awaiting-review message
+- Both links resolved → `present`. Every submission this action *writes* has a member link — matched, or created behind the v1.22 confirmation — so the only pending rows it produces are **orphans** (no event link); the member sees the received-awaiting-review message
 - No published event within the 48-hour orphan window → refused outright, nothing written
 - Success, pending, duplicate (prior-aware), refused, invalid, rate-limited, and error states all render distinctly
 - Honeypot field + per-IP rate limiting via `checkin_throttle` (see the v1.18 changelog for both mechanisms and the duplicate rule)
@@ -1218,7 +1266,9 @@ contact form's backend — it renders disabled, with email as the working path.
 
 **Two consequences of §4.2's exact-match check-in land here** (recorded v1.21, while building Stage 5). Neither is a defect in the check-in path — both are the deliberate design's bill, and the directory is where it comes due.
 
-**1. Duplicate members accumulate, and nothing merges them.** `resolveMember` matches on `normalized_student_id`, then `lower(email)`, then *creates*. A member who mistypes **both** their ID and their email is indistinguishable from a genuinely new person — the two are the same insert — so a new row appears. That is the right call at check-in time (a wrong fuzzy match silently credits one member's attendance to another, which corrupts real data; a spurious member is roster pollution, i.e. cleanup rather than loss) but it means ghosts accrue, and someone who mistypes repeatedly can leave several. They are findable: `members.source = 'self_checkin'` marks every auto-created row. What is missing is the merge itself, and it is not trivial — merging must repoint `attendance.member_id` and `point_adjustments.member_id`, and can hit `attendance_one_per_event` when both identities attended the same event, which is a real conflict needing a decision (keep one, reject the other) rather than a silent drop. Expect a preview-and-confirm flow like the CSV import, and one `admin_audit` row naming both sides.
+**1. Duplicate members still accumulate, and nothing merges them — but the main source is gone** (revised v1.22). Check-in used to match on `normalized_student_id`, then `lower(email)`, then *create*, so a member who mistyped **both** was indistinguishable from a genuinely new person — the two were the same insert — and someone mistyping repeatedly could leave several ghosts. Under §4.2's confirmation flow that submission is refused and re-prompted, writing nothing. What remains is narrower: someone who ticks "this is my first MISA event" *and* types badly, which is a single row rather than a stream, plus the officer-queued collision noted below. Ghosts stay findable — `members.source = 'self_checkin'` marks every auto-created row. What is still missing is the merge itself, and it is not trivial: merging must repoint `attendance.member_id` and `point_adjustments.member_id`, and can hit `attendance_one_per_event` when both identities attended the same event, which is a real conflict needing a decision (keep one, reject the other) rather than a silent drop. Expect a preview-and-confirm flow like the CSV import, and one `admin_audit` row naming both sides. Smaller in expectation than it was, so it can follow the directory rather than gate it.
+
+**1a. A confirmed first-timer can leave a member row with no attendance.** If an officer has already queued a manual row carrying that student ID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`, leaving a `self_checkin` row credited with nothing. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check, against §4.2's "three checks, not one". Another row for the directory to surface, and another reason merge tooling should assume the roster is untidy.
 
 **2. A valid-but-wrong student ID silently credits the wrong member.** The ID lookup runs *before* the email lookup, so someone who mistypes into **another member's** real student ID is recorded as that person, even though their own email was correct and would have matched. It is rare and it is not obviously fixable by reordering — people mistype and share emails too, so email-first trades one silent mis-credit for another — but it is the one path where the exact-match design attributes attendance to the wrong human with nothing surfaced to anyone. The directory is where it would be noticed ("why does this member have an event they didn't attend?"), so the member detail page should make a member's attendance easy to scan, and any merge tooling should assume mis-credits exist. Revisit if it ever actually happens; a cheap partial mitigation is to flag, at check-in, when the matched member's email differs from the submitted one.
 
@@ -1319,7 +1369,7 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 
 The five that affect the schema. Decided together; the schema in §4 reflects them.
 
-2. **Roster policy** — ✅ **Self-registering, no confirmation.** An unrecognized student ID at check-in creates an active member immediately. Resolution order is `normalized_student_id`, then `lower(email)`, then create; matching on email second contains the common typo case. `members.source` marks self-registered rows for review. Accepted residual risk: a typo in both ID *and* email creates a duplicate person, merged by an officer. Chosen for zero-friction check-in at recruiting events.
+2. **Roster policy** — ✅ **Self-registering, confirmed by the member** (revised v1.22; originally "self-registering, no confirmation"). Lookup order is `normalized_student_id`, then `lower(email)`; matching on email second contains the common typo case. What happens when both miss depends on the member's own "this is my first MISA event" claim: ticked, they confirm their details on a review screen and are added immediately as `source = 'self_checkin'`, active, with no officer approval; unticked, nothing is written and they are re-prompted. The original decision created a member unconditionally, which made a double typo and a genuinely new person the same insert. The residual risk moved with it — no longer a duplicate person, but someone who cannot get their details right getting no attendance at all, recovered by officer manual entry. `members.source` still marks self-registered rows for review. Zero-friction check-in at recruiting events is preserved for everyone the roster already knows: their path is unchanged and still a single submit.
 3. **Points weighting** — ✅ **Per-event `points`, default 1.** Flat scoring in practice, weighting available without a migration.
 4. **Semester boundaries** — ✅ **One leaderboard, current term only, terms derived from dates.** One row per member ranked on a single `total_points` figure with no attendance/bonus breakdown; ties alphabetical. `events.term` is a generated column computing `'Fall YYYY'` / `'Spring YYYY'` from `starts_at` (§4.7), so terms are never typed and rollover happens on its own each August and January. `app_settings.current_term` is a nullable override for pinning the board on a finished term. This reverses the split-column position earlier versions argued for; see §4.4 for what that costs and where the oversight moved.
 5. **Excused absences** — ✅ **Deferred to post-v1.** Attendance rate stays raw `attended / possible`. `point_adjustments` already handles the standing side with a required reason, so the gap is cosmetic rather than punitive.

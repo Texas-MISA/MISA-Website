@@ -1,7 +1,17 @@
 # `/attend` — first-time checkbox and conditional confirmation
 
-**Status:** designed and approved, **not built**. Decided 2026-07-31.
-Implement against this document; it is the spec.
+**Status:** **built** 2026-07-31, same day it was decided. This document remains
+the reference for *why*; `lib/checkin.ts`, `app/actions/attendance.ts`, and
+`app/(public)/attend/_components/checkin-form.tsx` are the implementation, and
+`tests/checkin.test.ts` covers every row of the decision table below. The
+normative summary now lives in the architecture doc (§4.2, §4.3, §6, v1.22).
+
+One deliberate departure from the plan as written, decided while building:
+**`RATE_LIMIT_MAX` rose from 30 to 90.** Verification item 5 requires the confirm
+step to be throttled like any other submission, so a first-timer spends two slots
+and the re-prompt invites retries — at a recruiting event behind one venue NAT the
+old number would have admitted barely fifteen people. Raising the ceiling was the
+only lever that did not weaken the property.
 
 ## Context
 
@@ -36,7 +46,8 @@ implementing; raise them separately if they turn out to be wrong.
 - **An unconfirmed first-timer is never written.** Closing the tab at the review
   screen means it did not happen.
 - **Failed lookups are not logged.** The existing per-IP `checkin_throttle`
-  (30 per 10 minutes) is the only abuse control.
+  is the only abuse control. (It was 30 per 10 minutes when this was written;
+  building it raised the ceiling to 90 — see the status note above.)
 
 ## The decision table
 
