@@ -1,13 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { MEMBER_SCAN_LIMIT } from "@/lib/attendance";
 import { requireOfficer } from "@/lib/auth";
 import { fetchEventOptions } from "@/lib/event-options";
 import { toCentralFields } from "@/lib/events";
+import { fetchMemberOptions } from "@/lib/member-options";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-import type { MemberOption } from "../[id]/_components/resolution-form";
 
 import { ManualEntryForm } from "./_components/manual-entry-form";
 
@@ -16,26 +14,6 @@ import { ManualEntryForm } from "./_components/manual-entry-form";
 // forever, which matters when reading the ledger back a year later.
 
 export const metadata: Metadata = { title: "Add a check-in" };
-
-async function fetchMemberOptions(): Promise<MemberOption[]> {
-  const db = createAdminClient();
-  const { data, error } = await db
-    .from("members")
-    .select("id, full_name, student_id, active")
-    .eq("active", true)
-    .order("full_name")
-    .limit(MEMBER_SCAN_LIMIT);
-
-  if (error) {
-    console.error("member options query failed:", error.message);
-    return [];
-  }
-  return data.map((member) => ({
-    id: member.id,
-    label: `${member.full_name} (${member.student_id})`,
-    active: member.active,
-  }));
-}
 
 export default async function NewAttendancePage({
   searchParams,
@@ -54,7 +32,7 @@ export default async function NewAttendancePage({
 
   const [events, members] = await Promise.all([
     fetchEventOptions(createAdminClient()),
-    fetchMemberOptions(),
+    fetchMemberOptions(createAdminClient()),
   ]);
 
   // Defaults computed on the server, in Central. A `new Date()` in the browser

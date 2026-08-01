@@ -7,8 +7,7 @@ import {
   type ManualEntryState,
 } from "@/app/actions/attendance-review";
 import type { EventOption } from "@/lib/event-options";
-
-import type { MemberOption } from "../../[id]/_components/resolution-form";
+import type { MemberOption } from "@/lib/member-options";
 
 // Manual entry (§4.2): the paper-sheet case, and the one place attendance is
 // created by an officer rather than by a member.

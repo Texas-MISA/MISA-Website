@@ -17,12 +17,10 @@ import { requireOfficer } from "@/lib/auth";
 import { normalizeStudentId, ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 import { fetchEventOptions } from "@/lib/event-options";
 import { formatInstant } from "@/lib/events";
+import { fetchMemberOptions } from "@/lib/member-options";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-import {
-  ResolutionForm,
-  type MemberOption,
-} from "./_components/resolution-form";
+import { ResolutionForm } from "./_components/resolution-form";
 import {
   buildEventSuggestions,
   EventSuggestions,
@@ -174,31 +172,6 @@ async function fetchMemberSuggestions(
   );
 }
 
-/** Every active member, plus whoever is currently linked even if they have been
- * deactivated since — dropping them from the list would silently unlink them on
- * the next save. */
-async function fetchMemberOptions(
-  linkedId: string | null
-): Promise<MemberOption[]> {
-  const db = createAdminClient();
-  const { data, error } = await db
-    .from("members")
-    .select("id, full_name, student_id, active")
-    .or(linkedId ? `active.eq.true,id.eq.${linkedId}` : "active.eq.true")
-    .order("full_name")
-    .limit(MEMBER_SCAN_LIMIT);
-
-  if (error) {
-    console.error("member options query failed:", error.message);
-    return [];
-  }
-  return data.map((member) => ({
-    id: member.id,
-    label: `${member.full_name} (${member.student_id})${member.active ? "" : " — inactive"}`,
-    active: member.active,
-  }));
-}
-
 export default async function SubmissionDetailPage({
   params,
   searchParams,
@@ -227,7 +200,9 @@ export default async function SubmissionDetailPage({
       fetchEventSuggestions(submission.submitted_at),
       fetchMemberSuggestions(submission),
       fetchEventOptions(createAdminClient()),
-      fetchMemberOptions(submission.member_id),
+      fetchMemberOptions(createAdminClient(), {
+        includeId: submission.member_id,
+      }),
     ]);
 
   const warnings = previewResolution({

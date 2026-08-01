@@ -356,6 +356,57 @@ export async function createTestAttendance(
 }
 
 /**
+ * A point adjustment that teardown will actually remove.
+ *
+ * cleanup() has no `point_adjustments` pass and does not need one:
+ * `member_id` is `on delete cascade`, so deleting a tracked member takes its
+ * adjustments with it. That only holds if every adjustment points at a tracked
+ * member — one written against a **seed** member survives teardown forever and
+ * then shows up in the leaderboard, the directory, and the ledger of every
+ * later run, quietly shifting totals that other tests assert on. So the check
+ * below is a hard throw rather than a comment: the failure it prevents is one
+ * that surfaces in a different file, days later.
+ */
+export async function createTestAdjustment(
+  db: SupabaseClient<Database>,
+  track: Tracker,
+  row: {
+    memberId: string;
+    points: number;
+    awardedBy: string;
+    reason?: string;
+    category?: string;
+    eventId?: string | null;
+  }
+): Promise<{ id: string; term: string }> {
+  if (!track.memberIds.includes(row.memberId)) {
+    throw new Error(
+      "point_adjustments are cleaned up only via the member cascade, so this " +
+        "must target a tracked member (createTestMember). Writing one against " +
+        "a seed member leaves it behind permanently."
+    );
+  }
+
+  const { data, error } = await db
+    .from("point_adjustments")
+    .insert({
+      member_id: row.memberId,
+      points: row.points,
+      reason: row.reason ?? "TEST adjustment",
+      category: row.category ?? "other",
+      event_id: row.eventId ?? null,
+      awarded_by: row.awardedBy,
+      // No `term`: it defaults to current_term() and is read back (§4.7).
+    })
+    .select("id, term")
+    .single();
+  if (error) {
+    throw new Error(`fixture adjustment insert failed: ${error.message}`);
+  }
+  return data;
+}
+
+/**
  * Members created *by the code under test* (self-registration) aren't in the
  * tracker at creation time; call this after asserting to adopt them so
  * cleanup removes them too.

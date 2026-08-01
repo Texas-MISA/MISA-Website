@@ -7,7 +7,7 @@ import {
   summarizeGrant,
 } from "@/lib/points";
 
-// Pure suite — the database half lives in tests/point-actions.test.ts.
+// Pure suite — the database half is tests/point-actions.test.ts.
 
 describe("POINT_CATEGORIES", () => {
   it("matches the CHECK constraint on point_adjustments.category", () => {

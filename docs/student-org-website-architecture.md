@@ -1,8 +1,37 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.22
-**Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phases 1–3 of 5 built
+**Version:** 1.23
+**Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phases 1–4 of 5 built
 **Last updated:** July 2026
+
+> **v1.23: `/admin/points` — granting, the ledger, and voiding.** Stage 5 phase 4,
+> the last functional piece of the stage; only the doc pass remains. Needed no
+> migration: §4.2's `point_adjustments` and migration 13's `void_requires_reason`
+> already carried everything. 208 tests across 10 files. Decisions now normative:
+>
+> - **A multi-member grant is one atomic insert, all-or-nothing** — the deliberate
+>   exception to §7's "bulk actions report partial success". That rule is right for
+>   `bulkAssignEvent`, which operates on rows that already exist, so a skipped
+>   submission stays visibly in the queue. A partial *grant* has no such backstop:
+>   eleven of twelve members credited, the officer told it worked, and the twelfth
+>   finds out a month later. A bad member id therefore costs the whole grant, and
+>   an oversized selection is refused rather than truncated to the cap.
+> - **The multi-member picker filters a scanned roster client-side.** The
+>   `?q=…&sel=…` URL scheme `tasks.md` previously sketched is
+>   withdrawn: it existed to survive a navigation, and a client-side filter over
+>   the already-scanned roster has no navigation to survive. What replaces it is
+>   two rules — the payload rides on hidden inputs rather than the filtered
+>   list's checkboxes, and no member is ever mounted twice — because both failure
+>   modes produce a partial grant that reports success.
+> - **Both sides of an audit before/after must select the same columns.** The
+>   trail diffs the union of their keys and renders a one-sided key as `—`, so a
+>   narrower select on an update invents changes that never happened. Found in the
+>   browser: voiding read as though it had erased the reason and the awarding
+>   officer.
+> - **§9 #9 and #10 needed no code.** No role check and no self-grant check exist
+>   in `grantPoints`, and its header says so, so neither is added back later as a
+>   missing safeguard. `MAX_POINTS_PER_GRANT` stays a fat-finger guard, not a
+>   policy cap.
 
 > **v1.22: `/attend` asks whether you're new.** Check-in resolved a member by
 > exact match and then *created* one, which made someone who mistyped both their
@@ -767,7 +796,7 @@ create table admin_profiles (
 
   Earlier versions created a member unconditionally on a double miss, which made a double typo indistinguishable from a new person — they were literally the same insert. The checkbox supplies the one bit the system cannot derive, so it only has to guess when the claim and the roster disagree, and it no longer guesses silently. A member created this way is still immediately `active` with `source = 'self_checkin'`; there is no approval step. Nothing is persisted between the two passes — the confirm step re-derives the whole outcome from its payload rather than trusting a token, which is why this needed no migration.
 - **`members.source`** distinguishes admin-seeded from self-registered rows. Officers filter the directory by it to review who the form has added, which is the cleanup path for junk rows. Self-registration writes no `admin_audit` row — there is no acting officer, and `source` plus `joined_at` already record it.
-- **The residual risk moved** (v1.22). A typo in *both* ID and email no longer creates a duplicate person — it is refused and re-prompted. The cost is on the other side: **someone who never gets their details right gets no attendance and leaves no trace.** No row, no queue entry, nothing for an officer to find later. The recovery path is officer manual entry at `/admin/attendance/new` (§7 Stage 5 phase 3), and it only works if officers are told it exists. A duplicate is still reachable by ticking "first time" *and* typing badly, so Stage 6's merge tool is smaller in expectation but not unnecessary.
+- **The residual risk moved** (v1.22). A typo in *both* ID and email no longer creates a duplicate person — it is refused and re-prompted. The cost is on the other side: **someone who never gets their details right gets no attendance and leaves no trace.** No row, no queue entry, nothing for an officer to find later. The recovery path is officer manual entry at `/admin/attendance/new` (§7 Stage 5 phase 3), which the queue has linked from its ADD A CHECK-IN button since phase 1 — so the gap is not the page but the **trigger**. An unrecognized submission used to leave a pending row an officer would come across unprompted; now it leaves nothing, and the only signal is a member saying the form won't take their details. A duplicate is still reachable by ticking "first time" *and* typing badly, so Stage 6's merge tool is smaller in expectation but not unnecessary.
 - **A window that closes mid-correction changes the outcome.** Nothing is written until the submission succeeds, so the event is resolved at the moment of the *final* submit. Someone correcting a typo across a window boundary can land as an orphan, or be refused. Accepted, and recorded rather than discovered.
 
 ### 4.3 Event-window resolution
@@ -1037,6 +1066,8 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 /admin/members         Roster directory — sort, filter, select, copy, export
 /admin/members/[id]    Member detail — full history, adjustments, notes
 /admin/points          Point adjustment ledger — every grant, filterable by officer
+/admin/points/new      Grant points to one or more members in a single action
+/admin/points/[id]     Adjustment detail — void it with a reason, and its history
 /admin/attendance      Review queue — all submissions, filterable by status
 /admin/attendance/[id] Submission detail: raw form data, suggestions, override actions
 /admin/audit           Full activity log across all entities
@@ -1189,8 +1220,8 @@ contact form's backend — it renders disabled, with email as the working path.
 | 1 | Migration 13, `lib/attendance.ts`, `lib/points.ts`, zod schemas, audit vocabulary, read-only `/admin/attendance` | ✅ built & verified |
 | 2 | `/admin/attendance/[id]` — raw submission, ranked suggestions, audit trail; still read-only | ✅ built & verified |
 | 3 | Mutations: resolve, approve, reject, reopen, bulk assign, manual entry, all-status event picker | ✅ built & verified |
-| 4 | `/admin/points` — grant, ledger, void | pending |
-| 5 | Docs, invariants, `tasks.md` | pending |
+| 4 | `/admin/points` — grant, ledger, void | ✅ built & verified |
+| 5 | Docs, invariants, `tasks.md` | in progress |
 
 **Everything through phase 2 is read-only**, which is deliberate: the queue and the detail page are worth having on their own — an officer can at least *see* what is unresolved and why — and shipping the reads first means the suggestion ranking gets exercised against real data before any mutation depends on it being right. That paid for itself twice: the ranker's distance-2 problem and a highlight that marked punctuation instead of the differing digit were both found by looking at real rows, while nothing was yet writable.
 
