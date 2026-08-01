@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–4 are complete. Stage 5 (attendance review) is in progress — phases 1 and 2 of 5 built.** Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–4 are complete. Stage 5 (attendance review) is in progress — phases 1–4 of 5 built; only the phase-5 doc pass remains.** Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -13,11 +13,11 @@ Read this before touching anything; it is the state no file can tell you on its 
 | | |
 |---|---|
 | **Branch** | `stage-5-attendance-review` **merged to `main` 2026-07-31** (`a9b10ac`) and pushed. Both branches exist on the remote; keep working on the branch and merge again at the end of each phase. |
-| **Production** | **Stage 5 phases 1–3 are live** on https://misa-website-beta.vercel.app. `/admin/attendance` and `/admin/attendance/new` return 307 to `/admin/login` when signed out (verified). `/admin/points` does **not** exist yet — the nav entry is disabled. |
-| **Database** | All 14 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); `migration list --linked` verified in sync before the merge. Phase 4 needs no new migration. |
-| ⚠️ **Merged mid-stage** | Stage 5 is 3 of 5 phases done. This was merged early, deliberately, so the work is visible in production — not because the stage is finished. Officers using `/admin/attendance` in production can resolve and approve attendance but cannot yet grant points. |
-| **Next task** | **Phase 4 — `/admin/points`.** Phases 1–3 are built and browser-verified as of 2026-07-31. |
-| **Local database** | Carries the phase-3 walkthrough's mutations (an approved row, a reopened one, two bulk assigns, a manual entry, one extra fixture row). `npx supabase db reset` restores the documented seed. |
+| **Production** | **Stage 5 phases 1–3 are live** on https://misa-website-beta.vercel.app. **Phase 4 is built and browser-verified locally but NOT yet merged or deployed** — production still has the Points nav entry disabled and no `/admin/points`. |
+| **Database** | All 14 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); `migration list --linked` verified in sync before the merge. Phase 4 needed no new migration, so nothing has changed here since. |
+| ⚠️ **Merged mid-stage** | Phases 1–3 were merged early, deliberately, so the work is visible in production — not because the stage was finished. Officers using `/admin/attendance` in production can resolve and approve attendance but **cannot yet grant points**: phase 4 is on the branch, unmerged. |
+| **Next task** | **Phase 5 — the doc pass**, then merge the branch and deploy. Phase 4 (`/admin/points`) is built, tested, and browser-verified as of 2026-07-31. |
+| **Local database** | Carries the phase-3 walkthrough's mutations (an approved row, a reopened one, two bulk assigns, a manual entry, one extra fixture row) **and phase 4's** (three adjustments granted to Amara Osei, Chen Wu, and Tomas Novak, all three since voided). Adjustments are back to 6 live + 3 voided; members and attendance are unchanged. `npx supabase db reset` restores the documented seed. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
 
@@ -304,16 +304,32 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 **One doc correction:** the note that the seed's `Mira Petrova` row is the live 23505-on-reopen case is **wrong**. `seed.sql` inserts that rejected row only `where not exists` a non-rejected row for the same member and event, so its slot is by construction free and it reopens cleanly. The collision is real and covered by `tests/attendance-review.test.ts`, which builds the contested pair explicitly — but it cannot be reproduced from seed data.
 
-### Phase 4 — `/admin/points`
+### ✅ Phase 4 — `/admin/points` (2026-07-31, browser-verified)
 
-- [x] ~~Decide §9 #9 and #10 first~~ — both resolved 2026-07-31: no grant restrictions, self-grants allowed. So `grantPoints` needs **no** role check and **no** self-grant check.
-- [ ] Grant (multi-member, one atomic insert, `term` read back never sent), ledger with filters, void-with-reason
-- [ ] Member picker carrying selection in the URL (`?q=…&sel=…`) — forms can't nest, so a search is a navigation and hidden inputs would drop every pick from a previous query
+- [x] ~~Decide §9 #9 and #10 first~~ — both resolved 2026-07-31: no grant restrictions, self-grants allowed. `grantPoints` carries **no** role check and **no** self-grant check, and says so in its header so neither gets added back as an "oversight".
+- [x] `app/actions/points.ts` — `grantPoints` (multi-member, **one atomic insert**, `term` in the `.select()` only and never in the payload) and `voidAdjustment` (guarded on `.is("voided_at", null)`, no CAS token — the table has no `updated_at` and needs none). Two exports and no more: there is no update path and no delete.
+- [x] Ledger at `/admin/points` with officer / category / member / date-range / state filters; grant at `/admin/points/new`; adjustment detail at `/admin/points/[id]` with the void form and the shared `AuditTrail`. Nav entry unlocked in the same commit as the page.
+- [x] `lib/member-options.ts` — extracted first, in its own commit. `fetchMemberOptions` was duplicated in `attendance/new/page.tsx` and `attendance/[id]/page.tsx` and the copies had drifted; the grant picker was the third caller.
+- [x] **26 new tests** (208 total), lint and build clean
+
+**The member picker does NOT carry selection in the URL.** The `?q=…&sel=…` scheme sketched here previously is superseded. Its whole purpose was to survive a navigation — but the roster already arrives as a bounded scan (`MEMBER_SCAN_LIMIT`, and *why* it is a scan rather than an ILIKE probe is recorded on that constant), so the filter runs in the browser and **there is no navigation to survive**. The URL scheme would also have put a 50-uuid list in the address bar and made every keystroke a server round trip. Two things the client-side version must get right instead, both of which produce *a partial grant that reports success*:
+
+- **The payload rides on hidden inputs, not the roster list's checkboxes.** Filtering unmounts rows, and an unmounted input is not in the FormData — so typing a new search term after picking would silently drop the earlier picks.
+- **One carrier per id:** the roster list excludes anyone already selected, so no member can be mounted twice (two rows, double points, and no constraint to catch it). `grantPoints` dedupes server-side as the backstop, not as the fix.
+
+**Three defects found in the walkthrough, none of which a test would have caught:**
+
+- 🪤 **The void's audit diff invented changes.** `before` selected more columns than `after`, and `AuditTrail` renders a key missing from one side as `—`, so voiding logged `reason: "Staffed the info booth" → —` and `awarded_by: <uuid> → —` — as though the void had erased the reason and the awarding officer. Both sides now share `AUDITED_ADJUSTMENT_COLUMNS`.
+- 🪤 **An oversized selection was truncated rather than refused.** The dedupe sliced to `MAX_GRANT_MEMBERS` *before* validation, so a hand-rolled POST of 60 ids would have granted silently to the first 50 — the exact partial-grant failure the atomic insert exists to prevent.
+- 🪤 **`AUDITED_ADJUSTMENT_COLUMNS` must be one unbroken literal with `as const`.** PostgREST types the returned row off the string *literal*; `"a, b" + "c"` widens to `string` and collapses the result to an untyped error shape.
 
 ### Phase 5 — docs
 
 - [x] Architecture doc → **v1.20**, `CLAUDE.md` invariants, this file
-- [ ] Final pass once phases 2–4 land
+- [x] Architecture doc → **v1.23** and the `CLAUDE.md` amendments for phase 4 — the atomic-grant exception to the partial-success invariant, the audit-column-symmetry invariant, and the client-side picker superseding `?q=&sel=`
+- [ ] Final read-through of the whole stage, then merge
+
+**Carry into Stage 7:** `revalidatePoints` in `app/actions/points.ts` deliberately does **not** revalidate `/admin` (nothing on the dashboard aggregates points) and cannot yet revalidate `/leaderboard` (the route doesn't exist). Granting and voiding both move public standings, so **that path must be added the day `/leaderboard` ships** — otherwise it is a stale-cache bug discovered three stages later.
 
 **✅ Both test-harness gaps closed in phase 3** — each would have made green tests that prove nothing:
 

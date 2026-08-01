@@ -1,8 +1,37 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.22
-**Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phases 1–3 of 5 built
+**Version:** 1.23
+**Status:** Stages 0–4 complete; Stage 5 (attendance review & manual adjustments) in progress — phases 1–4 of 5 built
 **Last updated:** July 2026
+
+> **v1.23: `/admin/points` — granting, the ledger, and voiding.** Stage 5 phase 4,
+> the last functional piece of the stage; only the doc pass remains. Needed no
+> migration: §4.2's `point_adjustments` and migration 13's `void_requires_reason`
+> already carried everything. 208 tests across 10 files. Decisions now normative:
+>
+> - **A multi-member grant is one atomic insert, all-or-nothing** — the deliberate
+>   exception to §7's "bulk actions report partial success". That rule is right for
+>   `bulkAssignEvent`, which operates on rows that already exist, so a skipped
+>   submission stays visibly in the queue. A partial *grant* has no such backstop:
+>   eleven of twelve members credited, the officer told it worked, and the twelfth
+>   finds out a month later. A bad member id therefore costs the whole grant, and
+>   an oversized selection is refused rather than truncated to the cap.
+> - **The multi-member picker filters a scanned roster client-side.** The
+>   `?q=…&sel=…` URL scheme `tasks.md` previously sketched is
+>   withdrawn: it existed to survive a navigation, and a client-side filter over
+>   the already-scanned roster has no navigation to survive. What replaces it is
+>   two rules — the payload rides on hidden inputs rather than the filtered
+>   list's checkboxes, and no member is ever mounted twice — because both failure
+>   modes produce a partial grant that reports success.
+> - **Both sides of an audit before/after must select the same columns.** The
+>   trail diffs the union of their keys and renders a one-sided key as `—`, so a
+>   narrower select on an update invents changes that never happened. Found in the
+>   browser: voiding read as though it had erased the reason and the awarding
+>   officer.
+> - **§9 #9 and #10 needed no code.** No role check and no self-grant check exist
+>   in `grantPoints`, and its header says so, so neither is added back later as a
+>   missing safeguard. `MAX_POINTS_PER_GRANT` stays a fat-finger guard, not a
+>   policy cap.
 
 > **v1.22: `/attend` asks whether you're new.** Check-in resolved a member by
 > exact match and then *created* one, which made someone who mistyped both their
