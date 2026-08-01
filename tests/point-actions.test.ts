@@ -1,7 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeAudit, writeAuditBatch } from "@/app/actions/audit";
-import { summarizeGrant } from "@/lib/points";
+import {
+  AUDITED_ADJUSTMENT_COLUMNS,
+  MAX_GRANT_MEMBERS,
+  summarizeGrant,
+} from "@/lib/points";
+import { pointGrantSchema } from "@/lib/validation";
 
 import {
   cleanup,
@@ -181,6 +186,29 @@ describe("point_adjustments constraints", () => {
 
     expect(error?.code).toBe("23514");
     expect(error?.message).toContain("void_reason_not_blank");
+  });
+});
+
+describe("an oversized selection is refused, never truncated", () => {
+  it("fails pointGrantSchema rather than granting the first 50", async () => {
+    // grantPoints bounds the id list only to cap what it reflects back, and
+    // that bound sits above MAX_GRANT_MEMBERS on purpose. Truncating to the cap
+    // instead would turn a 60-id POST into a silent grant to 50 — a partial
+    // grant reported as success, which is precisely what the all-or-nothing
+    // insert exists to prevent.
+    const tooMany = Array.from({ length: 60 }, () => crypto.randomUUID());
+    const parsed = pointGrantSchema.safeParse({
+      memberIds: tooMany,
+      points: "5",
+      reason: "staffed the info booth",
+      category: "recruitment",
+      eventId: "",
+    });
+
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues[0]?.message).toBe(
+      `Pick at most ${MAX_GRANT_MEMBERS} members at once`
+    );
   });
 });
 
@@ -425,6 +453,51 @@ describe("audit rows", () => {
       expect(latest?.actor_id).toBe(officerId);
       expect(latest?.note).toBe("+5 points to 2 members");
     }
+  });
+
+  it("moves only the void columns in the diff", async () => {
+    // AuditTrail unions the keys of before and after and renders a key missing
+    // from one side as "—". A narrower select on the update therefore made the
+    // void read as `reason: "Staffed the info booth" → —` and
+    // `awarded_by: <uuid> → —`, i.e. as if voiding had erased the reason and
+    // the awarding officer. Found in the browser; both sides now select the
+    // same list, and this is what keeps them that way.
+    const memberId = await trackedMember();
+    const created = await createTestAdjustment(db, track, {
+      memberId,
+      points: 5,
+      awardedBy: officerId,
+      reason: "ran the info booth",
+      category: "recruitment",
+    });
+
+    const { data: before } = await db
+      .from("point_adjustments")
+      .select(AUDITED_ADJUSTMENT_COLUMNS)
+      .eq("id", created.id)
+      .maybeSingle();
+
+    const { data: after } = await db
+      .from("point_adjustments")
+      .update({
+        voided_at: new Date().toISOString(),
+        voided_by: officerId,
+        void_reason: "granted in error",
+      })
+      .eq("id", created.id)
+      .is("voided_at", null)
+      .select(AUDITED_ADJUSTMENT_COLUMNS)
+      .maybeSingle();
+
+    const from = before as Record<string, unknown>;
+    const to = after as Record<string, unknown>;
+
+    expect(Object.keys(from).sort()).toEqual(Object.keys(to).sort());
+
+    const changed = Object.keys(from).filter(
+      (key) => JSON.stringify(from[key]) !== JSON.stringify(to[key])
+    );
+    expect(changed.sort()).toEqual(["void_reason", "voided_at", "voided_by"]);
   });
 
   it("writes a points.voided row carrying the before/after of the void", async () => {

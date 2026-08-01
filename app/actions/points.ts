@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 
 import { writeAudit, writeAuditBatch } from "@/app/actions/audit";
 import { getOfficer } from "@/lib/auth";
-import { MAX_GRANT_MEMBERS, summarizeGrant } from "@/lib/points";
+import {
+  AUDITED_ADJUSTMENT_COLUMNS,
+  MAX_GRANT_MEMBERS,
+  summarizeGrant,
+} from "@/lib/points";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pointGrantSchema, pointVoidSchema } from "@/lib/validation";
 
@@ -108,13 +112,21 @@ export async function grantPoints(
   // point_adjustments has no uniqueness to violate. Deduping first also means a
   // selection of 55 containing 5 repeats passes the cap rather than failing
   // with a count the officer can't see on screen.
+  //
+  // ⚠️ The bound here is deliberately ABOVE MAX_GRANT_MEMBERS, and that matters.
+  // Truncating to the cap would make a hand-rolled POST of 60 ids a silent
+  // grant to the first 50 — a partial grant reported as success, which is the
+  // exact failure this action's all-or-nothing insert exists to prevent. Any
+  // oversized selection must be *refused*, so the slice only bounds how much
+  // can be reflected back and leaves the refusing to pointGrantSchema's .max().
+  const ECHO_MEMBER_CAP = MAX_GRANT_MEMBERS * 2;
   const memberIds = [
     ...new Set(
       formData
         .getAll("memberIds")
         .filter((v): v is string => typeof v === "string" && v.length > 0)
     ),
-  ].slice(0, MAX_GRANT_MEMBERS);
+  ].slice(0, ECHO_MEMBER_CAP);
 
   const values: SubmittedGrantValues = {
     memberIds,
@@ -155,9 +167,7 @@ export async function grantPoints(
           // it is read back in the .select() below instead.
         }))
       )
-      .select(
-        "id, member_id, points, reason, category, event_id, term, awarded_by, awarded_at"
-      );
+      .select(AUDITED_ADJUSTMENT_COLUMNS);
 
     if (error) {
       // A picked member or the linked event was deleted while the form was
@@ -269,10 +279,7 @@ export async function voidAdjustment(
 
     const { data: before, error: beforeError } = await db
       .from("point_adjustments")
-      .select(
-        "id, member_id, points, reason, category, event_id, term, " +
-          "awarded_by, awarded_at, voided_at, voided_by, void_reason"
-      )
+      .select(AUDITED_ADJUSTMENT_COLUMNS)
       .eq("id", fields.id)
       .maybeSingle();
 
@@ -295,7 +302,13 @@ export async function voidAdjustment(
       })
       .eq("id", fields.id)
       .is("voided_at", null)
-      .select("id, member_id, points, term, voided_at, voided_by, void_reason")
+      // The same column list as `before`, and that is load-bearing rather than
+      // tidiness. AuditTrail's diff unions the keys of both sides and renders a
+      // key missing from one as "—", so a narrower list here made the void read
+      // as `reason: "Staffed the info booth" → —` in the log: it looked like
+      // voiding had erased the reason and the awarding officer. Only the three
+      // void columns actually move, and now only those three show.
+      .select(AUDITED_ADJUSTMENT_COLUMNS)
       .maybeSingle();
 
     if (error) {

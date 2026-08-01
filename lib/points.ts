@@ -31,6 +31,25 @@ export const MAX_GRANT_MEMBERS = 50;
  */
 export const MAX_POINTS_PER_GRANT = 500;
 
+/**
+ * The columns an audit row carries for a point adjustment.
+ *
+ * Both sides of a before/after pair must select exactly this list. The audit
+ * trail diffs the union of their keys and renders a key missing from one side
+ * as "—", so a mismatch invents changes that never happened: a narrower select
+ * on the void made the log read `reason: "Ran the info booth" → —` and
+ * `awarded_by: <uuid> → —`, as though voiding had erased the reason and the
+ * awarding officer. It lives here, rather than in the action, because
+ * "use server" modules may only export async functions — and because a shared
+ * constant is what lets the test assert on the real thing.
+ */
+// One unbroken literal with `as const`, not a concatenation: PostgREST's
+// generated types read the column list off the *literal* to type the row it
+// returns, and `"a, b" + "c"` widens to plain `string`, which collapses the
+// result to an untyped error shape.
+export const AUDITED_ADJUSTMENT_COLUMNS =
+  "id, member_id, points, reason, category, event_id, term, awarded_by, awarded_at, voided_at, voided_by, void_reason" as const;
+
 const LABELS: Record<PointCategory, string> = {
   volunteer: "Volunteer",
   recruitment: "Recruitment",
