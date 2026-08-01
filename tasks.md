@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–4 are complete. Stage 5 (attendance review) is in progress — phases 1–4 of 5 built; only the phase-5 doc pass remains.** Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–5 are complete. Stage 6 (member directory) is next.** Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -13,10 +13,10 @@ Read this before touching anything; it is the state no file can tell you on its 
 | | |
 |---|---|
 | **Branch** | `stage-5-attendance-review` merged to `main` again **2026-08-01** (`0fe85d2`, phase 4) and deployed. Both branches exist on the remote; keep working on the branch and merge at the end of each phase. |
-| **Production** | **Stage 5 phases 1–4 are live** on https://misa-website-beta.vercel.app. `/admin/points`, `/admin/points/new`, and `/admin/points/[id]` are all in the deployed build (confirmed in the build log, not from the 307 — the proxy redirects *any* `/admin/*` path including ones that don't exist, so a 307 proves nothing about whether a route shipped). The Points nav entry is live. |
+| **Production** | **All of Stage 5 is live** on https://misa-website-beta.vercel.app. `/admin/points`, `/admin/points/new`, and `/admin/points/[id]` are all in the deployed build (confirmed in the build log, not from the 307 — the proxy redirects *any* `/admin/*` path including ones that don't exist, so a 307 proves nothing about whether a route shipped). The Points nav entry is live. |
 | **Database** | All 14 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); `migration list --linked` verified in sync before the merge. Phase 4 needed no new migration, so nothing has changed here since. |
-| ⚠️ **Merged mid-stage** | Merged at the end of each phase rather than at the end of the stage, deliberately, so the work is visible in production. All of Stage 5's *functionality* is now live; only the phase-5 read-through is outstanding. |
-| **Next task** | **Stage 6 — Member directory.** Stage 5 is functionally complete, documented, merged, and deployed as of 2026-08-01; all that remains of phase 5 is a final read-through of the stage whenever you next touch it. |
+| ⚠️ **Merged mid-stage** | Merged at the end of each phase rather than at the end of the stage, deliberately, so the work is visible in production. It worked — the queue was resolving real submissions while `/admin/points` was still being written. Do the same in Stage 6. |
+| **Next task** | **Stage 6 — Member directory.** Stage 5 is closed: the phase-5 read-through ran 2026-08-01 and the doc is at **v1.24**. Nothing of Stage 5 is outstanding. |
 | **Local database** | **Freshly reset 2026-08-01** and back to the documented seed exactly: 32 members, 15 events, 208 attendance, 6 adjustments, 2 audit rows, 29 leaderboard rows, `current_term()` = Spring 2026. ⚠️ The reset wiped local `auth.users`, so **re-create the dev officer before signing in to `/admin`** — see the command below. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
@@ -239,7 +239,7 @@ later stage; pick it up between stages or when someone hands over the assets.
 
 **Deployed 2026-07-30** (`ebe3233`, plus `64d29e2` making draft-vs-publish an explicit button on the create form). No new env vars and no migrations were needed. The production officer account is registered and `/admin/login` is live; admin routes return 307 to it when signed out, including paths that don't exist, so the gate leaks no route names. **Stage 4 complete.**
 
-## Now — Stage 5: Attendance review & manual adjustments
+## Done — Stage 5: Attendance review & manual adjustments (closed 2026-08-01)
 
 *Officers can see every submission, correct any of them, and award points that never came from a check-in (§7 Stage 5). 5–6 days, shipped in five phases so each ends with something demonstrable. Branch: `stage-5-attendance-review`.*
 
@@ -274,7 +274,7 @@ later stage; pick it up between stages or when someone hands over the assets.
   - `Mira Petrova` rejected ⇒ the only attendance row with history: "Rejected by **Seed Officer**", note, and the diff `status: pending → rejected` — `fetchOfficerNames()` and `AuditTrail`'s `Diff` both confirmed
   - edges: unknown id ⇒ 404; signed out ⇒ 307 to `/admin/login` with `next` preserved; the Event link reaches the real `/admin/events/[id]`
 - [x] 🪤 **Fixed: the near-miss highlight marked the formatting, not the digit.** `diffStudentId` compared the **raw** ID strings, so `ut 100998` vs `UT100028` "first differed" at index 0 — the case of the `u` — and the page rendered `roster `**`U`**`T100028`. The seed stores IDs in four formats precisely because members type them four ways, so this fired on most real pairs and pointed the officer at the one character that carries no information. Now compared on `normalizeStudentId()` with the index mapped back onto the raw string, and null when the two ids are the same person's in different formats. Five tests added; the old ones all used same-format IDs, which is exactly why it survived phase 1. **160 tests** (the "156" recorded earlier was one over the real 155).
-- [ ] **Deferred to phase 3:** the independent all-status event picker. `nearby_events()` is published-only and returns nothing beyond 48h, so suggestions alone cannot express every assignment — but the picker is a form control, so it belongs with the mutations rather than on a read-only page.
+- [x] **Deferred to phase 3, and built there** as `lib/event-options.ts`: the independent all-status event picker. `nearby_events()` is published-only and returns nothing beyond 48h, so suggestions alone cannot express every assignment — but the picker is a form control, so it belongs with the mutations rather than on a read-only page.
 
 **Two findings left open at the time — both closed in phase 3:**
 
@@ -323,16 +323,21 @@ later stage; pick it up between stages or when someone hands over the assets.
 - 🪤 **An oversized selection was truncated rather than refused.** The dedupe sliced to `MAX_GRANT_MEMBERS` *before* validation, so a hand-rolled POST of 60 ids would have granted silently to the first 50 — the exact partial-grant failure the atomic insert exists to prevent.
 - 🪤 **`AUDITED_ADJUSTMENT_COLUMNS` must be one unbroken literal with `as const`.** PostgREST types the returned row off the string *literal*; `"a, b" + "c"` widens to `string` and collapses the result to an untyped error shape.
 
-### Phase 5 — docs
+### ✅ Phase 5 — docs (2026-08-01)
 
 - [x] Architecture doc → **v1.20**, `CLAUDE.md` invariants, this file
 - [x] Architecture doc → **v1.23** and the `CLAUDE.md` amendments for phase 4 — the atomic-grant exception to the partial-success invariant, the audit-column-symmetry invariant, and the client-side picker superseding `?q=&sel=`
 - [x] README replaced — it was still `create-next-app` boilerplate on a **public** repo, telling visitors to edit `app/page.tsx`, which Stage 2 deleted
 - [x] Route table and phase table in the architecture doc; two stale `tasks.md` headings (Stage 2 marked "Now"; the `/attend` checkbox filed as "not built")
 - [x] **Merged to `main` and deployed 2026-08-01** (`0fe85d2`)
-- [ ] Final read-through of the whole stage, whenever you next touch it
+- [x] **Final read-through of the whole stage** — done 2026-08-01, doc → **v1.24**. Re-verified against the running system rather than taken on trust: **208 tests / 10 files pass**, lint and build clean, all **14 migrations identical local and remote**, and every Stage 5 route present in the production build output. Four pieces of drift found and fixed, none of them code:
+  - The architecture doc's Stage 5 heading still read *"phases 1–3 of 5 built"* and its status line *"in progress"*, two versions after phase 4 shipped.
+  - §5's route table was missing `/admin/events/series` — a live route since Stage 4 — and §10's layout was missing six modules that exist (`/admin/points`, `app/actions/auth.ts`, `lib/event-options.ts`, `lib/member-options.ts`, `lib/admin-profiles.ts`, `lib/supabase/admin.ts`). §10 is the first map a new officer reads.
+  - `CLAUDE.md` carried a stale status paragraph — *"Stage 2 (public site) in progress"* — four lines below one saying Stage 5 was complete. Its layout block also listed `lib/filters.ts` and `lib/export.ts` as though they existed, and filed the built `/attend` under "later".
+  - The Stage 7 revalidation carry-forward existed only here, in a stage section that gets archived. It is now in the doc's Stage 7 checklist too (see below).
+- [x] **Two claims checked against the live databases, both true.** The remote `admin_audit` does carry exactly two pre-Stage-5 rows with the bare verbs `reject` and `void`, permanently uncorrectable — so the "readers must tolerate unknown action values" invariant is load-bearing, not hypothetical. And on the seeded roster `leaderboard.total_points` equals `member_directory.attendance_points + bonus_points` for every member, with the negative adjustment reducing the total and the voided one contributing nothing (§4.4, §9 #11).
 
-**Carry into Stage 7:** `revalidatePoints` in `app/actions/points.ts` deliberately does **not** revalidate `/admin` (nothing on the dashboard aggregates points) and cannot yet revalidate `/leaderboard` (the route doesn't exist). Granting and voiding both move public standings, so **that path must be added the day `/leaderboard` ships** — otherwise it is a stale-cache bug discovered three stages later.
+**Carry into Stage 7 — now recorded in the architecture doc's Stage 7 section as well, which is where it will actually be read.** `revalidatePoints` in `app/actions/points.ts` deliberately does **not** revalidate `/admin` (nothing on the dashboard aggregates points) and cannot yet revalidate `/leaderboard` (the route doesn't exist). Granting and voiding both move public standings, so **that path must be added the day `/leaderboard` ships** — otherwise it is a stale-cache bug discovered three stages later.
 
 **✅ Both test-harness gaps closed in phase 3** — each would have made green tests that prove nothing:
 
