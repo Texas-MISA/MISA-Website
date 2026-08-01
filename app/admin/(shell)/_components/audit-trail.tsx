@@ -1,4 +1,4 @@
-import { fetchOfficerNames } from "@/lib/admin-profiles";
+import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
 import { formatInstant } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/types/database";
@@ -47,23 +47,6 @@ function formatAuditAction(action: string): string {
     "event.deleted": "Deleted",
   };
   return LABELS[action] ?? action;
-}
-
-/**
- * Who did this.
- *
- * Three distinguishable cases, and the middle one is the common one:
- * a named officer, a current officer with no display name set
- * (create-officer.mjs leaves it null by default), and someone whose profile is
- * gone because they were revoked. Calling the second "a former officer" — as
- * this did until phase 3 — libels every officer who never set a name.
- */
-function describeActor(
-  names: Map<string, string | null>,
-  actorId: string
-): string {
-  if (!names.has(actorId)) return "a former officer";
-  return names.get(actorId) ?? "an officer";
 }
 
 async function fetchTrail(
@@ -127,7 +110,7 @@ export async function AuditTrail({
           <p className="text-sm">
             <strong>{formatAuditAction(row.action)}</strong>{" "}
             <span className="text-foreground/70">
-              by {describeActor(result.names, row.actor_id)} on{" "}
+              by {describeOfficer(result.names, row.actor_id)} on{" "}
               {formatInstant(row.acted_at)} CT
             </span>
           </p>

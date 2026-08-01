@@ -54,3 +54,20 @@ export async function fetchOfficerNames(
 
   return new Map(data.map((row) => [row.user_id, row.display_name]));
 }
+
+/**
+ * How one officer id reads on screen.
+ *
+ * The three cases fetchOfficerNames distinguishes, phrased. Lives here rather
+ * than beside any one caller because the audit trail, the points ledger, and
+ * the adjustment detail page must phrase them identically — three copies is
+ * three chances for one of them to collapse the middle case back into "a former
+ * officer", which is the exact regression phase 3 fixed.
+ */
+export function describeOfficer(
+  names: Map<string, string | null>,
+  userId: string
+): string {
+  if (!names.has(userId)) return "a former officer";
+  return names.get(userId) ?? "an officer";
+}
