@@ -75,7 +75,7 @@ Read this before touching anything; it is the state no file can tell you on its 
 
 | # | Decision | Resolution |
 |---|---|---|
-| 2 | Roster policy | **Self-registering, no confirmation.** Unknown ID → active member created immediately. Resolve by `normalized_student_id`, then `lower(email)`, then create with `source = 'self_checkin'`. |
+| 2 | Roster policy | **Self-registering, confirmed by the member** (revised doc v1.22). Look up by `normalized_student_id`, then `lower(email)`. Both miss: ticked "first time" → review screen, then create with `source = 'self_checkin'`, active, no officer approval; unticked → nothing written, re-prompt. |
 | 3 | Points weighting | Per-event `points`, default 1. |
 | 4 | Semester boundaries | **One leaderboard, current term only; terms derived from dates.** One row per member, `total_points` only (no split), ties alphabetical. `events.term` generated from `starts_at` → `'Fall 2026'` / `'Spring 2027'`, half-open at Aug 1 / Jan 1, anchored America/Chicago. Rollover automatic; `app_settings.current_term` is a nullable override. |
 | 5 | Excused absences | Deferred post-v1. Rate stays raw `attended / possible`. |
@@ -209,6 +209,7 @@ later stage; pick it up between stages or when someone hands over the assets.
 - [x] `lib/checkin.ts` — `resolveCheckin()` core (§4.2/§4.3 order), `ORPHAN_WINDOW_HOURS = 48` (the §9 #7 exported constant), `normalizeStudentId()` JS mirror of the SQL expression (lockstep-tested), `checkRateLimit()`. No `next/*` imports, so tests inject clients and time.
 - [x] `app/actions/attendance.ts` — `submitCheckin` Server Action: honeypot → zod (`lib/validation.ts`) → per-IP rate limit → resolve. Service-role client only here + `lib/supabase/admin.ts` (`server-only`-guarded).
 - [x] `/attend` — three-field, phone-first form (`useActionState`, works pre-hydration); distinct present/pending/duplicate/refused/invalid/rate-limited/error states; in the nav as **Check In** and linked from the home events section.
+  - [x] **First-time checkbox + conditional confirmation** (doc v1.22, spec `docs/attend-confirmation-flow.md`). Two more states — `unmatched` (re-prompt, nothing written) and `needs_confirmation` (review screen) — on the same `useActionState` machine, so both steps work pre-hydration. `submitCheckin` stays a single export and takes a `step` field; the confirm pass re-runs honeypot, zod, throttle, and resolution from scratch. Nothing persists between passes, so **no migration**. `RATE_LIMIT_MAX` 30 → 90, since a first-timer now spends two slots.
 - [x] **Duplicate rule decided and recorded** (doc v1.18): index on `(event_id, normalized_student_id)` + app check on `(event_id, member_id)` + orphan-resubmission check. Pending orphan never blocks a later resolved check-in; rejected never blocks re-entry.
 - [x] Migrations: `…000011_checkin_throttle` (rate-limit table, deny-all RLS) and `…000012_api_role_grants` — **the trap find of the stage**: newer stacks grant the API roles only `TRUNCATE/REFERENCES/TRIGGER` on new tables, so a fresh `create → link → db push` would be silently broken; codified the classic grants, RLS stays the boundary. Types regenerated.
 - [x] **§7 exit criteria verified in a real browser** against the local stack: during-window ⇒ `present` on the correct event + member self-registered (`source='self_checkin'`); 1h after close ⇒ `pending` orphan; nothing within 48h ⇒ refused, zero rows. Lint + build green (`/attend` static, action request-time).
@@ -319,11 +320,27 @@ later stage; pick it up between stages or when someone hands over the assets.
 - **The 2030 fixtures cannot exercise the views.** `helpers.ts` puts fixture events in 2030, so `events.term` is `"Spring 2030"`, and both views filter `e.term = current_term()`; every leaderboard assertion would have passed vacuously at zero. `createCurrentTermEvent()` now places the event a few hours in the past, reads back the generated `term`, compares it to `current_term()`, and throws if they differ — so a run straddling Aug 1 / Jan 1 fails loudly rather than silently asserting nothing. Both values come from the database; no term string is typed (§4.7).
 - **`cleanup()` leaked attendance rows with neither link** — it deleted only by `event_id` or `member_id`, and that is the queue's most important fixture shape. `Tracker.attendanceIds` plus a `createTestAttendance()` helper closes it; a full run is now member-neutral (verified 33 → 33). (`point_adjustments` needs no pass: `member_id` cascades.)
 
+## Designed, approved, not built — `/attend` first-time checkbox
+
+Spec: [`docs/attend-confirmation-flow.md`](docs/attend-confirmation-flow.md). Decided 2026-07-31; implement straight from it.
+
+A check-in optionally declares "this is my first time". A returning member whose details match is written immediately and sees the same success screen as today — the fast path is unchanged. An unmatched submission from someone who did **not** tick the box is **re-prompted and not written at all**; a first-timer gets a review screen and is written only on confirm.
+
+Three things not to rediscover the hard way:
+
+- **This narrows the "nothing is ever dropped on the floor" invariant**, and the amendment must land in the same commit as `lib/checkin.ts`. The note is already parked under that invariant in `CLAUDE.md`.
+- **It needs no migration** — nothing is persisted between steps, which is what makes it much smaller than it sounds.
+- **The membership oracle is accepted**, deliberately and against the stance §6 takes for the officer login. The reasoning is in the spec; don't "fix" it.
+
 ## Later
 
 Placeholders — expand on arrival. Effort estimates from §7.
 
-- **Stage 6 — Member directory** · 4–5 days · the screen officers will live in; select-all-matching semantics need real tests
+- **Stage 6 — Member directory** · 4–5 days *plus a merge tool* · the screen officers will live in; select-all-matching semantics need real tests
+  - 🪤 **Duplicate members still accumulate and nothing merges them — but far fewer of them** (revised v1.22). The main source of ghosts is gone: a double typo used to create a member silently, and now it is refused and re-prompted. What remains is someone who ticks "this is my first MISA event" *and* types badly, which is a narrower and mostly one-shot failure. Ghosts are still findable via `members.source = 'self_checkin'`. A merge must repoint `attendance.member_id` and `point_adjustments.member_id` and can hit `attendance_one_per_event` when both identities attended the same event — a real conflict to decide, not to swallow. Preview-and-confirm, one audit row naming both sides. Smaller in expectation, so it can follow the directory rather than gate it.
+  - 🪤 **A valid-but-wrong student ID silently credits the wrong member — and got slightly *more* likely** (v1.22). The ID lookup runs before the email lookup, so mistyping into *another member's* real ID records you as them even though your own email would have matched. The one path where exact matching attributes attendance to the wrong human with nothing surfaced, and a confident typo that happens to hit a real ID now sails straight through as a matched member. Reordering just trades one silent mis-credit for another, so this is recorded rather than fixed — but merge tooling should assume mis-credits exist, and flagging a submitted-vs-matched email mismatch at check-in is the cheap partial mitigation.
+  - 🪤 **A confirmed first-timer can leave a member row with no attendance.** If an officer already queued a manual row carrying that student ID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check against the "three checks, not one" invariant. Another `source = 'self_checkin'` row for the directory to surface.
+  - All three are consequences of §4.2's exact-match design rather than defects in it; the reasoning is written up in the doc's Stage 6 section (v1.21) and revised in v1.22.
 - **Stage 7 — Member-facing views** · 3 days · `/leaderboard` and `/lookup`
 - **Stage 8 — Hardening & data integrity** · 3–4 days · every RLS policy tested with the anon key; historically the stage most likely to be skipped and most likely to be regretted
 - **Stage 9 — Launch** · 1–2 days + spreadsheet migration · soft launch with a paper backup sheet on hand

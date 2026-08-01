@@ -21,7 +21,13 @@ export const ORPHAN_WINDOW_HOURS = 48;
 // Deliberately generous (§6): an event venue's NAT can put a whole room of
 // legitimate members behind one IP. The honeypot and the orphan-window bound
 // are the primary controls; this only stops scripted floods.
-export const RATE_LIMIT_MAX = 30;
+//
+// Raised from 30 when the first-time confirmation flow landed. A first-timer
+// now spends two slots (submit, then confirm), and the `unmatched` re-prompt
+// actively invites retries — so at a recruiting event, where everyone is new
+// and everyone shares the venue's IP, 30 would have let barely 15 people
+// through. Sized for the room, not for the request count.
+export const RATE_LIMIT_MAX = 90;
 export const RATE_LIMIT_WINDOW_MINUTES = 10;
 
 /**
@@ -50,6 +56,14 @@ export type CheckinInput = {
   fullName: string;
   studentId: string;
   email: string;
+  /**
+   * The member's own claim that they are new — the one bit of information the
+   * system cannot derive. A hint, never an instruction: ticking it when you
+   * already exist links you to yourself and must never create a duplicate.
+   */
+  declaredNew: boolean;
+  /** Second pass: the member has seen their details on the review screen. */
+  confirmed: boolean;
 };
 
 export type CheckinResult =
@@ -57,9 +71,30 @@ export type CheckinResult =
   | { status: "pending" }
   | { status: "duplicate"; prior: "present" | "pending" }
   | { status: "refused" }
+  // Nothing written. No roster match and the member did not claim to be new,
+  // so this is a typo rather than a new person — re-prompt instead of quietly
+  // creating a duplicate member (see docs/attend-confirmation-flow.md).
+  | { status: "unmatched" }
+  // Nothing written yet. `existing` says only whether the roster already knows
+  // this person — never the matched member's name, email, or ID. That would
+  // turn the accepted "is this ID on the roster" oracle into "here is the
+  // human behind it", which §6 does not accept.
+  | { status: "needs_confirmation"; existing: boolean }
   | { status: "error" };
 
 type Client = SupabaseClient<Database>;
+
+/**
+ * Explicit shape rather than `string | undefined | null`. The bare tri-state
+ * invited `if (!memberId)`, and a single such slip would report a transient
+ * Supabase error as `unmatched` — telling a whole room "we don't have that
+ * info on file" and sending them away with no attendance and no trace, which
+ * is exactly the failure this system is built to make impossible.
+ */
+type MemberLookup =
+  | { kind: "found"; id: string }
+  | { kind: "missing" }
+  | { kind: "error" };
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -71,11 +106,10 @@ const UNIQUE_VIOLATION = "23505";
  *      and the app (the CLAUDE.md three-places invariant).
  *   2. No open event and nothing within ORPHAN_WINDOW_HOURS → refused, and
  *      nothing is written.
- *   3. Member resolution always succeeds: normalized_student_id, then
- *      lower(email), then create with source='self_checkin' (active
- *      immediately, no approval step, no audit row — §4.2). This runs on the
- *      orphan path too; a later-rejected orphan may leave a self-registered
- *      member behind, which is §6's roster-pollution row: cleanup, not loss.
+ *   3. Member *lookup* — normalized_student_id, then lower(email). Creating a
+ *      member is no longer part of resolution; it happens only behind an
+ *      explicit confirmation (§4.2, docs/attend-confirmation-flow.md). A
+ *      lookup miss is `unmatched` and writes nothing.
  *   4. Duplicate checks, then insert. The partial unique index is the
  *      concurrency backstop; the app-level checks close the two gaps the
  *      index cannot see (same member via a different raw ID, and orphan
@@ -104,6 +138,10 @@ export async function resolveCheckin(
   // 2. No open event: refuse outright unless something is inside the grace
   //    window (§4.3 — refused, not queued, so the form can't manufacture
   //    attendance in the middle of summer).
+  //
+  //    Refusing here, before any member lookup, also closes the membership
+  //    oracle outside event windows: someone probing a student ID off-season
+  //    learns only that there is no event on.
   if (!event) {
     const nearby = await db.rpc("nearby_events", {
       ts,
@@ -116,9 +154,35 @@ export async function resolveCheckin(
     if (nearby.data.length === 0) return { status: "refused" };
   }
 
-  // 3. Member resolution: ID, then email, then create.
-  const memberId = await resolveMember(db, input, normalized);
-  if (memberId === null) return { status: "error" };
+  // 3. Member lookup: ID, then email. No create — see below.
+  const lookup = await findMember(db, input, normalized);
+  if (lookup.kind === "error") return { status: "error" };
+
+  let memberId: string;
+  if (!input.declaredNew) {
+    // The member says they've been here before. If the roster disagrees, the
+    // likeliest explanation is a typo in both fields, not a new person — so
+    // re-prompt and write nothing rather than manufacture a duplicate member
+    // that no tool can merge back. The cost is real and accepted: someone who
+    // never gets their details right leaves no trace, and an officer adds
+    // them at /admin/attendance/new instead.
+    if (lookup.kind === "missing") return { status: "unmatched" };
+    memberId = lookup.id;
+  } else if (!input.confirmed) {
+    // Claimed first-timer, first pass: always confirm, matched or not. Not
+    // worth optimizing away for the already-recorded case — returning
+    // `duplicate` here would disclose that this person attended this specific
+    // event, which is strictly more than the roster-membership oracle §6
+    // accepted.
+    return { status: "needs_confirmation", existing: lookup.kind === "found" };
+  } else if (lookup.kind === "found") {
+    // Ticking the box when you already exist links you to yourself.
+    memberId = lookup.id;
+  } else {
+    const created = await createMember(db, input, normalized);
+    if (created === null) return { status: "error" };
+    memberId = created;
+  }
 
   if (event) {
     // 4a. Same member already recorded for this event under any raw ID —
@@ -203,19 +267,26 @@ export async function resolveCheckin(
 }
 
 /**
- * §4.2 resolution order: normalized_student_id → lower(email) → create with
- * source='self_checkin'. Returns the member id, or null on unexpected error.
+ * Create a self-registered member. Reached only from the confirmed path —
+ * `declaredNew && confirmed` with the lookup still finding nothing — so this
+ * is the single place in the whole application that inserts a `members` row
+ * on an unauthenticated request.
+ *
+ * The member is `active` immediately: no approval step, no audit row (§4.2).
+ * Returns the member id, or null on unexpected error.
+ *
+ * Note what `confirmed` is and is not. It stops honest typos from becoming
+ * roster rows; it is not a security control. A scripted POST carrying
+ * step=confirm creates a member in one request without ever rendering the
+ * review screen — correct by design, since the server re-derives everything
+ * from scratch rather than trusting the previewed payload. The per-IP
+ * throttle remains the only abuse control here.
  */
-async function resolveMember(
+async function createMember(
   db: Client,
   input: CheckinInput,
   normalized: string
 ): Promise<string | null> {
-  const lookup = () => findMember(db, input, normalized);
-
-  const found = await lookup();
-  if (found !== undefined) return found;
-
   const created = await db
     .from("members")
     .insert({
@@ -233,19 +304,19 @@ async function resolveMember(
     // Race: someone created the same member between our lookup and insert,
     // or the email already belongs to an existing member. Re-run the lookups
     // and use whatever they find.
-    const retry = await lookup();
-    if (retry !== undefined) return retry;
+    const retry = await findMember(db, input, normalized);
+    if (retry.kind === "found") return retry.id;
   }
   console.error("member insert failed:", created.error.message);
   return null;
 }
 
-/** Returns member id if matched, undefined if no match, null on error. */
+/** §4.2 lookup order: normalized_student_id, then lower(email). Never writes. */
 async function findMember(
   db: Client,
   input: CheckinInput,
   normalized: string
-): Promise<string | undefined | null> {
+): Promise<MemberLookup> {
   const byId = await db
     .from("members")
     .select("id")
@@ -253,12 +324,14 @@ async function findMember(
     .maybeSingle();
   if (byId.error) {
     console.error("member lookup by id failed:", byId.error.message);
-    return null;
+    return { kind: "error" };
   }
-  if (byId.data) return byId.data.id;
+  if (byId.data) return { kind: "found", id: byId.data.id };
 
   // Email second: contains the common typo — a botched student ID is still
   // recognized by email and linked instead of becoming a duplicate person.
+  // This fallback is what keeps `unmatched` rare, so it has to run before any
+  // miss is reported.
   const byEmail = await db
     .from("members")
     .select("id")
@@ -266,11 +339,11 @@ async function findMember(
     .maybeSingle();
   if (byEmail.error) {
     console.error("member lookup by email failed:", byEmail.error.message);
-    return null;
+    return { kind: "error" };
   }
-  if (byEmail.data) return byEmail.data.id;
+  if (byEmail.data) return { kind: "found", id: byEmail.data.id };
 
-  return undefined;
+  return { kind: "missing" };
 }
 
 async function duplicateFromIndex(
