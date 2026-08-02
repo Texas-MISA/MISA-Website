@@ -1,9 +1,51 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.25
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phase 1 of 6 built
+**Version:** 1.26
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phase 1 of 9 built, stage re-planned 2026-08-01
 **Last updated:** August 2026
 
+> **v1.26: Stage 6 re-planned, after phase 1 had already shipped.** Four
+> decisions landed on top of a stage that was already one phase in. Together
+> they replace enough of the remaining plan that the phase list was rewritten
+> rather than patched — six phases become nine. `tasks.md` carries the phase
+> detail; what follows is what became normative.
+>
+> - **"Student ID" becomes "EID", and not only as a label.** The identifier
+>   itself becomes a real UT EID — alphanumeric, `abc1234` — replacing the
+>   `UT` + six-sequential-digit format the seed, the fixtures, and the
+>   suggestion ranker were all built around. Stage 6 phase 2 does the rename;
+>   **§4's DDL still describes the pre-rename schema and is correct until that
+>   migration lands.** Two consequences are not obvious. The normalization's
+>   whitespace and hyphen stripping loses its purpose (EIDs contain neither) and
+>   what remains is case-insensitivity, folded to **lower** rather than upper,
+>   because EIDs are conventionally lowercase. And §7's near-miss calibration
+>   does not survive: `id_contains` exists solely to catch a dropped `UT` prefix
+>   and degrades into a broad substring match on short alphanumerics, while
+>   distance-1-stands-alone was tuned for 8-character strings with a constant
+>   2-character prefix. Both are re-derived empirically in phase 2.
+> - **The directory shows four columns; everything else moves to a member
+>   detail page.** Name, Email, EID, Total Points, plus officer-defined custom
+>   fields. Sorting and filtering narrow to what is displayed. This is the
+>   reason `/admin/members/[id]` can no longer be a later phase: removing a
+>   column before its new home exists makes that data unreachable, so the
+>   reduction and the detail page land together in phase 3.
+> - **Officers can define their own member fields.** Dropdowns first (Paid Dues
+>   → Yes/No, T-shirt size → S/M/L), inline-editable from the directory table,
+>   with inline-editability chosen when the field is created. Values live in a
+>   JSONB column on `members` rather than an EAV table, and the reason is
+>   sorting rather than taste: PostgREST orders by column, a `create or replace`
+>   view cannot grow a column per officer-defined field, and a values table
+>   cannot be sorted from the parent under pagination at all. This is the same
+>   wall migration 14 hit with `attendance_rate`, reached from the other side.
+> - **A view may be dropped to rename an output column.** `create or replace`
+>   can only append, and migration 14 chose it precisely to keep
+>   `member_directory`'s `authenticated` grant — the §6 security boundary.
+>   Renaming `student_id` → `eid` cannot be done that way, so a drop is now
+>   permitted *provided the same migration re-issues the grant*. DDL is
+>   transactional, so there is no window; the hazard is forgetting the re-grant,
+>   which surfaces at the next non-service-role read rather than at migration
+>   time.
+>
 > **v1.25: the member directory, read-only.** Stage 6 phase 1 — migration 14,
 > `lib/filters.ts`, and `/admin/members` with server-side sorting, pagination,
 > and the filters that live on the view. 238 tests across 12 files. Decisions
@@ -1137,7 +1179,11 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 /admin/events/series   Create a recurring series — expanded to one draft per date
 /admin/events/[id]     Edit event, view its attendance, duplicate, cancel
 /admin/members         Roster directory — sort, filter, select, copy, export
-/admin/members/[id]    Member detail — full history, adjustments, notes
+/admin/members/[id]    Member detail — full history, adjustments, notes,
+                       and the current term's events with an attendance
+                       indicator (Stage 6 phase 3)
+/admin/members/fields  Custom field definitions — create, edit, archive
+                       (Stage 6 phase 4)
 /admin/points          Point adjustment ledger — every grant, filterable by officer
 /admin/points/new      Grant points to one or more members in a single action
 /admin/points/[id]     Adjustment detail — void it with a reason, and its history
@@ -1344,47 +1390,58 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 6 — Member Directory 🔨 phase 1 of 6 built (v1.25)
+### Stage 6 — Member Directory 🔨 phase 1 of 9 built · re-planned 2026-08-01 (v1.26)
 **Goal:** Officers can slice the roster any way they need and get the result out of the system in one action. This is the screen officers will actually live in.
 
-**Six phases**, same shape as Stage 5 — each ends in something demonstrable and merges to `main` as it lands. `tasks.md` carries the working detail.
+**Nine phases** — six originally, re-planned after phase 1 shipped (see the v1.26 note at the top of this document for the four decisions and their reasoning). Same shape as Stage 5: each ends in something demonstrable and merges to `main` as it lands. `tasks.md` carries the working detail.
 
 | Phase | Scope | State |
 |---|---|---|
-| 1 | Migration 14, `lib/filters.ts`, read-only `/admin/members` — sorting, pagination, view-column filters | ✅ built |
-| 2 | Selection and extraction — copy emails / names / TSV, CSV download, export auditing | **exit criteria met here** |
-| 3 | Relational filters (attended or missed a given event, has pending, free text) and `/admin/members/[id]` | |
-| 4 | Saved filter presets and CSV roster import | |
-| 5 | The merge tool — its own estimate, see below | |
-| 6 | Docs and a closing read-through | |
+| 1 | Migration 14, `lib/filters.ts`, read-only `/admin/members` — sorting, pagination, view-column filters | ✅ built, partly superseded by 3 |
+| 2 | The EID switch — migration 15, the ranker retune, seed and fixture regeneration | |
+| 3 | The reshaped four-column directory **and** `/admin/members/[id]` | |
+| 4 | Custom fields — definitions, dropdown values, inline editing, sorting | |
+| 5 | Selection and extraction — copy emails / names / TSV, CSV download, export auditing | **exit criteria met here** |
+| 6 | Relational filters (attended or missed a given event, has pending, not seen since) | |
+| 7 | Saved filter presets and CSV roster import | |
+| 8 | The merge tool — its own estimate, see below | |
+| 9 | Docs and a closing read-through | |
 
-⚠️ **Phase 1 has not been walked through a browser.** The auth gate is confirmed and the query behaviour is covered by tests, but no human has looked at the screen. Each of Stage 5's phases found defects that way that no test caught — a control deriving its enabled state from the wrong source, a selection count outliving its checkboxes, an audit diff inventing changes — and all three were in screens of exactly this kind. It is the first item of phase 2.
+⚠️ **Phase 1 has not been walked through a browser.** The auth gate is confirmed and the query behaviour is covered by tests, but no human has looked at the screen. Each of Stage 5's phases found defects that way that no test caught — a control deriving its enabled state from the wrong source, a selection count outliving its checkboxes, an audit diff inventing changes — and all three were in screens of exactly this kind. **Do it before the phase-2 rework**, so anything found is attributable to phase 1 rather than to the change layered on top.
 
-**Sorting**
-- Every column sortable: name, student ID, join date, events attended, attendance points, bonus points, total points, attendance rate, last seen, pending count
-- Server-side sorting against `member_directory`, not client-side — required for correct behavior with pagination
+**Two phases that must not be separated.** Phase 3 reduces the directory to four columns and builds the member detail page in the same phase, because the detail page is where the removed columns go. Shipping the reduction first would make attendance rate, pending count, and last seen unreachable from the UI entirely.
 
-**Filtering, composable**
-- Active / inactive
-- Point range, events-attended range, attendance-rate threshold
-- Attended *or* missed a specific event (the query officers ask most often)
-- Joined within a date range; not seen since a date
-- Has pending submissions awaiting review
-- Free-text search across name, ID, and email
+**The directory — what is displayed**
+- **Name, Email, EID, Total Points**, plus officer-defined custom-field columns
+- Name links to `/admin/members/[id]`
+- Sortable: exactly the displayed columns, custom fields included. Server-side against `member_directory`, never client-side — required for correct behaviour with pagination, and the reason a custom field's value has to be a *column* the database can order by rather than something assembled in the app.
+- Filterable: the displayed columns, plus two deliberate exceptions — **active/inactive**, kept as a scope selector rather than a column filter (dropping it would strand inactive members, who are excluded from `leaderboard` too), and **free-text search across name / email / EID**, which touches only displayed columns.
+- Phase 6 adds the relational filters — attended or missed a given event, has pending submissions, not seen since a date. These narrow on data the table does not show, so they get their own labelled panel rather than sitting among the column filters.
 
-**Selection and extraction**
+**The member detail page — everything displaced from the directory**
+- Joined, source, active, events attended / possible, attendance rate, attendance points, bonus points
+- **Pending count and last seen, labelled all-time.** These are the two columns in `member_directory` that are not term-scoped, and putting them beside term-scoped figures in a table is what made that ambiguous. Here they sit apart and say so.
+- **A grid of the current term's events with an attendance indicator.** Three states, not two: attended, missed, and **upcoming** — `events_possible` counts only events that have ended, so treating a future event as a miss makes every member look worse at the start of a term. Published events only; a cancelled event credits nobody.
+- Point adjustment history, officer notes, and the shared audit trail
+
+**Custom fields (phase 4)**
+- Officer-defined, dropdown-first: Paid Dues → Yes/No, T-shirt size → S/M/L. A definition carries its options, its display order, whether it appears in the directory, and **whether it is editable inline** — chosen at creation.
+- Non-calculated fields are edited directly from the directory table, which is what makes them worth having: the alternative is opening 40 member pages to record who paid dues.
+- Values are stored as JSONB on `members` so PostgREST can sort on them; definitions live in their own table and are **archived, never deleted**, since deleting one would silently rewrite what the audit log refers to.
+- Every edit is an audited member mutation with a compare-and-set on `members.updated_at` — a column the table does not have today, because nothing edited a member until now.
+
+**Selection and extraction (phase 5)**
 - Row checkboxes plus **"select all N matching this filter"** — explicitly distinct from "select the 25 rows on this page." Getting this wrong is the classic bug in this kind of screen, and it silently produces a partial email list.
 - **Copy emails** as a comma-separated string, ready to paste into a To: field. This is the workflow officers care about most; make it one click with a visible confirmation of how many addresses were copied.
 - **Copy as TSV** — pastes directly into Sheets or Excel with columns intact
 - **Copy names** for announcements or shoutouts
-- **Download CSV** for the current filter and column selection
-- Saved filter presets, shared across officers — "award eligible", "missed last 3 meetings", "inactive since October"
+- **Download CSV** for the current filter and column selection, custom fields included
+- Exports logged to `admin_audit` per §6, each as its own receipt row carrying the filter and the row count
 
 **Supporting work**
-- CSV roster import with a preview-and-confirm step, duplicate detection on `normalized_student_id`, and a dry-run row count before committing
-- Member detail page: full attendance history, point adjustment history, officer notes
-- Exports logged to `admin_audit` per §6
-- **Merging duplicate members** — see below; this is the piece with real domain logic in it
+- Saved filter presets, shared across officers — "award eligible", "missed last 3 meetings", "inactive since October" (phase 7)
+- CSV roster import with a preview-and-confirm step, duplicate detection on the normalized EID, and a dry-run row count before committing (phase 7)
+- **Merging duplicate members** — see below; this is the piece with real domain logic in it (phase 8)
 
 **Two consequences of §4.2's exact-match check-in land here** (recorded v1.21, while building Stage 5). Neither is a defect in the check-in path — both are the deliberate design's bill, and the directory is where it comes due.
 
@@ -1394,8 +1451,13 @@ contact form's backend — it renders disabled, with email as the working path.
 
 **2. A valid-but-wrong student ID silently credits the wrong member.** The ID lookup runs *before* the email lookup, so someone who mistypes into **another member's** real student ID is recorded as that person, even though their own email was correct and would have matched. It is rare and it is not obviously fixable by reordering — people mistype and share emails too, so email-first trades one silent mis-credit for another — but it is the one path where the exact-match design attributes attendance to the wrong human with nothing surfaced to anyone. The directory is where it would be noticed ("why does this member have an event they didn't attend?"), so the member detail page should make a member's attendance easy to scan, and any merge tooling should assume mis-credits exist. Revisit if it ever actually happens; a cheap partial mitigation is to flag, at check-in, when the matched member's email differs from the submitted one.
 
-**Exit criteria:** an officer filters to members who attended fewer than three events this term, sees an accurate count, clicks copy-emails, and pastes a complete list into an email client — with the list containing every matching member, not just the visible page.
-**Effort:** 4–5 days, plus whatever the merge tool costs — that one *is* new domain logic and the estimate below does not cover it. Otherwise mostly query and UI-state work, but the select-all-matching semantics, the import preview, and any merge deserve real test coverage.
+⚠️ **The EID switch makes this materially more likely, for a reason worth stating plainly** (v1.26). UT EIDs are derived from name initials, so the near-miss population is *correlated with the roster* rather than scattered across a numeric range — students with similar names hold similar EIDs. Under `UT` + a sequential number, a one-character typo landed on a real person only by coincidence and on a plausibly-confusable person almost never. Under EIDs it does both more often. The mitigation does not change — the detail page is still where it surfaces — but this moves from "revisit if it ever happens" toward "expect it", and it is the strongest argument for the email-mismatch flag at check-in.
+
+**Exit criteria** (revised v1.26): an officer filters the directory to members whose **Paid Dues = No**, sees an accurate count, clicks copy-emails, and pastes a complete list into an email client — with the list containing every matching member, not just the visible page. Met at the end of phase 5.
+
+The criterion previously read "attended fewer than three events this term". That query no longer fits the screen it is meant to demonstrate: `events_attended` is not a directory column after phase 3, and filtering narrows to what is displayed. It moves to the relational filters in phase 6. The replacement exercises the custom-field machinery as well as the select-all semantics, which makes it the stronger demonstration of the two.
+
+**Effort:** 4–5 days as originally scoped, and the re-plan adds materially to it — the EID switch is wide and mechanical rather than hard (roughly 41 files, and the seed and fixture regeneration is the bulk of it), while custom fields are a genuine subsystem: a definitions table, an editing surface in a table that was a Server Component, and sorting on values the view cannot hold as columns. The merge tool remains its own estimate on top; that one *is* new domain logic. Otherwise mostly query and UI-state work, but the select-all-matching semantics, the import preview, the inline-edit compare-and-set, and any merge all deserve real test coverage.
 
 ---
 
@@ -1573,7 +1635,9 @@ The two member-facing decisions were settled in the same pass:
   filters.ts                 directory filter → SQL translation. One filter
                              object, one translation; pagination stays outside
                              it so the export is the same query (§4.5)
-  export.ts                  CSV / TSV / clipboard formatting (Stage 6 phase 2)
+  export.ts                  CSV / TSV / clipboard formatting (Stage 6 phase 5)
+  members.ts                 custom-field definitions, option validation, and
+                             AUDITED_MEMBER_COLUMNS (Stage 6 phase 4)
 /supabase
   /migrations                versioned SQL
   seed.sql

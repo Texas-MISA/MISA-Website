@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–5 are complete. Stage 6 (member directory) is in progress — phase 1 of 6 built.** Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–5 are complete. Stage 6 (member directory) is in progress — phase 1 of 9 built, and the stage was re-planned on 2026-08-01 after four design decisions landed on top of it.** Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -16,7 +16,7 @@ Read this before touching anything; it is the state no file can tell you on its 
 | **Production** | **All of Stage 5 is live** on https://misa-website-beta.vercel.app. `/admin/points`, `/admin/points/new`, and `/admin/points/[id]` are all in the deployed build (confirmed in the build log, not from the 307 — the proxy redirects *any* `/admin/*` path including ones that don't exist, so a 307 proves nothing about whether a route shipped). The Points nav entry is live. |
 | **Database** | All 15 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`). Stage 6 phase 1 added `20260730000014_member_directory.sql` — `attendance_rate`, `members.notes`, and `'roster'` as an `admin_audit` entity type — pushed to both, types regenerated from `--linked`. |
 | ⚠️ **Merged mid-stage** | Merged at the end of each phase rather than at the end of the stage, deliberately, so the work is visible in production. It worked — the queue was resolving real submissions while `/admin/points` was still being written. Do the same in Stage 6. |
-| **Next task** | **Stage 6 phase 2 — selection and extraction**, which is where the stage's exit criteria are met. **Start by walking phase 1 through a browser**: `/admin/members` is built, tested, and lint/build clean, but no human has looked at it. |
+| **Next task** | **Stage 6 phase 2 — the EID switch.** **Start by walking phase 1 through a browser**: `/admin/members` is built, tested, and lint/build clean, but no human has looked at it, and doing it *before* the rework keeps any defect attributable to phase 1. ⚠️ **The stage was re-planned on 2026-08-01** and now runs to nine phases — read "What changed and why" in the Stage 6 section before picking up anything; the old phase 2 (selection and extraction) is now phase 5. |
 | **Local database** | **Freshly reset 2026-08-01** and back to the documented seed exactly: 32 members, 15 events, 208 attendance, 6 adjustments, 2 audit rows, 29 leaderboard rows, `current_term()` = Spring 2026. ⚠️ The reset wiped local `auth.users`, so **re-create the dev officer before signing in to `/admin`** — see the command below. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
@@ -358,24 +358,41 @@ Three things not to rediscover the hard way:
 
 ## Now — Stage 6: Member directory
 
-*The screen officers will actually live in (§7 Stage 6). 4–5 days **plus** the merge tool, which carries its own estimate. Six phases, same shape as Stage 5: each ends in something demonstrable, and each merges to `main` as it lands rather than waiting for the stage. Branch: `stage-6-member-directory` off current `main`.*
+*The screen officers will actually live in (§7 Stage 6). **Re-planned 2026-08-01**, after phase 1 had already shipped — see "What changed and why" below. Nine phases now, same shape as Stage 5: each ends in something demonstrable, and each merges to `main` as it lands rather than waiting for the stage. Branch: `stage-6-member-directory` off current `main`.*
 
-**Exit criterion, and the thing to build toward:** an officer filters to members who attended fewer than three events this term, sees an accurate count, clicks copy-emails, and pastes a complete list — **every** matching member, not just the visible page. That is reachable at the end of phase 2; phases 3–6 are the rest of the screen.
+**Exit criterion, and the thing to build toward:** an officer filters the directory to members whose **Paid Dues = No**, sees an accurate count, clicks copy-emails, and pastes a complete list — **every** matching member, not just the visible page. That is reachable at the end of **phase 5**; phases 6–9 are the rest of the screen.
 
-### Before writing any code — four things the schema does not have yet
+The criterion used to read "attended fewer than three events this term". That query no longer fits the screen: `events_attended` is not a directory column any more, and filtering now narrows to what is displayed. It moves to the relational filters in phase 6 — and the replacement is a better demonstration anyway, since it exercises the custom-field machinery that phase 4 introduces.
 
-Found by reading `20260730000008_views.sql` and `20260730000002_members.sql` against §7's feature list, not by guessing. Each one is cheap now and expensive after the UI depends on it (§7's "don't rush Stage 1" applies again here).
+### What changed and why (2026-08-01)
 
-- **`member_directory` has no `attendance_rate` column**, only `events_attended` and `events_possible`. PostgREST cannot filter or sort on a computed expression, so "attendance-rate threshold" and a sortable rate column are impossible until the rate exists *in the view*. Add `attendance_rate` as `events_attended::numeric / nullif(events_possible, 0)` — nullable by construction, since a term with no completed events has no rate, and that must render as "—" rather than 0%.
-- **`members` has no `notes` column**, and §7 puts officer notes on the member detail page.
-- **`admin_audit` has no natural row shape for an export.** `entity_id` is `uuid not null` and the `entity_type` check is `('attendance','event','member','point_adjustment')` — but an export spans N members and is not an entity. §6 nevertheless calls export the largest PII egress point in the system and requires it logged with the filter used and the row count. **Decide this in phase 1, don't discover it in phase 2.** Recommendation: widen the check with `'roster'` and give each export its own generated uuid as a receipt id, which keeps `entity_id` non-null and the `(entity_type, entity_id, acted_at)` index meaningful; the filter and count go in `before`/`after` and `note`.
-- **`AuditAction` has no `member.*` verbs at all.** Stage 6 adds roughly `member.created`, `member.updated`, `member.deactivated`, `member.merged`, `member.imported`, `roster.exported` — and the SQL column is free text, so the union is the only thing enforcing them. Extend it in the same commit as the first mutation that uses one.
+Four decisions, taken after phase 1 was built, merged, and deployed. Together they invalidated enough of phases 2–6 to be worth re-planning rather than patching.
 
-**One inconsistency to decide rather than inherit:** `pending_count` and `last_seen_at` in `member_directory` are **not** term-scoped, while every column beside them is. That is defensible — a pending row from last term still needs review, and "last seen" is a genuinely all-time question — but a "not seen since October" filter sitting next to term-scoped point columns will be read as term-scoped by whoever uses it. Pick one, and label the column in the UI to match.
+1. **"Student ID" becomes "EID"** — and not merely as a label. The identifier itself becomes a real UT EID (alphanumeric, `abc1234`), replacing the `UT` + six-sequential-digit format the seed and the suggestion ranker were built around.
+2. **The directory shrinks to four columns** — Name, Email, EID, Total Points — plus officer-defined custom fields. Everything else moves to a per-member detail page.
+3. **Officers can define their own member fields**, primarily dropdowns (Paid Dues → Yes/No, T-shirt size → S/M/L). Non-calculated fields are editable inline from the directory, and inline-editability is chosen when the field is created.
+4. **Sorting and filtering narrow to what is displayed**, custom fields included.
+
+**Two structural consequences drove the new phase order.** Neither is obvious and both are expensive to find late:
+
+- **The detail page can no longer wait until phase 3.** Removing six columns from the directory before their new home exists makes that data unreachable. The column reduction and `/admin/members/[id]` must land in the same phase, and now do.
+- 🪤 **`create or replace view` cannot rename an output column.** `member_directory` pins `student_id` as an output name (`20260730000008_views.sql:48`, re-pinned at `20260730000014_member_directory.sql:61`). Renaming it to `eid` needs `drop view` + recreate + re-`grant select … to authenticated`. Migration 14 chose `create or replace` *specifically to avoid* dropping the grant on a §6 security boundary — so this reverses a written rule and is recorded as an exception in `CLAUDE.md` rather than done quietly.
+
+### Schema gaps — three closed by migration 14, three opened by the re-plan
+
+The original four were found by reading `20260730000008_views.sql` and `20260730000002_members.sql` against §7's feature list. **Three are closed:** `member_directory.attendance_rate` exists, `members.notes` exists, and `admin_audit`'s `entity_type` check now carries `'roster'` so an export can be its own receipt row. The fourth is still open, and the re-plan adds two more. Each is cheap now and expensive once the UI depends on it — §7's "don't rush Stage 1" applies again here.
+
+- **`AuditAction` still has no `member.*` verbs.** Phase 4 adds `member.updated`, `member_field.created`, `member_field.updated`, `member_field.archived`; phase 5 adds `roster.exported`; phase 7 adds `member.imported` and phase 8 `member.merged`. The SQL column is free text, so the TypeScript union is the only thing enforcing them — extend it in the same commit as the first mutation that uses one, and add a matching entry to `formatAuditAction`'s `LABELS` or the trail renders the raw verb.
+- **`members` has no `updated_at`, so member edits have no compare-and-set anchor.** `events` and `attendance` both carry one; `members` never needed one because nothing edited a member. Inline editing changes that. Phase 4 adds the column and the `set_updated_at()` trigger.
+- **Custom field values have nowhere to live, and the storage choice is forced by sorting.** PostgREST orders by column, never by a computed expression — the exact wall migration 14 hit with `attendance_rate` — and a `create or replace` view cannot grow a column per officer-defined field. An EAV values table cannot be sorted from the parent under pagination at all. Phase 4 resolves this with a JSONB column; the reasoning and the fallback are recorded there.
+
+**One inconsistency to decide rather than inherit:** `pending_count` and `last_seen_at` in `member_directory` are **not** term-scoped, while every column beside them is. That is defensible — a pending row from last term still needs review, and "last seen" is a genuinely all-time question — but sitting next to term-scoped point columns they will be read as term-scoped by whoever uses them. **Resolved by the re-plan:** both move to the detail page (phase 3), where they are labelled all-time explicitly and sit apart from the term-scoped block. The "not seen since" filter in phase 6 must carry the same label.
 
 ### ✅ Phase 1 — schema, `lib/filters.ts`, read-only `/admin/members` (2026-08-01)
 
 *Numbering note: this is **migration 14** (`20260730000014_member_directory.sql`). The plan above called it "migration 15" by counting files rather than following the existing convention, where `…000013` is "migration 13".*
+
+⚠️ **Partly superseded by the 2026-08-01 re-plan.** Three things built here are replaced in phase 3: the ten-column table, the ten-entry `MEMBER_SORTS` allow-list, and the six view-column filters. **Migration 14 itself stands unchanged** — `attendance_rate`, `members.notes`, and the `'roster'` entity type are all still correct, and `attendance_rate` now backs the detail page instead of a directory column. `lib/filters.ts` keeps its shape (total parse, round-tripping params, pagination outside `applyMemberFilter`, structural query typing); what changes is which columns it knows about.
 
 - [x] **Migration 14** — `attendance_rate` on `member_directory`, `members.notes`, and `admin_audit`'s `entity_type` widened with `'roster'`. **Applied to local and the remote**; types regenerated from `--linked`, so the `__InternalSupabase` block is intact and the diff is purely additive.
   - The view is `create or replace`, not drop-and-create: dropping would take the `authenticated` grant with it, and this view is a §6 security boundary. The replace form can only *append* columns, which is why `attendance_rate` sits last rather than beside the counts it comes from.
@@ -398,55 +415,121 @@ Found by reading `20260730000008_views.sql` and `20260730000002_members.sql` aga
 
 **Not done in this phase, deliberately:** the browser walkthrough. Every Stage 5 phase was verified in a real browser and each one found something the tests could not, so this is a genuine gap rather than a skipped formality — see the note under phase 2.
 
-### Phase 2 — selection and extraction · **exit criteria met here**
+### Phase 2 — the EID switch
 
-- [ ] **Walk phase 1 through a browser first.** `/admin/members` has never been looked at by a human — the auth gate was confirmed (signed out ⇒ 307 to `/admin/login` with `next` preserved) and everything else rests on tests and the build. Stage 5 found three defects this way that no test caught, all of them in exactly this kind of screen: a control whose enabled state came from the wrong source, a count that outlived its checkboxes, and an audit diff that invented changes. Sign in locally as `dev@example.edu` (recreate with `create-officer.mjs --local` after any `db reset`) and check the sort arrows, the paging links, the CLEAR button, and that the rate column reads `—` rather than `0%` where it should.
+*Cross-cutting, mechanical, and wide — **39 code / SQL / test files carrying 480 occurrences**, plus 4 markdown files, measured 2026-08-01 with `grep -riE "student_?id"` excluding `.next` and `node_modules`. Deliberately first and deliberately alone: it touches the public check-in path, the attendance review screens, and the suggestion ranker, and mixing it with the directory rework would leave both unreviewable. First also means every later phase writes `eid` from the start instead of renaming twice.*
+
+- [ ] **Walk phase 1 through a browser before touching anything.** `/admin/members` has never been looked at by a human — the auth gate was confirmed (signed out ⇒ 307 to `/admin/login` with `next` preserved) and everything else rests on tests and the build. Doing it before the rework means any defect found is attributable to phase 1 rather than to the change on top of it. Stage 5 found three defects this way that no test caught, all in exactly this kind of screen: a control whose enabled state came from the wrong source, a count that outlived its checkboxes, and an audit diff that invented changes. Sign in locally as `dev@example.edu` (recreate with `create-officer.mjs --local` after any `db reset`) and check the sort arrows, the paging links, and the CLEAR button.
+  - 🪤 **The `—` rate case is not observable on either database, so don't tick it off by eye.** `events_possible` is a term-wide scalar, identical for every member, so `attendance_rate` is null for everyone or for no one. The remote currently has 12 completed published Spring 2026 events and **zero** null rates. Seeing `—` requires pinning `app_settings.current_term` to a term with no completed events — a write, so local only.
+- [ ] **Migration 15 — the rename.** `members.student_id` → `eid`, `members.normalized_student_id` → `normalized_eid`, `attendance.submitted_student_id` → `submitted_eid`, `attendance.normalized_student_id` → `normalized_eid`. Generated-column expressions follow a base-column rename automatically. Rename the constraints and indexes carrying the old name too: `members_student_id_not_blank`, `attendance_id_not_blank`, `members_normalized_id`, `attendance_normalized_idx`, and the `attendance_one_per_event` unique index.
+  - **Drop and recreate `member_directory`**, re-granting `select … to authenticated` in the same migration — `create or replace` cannot rename an output column. DDL is transactional, so there is no window where the grant is missing; the hazard is a migration that *forgets* the re-grant. Say so in the migration header.
+  - **Switch the normalization from `upper()` to `lower()`.** EIDs are conventionally lowercase, and today's screens would render "matches as ABC1234" at a member who typed `abc1234`. PG17 supports `alter table … alter column … set expression as (…)` and both local and remote are 17.x — verify on both. Fallback is dropping and re-adding the generated column, which changes column order but is otherwise safe at this size.
+  - Apply to local **and** remote, regenerate types from `--linked` (`--local` omits the `__InternalSupabase` block).
+- [ ] **Retune the suggestion ranker** — `lib/attendance.ts`, the ID block in `scoreMemberMatch`. Two rules lose their basis with alphanumeric EIDs:
+  - **Remove `id_contains` (+35) and its `MatchReason` kind.** It exists solely to catch a dropped `UT` prefix — its own comment says so. With short alphanumeric EIDs it degrades into a broad substring match that clears `MIN_SUGGESTION_SCORE` on its own. The kind is computed per request and never stored, so removing it is safe.
+  - **Reconsider distance-1 standing alone (+45).** It was calibrated against 8-char strings with a constant 2-char prefix. EIDs are shorter, drawn from a 36-symbol alphabet, and derived from name initials — so members share prefixes and distance-1 collisions get *more* likely, not less.
+  - 🪤 **Recalibrate empirically, not by guessing constants.** The current numbers came from finding three confident-looking strangers on a real review screen for `Rowan Pike`. Regenerate the seed first, then re-run the phase-2 review screens and set the floor against what actually appears.
+- [ ] **Code and copy** — `normalizeStudentId` → `normalizeEid` in `lib/checkin.ts` (kept in lockstep with the SQL expression; `tests/normalization.test.ts` is the lock); both copies of the ID block in `lib/validation.ts` (messages to "EID", minimum normalized length 2 → 3, since the shortest real EIDs are 3 characters and the old floor is what made substring matching dangerous); `MEMBER_SORTS` in `lib/filters.ts`; every `<th>Student ID</th>` and form label.
+  - Drop `tabular-nums` from the EID cell — it is a numeric-figures feature and does nothing for `abc1234`.
+  - `/attend` input: `autoCapitalize="characters"` → `none`, plus `autoCorrect="off"`.
+  - `?sort=student_id` is a **user-visible URL token** and bookmarks will break. `parseMemberFilter` already falls back to `name` on an unknown sort, so the failure is graceful — no redirect shim needed.
+  - `tests/attendance-review.test.ts` re-implements the normalization inline rather than importing it. Import it, so the rename cannot leave a stale copy behind.
+- [ ] **Seed and fixtures** — the largest single chunk of the phase. `seed.sql` generates IDs as `100000 + row_number()` in four formats; replace with EID-shaped values, keeping mixed case (case-insensitivity is now the only thing normalization buys) and a marker prefix. Re-pick the `Rowan Pike` / `Sage Delacroix` near-miss fixtures at the new distances. Then `tests/helpers.ts`'s ID factory, `tests/normalization.test.ts`'s pathological inputs, `tests/checkin.test.ts`'s format-variant builder, and ~53 `UT1xxxxx` literals in `tests/attendance.test.ts` including `diffStudentId`'s hard-coded expected indices.
+  - ⚠️ **Seed EIDs must stay obviously fake — this repo is public.** They now *look* like real credentials in a way `UT-100001` did not.
+- [ ] Docs: architecture doc DDL and §4.2 narrative, `CLAUDE.md`, `docs/attend-confirmation-flow.md`, `README.md`
+
+### Phase 3 — the reshaped directory and `/admin/members/[id]`
+
+*These land together or the displaced data becomes unreachable.*
+
+- [ ] **Directory down to four columns** — Name (linking to the detail page), Email, EID, Total Points
+- [ ] `MEMBER_SORTS` shrinks to `name`, `email`, `eid`, `total_points`. **`email` is newly sortable** — it was displayed in phase 1 but not sortable.
+- [ ] **Filters trim to the displayed columns**: a total-points range, plus the two exceptions below. Drop the events, rate, joined-date, and source controls from the UI.
+  - **`state` (active/inactive) stays, framed as a scope selector rather than a column filter.** It is not a displayed column, but dropping it would strand inactive members with no route to them at all — they are excluded from `leaderboard` too.
+  - **Free-text search across name / email / EID moves up from phase 6.** It filters only displayed columns, so it belongs here, and without it the screen has almost no filtering left.
+- [ ] `parseMemberFilter` must keep **tolerating** the removed params rather than rejecting them — existing URLs and bookmarks carry them, and it is already total with a per-field fallback
+- [ ] **Do not remove columns from the view.** The detail page needs every one of them.
+- [ ] **`/admin/members/[id]` — read-only in this phase**; mutations arrive in phase 4. Carries everything displaced from the directory: joined, source, active, events attended / possible, attendance rate, attendance points, bonus points, pending count, last seen. Label the term scope, and label `pending_count` and `last_seen_at` as **all-time** — they are the two columns in `member_directory` that are not term-scoped, and this is where that stops being ambiguous.
+- [ ] **The events grid — current term only**, matching the `current_term()` scoping invariant, with the term named on the grid. Published events only; a cancelled event credits nobody.
+  - **Three states, not two: attended, missed, and _upcoming_.** `events_possible` counts only events where `ends_at < now()`, so an event that has not happened yet is not a miss — rendering it as one makes every member look worse at the start of a term.
+  - Two queries joined in the Server Component (term events; this member's attendance), not one PostgREST embed
+- [ ] Point-adjustment history, and the shared `AuditTrail` with `entityType="member"` (already an allowed entity type)
+- [ ] Unchanged and load-bearing throughout: `.order("id")` last for a total order, `nullsFirst: false`, `applyMemberFilter` never paginating, one unbroken `as const` select literal
+
+### Phase 4 — custom fields
+
+- [ ] ⚠️ **Spike first, before any UI.** Confirm that supabase-js `.order()` accepts a JSON path (`custom_fields->>key`) and that it survives `.range()` pagination, against **both** the local stack and the hosted project. Every sortable-custom-column claim rests on it. If it does not hold, the fallback is a fixed set of generic `custom_1 … custom_n` text columns on `members` — natively sortable, uglier, and capped.
+- [ ] **Migration 16 — `member_field_definitions`**: `key` (stable machine key, `^[a-z][a-z0-9_]*$`, unique, rejected if it collides with a built-in sort key), `label`, `kind` (`check (kind in ('select'))` — dropdown only for now, with room to add `text`/`boolean` later without a data migration), `options text[]` (non-empty, no blank entries, bounded), `editable_inline boolean` (**the "option when creating the field"**), `show_in_directory boolean` (otherwise every field ever created widens the table forever), `sort_order`, `archived_at`, plus the house `created_by` / `created_at` / `updated_at` + trigger. RLS enabled, no policies, per every other table.
+- [ ] **Values live in `members.custom_fields jsonb not null default '{}'`**, keyed by definition `key`, with a GIN index. The reason is sorting, not taste: PostgREST orders by column and an EAV values table cannot be sorted from the parent under pagination — the same wall migration 14 hit with `attendance_rate`, and a `create or replace` view cannot grow a column per officer-defined field.
+- [ ] `members.updated_at` + the `set_updated_at()` trigger — the CAS anchor inline editing needs, and `members` has none today
+- [ ] Append `custom_fields` and `notes` to `member_directory` (`create or replace` suffices — appending only), and widen `admin_audit.entity_type` with `'member_field'`
+- [ ] **`app/actions/members.ts` and `lib/members.ts`** — the house action shape: `getOfficer()` guard, zod validation that the submitted value is one of the definition's `options` (or empty to clear), CAS on `members.updated_at` carried as the **raw PostgREST string**, `writeAudit`, `revalidatePath`, `redirect()` outside the try/catch. `AUDITED_MEMBER_COLUMNS` as one unbroken `as const` literal, used by **both** sides of the audit before/after.
+- [ ] New `AuditAction` verbs — `member.updated`, `member_field.created`, `member_field.updated`, `member_field.archived` — each with a matching entry in `formatAuditAction`'s `LABELS`
+- [ ] 🐛 **Fix a latent bug while here:** `AuditEntityType` in `app/actions/audit.ts` is missing `'roster'`, which migration 14 added to the SQL check. The union is the only thing enforcing entity types on the TS side.
+- [ ] `parseMemberFilter` gains a definitions argument so it can validate custom sort keys while staying pure (tests pass a fake list). Sort keys are namespaced **`cf:<key>`** so a custom field can never collide with a built-in, and an unrecognized key falls back to `name`.
+- [ ] **`/admin/members/fields`** — create, edit, archive definitions. **Archiving never deletes stored values**; a hard delete would silently rewrite history.
+- [ ] **Inline editing in the directory.** The table becomes a Client Component for the `<select>` cells — `member-table.tsx` already carries a note that the row markup should move wholesale rather than the file gaining `"use client"`. One small form per editable cell, which sidesteps both the "never `formAction` on a submit button whose `name` you read" and "one carrier per field name" traps at once. Dates must stay pre-formatted props.
+- [ ] Detail page gains the full field set (including `show_in_directory = false` fields) and the officer-notes editor, on the same `member.updated` plumbing
+- [ ] **Decide and write down who may define fields and who may edit values.** Recommendation: any officer for both, consistent with §9 #6 ("the audit log is the control, not a role gate"). Nothing in the codebase branches on `admin_profiles.role` today, and this should not be the first thing that does.
+
+### Phase 5 — selection and extraction · **exit criteria met here**
+
 - [ ] Row checkboxes plus **"select all N matching this filter"**, visibly distinct from "the 25 rows on this page"
-- [ ] Copy emails (comma-separated, ready for a To: field), copy names, copy TSV, download CSV — `lib/export.ts`, pure formatting
-- [ ] Every export writes an `admin_audit` row carrying the filter and the row count (§6)
+- [ ] Copy emails (comma-separated, ready for a To: field), copy names, copy TSV, download CSV — `lib/export.ts`, pure formatting, **custom-field columns included**
+- [ ] Every export writes an `admin_audit` row under entity type `'roster'` with its own generated receipt uuid, carrying the filter — custom-field predicates included — and the row count (§6)
 - [ ] Confirmation states the count that was actually copied, not the count that was selected
+- [ ] **Settle whether export is admin-only.** §6 says "consider restricting it"; §9 #6 decided any officer may *approve*, which is a different question. Decide it here and record which way and why.
 
-### Phase 3 — the relational filters and `/admin/members/[id]`
+### Phase 6 — the relational filters
 
-- [ ] **Attended *or* missed a specific event** — the query officers ask most often, and the one filter that cannot be expressed on `member_directory` at all: it needs an `attendance` subquery against a chosen `event_id`. Design `MemberFilter` in phase 1 knowing this is coming.
-- [ ] Has-pending-submissions, not-seen-since, free-text across name / ID / email
-- [ ] **`/admin/members/[id]`** — full attendance history, point-adjustment history, officer notes, and the shared `AuditTrail`. Make the attendance list easy to scan: this is where a mis-credited event gets noticed (see the traps below).
+- [ ] **Attended *or* missed a specific event** — the query officers ask most often, and the one filter that cannot be expressed on `member_directory` at all: it needs an `attendance` subquery against a chosen `event_id`
+- [ ] Has-pending-submissions, and not-seen-since (labelled **all-time**, matching the detail page)
+- [ ] The "attended fewer than N events this term" query displaced from the phase-3 trim lands here
+- [ ] `FilterableQuery` currently exposes only `eq` / `gte` / `lte` / `lt` / `order`. It needs `in` / `or` / `not` before any of this works — extend the structural type, not the page.
+- [ ] ⚠️ **Flag the tension in the UI.** These filter on data the directory no longer displays, which cuts against the phase-3 trim. Give them their own clearly-labelled advanced panel so it is obvious they narrow the list without being columns — otherwise the count and the visible columns look unrelated.
 
-### Phase 4 — saved presets and CSV import
+### Phase 7 — saved presets and CSV import
 
-- [ ] Saved filter presets, shared across officers ("award eligible", "missed last 3 meetings") — a new table, so a second migration, and RLS deny-all in its own migration like every other table
-- [ ] CSV roster import: preview-and-confirm, duplicate detection on `normalized_student_id`, a dry-run row count before committing. Same preview-then-write shape as the event edit-impact confirm.
+- [ ] Saved filter presets, shared across officers ("award eligible", "missed last 3 meetings") — a new table, so its own migration, and RLS deny-all in it like every other table
+- [ ] CSV roster import: preview-and-confirm, duplicate detection on `normalized_eid`, a dry-run row count before committing. Same preview-then-write shape as the event edit-impact confirm. Adds `member.imported`.
 
-### Phase 5 — the merge tool
+### Phase 8 — the merge tool
 
-*Explicitly allowed to follow the directory rather than gate it (§7, v1.22). Its own estimate; the 4–5 days above does not cover it.*
+*Explicitly allowed to follow the directory rather than gate it (§7, v1.22). Its own estimate.*
 
-- [ ] Preview-and-confirm, one `admin_audit` row naming both sides
-- [ ] Repoints `attendance.member_id` **and** `point_adjustments.member_id`
+- [ ] Preview-and-confirm, one `admin_audit` row naming both sides. Adds `member.merged`.
+- [ ] Repoints `attendance.member_id`, `point_adjustments.member_id`, **and now `members.custom_fields`**
 - [ ] **Handles the `attendance_one_per_event` collision as a decision, not a silent drop** — when both identities attended the same event, the officer chooses which row survives
+- [ ] **Conflicting custom-field values are the same shape of decision.** Two members with different answers for the same dropdown is an officer's call, not a silent overwrite.
 
-### Phase 6 — docs
+### Phase 9 — docs
 
 - [ ] Architecture doc version bump, `CLAUDE.md` invariants, this file
 - [ ] Final read-through of the whole stage — Stage 5's found four pieces of drift in one pass, all in docs nobody had reread
 
 ### 🪤 Traps specific to this stage
 
+- **`create or replace view` cannot rename an output column** — only append. This is why phase 2 needs an explicit `drop view` and a re-`grant`, reversing what migration 14 wrote down. A migration that drops and forgets the re-grant leaves `member_directory` unreadable by `authenticated` with no error at migration time.
+- **A JSONB text sort is lexicographic** — `"10"` sorts before `"2"`. Harmless for categorical dropdowns, and a real defect the day someone defines numeric-looking options. Decide then whether to store an explicit `sort_order` per option rather than sorting on the value.
+- **An unvalidated `order=` value must never reach the query.** Custom sort keys are validated against the live definition list, never passed through from the URL. This is the one place the `cf:` namespacing is load-bearing rather than cosmetic.
+- **The near-miss recalibration is empirical, not analytical.** The existing constants were set by looking at a real review screen offering three strangers, not by reasoning about edit distance. The new ones must be set the same way, against the new seed.
+- **Seed EIDs must stay obviously fake.** The repo is public, and EID-shaped values *look* like real credentials in a way `UT-100001` did not.
 - **The select-all bug is invisible against the seed.** The roster is **32 members, 29 active** — smaller than two pages at any sensible page size, so "copy emails" will look perfectly correct while silently returning one page. Either seed enough members to exceed the page size or drop the page size in the test; asserting 60 addresses from a 60-row filter across a 25-row page is the whole point of the coverage §7 asks for.
 - **A row cap can truncate an export silently, and local and hosted may not agree.** `config.toml` sets no `max_rows`, but the hosted project applies its own — so an export that is complete locally can come back short in production, which is the same partial-list failure wearing a different hat. Verify the effective cap on **both**, and page through explicitly rather than trusting one request.
 - **Don't reuse `fetchMemberOptions` for the directory query.** It is an active-only bounded scan built for pickers (`MEMBER_SCAN_LIMIT`, and the reason it is a scan and not an `ilike` probe is recorded on that constant). The directory needs its own paginated query over `member_directory`, including inactive members.
-- **Date filters stay Central-anchored and half-open** — `joined_at` and `last_seen_at` both. The existing `centralWallTimeToInstant` / `addCivilDays` pattern is the one to copy; a bare `.lte(date)` is a UTC-midnight cut that drops five hours and looks reasonable.
-- **Server Components own the date formatting** for `joined_at` and `last_seen_at`. Pass formatted labels down as props.
-- **Admin pages read through `createAdminClient()` behind `requireOfficer()`**, as every existing admin screen does. `member_directory` is granted to `authenticated` only and carries emails and student IDs — never read it from a Client Component with the anon key, and never loosen that grant to make one work.
-- **Whether export should be `admin`-role-only is still open.** §6 says "consider restricting it"; §9 #6 decided any officer may *approve*, which is a different question. Decide it in phase 2 and write down which way and why.
+- **Date filters stay Central-anchored and half-open** — `joined_at` and `last_seen_at` both, wherever they survive the phase-3 trim or return in phase 6. The existing `centralWallTimeToInstant` / `addCivilDays` pattern is the one to copy; a bare `.lte(date)` is a UTC-midnight cut that drops five hours and looks reasonable.
+- **Server Components own the date formatting** for `joined_at` and `last_seen_at`. Pass formatted labels down as props — and this gets sharper in phase 4, when the directory table becomes a Client Component for the inline `<select>` cells.
+- **Admin pages read through `createAdminClient()` behind `requireOfficer()`**, as every existing admin screen does. `member_directory` is granted to `authenticated` only and carries emails and EIDs — never read it from a Client Component with the anon key, and never loosen that grant to make one work.
+- **Whether export should be `admin`-role-only is still open.** §6 says "consider restricting it"; §9 #6 decided any officer may *approve*, which is a different question. Decide it in **phase 5** and write down which way and why.
 
 ### Carried in from earlier stages — the three §4.2 consequences this screen inherits
 
 All three are the deliberate exact-match design's bill coming due, not defects. Reasoning is in the doc's Stage 6 section (v1.21, revised v1.22).
 
 - 🪤 **Duplicate members still accumulate and nothing merges them — but far fewer of them** (revised v1.22). The main source of ghosts is gone: a double typo used to create a member silently, and now it is refused and re-prompted. What remains is someone who ticks "this is my first MISA event" *and* types badly, which is a narrower and mostly one-shot failure. Ghosts are still findable via `members.source = 'self_checkin'`. A merge must repoint `attendance.member_id` and `point_adjustments.member_id` and can hit `attendance_one_per_event` when both identities attended the same event — a real conflict to decide, not to swallow. Preview-and-confirm, one audit row naming both sides. Smaller in expectation, so it can follow the directory rather than gate it.
-- 🪤 **A valid-but-wrong student ID silently credits the wrong member — and got slightly *more* likely** (v1.22). The ID lookup runs before the email lookup, so mistyping into *another member's* real ID records you as them even though your own email would have matched. The one path where exact matching attributes attendance to the wrong human with nothing surfaced, and a confident typo that happens to hit a real ID now sails straight through as a matched member. Reordering just trades one silent mis-credit for another, so this is recorded rather than fixed — but merge tooling should assume mis-credits exist, and flagging a submitted-vs-matched email mismatch at check-in is the cheap partial mitigation. **This is the one the member detail page in phase 3 is the mitigation for** — it is where someone finally asks "why does this member have an event they didn't attend?"
-- 🪤 **A confirmed first-timer can leave a member row with no attendance.** If an officer already queued a manual row carrying that student ID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check against the "three checks, not one" invariant. Another `source = 'self_checkin'` row for the directory to surface — a member with zero attendance and a self-registered source is the shape to look for.
+- 🪤 **A valid-but-wrong EID silently credits the wrong member — and got slightly *more* likely** (v1.22). The EID lookup runs before the email lookup, so mistyping into *another member's* real EID records you as them even though your own email would have matched. The one path where exact matching attributes attendance to the wrong human with nothing surfaced, and a confident typo that happens to hit a real EID now sails straight through as a matched member. Reordering just trades one silent mis-credit for another, so this is recorded rather than fixed — but merge tooling should assume mis-credits exist, and flagging a submitted-vs-matched email mismatch at check-in is the cheap partial mitigation. **This is the one the member detail page in phase 3 is the mitigation for** — it is where someone finally asks "why does this member have an event they didn't attend?"
+  - ⚠️ **The EID switch makes this worse, and the reason is not obvious.** UT EIDs are derived from name initials, so students with similar names hold similar EIDs — the near-miss population is *correlated with the roster* rather than spread across a numeric range the way `UT-1000xx` was. A one-character typo is now meaningfully more likely to land on a real person, and more likely to land on someone plausibly confusable with you. Weigh this again when recalibrating the ranker in phase 2.
+- 🪤 **A confirmed first-timer can leave a member row with no attendance.** If an officer already queued a manual row carrying that EID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check against the "three checks, not one" invariant. Another `source = 'self_checkin'` row for the directory to surface — a member with zero attendance and a self-registered source is the shape to look for.
 
 ## Later
 
