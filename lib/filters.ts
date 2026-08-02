@@ -8,67 +8,77 @@
 // breaks is the page query and the export query drifting apart, so "copy all
 // 60 matching" quietly returns the 25 rows that happened to be rendered. The
 // defence is structural rather than careful: there is one filter object, parsed
-// in one place, and one function that turns it into a query. Phase 2's export
+// in one place, and one function that turns it into a query. Phase 5's export
 // re-derives the filter from the same URL and applies the same function, with
 // only the pagination differing.
-
-import { addCivilDays, centralWallTimeToInstant } from "@/lib/events";
+//
+// ⚠️ Phase 3 REMOVED six fields — `source`, `minEvents`, `maxEvents`, `minRate`,
+// `joinedFrom`, `joinedTo` — rather than merely hiding their controls. The
+// directory now shows four columns and filtering narrows to what is displayed,
+// and a filter with no control on screen is the phase-1 defect arriving from
+// the other direction: a count the officer cannot account for. parseMemberFilter
+// reads by key and is total, so an old bookmark carrying `minRate=50` is simply
+// ignored, and memberFilterToParams does not put it back in the URL.
+//
+// The Central-anchored half-open date-range translation went with them. Phase 6
+// needs it back for "not seen since"; the pattern to copy is the awarded-date
+// range in app/admin/(shell)/points/page.tsx.
 
 /** Rows per page in the directory. Small enough that the seeded roster of 32
  * actually paginates — a page size that fits the whole fixture set hides every
  * bug this screen is prone to. */
 export const PAGE_SIZE = 25;
 
-/** Sortable columns, as the URL spells them. Mapped to real column names by
+/**
+ * Sortable columns, as the URL spells them. Mapped to real column names by
  * SORT_COLUMNS below; the two are separate so a URL cannot name a column that
- * is not meant to be sortable. */
-export const MEMBER_SORTS = [
-  "name",
-  "eid",
-  "joined_at",
-  "events_attended",
-  "attendance_points",
-  "bonus_points",
-  "total_points",
-  "attendance_rate",
-  "last_seen_at",
-  "pending_count",
-] as const;
+ * is not meant to be sortable.
+ *
+ * Exactly the four columns the table displays (phase 3). Phase 1 allowed ten,
+ * which was right when the table had ten — a sort on a column nobody can see
+ * rearranges the list for no visible reason. `email` is newly sortable here: it
+ * was displayed from phase 1 but had no header of its own until now.
+ */
+export const MEMBER_SORTS = ["name", "email", "eid", "total_points"] as const;
 
 export type MemberSort = (typeof MEMBER_SORTS)[number];
 
 const SORT_COLUMNS: Record<MemberSort, string> = {
   name: "full_name",
+  email: "email",
   eid: "eid",
-  joined_at: "joined_at",
-  events_attended: "events_attended",
-  attendance_points: "attendance_points",
-  bonus_points: "bonus_points",
   total_points: "total_points",
-  attendance_rate: "attendance_rate",
-  last_seen_at: "last_seen_at",
-  pending_count: "pending_count",
 };
 
 export const MEMBER_STATES = ["active", "inactive", "all"] as const;
 export type MemberState = (typeof MEMBER_STATES)[number];
 
-export const MEMBER_SOURCES = ["admin", "self_checkin"] as const;
+/** How much free text the search box will carry. Long enough for a full name or
+ * an email, short enough that a pasted essay cannot become the query. */
+export const MAX_SEARCH_LENGTH = 64;
 
 export type MemberFilter = {
+  /**
+   * Active / inactive / all.
+   *
+   * Not a displayed column, and kept anyway — deliberately framed as a *scope
+   * selector* rather than a column filter. Dropping it with the rest of phase
+   * 1's filters would strand inactive members with no route to them at all;
+   * `leaderboard` excludes them too, so this screen is the only way to reach
+   * one.
+   */
   state: MemberState;
-  /** "" means any. `self_checkin` is how §4.2 says to find rows the check-in
-   * form created, which is the roster-cleanup query. */
-  source: string;
+  /**
+   * Free text across name / email / EID — the displayed identity columns, which
+   * is what keeps it inside "filtering narrows to what is displayed".
+   *
+   * Already sanitized: parseMemberFilter is the only thing that writes this, so
+   * anything holding a MemberFilter holds a string that is safe to interpolate
+   * into a PostgREST filter. See searchTerm() for what is stripped and why.
+   */
+  q: string;
   minPoints: number | null;
   maxPoints: number | null;
-  minEvents: number | null;
-  maxEvents: number | null;
-  /** Whole percent, 0–100, as typed. Converted to the view's fraction only at
-   * the point of querying. */
-  minRate: number | null;
-  joinedFrom: string;
-  joinedTo: string;
   sort: MemberSort;
   dir: "asc" | "desc";
   /** 1-based, as it appears in the URL. */
@@ -77,13 +87,7 @@ export type MemberFilter = {
 
 /** Sorts that read better largest-first when the officer has not said. */
 const DESC_BY_DEFAULT: ReadonlySet<MemberSort> = new Set<MemberSort>([
-  "events_attended",
-  "attendance_points",
-  "bonus_points",
   "total_points",
-  "attendance_rate",
-  "last_seen_at",
-  "pending_count",
 ]);
 
 /** Which way a column sorts when the officer picks it but says nothing about
@@ -113,10 +117,30 @@ function intOrNull(raw: string, max: number): number | null {
   return Math.min(floored, max);
 }
 
-/** A civil date (YYYY-MM-DD) or "". Rejects anything else rather than handing a
- * malformed string to centralWallTimeToInstant. */
-function civilDateOrEmpty(raw: string): string {
-  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : "";
+/**
+ * The search box's text, reduced to something safe to interpolate into a
+ * PostgREST filter string.
+ *
+ * Sanitizing happens here, at the one place a MemberFilter is built, rather
+ * than at the query — so every holder of a filter holds a safe string and there
+ * is no second escape step to forget. What goes:
+ *
+ * - `%` and `*` are ILIKE wildcards. A search box must not hand the user the
+ *   pattern language; `%` alone would silently match the entire roster.
+ * - `"` and `\` break the double-quoted value applyMemberFilter builds.
+ *
+ * What deliberately stays: `.`, `,`, `(`, `)`, `@`, `-`, `_`. The first four are
+ * PostgREST filter syntax and are handled by quoting the value instead, because
+ * stripping them would make `a.person@example.edu` unsearchable — and searching
+ * an email is most of the point. `_` is a single-character ILIKE wildcard, left
+ * in as a harmless over-match so underscored emails and EIDs still match.
+ */
+function searchTerm(raw: string): string {
+  return raw
+    .replace(/["\\%*]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_SEARCH_LENGTH);
 }
 
 /**
@@ -136,11 +160,6 @@ export function parseMemberFilter(params: RawParams): MemberFilter {
     ? (rawState as MemberState)
     : "active";
 
-  const rawSource = one(params, "source");
-  const source = (MEMBER_SOURCES as readonly string[]).includes(rawSource)
-    ? rawSource
-    : "";
-
   const rawSort = one(params, "sort");
   const sort: MemberSort = (MEMBER_SORTS as readonly string[]).includes(rawSort)
     ? (rawSort as MemberSort)
@@ -156,16 +175,14 @@ export function parseMemberFilter(params: RawParams): MemberFilter {
 
   const page = Math.max(1, intOrNull(one(params, "page"), 100_000) ?? 1);
 
+  // Any other key in `params` — `minRate`, `source`, `joinedFrom` from a phase-1
+  // bookmark, or anything a human typed — is ignored by construction: this reads
+  // the keys it knows and never enumerates the input.
   return {
     state,
-    source,
+    q: searchTerm(one(params, "q")),
     minPoints: intOrNull(one(params, "minPoints"), 1_000_000),
     maxPoints: intOrNull(one(params, "maxPoints"), 1_000_000),
-    minEvents: intOrNull(one(params, "minEvents"), 100_000),
-    maxEvents: intOrNull(one(params, "maxEvents"), 100_000),
-    minRate: intOrNull(one(params, "minRate"), 100),
-    joinedFrom: civilDateOrEmpty(one(params, "joinedFrom")),
-    joinedTo: civilDateOrEmpty(one(params, "joinedTo")),
     sort,
     dir,
     page,
@@ -197,22 +214,16 @@ export function memberFilterToParams(
   const params = new URLSearchParams();
 
   if (merged.state !== "active") params.set("state", merged.state);
-  if (merged.source) params.set("source", merged.source);
+  if (merged.q) params.set("q", merged.q);
 
   const numbers: [keyof MemberFilter, string][] = [
     ["minPoints", "minPoints"],
     ["maxPoints", "maxPoints"],
-    ["minEvents", "minEvents"],
-    ["maxEvents", "maxEvents"],
-    ["minRate", "minRate"],
   ];
   for (const [key, name] of numbers) {
     const value = merged[key];
     if (typeof value === "number") params.set(name, String(value));
   }
-
-  if (merged.joinedFrom) params.set("joinedFrom", merged.joinedFrom);
-  if (merged.joinedTo) params.set("joinedTo", merged.joinedTo);
 
   if (merged.sort !== "name") params.set("sort", merged.sort);
   // The direction is only omitted when it matches what this sort defaults to,
@@ -227,23 +238,21 @@ export function memberFilterToParams(
 }
 
 /** True when nothing narrows the roster beyond the default view. Used to
- * choose the empty-state wording, and by phase 2 to warn before an export of
+ * choose the empty-state wording, and by phase 5 to warn before an export of
  * everything. */
 export function isDefaultFilter(filter: MemberFilter): boolean {
   return memberFilterToParams({ ...filter, page: 1 }).toString() === "";
 }
 
-/** The five numeric filter boxes, as the strings they display. */
+/** The free-text and numeric filter boxes, as the strings they display. */
 export type MemberFilterFields = {
+  q: string;
   minPoints: string;
   maxPoints: string;
-  minEvents: string;
-  maxEvents: string;
-  minRate: string;
 };
 
 /**
- * What the numeric filter boxes should show for a given filter.
+ * What the typed-into filter boxes should show for a given filter.
  *
  * 🪤 Pure, exported, and tested because this is exactly what broke: the boxes
  * were uncontrolled (`defaultValue`), which React reads only at mount, so
@@ -252,17 +261,19 @@ export type MemberFilterFields = {
  * displayed value a function of the filter is the fix; keeping that function
  * here is what lets a test hold it.
  *
+ * The search box is in here for the same reason and not as an afterthought: it
+ * is the control most likely to be typed into and then cleared, so it is the
+ * one most likely to reproduce the original bug.
+ *
  * A null bound renders as empty, never "0". A `0` is a real bound that hides
  * rows, and the two must not be able to blur into each other.
  */
 export function memberFilterFields(filter: MemberFilter): MemberFilterFields {
   const show = (value: number | null) => (value === null ? "" : String(value));
   return {
+    q: filter.q,
     minPoints: show(filter.minPoints),
     maxPoints: show(filter.maxPoints),
-    minEvents: show(filter.minEvents),
-    maxEvents: show(filter.maxEvents),
-    minRate: show(filter.minRate),
   };
 }
 
@@ -318,7 +329,11 @@ export type FilterableQuery<Q> = {
   eq(column: string, value: string | number | boolean): Q;
   gte(column: string, value: string | number): Q;
   lte(column: string, value: string | number): Q;
-  lt(column: string, value: string | number): Q;
+  /** One PostgREST `or=(…)` group, as its comma-separated body. Arrives ahead of
+   * the roadmap, which files `in`/`or`/`not` under phase 6's relational filters
+   * — but free-text search across three columns is an `or` and nothing else.
+   * `lt` left with the joined-date range and returns with `in`/`not` in phase 6. */
+  or(filters: string): Q;
   order(
     column: string,
     options?: { ascending?: boolean; nullsFirst?: boolean }
@@ -330,7 +345,7 @@ export type FilterableQuery<Q> = {
  * NOT here — see the note below.
  *
  * This is the single translation from filter to query. The directory page and
- * phase 2's export must both go through it; a second hand-written query is how
+ * phase 5's export must both go through it; a second hand-written query is how
  * "select all N matching" starts returning a different set than the count that
  * was shown next to it.
  */
@@ -343,43 +358,31 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
   if (filter.state === "active") q = q.eq("active", true);
   else if (filter.state === "inactive") q = q.eq("active", false);
 
-  if (filter.source) q = q.eq("source", filter.source);
+  // Free text over the three identity columns the table displays. One `or`
+  // group, so it composes with the other clauses as a conjunction — three
+  // separate calls would be three ANDed groups and match nothing.
+  //
+  // ⚠️ The value is double-quoted. `.`, `,` and parentheses are PostgREST filter
+  // syntax, and an email is full of the first two — an unquoted
+  // `email.ilike.*a.person@example.edu*` is read as a malformed operator rather
+  // than as a search. searchTerm() has already removed the characters quoting
+  // cannot save us from (`"` and `\`) and the ILIKE wildcards, so nothing here
+  // needs a second escape pass.
+  if (filter.q) {
+    const like = `*${filter.q}*`;
+    q = q.or(
+      `full_name.ilike."${like}",email.ilike."${like}",eid.ilike."${like}"`
+    );
+  }
 
   if (filter.minPoints !== null) q = q.gte("total_points", filter.minPoints);
   if (filter.maxPoints !== null) q = q.lte("total_points", filter.maxPoints);
-  if (filter.minEvents !== null) q = q.gte("events_attended", filter.minEvents);
-  if (filter.maxEvents !== null) q = q.lte("events_attended", filter.maxEvents);
 
-  // The view stores a fraction; the URL carries whole percent. A member with no
-  // rate at all (a term with no completed events yet) has null here and is
-  // excluded by the comparison, which is the right answer: "no rate" is not
-  // "meets the threshold".
-  if (filter.minRate !== null) {
-    q = q.gte("attendance_rate", filter.minRate / 100);
-  }
-
-  // Central-anchored and half-open, like every other date range in the app. A
-  // bare .lte("joined_at", "2026-04-07") is a UTC-midnight cut that drops the
-  // last five or six hours of a Central day and looks entirely reasonable.
-  if (filter.joinedFrom) {
-    q = q.gte(
-      "joined_at",
-      centralWallTimeToInstant(filter.joinedFrom, "00:00").toISOString()
-    );
-  }
-  if (filter.joinedTo) {
-    q = q.lt(
-      "joined_at",
-      centralWallTimeToInstant(
-        addCivilDays(filter.joinedTo, 1),
-        "00:00"
-      ).toISOString()
-    );
-  }
-
-  // Nulls last in both directions: an unrated member or one never seen belongs
-  // at the bottom of the list whichever way it is sorted, not floating to the
-  // top of a descending sort as Postgres would otherwise put them.
+  // Nulls last in both directions. None of the four sortable columns is nullable
+  // today — that went with attendance_rate and last_seen_at in the phase-3 trim
+  // — but the option is kept rather than dropped: it is the correct default for
+  // this screen, and phase 4's custom fields are sparse by nature, so a member
+  // with no answer for a dropdown belongs at the bottom either way.
   q = q.order(SORT_COLUMNS[filter.sort], {
     ascending: filter.dir === "asc",
     nullsFirst: false,
@@ -399,7 +402,7 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
 /**
  * The row window for a page, as PostgREST's inclusive .range() bounds.
  *
- * Kept apart from applyMemberFilter on purpose: the export in phase 2 applies
+ * Kept apart from applyMemberFilter on purpose: the export in phase 5 applies
  * the identical filter and must NOT apply this. Making pagination the separate
  * step is what makes "the same query, unpaginated" expressible without copying
  * the filter logic.

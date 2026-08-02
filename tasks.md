@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–5 are complete. Stage 6 (member directory) is in progress — phases 1, 2a, and 2 of 9 built, merged, and deployed.** The stage was re-planned on 2026-08-01 after four design decisions landed on top of phase 1. Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–5 are complete. Stage 6 (member directory) is in progress — phases 1, 2a, 2, and 3 of 9 built.** The stage was re-planned on 2026-08-01 after four design decisions landed on top of phase 1. Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -12,13 +12,13 @@ Read this before touching anything; it is the state no file can tell you on its 
 
 | | |
 |---|---|
-| **Branch** | `main` and `stage-6-member-directory` are both at `c21327f`, in sync with `origin`, clean. Stage 6 merges to `main` **at the end of each phase** rather than at the end of the stage — keep doing that. |
-| **Production** | **Everything through Stage 6 phase 2 is live** on https://misa-website-beta.vercel.app. Verified by response, not assumed: `/`, `/attend`, `/officers` all 200; anon is **401** on `member_directory` and 200 on `leaderboard`. ⚠️ A 307 on an `/admin/*` path proves nothing about whether a route shipped — the proxy redirects paths that do not exist. |
-| **Database** | **18 migration files (through `…000017`), identical on local and the remote** (`gbxypeofjnhrhotlhyzs`) — confirmed with `npx supabase migration list --linked`. Phase 2 added **15** (anon revoke), **16** (the EID rename), and **17** (a data backfill rewriting the remote's pre-rename values). Types regenerated. |
+| **Branch** | Phase 3 is built on `stage-6-member-directory`, **not yet merged or deployed**; `main` is at `01f9f68`. Stage 6 merges to `main` **at the end of each phase** rather than at the end of the stage — keep doing that. |
+| **Production** | **Everything through Stage 6 phase 2 is live** on https://misa-website-beta.vercel.app; **phase 3 is not deployed yet.** Verified by response, not assumed: `/`, `/attend`, `/officers` all 200; anon is **401** on `member_directory` and 200 on `leaderboard`. ⚠️ A 307 on an `/admin/*` path proves nothing about whether a route shipped — the proxy redirects paths that do not exist. |
+| **Database** | **18 migration files (through `…000017`), identical on local and the remote** (`gbxypeofjnhrhotlhyzs`) — confirmed with `npx supabase migration list --linked`. Phase 2 added **15** (anon revoke), **16** (the EID rename), and **17** (a data backfill rewriting the remote's pre-rename values). **Phase 3 added none** and regenerated no types — the view already carried everything, which is what migration 14 was for. |
 | 🔴 **Production is NOT purely fake data** | It carries **one real member** — `Christian A Gonzales / cag7284`, `source = 'self_checkin'`, one attendance row — who self-registered through the live check-in form, plus a real officer account. This is why `seed.sql`'s guard refuses to run against it, and the guard is **right**: a wipe would destroy a real person's row. Production totals (33 members / 16 events / 209 attendance / 12 audit) therefore do **not** match the seed's 32/15/208/2, and are not supposed to. |
-| **Next task** | **Stage 6 phase 3 — the reshaped four-column directory and `/admin/members/[id]`.** They land in the same phase deliberately: removing six columns before the detail page exists makes that data unreachable. Read "What changed and why" in the Stage 6 section first — the stage runs to nine phases and the old phase 2 (selection and extraction) is now **phase 5**. |
+| **Next task** | **Stage 6 phase 4 — custom fields.** ⚠️ **Spike first, before any UI:** confirm supabase-js `.order()` accepts a JSON path (`custom_fields->>key`) and that it survives `.range()` pagination, against **both** the local stack and the hosted project. Every sortable-custom-column claim rests on it, and the fallback (fixed generic `custom_1 … custom_n` columns) is a different schema. Read "What changed and why" in the Stage 6 section first. |
 | **Local database** | **Reset 2026-08-02** and at the documented seed exactly: 32 members, 15 events, 202 present + 5 pending + 1 rejected attendance, 6 adjustments, 2 audit rows, 29 leaderboard rows, `current_term()` = Spring 2026. `seed.sql` now **asserts these counts itself** and aborts if any drifts. ⚠️ `admin_audit` climbs after that: `cleanup()` deliberately leaves audit rows behind (they cannot be deleted — P0001), so a local database that has run `npm test` shows ~10, not 2. Members stay at 32; the suite is member-neutral. ⚠️ The reset wiped local `auth.users`, so **re-create the dev officer before signing in** — command below. |
-| **Tests** | **264 across 14 files**, lint and build clean. Two files are new in phase 2: `tests/security.test.ts` (anon boundary) and `tests/seed-fixtures.test.ts` (the seeded near-miss fixtures against the real ranker). |
+| **Tests** | **283 across 15 files**, lint and build clean — **and `npx tsc --noEmit` is now clean too, which it had never been.** `tests/` is outside both the lint and the build graph, so run tsc explicitly; the reason it had been passing vacuously is recorded under phase 3. `tests/members.test.ts` is new. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
 
@@ -473,23 +473,32 @@ Neither blocks phase 3. Both were found by reading the code and would otherwise 
   - **What is actually wrong is the seed:** the three unmatched fixtures omit `source`, so they default to `'self_checkin'`, asserting a provenance the code cannot produce. A reader would reasonably conclude the form still does that. Fix is a comment or an explicit `source`, not a behaviour change.
 - ⚠️ **`on delete set null` turns a merge-tool bug into silent data loss** (phase 8). Merge repoints `attendance.member_id` and `point_adjustments.member_id`, then deletes the losing member. If it misses a row, Postgres will **not** raise — it nulls the link, and the attendance survives while the credit does not. That is the §4.2 failure mode arriving through the back door. Decide before phase 8 whether the FK should be `on delete restrict` with an explicit repoint-then-delete, so a miss fails loudly.
 
-### Phase 3 — the reshaped directory and `/admin/members/[id]`
+### ✅ Phase 3 — the reshaped directory and `/admin/members/[id]`
 
-*These land together or the displaced data becomes unreachable.*
+*These landed together, or the displaced data would have become unreachable. **No migration** — the first Stage 6 phase that needed none, which is what migration 14 was for.*
 
-- [ ] **Directory down to four columns** — Name (linking to the detail page), Email, EID, Total Points
-- [ ] `MEMBER_SORTS` shrinks to `name`, `email`, `eid`, `total_points`. **`email` is newly sortable** — it was displayed in phase 1 but not sortable.
-- [ ] **Filters trim to the displayed columns**: a total-points range, plus the two exceptions below. Drop the events, rate, joined-date, and source controls from the UI.
+- [x] **Directory down to four columns** — Name (linking to the detail page), Email, EID, Total Points. `active` and `source` are still selected but are not columns: they drive the INACTIVE / SELF badges beside the name.
+- [x] `MEMBER_SORTS` shrinks to `name`, `email`, `eid`, `total_points`. **`email` is newly sortable** — it was displayed in phase 1 but not sortable.
+- [x] **Filters trim to the displayed columns**: a total-points range, plus the two exceptions below.
+  - ⚠️ **The six retired fields left `MemberFilter` entirely rather than just losing their controls** — a decision taken deliberately, not a shortcut. A filter that still applies with no control on screen is the phase-1 defect arriving from the other direction: a count the officer cannot account for. An old bookmark carrying `minRate=50` now narrows nothing, which is visible and safe, and `memberFilterToParams` does not put it back in the URL. There is a test for exactly that.
   - **`state` (active/inactive) stays, framed as a scope selector rather than a column filter.** It is not a displayed column, but dropping it would strand inactive members with no route to them at all — they are excluded from `leaderboard` too.
-  - **Free-text search across name / email / EID moves up from phase 6.** It filters only displayed columns, so it belongs here, and without it the screen has almost no filtering left.
-- [ ] `parseMemberFilter` must keep **tolerating** the removed params rather than rejecting them — existing URLs and bookmarks carry them, and it is already total with a per-field fallback
-- [ ] **Do not remove columns from the view.** The detail page needs every one of them.
-- [ ] **`/admin/members/[id]` — read-only in this phase**; mutations arrive in phase 4. Carries everything displaced from the directory: joined, source, active, events attended / possible, attendance rate, attendance points, bonus points, pending count, last seen. Label the term scope, and label `pending_count` and `last_seen_at` as **all-time** — they are the two columns in `member_directory` that are not term-scoped, and this is where that stops being ambiguous.
-- [ ] **The events grid — current term only**, matching the `current_term()` scoping invariant, with the term named on the grid. Published events only; a cancelled event credits nobody.
-  - **Three states, not two: attended, missed, and _upcoming_.** `events_possible` counts only events where `ends_at < now()`, so an event that has not happened yet is not a miss — rendering it as one makes every member look worse at the start of a term.
-  - Two queries joined in the Server Component (term events; this member's attendance), not one PostgREST embed
-- [ ] Point-adjustment history, and the shared `AuditTrail` with `entityType="member"` (already an allowed entity type)
-- [ ] Unchanged and load-bearing throughout: `.order("id")` last for a total order, `nullsFirst: false`, `applyMemberFilter` never paginating, one unbroken `as const` select literal
+  - **Free-text search across name / email / EID moved up from phase 6.**
+- [x] `parseMemberFilter` **tolerates** the removed params — it reads by key and is total, so this is free; the test makes it explicit rather than incidental.
+- [x] **No column removed from the view.** The detail page needs every one of them.
+- [x] **`/admin/members/[id]` — read-only**; mutations arrive in phase 4. Joined, source, active, events attended / possible, attendance rate, attendance points, bonus points, pending count, last seen, the adjustment history, read-only officer notes, and the shared `AuditTrail` with `entityType="member"`.
+  - `pending_count` and `last_seen_at` sit in their own **All-time** block, apart from the term-scoped figures and labelled as such — this is where that ambiguity stops. The pending submissions are listed individually and link to `/admin/attendance/[id]`; the queue has no member scope to link to instead.
+  - `notes` is **not on the view** until phase 4 appends it, so it takes its own small read against `members`. Rendering it read-only means no column in the schema is unreachable from the UI at the end of this phase.
+- [x] **The events grid — current term only**, term named on the grid, published events only.
+  - **Three states, not two: attended, missed, and _upcoming_**, in `classifyTermEvents` (`lib/members.ts`, new). `now` is an argument so it is testable without touching the clock, and the boundary is the same half-open one the view uses.
+  - Two queries joined in the Server Component, not a PostgREST embed
+- [x] `.order("id")` last for a total order, `nullsFirst: false`, `applyMemberFilter` never paginating, one unbroken `as const` select literal — all unchanged
+- [x] **283 tests across 15 files** (from 264/14), lint, build and `tsc --noEmit` all clean
+
+**Three things worth carrying forward:**
+
+- 🪤 **Free-text search needs a quoted PostgREST value, and no pure test can prove it.** The `or` group is built as `full_name.ilike."*q*",email.ilike."*q*",eid.ilike."*q*"`. Unquoted, `.` and `,` are filter syntax — and every email is full of both, so `email.ilike.*a.person@example.edu*` parses as a malformed operator rather than as a search. Sanitizing happens once, in `parseMemberFilter` (strips `%`, `*`, `"`, `\`; deliberately keeps `.`, `,`, `@`, `-`, `_`), so nothing downstream needs a second escape pass. `tests/member-directory.test.ts` asserts the dots, a comma, case-insensitivity, and that the group composes with the roster scope as a conjunction rather than replacing it.
+- **`tests/member-directory.test.ts` isolates its 31 fixtures on the `t3q` EID marker now**, not on a `joined_at` in 2035 — that filter left with the trim. The marker is the better handle anyway: it selects the fixtures by something deliberately put there rather than by a date they happen to hold, and it puts the new `.or()` in front of real PostgREST, which is the only place a quoting bug can surface. Coverage that left with the retired filters is named in the file header so it is not silently forgotten.
+- 🪤 **`tsc --noEmit` had never actually checked the test suite.** `tests/filters.test.ts` declared `type Recorder = FilterableQuery<Recorder> & { calls: Call[] }`, which is circular to tsc — so it inferred `any` for every callback parameter in the file and stopped checking it. An `interface Recorder extends FilterableQuery<Recorder>` resolves lazily and does not. Fixing it immediately surfaced a real latent error in `tests/event-actions.test.ts`, where a `.select()` omitted `ends_at` from a row passed to `effectiveWindow()` — harmless only because that fixture sets an explicit `checkin_closes_at`. Both fixed; the whole repo is now `tsc` clean. Neither `npm run build` nor `npm run lint` covers `tests/`, so run `npx tsc --noEmit` to keep it that way.
 
 ### Phase 4 — custom fields
 
@@ -520,7 +529,7 @@ Neither blocks phase 3. Both were found by reading the code and would otherwise 
 - [ ] **Attended *or* missed a specific event** — the query officers ask most often, and the one filter that cannot be expressed on `member_directory` at all: it needs an `attendance` subquery against a chosen `event_id`
 - [ ] Has-pending-submissions, and not-seen-since (labelled **all-time**, matching the detail page)
 - [ ] The "attended fewer than N events this term" query displaced from the phase-3 trim lands here
-- [ ] `FilterableQuery` currently exposes only `eq` / `gte` / `lte` / `lt` / `order`. It needs `in` / `or` / `not` before any of this works — extend the structural type, not the page.
+- [ ] `FilterableQuery` exposes `eq` / `gte` / `lte` / `or` / `order`. **`or` arrived early in phase 3** for the free-text search; `lt` left with the joined-date range. This phase needs `in`, `not`, and `lt` back — extend the structural type, not the page, and add each to the recorder fake in `tests/filters.test.ts` in the same commit or that file stops compiling.
 - [ ] ⚠️ **Flag the tension in the UI.** These filter on data the directory no longer displays, which cuts against the phase-3 trim. Give them their own clearly-labelled advanced panel so it is obvious they narrow the list without being columns — otherwise the count and the visible columns look unrelated.
 
 ### Phase 7 — saved presets and CSV import
@@ -544,7 +553,8 @@ Neither blocks phase 3. Both were found by reading the code and would otherwise 
 
 ### 🪤 Traps specific to this stage
 
-- **`create or replace view` cannot rename an output column** — only append. This is why phase 2 needs an explicit `drop view` and a re-`grant`, reversing what migration 14 wrote down. A migration that drops and forgets the re-grant leaves `member_directory` unreadable by `authenticated` with no error at migration time.
+- **`create or replace view` cannot rename an output column** — only append. This is why phase 2 needed an explicit `drop view` and a re-`grant`, reversing what migration 14 wrote down. A migration that drops and forgets the re-grant leaves `member_directory` unreadable by `authenticated` with no error at migration time. Phase 4 appends `custom_fields` and `notes`, which `create or replace` handles — do not reach for a drop.
+- **Date filters left `lib/filters.ts` in phase 3 and come back in phase 6.** `joinedFrom`/`joinedTo` were the only Central-anchored half-open range this module carried, so its `centralWallTimeToInstant` / `addCivilDays` import went with them. "Not seen since" needs the same shape back; copy the awarded-date range in `app/admin/(shell)/points/page.tsx`, not a bare `.lte(date)`, which is a UTC-midnight cut that drops five hours and looks reasonable.
 - **A JSONB text sort is lexicographic** — `"10"` sorts before `"2"`. Harmless for categorical dropdowns, and a real defect the day someone defines numeric-looking options. Decide then whether to store an explicit `sort_order` per option rather than sorting on the value.
 - **An unvalidated `order=` value must never reach the query.** Custom sort keys are validated against the live definition list, never passed through from the URL. This is the one place the `cf:` namespacing is load-bearing rather than cosmetic.
 - **The near-miss recalibration is empirical, not analytical.** The existing constants were set by looking at a real review screen offering three strangers, not by reasoning about edit distance. The new ones must be set the same way, against the new seed.

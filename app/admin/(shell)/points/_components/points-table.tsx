@@ -75,8 +75,11 @@ export function PointsTable({
               </td>
               <td className="py-2 pr-4">
                 {row.members ? (
-                  // Filters the ledger rather than opening a member page:
-                  // /admin/members/[id] does not exist until Stage 6.
+                  // Filters the ledger rather than opening the member page,
+                  // deliberately: from here the useful next question is "what
+                  // else was awarded to this person", not "who are they". The
+                  // member page carries its own adjustment list for the other
+                  // direction.
                   <Link
                     href={memberHref(row.member_id)}
                     className="underline underline-offset-2"

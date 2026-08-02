@@ -7,6 +7,7 @@ import {
   parseMemberFilter,
   PAGE_SIZE,
 } from "@/lib/filters";
+import { classifyTermEvents } from "@/lib/members";
 
 import {
   cleanup,
@@ -19,15 +20,18 @@ import {
   type Tracker,
 } from "./helpers";
 
-// Integration tests for the directory query (§7 Stage 6 phase 1) against the
-// local stack — real PostgREST, real view, real ordering. The pure translation
-// is covered in filters.test.ts; what can only be checked here is that the
-// filter, the count, and the pages agree with each other on live data.
+// Integration tests for the directory query (§7 Stage 6, phases 1 and 3) against
+// the local stack — real PostgREST, real view, real ordering. The pure
+// translation is covered in filters.test.ts; what can only be checked here is
+// that the filter, the count, and the pages agree with each other on live data.
 //
-// Fixture members are isolated by `joined_at`: they are placed in 2035, which
-// no seed row occupies, so a joined-date filter selects exactly this file's
-// rows out of a table the seed also populates. The 2030 convention the other
-// files use for events does not help here — members have no term.
+// Fixture members are isolated by the free-text search on `t3q`, the marker
+// every testIdentity() EID carries (helpers.ts) and no seed EID does. Phase 1
+// isolated on a `joined_at` in 2035 instead; that filter left MemberFilter with
+// the phase-3 trim, and the marker is the better handle anyway — it selects the
+// fixtures by something deliberately put there rather than by a date they
+// happen to hold, and it puts the new `.or()` in front of real PostgREST, which
+// is the only place a quoting bug can surface.
 //
 // ⚠️ `tests/global-setup.ts` unpins `app_settings.current_term` for the run, so
 // `current_term()` is whatever today's date derives. The seed's 2026 events
@@ -35,30 +39,28 @@ import {
 // events this file creates. That makes the denominator small and knowable,
 // which is useful — but it also means a fixture member who attends one event
 // can legitimately sit at 100%.
+//
+// Coverage that left with the phase-3 trim, so it is not quietly forgotten: the
+// `source` narrowing (§4.2's roster-cleanup query) and the Central-anchored
+// half-open joined-date range. The date-range shape returns in phase 6 with
+// "not seen since"; the pure half of it is still asserted for the points
+// ledger's awarded-date range.
 
 const db = testClient();
 const track: Tracker = newTracker();
 
-/** Far outside the seed's range, and outside the 2030 event fixtures too. */
-const ISOLATION_DAY = "2035-06-15";
+/** The marker every testIdentity() EID carries. No seed EID contains it, and no
+ * real UT EID could. */
+const FIXTURE_MARKER = "t3q";
 
 /** Every fixture row in this file, active and inactive alike. Individual tests
  * narrow from here; the default `state: "active"` would silently exclude the
  * deactivated fixtures and make every count assertion off by three. */
 const isolated = () =>
-  parseMemberFilter({
-    joinedFrom: ISOLATION_DAY,
-    joinedTo: ISOLATION_DAY,
-    state: "all",
-  });
-
-function joinedAt(hour: number): Date {
-  // 2035-06-15 is CDT (UTC-5), so hour 12 Central is 17:00 UTC.
-  return new Date(Date.UTC(2035, 5, 15, hour + 5, 0, 0));
-}
+  parseMemberFilter({ q: FIXTURE_MARKER, state: "all" });
 
 const ROW_COLUMNS =
-  "id, full_name, active, source, events_attended, events_possible, attendance_rate, total_points" as const;
+  "id, full_name, email, eid, active, source, events_attended, events_possible, attendance_rate, total_points" as const;
 
 async function page(filter: ReturnType<typeof parseMemberFilter>) {
   const { from, to } = pageRange(filter.page);
@@ -85,9 +87,8 @@ beforeAll(async () => {
   for (let i = 0; i < FIXTURE_COUNT; i++) {
     const identity = testIdentity();
     const id = await createTestMember(db, track, identity, {
-      // Many members share an hour on purpose: it leaves the sort columns tied
-      // for most of the set, which is what makes the stability test meaningful.
-      joinedAt: joinedAt(1 + (i % 5)),
+      // Every fixture sits at zero points, so the sort column is tied across the
+      // whole set — which is what makes the page-stability test meaningful.
       active: i % INACTIVE_EVERY !== 0,
       source: i % SELF_CHECKIN_EVERY === 0 ? "self_checkin" : "admin",
     });
@@ -134,7 +135,7 @@ describe("the directory query on live data", () => {
   });
 
   it("keeps the page split stable across repeated reads", async () => {
-    // Every fixture member has zero points and most share a joined_at, so the
+    // Every fixture member has zero points, so the
     // sort column is tied across the whole set. Without the id tie-break in
     // applyMemberFilter the same request can return a different split each
     // time — which is how a member silently vanishes between page 1 and page 2.
@@ -155,46 +156,134 @@ describe("the directory query on live data", () => {
     expect(active.count + inactive.count).toBe(all.count);
   });
 
-  it("narrows on source, which is the roster-cleanup query", async () => {
-    // §4.2: members.source = 'self_checkin' is how an officer finds the rows
-    // the check-in form created.
-    const selfRegistered = await page({
-      ...isolated(),
-      source: "self_checkin",
-    });
+});
 
-    expect(selfRegistered.count).toBe(
-      Math.ceil(FIXTURE_COUNT / SELF_CHECKIN_EVERY)
-    );
-    expect(selfRegistered.rows.every((r) => r.source === "self_checkin")).toBe(
-      true
-    );
+// The whole isolation scheme above already proves the or-group works — every
+// test in this file selects its 31 fixtures with it. These pin the parts of it
+// that a pure test cannot reach, because they depend on how PostgREST actually
+// parses the filter string rather than on how we build it.
+describe("free-text search against real PostgREST", () => {
+  it("matches on each of the three columns it claims to search", async () => {
+    const identity = testIdentity();
+    const id = await createTestMember(db, track, identity);
+
+    for (const term of [identity.fullName, identity.email, identity.eid]) {
+      const { rows } = await page(parseMemberFilter({ q: term, state: "all" }));
+      expect(rows.map((r) => r.id)).toContain(id);
+    }
   });
 
-  it("includes a member who joined late on the last Central day of the range", async () => {
-    // 2035-06-15 22:00 Central is 2035-06-16 03:00 UTC. A bare
-    // .lte("joined_at", "2035-06-15") is a UTC-midnight cut and drops them.
+  it("survives the dots in an email, which are PostgREST filter syntax", async () => {
+    // ⚠️ This is the assertion the quoting in applyMemberFilter exists for.
+    // Unquoted, `email.ilike.*test.person.123@example.edu*` is read as a column
+    // and an operator rather than as a value — the request fails or, worse,
+    // matches something else. Every fixture email carries dots, so an unquoted
+    // build breaks here and nowhere in the pure tests.
     const identity = testIdentity();
-    const lateId = await createTestMember(db, track, identity, {
-      joinedAt: new Date(Date.UTC(2035, 5, 16, 3, 0, 0)),
+    const id = await createTestMember(db, track, identity);
+
+    const local = identity.email.split("@")[0];
+    expect(local).toContain(".");
+
+    const { rows } = await page(parseMemberFilter({ q: local, state: "all" }));
+    expect(rows.map((r) => r.id)).toContain(id);
+  });
+
+  it("does not treat a comma as a second condition", async () => {
+    // A comma separates conditions inside an or-group. Unquoted, a searched
+    // comma would split one predicate into two and silently widen the result —
+    // the partial/over-broad list failure this screen is prone to.
+    const { count } = await page(
+      parseMemberFilter({ q: `${FIXTURE_MARKER}, nobody`, state: "all" })
+    );
+    expect(count).toBe(0);
+  });
+
+  it("is case-insensitive, which is what ilike buys over like", async () => {
+    // Compared against the lower-case run rather than against FIXTURE_COUNT:
+    // earlier tests in this file add members carrying the same marker, so the
+    // absolute number is not stable across the file. The property under test is
+    // that case makes no difference, and that is what this asserts.
+    const lower = await page(isolated());
+    const upper = await page(
+      parseMemberFilter({ q: FIXTURE_MARKER.toUpperCase(), state: "all" })
+    );
+    expect(upper.count).toBe(lower.count);
+    expect(upper.count).toBeGreaterThanOrEqual(FIXTURE_COUNT);
+  });
+
+  it("composes with the roster scope rather than replacing it", async () => {
+    // An `or` group and an `eq` are ANDed. If the search ever escaped its group,
+    // "inactive only" plus a search would return active members too.
+    const inactive = await page(
+      parseMemberFilter({ q: FIXTURE_MARKER, state: "inactive" })
+    );
+    expect(inactive.count).toBe(Math.ceil(FIXTURE_COUNT / INACTIVE_EVERY));
+    expect(inactive.rows.every((r) => r.active === false)).toBe(true);
+  });
+});
+
+// The member detail page renders two things that come from different queries
+// and must agree: the view's "N of M completed" and the events grid beneath it.
+// Nothing forces them to — the grid is a left join from events, the view is an
+// aggregate over attendance — so this is the assertion that catches them
+// drifting. The classification itself is covered purely in members.test.ts.
+describe("the detail page's events grid agrees with the view", () => {
+  it("classifies the term's published events into exactly events_possible completed", async () => {
+    const identity = testIdentity();
+    const memberId = await createTestMember(db, track, identity);
+    await createTestAttendance(db, track, {
+      eventId: sharedEventId,
+      memberId,
+      submittedName: identity.fullName,
+      submittedEid: identity.eid,
+      submittedEmail: identity.email,
+      submittedAt: new Date(),
+      status: "present",
     });
 
-    const seen: string[] = [];
-    for (let p = 1; p <= pageCount(FIXTURE_COUNT + 1); p++) {
-      const { rows } = await page({ ...isolated(), page: p });
-      seen.push(...rows.map((r) => r.id!));
-    }
+    const { data: currentTerm, error: termError } = await db.rpc("current_term");
+    if (termError) throw new Error(termError.message);
 
-    expect(seen).toContain(lateId);
+    // Exactly the two queries the page runs.
+    const { data: termEvents, error: eventsError } = await db
+      .from("events")
+      .select("id, ends_at")
+      .eq("term", currentTerm)
+      .eq("status", "published");
+    if (eventsError) throw new Error(eventsError.message);
+
+    const { data: rows, error: attendanceError } = await db
+      .from("attendance")
+      .select("event_id, status")
+      .eq("member_id", memberId);
+    if (attendanceError) throw new Error(attendanceError.message);
+
+    const attended = new Set(
+      rows
+        .filter((r) => r.status === "present" && r.event_id)
+        .map((r) => r.event_id as string)
+    );
+    const grid = classifyTermEvents(termEvents, attended, new Date());
+
+    const { data: directory, error } = await db
+      .from("member_directory")
+      .select("events_attended, events_possible")
+      .eq("id", memberId)
+      .single();
+    if (error) throw new Error(error.message);
+
+    // The grid's completed events are the view's denominator. An upcoming event
+    // belongs to neither, which is the whole point of the third state.
+    expect(grid.attended + grid.missed).toBe(directory.events_possible);
+    expect(grid.attended).toBe(directory.events_attended);
   });
 });
 
 describe("attendance_rate", () => {
   it("is the term-scoped ratio of events attended to events completed", async () => {
     const identity = testIdentity();
-    const memberId = await createTestMember(db, track, identity, {
-      joinedAt: joinedAt(2),
-    });
+    const memberId = await createTestMember(db, track, identity);
     await createTestAttendance(db, track, {
       eventId: sharedEventId,
       memberId,
@@ -230,11 +319,9 @@ describe("attendance_rate", () => {
     // events at all, which cannot be produced here because the fixture event
     // above is one. A member who simply attended nothing has a genuine 0, and
     // must not be confused with "no rate": one sorts at the bottom, the other
-    // is excluded from a threshold filter entirely.
+    // would be excluded by a threshold filter entirely (phase 6's, now).
     const identity = testIdentity();
-    const memberId = await createTestMember(db, track, identity, {
-      joinedAt: joinedAt(3),
-    });
+    const memberId = await createTestMember(db, track, identity);
 
     const { data, error } = await db
       .from("member_directory")
@@ -248,20 +335,4 @@ describe("attendance_rate", () => {
     expect(data.attendance_rate).toBe(0);
   });
 
-  it("converts a whole-percent threshold into the view's fraction", async () => {
-    const all = await page(isolated());
-    const atLeastOne = await page({ ...isolated(), minRate: 1 });
-    const perfect = await page({ ...isolated(), minRate: 100 });
-
-    // Only the member who attended clears any threshold above zero; everyone
-    // else sits at a real 0.
-    expect(atLeastOne.count).toBeLessThan(all.count);
-    expect(atLeastOne.count).toBeGreaterThan(0);
-    expect(atLeastOne.rows.every((r) => (r.attendance_rate ?? 0) >= 0.01)).toBe(
-      true
-    );
-    // 100 in the URL must mean 1.0 in the query, not 100.0 — which would match
-    // nobody and look like an empty result rather than a unit error.
-    expect(perfect.rows.every((r) => (r.attendance_rate ?? 0) >= 1)).toBe(true);
-  });
 });

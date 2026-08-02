@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 
 import { requireOfficer } from "@/lib/auth";
-import { formatDay, formatInstant } from "@/lib/events";
 import {
   applyMemberFilter,
   isDefaultFilter,
@@ -25,10 +24,12 @@ import { Pagination } from "./_components/pagination";
 // `authenticated` only and must never be read from a Client Component with the
 // anon key (§6).
 //
-// Phase 1 is read-only: sorting, pagination, and the filters that live on the
-// view. The relational filters — attended or missed a specific event, has
-// pending submissions, free-text search — need an attendance subquery rather
-// than a column comparison and land in phase 3.
+// Four columns as of phase 3 — Name, Email, EID, Total Points — with everything
+// else on /admin/members/[id]. Still read-only: inline editing arrives with the
+// custom fields in phase 4, and selection and export in phase 5. The relational
+// filters (attended or missed a specific event, has pending submissions, not
+// seen since) need an attendance subquery rather than a column comparison and
+// land in phase 6, in their own labelled panel.
 
 export const metadata: Metadata = { title: "Members" };
 
@@ -37,8 +38,12 @@ export const metadata: Metadata = { title: "Members" };
 // off the string *literal*, so `"a, b" + "c"` widens to plain `string` and
 // collapses the result into an untyped error shape. The wrapped-and-concatenated
 // version of this line cost a build here too.
+//
+// `active` and `source` are not displayed columns — they drive the INACTIVE and
+// SELF badges beside the name. The view keeps every other column for the detail
+// page; nothing was dropped from the schema by this trim.
 const COLUMNS =
-  "id, eid, full_name, email, active, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate" as const;
+  "id, eid, full_name, email, active, source, total_points" as const;
 
 type DirectoryQueryResult =
   | { kind: "ok"; rows: MemberRow[]; total: number }
@@ -52,7 +57,7 @@ async function fetchDirectory(
   const { from, to } = pageRange(filter.page);
 
   // applyMemberFilter is the only thing that translates a filter into a query.
-  // Phase 2's export will call it on the same filter and skip the .range()
+  // Phase 5's export will call it on the same filter and skip the .range()
   // below — that separation is what keeps "copy all N matching" honest.
   const { data, error, count } = await applyMemberFilter(
     db.from("member_directory").select(COLUMNS, { count: "exact" }),
@@ -64,10 +69,9 @@ async function fetchDirectory(
     return { kind: "error" };
   }
 
-  // Timestamps are formatted here and the raw values dropped. The table renders
-  // on the server too, but keeping the discipline means a later "make this
-  // interactive" change cannot quietly turn a raw timestamp into a hydration
-  // mismatch.
+  // No timestamp reaches the table any more, so there is nothing to pre-format
+  // here — the columns that needed it moved to the detail page, which formats
+  // them on the server for the same reason.
   const rows: MemberRow[] = data.map((row) => ({
     id: row.id ?? "",
     eid: row.eid ?? "",
@@ -75,15 +79,7 @@ async function fetchDirectory(
     email: row.email ?? "",
     active: row.active ?? true,
     source: row.source ?? "admin",
-    joinedLabel: row.joined_at ? formatDay(row.joined_at) : "—",
-    eventsAttended: row.events_attended ?? 0,
-    eventsPossible: row.events_possible ?? 0,
-    attendancePoints: row.attendance_points ?? 0,
-    bonusPoints: row.bonus_points ?? 0,
     totalPoints: row.total_points ?? 0,
-    pendingCount: row.pending_count ?? 0,
-    lastSeenLabel: row.last_seen_at ? formatInstant(row.last_seen_at) : null,
-    rate: row.attendance_rate,
   }));
 
   return { kind: "ok", rows, total: count ?? rows.length };
@@ -110,11 +106,9 @@ export default async function AdminMembersPage({
       </h1>
 
       <p className="mt-3 max-w-2xl text-sm text-foreground/70">
-        The roster for the current term. Points, events attended, and the
-        attendance rate are all scoped to this term;{" "}
-        <span className="font-medium">pending submissions and last seen are
-        all-time</span>, because a submission from last term still needs an
-        officer.
+        The roster. <span className="font-medium">Total points are scoped to
+        the current term.</span> Open a member for their attendance, rate,
+        points breakdown, pending submissions, and history.
       </p>
 
       <div className="mt-6">

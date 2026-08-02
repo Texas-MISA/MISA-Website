@@ -501,7 +501,11 @@ describe("duplicateDraft against a stored row", () => {
     const { data: inserted, error } = await db
       .from("events")
       .insert(draft)
-      .select("id, status, series_id, points, category, starts_at, checkin_opens_at, checkin_closes_at")
+      // ends_at is not asserted on, but effectiveWindow() needs it — it falls
+      // back to it when checkin_closes_at is null. Selecting it keeps the row
+      // an honest EventWindowRow rather than one that happens to work because
+      // this fixture sets an explicit close.
+      .select("id, status, series_id, points, category, starts_at, ends_at, checkin_opens_at, checkin_closes_at")
       .single();
 
     expect(error).toBeNull();

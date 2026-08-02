@@ -9,6 +9,8 @@ import {
   memberFilterFields,
   memberFilterToParams,
   memberFilterUrl,
+  MAX_SEARCH_LENGTH,
+  MEMBER_SORTS,
   pageCount,
   pageRange,
   parseMemberFilter,
@@ -24,7 +26,13 @@ import {
 
 type Call = [method: string, ...args: unknown[]];
 
-type Recorder = FilterableQuery<Recorder> & { calls: Call[] };
+// An interface rather than a type alias, and not a style choice: a self-
+// referential `type Recorder = FilterableQuery<Recorder> & …` is circular to
+// tsc, which then infers `any` for every callback parameter below and silently
+// stops type-checking the file. Interfaces resolve lazily and do not.
+interface Recorder extends FilterableQuery<Recorder> {
+  calls: Call[];
+}
 
 function recorder(): Recorder {
   const calls: Call[] = [];
@@ -42,8 +50,8 @@ function recorder(): Recorder {
       calls.push(["lte", column, value]);
       return q;
     },
-    lt(column, value) {
-      calls.push(["lt", column, value]);
+    or(filters) {
+      calls.push(["or", filters]);
       return q;
     },
     order(column, options) {
@@ -70,14 +78,33 @@ describe("parseMemberFilter", () => {
     expect(isDefaultFilter(filter)).toBe(true);
   });
 
-  it("gives count-like columns a descending default", () => {
+  it("gives the points column a descending default and the text columns ascending", () => {
     expect(parseMemberFilter({ sort: "total_points" }).dir).toBe("desc");
-    expect(parseMemberFilter({ sort: "attendance_rate" }).dir).toBe("desc");
     expect(parseMemberFilter({ sort: "eid" }).dir).toBe("asc");
+    expect(parseMemberFilter({ sort: "email" }).dir).toBe("asc");
     // An explicit direction always wins over the default.
     expect(parseMemberFilter({ sort: "total_points", dir: "asc" }).dir).toBe(
       "asc"
     );
+  });
+
+  it("sorts on the four displayed columns and nothing else", () => {
+    // Email is newly sortable in phase 3 — displayed since phase 1, but with no
+    // header of its own until the table shrank to four columns.
+    expect(parseMemberFilter({ sort: "email" }).sort).toBe("email");
+    // The phase-1 sort keys are gone with their columns. A URL naming one must
+    // fall back rather than order by something nobody can see.
+    for (const retired of [
+      "joined_at",
+      "events_attended",
+      "attendance_points",
+      "bonus_points",
+      "attendance_rate",
+      "last_seen_at",
+      "pending_count",
+    ]) {
+      expect(parseMemberFilter({ sort: retired }).sort).toBe("name");
+    }
   });
 
   it("falls back rather than throwing on values a human edited into the URL", () => {
@@ -85,14 +112,41 @@ describe("parseMemberFilter", () => {
       state: "banana",
       sort: "'; drop table members; --",
       dir: "sideways",
-      source: "whatever",
       page: "-4",
     });
     expect(filter.state).toBe("active");
     expect(filter.sort).toBe("name");
     expect(filter.dir).toBe("asc");
-    expect(filter.source).toBe("");
     expect(filter.page).toBe(1);
+  });
+
+  it("tolerates a phase-1 bookmark without letting it narrow anything", () => {
+    // The six retired fields left MemberFilter entirely rather than merely
+    // losing their controls. An old URL must therefore parse to the default
+    // filter — not to an invisible narrowing the officer cannot account for,
+    // which is the phase-1 defect arriving from the other direction.
+    const filter = parseMemberFilter({
+      source: "self_checkin",
+      minEvents: "2",
+      maxEvents: "9",
+      minRate: "50",
+      joinedFrom: "2026-01-01",
+      joinedTo: "2026-06-30",
+    });
+    expect(isDefaultFilter(filter)).toBe(true);
+    // And it does not survive back into the URL.
+    expect(memberFilterToParams(filter).toString()).toBe("");
+    // Nor does it reach the query.
+    const calls = applyMemberFilter(recorder(), filter).calls;
+    expect(
+      calls.filter(
+        ([, column]) =>
+          column === "attendance_rate" ||
+          column === "events_attended" ||
+          column === "joined_at" ||
+          column === "source"
+      )
+    ).toHaveLength(0);
   });
 
   it("treats an unparseable number as no filter, never as zero", () => {
@@ -105,19 +159,6 @@ describe("parseMemberFilter", () => {
     expect(parseMemberFilter({ minPoints: "7.9" }).minPoints).toBe(7);
   });
 
-  it("clamps a rate to 0–100", () => {
-    expect(parseMemberFilter({ minRate: "150" }).minRate).toBe(100);
-    expect(parseMemberFilter({ minRate: "50" }).minRate).toBe(50);
-  });
-
-  it("ignores a malformed date rather than passing it to the zone helper", () => {
-    expect(parseMemberFilter({ joinedFrom: "2026-4-7" }).joinedFrom).toBe("");
-    expect(parseMemberFilter({ joinedFrom: "yesterday" }).joinedFrom).toBe("");
-    expect(parseMemberFilter({ joinedFrom: "2026-04-07" }).joinedFrom).toBe(
-      "2026-04-07"
-    );
-  });
-
   it("takes the first value when a key is repeated", () => {
     expect(parseMemberFilter({ state: ["inactive", "all"] }).state).toBe(
       "inactive"
@@ -125,16 +166,57 @@ describe("parseMemberFilter", () => {
   });
 });
 
+describe("the search term is sanitized where the filter is built", () => {
+  const q = (raw: string) => parseMemberFilter({ q: raw }).q;
+
+  it("keeps the characters an email or an EID is made of", () => {
+    // Stripping these would make most of the roster unsearchable, and searching
+    // an email is most of the point. applyMemberFilter quotes the value instead,
+    // which is what makes `.` and `,` safe to keep.
+    expect(q("a.person+tag@example.edu")).toBe("a.person+tag@example.edu");
+    expect(q("Nolan, Dara")).toBe("Nolan, Dara");
+    expect(q("vi-9701")).toBe("vi-9701");
+    expect(q("some_one")).toBe("some_one");
+    expect(q("O'Brien (Sam)")).toBe("O'Brien (Sam)");
+  });
+
+  it("strips the ILIKE wildcards, so a search box is not a pattern language", () => {
+    // A bare "%" would silently match the entire roster while reading as a
+    // legitimately-narrowed result.
+    expect(q("%")).toBe("");
+    expect(q("*")).toBe("");
+    expect(q("ni%all")).toBe("niall");
+  });
+
+  it("strips the two characters the quoted value cannot survive", () => {
+    expect(q('say "hi"')).toBe("say hi");
+    expect(q("back\\slash")).toBe("backslash");
+  });
+
+  it("collapses whitespace and caps the length", () => {
+    expect(q("  Dara   Nolan  ")).toBe("Dara Nolan");
+    expect(q("")).toBe("");
+    expect(q("   ")).toBe("");
+    expect(q("a".repeat(200))).toHaveLength(MAX_SEARCH_LENGTH);
+  });
+
+  it("round-trips a sanitized term through the URL", () => {
+    const filter = parseMemberFilter({ q: '  Dara %"Nolan"  ' });
+    expect(filter.q).toBe("Dara Nolan");
+    const again = parseMemberFilter(
+      Object.fromEntries(memberFilterToParams(filter))
+    );
+    expect(again).toEqual(filter);
+  });
+});
+
 describe("memberFilterToParams", () => {
   it("round-trips through parseMemberFilter", () => {
     const original = parseMemberFilter({
       state: "all",
-      source: "self_checkin",
+      q: "dara",
       minPoints: "3",
-      maxEvents: "9",
-      minRate: "40",
-      joinedFrom: "2026-01-01",
-      joinedTo: "2026-06-30",
+      maxPoints: "40",
       sort: "total_points",
       dir: "asc",
       page: "3",
@@ -170,7 +252,7 @@ describe("memberFilterToParams", () => {
   });
 
   it("defaultDirection agrees with what the parser would have chosen", () => {
-    for (const sort of ["name", "total_points", "last_seen_at", "eid"] as const) {
+    for (const sort of MEMBER_SORTS) {
       expect(defaultDirection(sort)).toBe(parseMemberFilter({ sort }).dir);
     }
   });
@@ -189,30 +271,40 @@ describe("applyMemberFilter", () => {
     ).toHaveLength(0);
   });
 
-  it("converts a whole-percent rate into the view's fraction", () => {
-    expect(callsFor({ minRate: 50 })).toContainEqual([
-      "gte",
-      "attendance_rate",
-      0.5,
-    ]);
+  it("bounds the roster on total points", () => {
+    const calls = callsFor({ minPoints: 3, maxPoints: 12 });
+    expect(calls).toContainEqual(["gte", "total_points", 3]);
+    expect(calls).toContainEqual(["lte", "total_points", 12]);
   });
 
-  it("anchors the joined range to Central time and leaves it half-open", () => {
-    const calls = callsFor({
-      joinedFrom: "2026-04-07",
-      joinedTo: "2026-04-07",
-    });
+  it("searches the three displayed identity columns as ONE or-group", () => {
+    // Three separate .or() calls would be three ANDed groups and match nobody —
+    // a filter that silently returns an empty roster and looks like a legitimate
+    // "no results".
+    const groups = callsFor({ q: "dara" }).filter(([m]) => m === "or");
+    expect(groups).toHaveLength(1);
+    expect(groups[0][1]).toBe(
+      'full_name.ilike."*dara*",email.ilike."*dara*",eid.ilike."*dara*"'
+    );
+  });
 
-    const lower = calls.find(([m, c]) => m === "gte" && c === "joined_at");
-    const upper = calls.find(([m, c]) => m === "lt" && c === "joined_at");
+  it("quotes the search value, so an email is not read as filter syntax", () => {
+    // `.` and `,` are PostgREST's column/operator and condition separators, and
+    // an email is full of both. Unquoted, `email.ilike.*a.person@example.edu*`
+    // parses as a malformed operator rather than as a search.
+    const [, group] = callsFor({ q: "a.person@example.edu" }).find(
+      ([m]) => m === "or"
+    )!;
+    expect(group).toContain('email.ilike."*a.person@example.edu*"');
+    expect(group).toBe(
+      'full_name.ilike."*a.person@example.edu*",' +
+        'email.ilike."*a.person@example.edu*",' +
+        'eid.ilike."*a.person@example.edu*"'
+    );
+  });
 
-    // 2026-04-07 00:00 CDT is 05:00 UTC, and the top bound is the *next* day's
-    // midnight — so a member who joined at 8:15 PM Central on the 7th, which is
-    // 01:15 UTC on the 8th, is inside the range. A bare .lte(date) would drop
-    // them, and would look entirely reasonable doing it.
-    expect(lower?.[2]).toBe("2026-04-07T05:00:00.000Z");
-    expect(upper?.[2]).toBe("2026-04-08T05:00:00.000Z");
-    expect(calls.some(([m]) => m === "lte")).toBe(false);
+  it("emits no or-group at all when the search is empty", () => {
+    expect(callsFor({ q: "" }).some(([m]) => m === "or")).toBe(false);
   });
 
   it("always ends with a deterministic total order", () => {
@@ -237,15 +329,15 @@ describe("applyMemberFilter", () => {
 
   it("puts nulls last whichever way it is sorting", () => {
     for (const dir of ["asc", "desc"] as const) {
-      const order = callsFor({ sort: "last_seen_at", dir }).find(
-        ([m, c]) => m === "order" && c === "last_seen_at"
+      const order = callsFor({ sort: "email", dir }).find(
+        ([m, c]) => m === "order" && c === "email"
       );
       expect(order?.[2]).toEqual({ ascending: dir === "asc", nullsFirst: false });
     }
   });
 
   it("never paginates — that is the caller's job", () => {
-    // The export in phase 2 applies this same function and simply does not call
+    // The export in phase 5 applies this same function and simply does not call
     // pageRange(). If a .range() ever appears in here, "copy all N matching"
     // starts returning one page and reporting success.
     const calls = callsFor({ page: 4 });
@@ -270,7 +362,7 @@ describe("pagination arithmetic", () => {
 });
 
 // Regression coverage for the defect found in the phase-1 browser walkthrough
-// (2026-08-01). The five numeric filter boxes were uncontrolled — `defaultValue`
+// (2026-08-01). The numeric filter boxes were uncontrolled — `defaultValue`
 // plus `onBlur` — which React reads only at mount. CLEAR is a client-side push
 // with no remount, so an officer who typed "Rate at least 50", cleared, and then
 // typed a points bound saw BOTH values on screen above a count that applied only
@@ -280,17 +372,19 @@ describe("pagination arithmetic", () => {
 // Neither half is reachable from a node-environment test as a rendered
 // component, so the fix put both translations in lib/filters.ts: what the boxes
 // display, and what the next URL is. These lock them.
+//
+// The rate box is gone in phase 3 and the search box is the one now most exposed
+// to this — it is the control an officer is likeliest to type into and clear —
+// so it is covered here in the same shape.
 describe("filter control state", () => {
   const base = parseMemberFilter({});
 
-  it("shows an empty box for every unset bound, so CLEAR empties them all", () => {
+  it("shows an empty box for every unset field, so CLEAR empties them all", () => {
     // The exact post-CLEAR filter: nothing narrowing.
     expect(memberFilterFields(base)).toEqual({
+      q: "",
       minPoints: "",
       maxPoints: "",
-      minEvents: "",
-      maxEvents: "",
-      minRate: "",
     });
   });
 
@@ -301,40 +395,37 @@ describe("filter control state", () => {
     expect(fields.maxPoints).toBe("");
   });
 
-  it("renders every bound the filter carries", () => {
+  it("renders every field the filter carries", () => {
     expect(
       memberFilterFields({
         ...base,
+        q: "dara",
         minPoints: 15,
         maxPoints: 40,
-        minEvents: 3,
-        maxEvents: 9,
-        minRate: 50,
       })
     ).toEqual({
+      q: "dara",
       minPoints: "15",
       maxPoints: "40",
-      minEvents: "3",
-      maxEvents: "9",
-      minRate: "50",
     });
   });
 
   it("builds the next URL from the filter, not from a stale control", () => {
-    // The walkthrough repro. The filter carries no rate — whatever a box may
-    // still be showing — so editing points must not resurrect one.
+    // The walkthrough repro, in its phase-3 shape. The filter carries no search
+    // term — whatever the box may still be showing — so editing points must not
+    // resurrect one.
     const url = memberFilterUrl(base, { minPoints: "15" });
     expect(url).toBe("minPoints=15");
-    expect(url).not.toContain("minRate");
+    expect(url).not.toContain("q=");
   });
 
-  it("drops a bound when its box is emptied", () => {
-    const withRate: MemberFilter = { ...base, minRate: 50 };
-    expect(memberFilterUrl(withRate, { minRate: "" })).toBe("");
+  it("drops a field when its box is emptied", () => {
+    const withSearch: MemberFilter = { ...base, q: "dara" };
+    expect(memberFilterUrl(withSearch, { q: "" })).toBe("");
     // And leaves the others alone while doing it.
-    expect(
-      memberFilterUrl({ ...withRate, minPoints: 15 }, { minRate: "" })
-    ).toBe("minPoints=15");
+    expect(memberFilterUrl({ ...withSearch, minPoints: 15 }, { q: "" })).toBe(
+      "minPoints=15"
+    );
   });
 
   it("always drops page, because a narrower filter invalidates the offset", () => {
@@ -352,28 +443,29 @@ describe("filter control state", () => {
     expect(params.get("state")).toBe("all");
   });
 
-  it("clamps a typed value immediately rather than displaying an unapplied one", () => {
-    // 250% is parsed to 100 on the next request either way; putting the clamped
-    // value in the URL is what stops the box from reading 250 over results
-    // filtered at 100 — the same class of lie as the original defect.
-    expect(memberFilterUrl(base, { minRate: "250" })).toBe("minRate=100");
+  it("sanitizes a typed value immediately rather than displaying an unapplied one", () => {
+    // A `%` is stripped on the next request either way; putting the sanitized
+    // value in the URL is what stops the box from reading "ni%all" over results
+    // matched on "niall" — the same class of lie as the original defect.
+    expect(memberFilterUrl(base, { q: "ni%all" })).toBe("q=niall");
     // Junk narrows nothing at all, and must not reach the query string.
     expect(memberFilterUrl(base, { minPoints: "abc" })).toBe("");
     expect(memberFilterUrl(base, { minPoints: "-5" })).toBe("");
+    expect(memberFilterUrl(base, { q: "   " })).toBe("");
   });
 
   it("round-trips: the URL it emits parses back to the fields it displays", () => {
-    const url = memberFilterUrl(base, { minRate: "250", minPoints: "7" });
+    const url = memberFilterUrl(base, { q: "  Dara  Nolan ", minPoints: "7" });
     const reparsed = parseMemberFilter(
       Object.fromEntries(new URLSearchParams(url))
     );
-    expect(memberFilterFields(reparsed).minRate).toBe("100");
+    expect(memberFilterFields(reparsed).q).toBe("Dara Nolan");
     expect(memberFilterFields(reparsed).minPoints).toBe("7");
   });
 });
 
 // The defect above lived in JSX, not in a pure function: `defaultValue` instead
-// of `value` on five inputs. Nothing in a node-environment suite can render the
+// of `value` on the numeric inputs. Nothing in a node-environment suite can render the
 // component, so none of the tests above would fail if someone changed it back —
 // they lock the extracted logic, not the wiring that consumes it.
 //
@@ -399,15 +491,11 @@ describe("the filter controls stay controlled", () => {
     expect(source).not.toContain("defaultValue=");
   });
 
-  it("drives every numeric box from the shared field translation", () => {
+  it("drives every typed-into box from the shared field translation", () => {
     expect(source).toContain("memberFilterFields");
-    for (const field of [
-      "minPoints",
-      "maxPoints",
-      "minEvents",
-      "maxEvents",
-      "minRate",
-    ]) {
+    // Every key of MemberFilterFields, derived rather than listed, so adding a
+    // field to the translation without wiring its control fails here.
+    for (const field of Object.keys(memberFilterFields(parseMemberFilter({})))) {
       expect(source).toContain(`value={fields.${field}}`);
     }
   });
