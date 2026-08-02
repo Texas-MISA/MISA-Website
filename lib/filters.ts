@@ -233,6 +233,78 @@ export function isDefaultFilter(filter: MemberFilter): boolean {
   return memberFilterToParams({ ...filter, page: 1 }).toString() === "";
 }
 
+/** The five numeric filter boxes, as the strings they display. */
+export type MemberFilterFields = {
+  minPoints: string;
+  maxPoints: string;
+  minEvents: string;
+  maxEvents: string;
+  minRate: string;
+};
+
+/**
+ * What the numeric filter boxes should show for a given filter.
+ *
+ * 🪤 Pure, exported, and tested because this is exactly what broke: the boxes
+ * were uncontrolled (`defaultValue`), which React reads only at mount, so
+ * CLEAR — a client-side push with no remount — left the officer's typed
+ * numbers on screen above a count that no longer applied them. Making the
+ * displayed value a function of the filter is the fix; keeping that function
+ * here is what lets a test hold it.
+ *
+ * A null bound renders as empty, never "0". A `0` is a real bound that hides
+ * rows, and the two must not be able to blur into each other.
+ */
+export function memberFilterFields(filter: MemberFilter): MemberFilterFields {
+  const show = (value: number | null) => (value === null ? "" : String(value));
+  return {
+    minPoints: show(filter.minPoints),
+    maxPoints: show(filter.maxPoints),
+    minEvents: show(filter.minEvents),
+    maxEvents: show(filter.maxEvents),
+    minRate: show(filter.minRate),
+  };
+}
+
+/**
+ * The filter controls' one translation: the current filter plus raw input
+ * strings, in; the next query string, out.
+ *
+ * 🪤 The starting point is `memberFilterToParams(filter)` and **never the
+ * incoming URL text**. That distinction is the whole reason this function
+ * exists. The controls used to build on `new URLSearchParams(searchParams)`,
+ * which sounds equivalent and is not: an uncontrolled input can be *showing*
+ * a value the URL does not carry — after CLEAR, most obviously — and editing
+ * any other field then emitted a URL that silently omitted it. The officer saw
+ * "Rate at least 50" above a count that ignored the rate. Building from the
+ * parsed filter makes the query a function of state the page can actually see,
+ * so a stale control can no longer corrupt it.
+ *
+ * The round trip through `parseMemberFilter` is not redundant either: it
+ * clamps and floors exactly as the page will on the next request, so a typed
+ * `250` becomes `minRate=100` in the URL immediately rather than rendering as
+ * 250 over results filtered at 100.
+ *
+ * Page is always dropped. Any change to what is being filtered invalidates the
+ * offset, and staying on page 3 of a narrower result set shows an officer an
+ * empty table with no reason for it.
+ */
+export function memberFilterUrl(
+  filter: MemberFilter,
+  changes: Record<string, string>
+): string {
+  const params = memberFilterToParams(filter);
+  for (const [key, value] of Object.entries(changes)) {
+    if (value) params.set(key, value);
+    else params.delete(key);
+  }
+  params.delete("page");
+
+  const raw: RawParams = {};
+  for (const [key, value] of params.entries()) raw[key] = value;
+  return memberFilterToParams(parseMemberFilter(raw)).toString();
+}
+
 /**
  * The minimum a PostgREST query builder has to offer for applyMemberFilter to
  * work on it.

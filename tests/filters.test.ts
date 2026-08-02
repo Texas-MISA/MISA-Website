@@ -1,10 +1,14 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
   applyMemberFilter,
   defaultDirection,
   isDefaultFilter,
+  memberFilterFields,
   memberFilterToParams,
+  memberFilterUrl,
   pageCount,
   pageRange,
   parseMemberFilter,
@@ -262,5 +266,156 @@ describe("pagination arithmetic", () => {
     expect(pageCount(1)).toBe(1);
     expect(pageCount(PAGE_SIZE)).toBe(1);
     expect(pageCount(PAGE_SIZE + 1)).toBe(2);
+  });
+});
+
+// Regression coverage for the defect found in the phase-1 browser walkthrough
+// (2026-08-01). The five numeric filter boxes were uncontrolled — `defaultValue`
+// plus `onBlur` — which React reads only at mount. CLEAR is a client-side push
+// with no remount, so an officer who typed "Rate at least 50", cleared, and then
+// typed a points bound saw BOTH values on screen above a count that applied only
+// the points one. The rate box was lying, and on this seed the two sets happened
+// to coincide, which is how it would have shipped.
+//
+// Neither half is reachable from a node-environment test as a rendered
+// component, so the fix put both translations in lib/filters.ts: what the boxes
+// display, and what the next URL is. These lock them.
+describe("filter control state", () => {
+  const base = parseMemberFilter({});
+
+  it("shows an empty box for every unset bound, so CLEAR empties them all", () => {
+    // The exact post-CLEAR filter: nothing narrowing.
+    expect(memberFilterFields(base)).toEqual({
+      minPoints: "",
+      maxPoints: "",
+      minEvents: "",
+      maxEvents: "",
+      minRate: "",
+    });
+  });
+
+  it("distinguishes a real 0 bound from no bound", () => {
+    // "" and "0" must never blur together: 0 is a bound that hides rows.
+    const fields = memberFilterFields({ ...base, minPoints: 0 });
+    expect(fields.minPoints).toBe("0");
+    expect(fields.maxPoints).toBe("");
+  });
+
+  it("renders every bound the filter carries", () => {
+    expect(
+      memberFilterFields({
+        ...base,
+        minPoints: 15,
+        maxPoints: 40,
+        minEvents: 3,
+        maxEvents: 9,
+        minRate: 50,
+      })
+    ).toEqual({
+      minPoints: "15",
+      maxPoints: "40",
+      minEvents: "3",
+      maxEvents: "9",
+      minRate: "50",
+    });
+  });
+
+  it("builds the next URL from the filter, not from a stale control", () => {
+    // The walkthrough repro. The filter carries no rate — whatever a box may
+    // still be showing — so editing points must not resurrect one.
+    const url = memberFilterUrl(base, { minPoints: "15" });
+    expect(url).toBe("minPoints=15");
+    expect(url).not.toContain("minRate");
+  });
+
+  it("drops a bound when its box is emptied", () => {
+    const withRate: MemberFilter = { ...base, minRate: 50 };
+    expect(memberFilterUrl(withRate, { minRate: "" })).toBe("");
+    // And leaves the others alone while doing it.
+    expect(
+      memberFilterUrl({ ...withRate, minPoints: 15 }, { minRate: "" })
+    ).toBe("minPoints=15");
+  });
+
+  it("always drops page, because a narrower filter invalidates the offset", () => {
+    const onPage3: MemberFilter = { ...base, page: 3, minPoints: 15 };
+    expect(memberFilterUrl(onPage3, { minPoints: "20" })).toBe("minPoints=20");
+  });
+
+  it("preserves sort and direction across a filter change", () => {
+    const sorted: MemberFilter = { ...base, sort: "total_points", dir: "asc" };
+    // total_points defaults to desc, so an explicit asc has to survive.
+    const url = memberFilterUrl(sorted, { state: "all" });
+    const params = new URLSearchParams(url);
+    expect(params.get("sort")).toBe("total_points");
+    expect(params.get("dir")).toBe("asc");
+    expect(params.get("state")).toBe("all");
+  });
+
+  it("clamps a typed value immediately rather than displaying an unapplied one", () => {
+    // 250% is parsed to 100 on the next request either way; putting the clamped
+    // value in the URL is what stops the box from reading 250 over results
+    // filtered at 100 — the same class of lie as the original defect.
+    expect(memberFilterUrl(base, { minRate: "250" })).toBe("minRate=100");
+    // Junk narrows nothing at all, and must not reach the query string.
+    expect(memberFilterUrl(base, { minPoints: "abc" })).toBe("");
+    expect(memberFilterUrl(base, { minPoints: "-5" })).toBe("");
+  });
+
+  it("round-trips: the URL it emits parses back to the fields it displays", () => {
+    const url = memberFilterUrl(base, { minRate: "250", minPoints: "7" });
+    const reparsed = parseMemberFilter(
+      Object.fromEntries(new URLSearchParams(url))
+    );
+    expect(memberFilterFields(reparsed).minRate).toBe("100");
+    expect(memberFilterFields(reparsed).minPoints).toBe("7");
+  });
+});
+
+// The defect above lived in JSX, not in a pure function: `defaultValue` instead
+// of `value` on five inputs. Nothing in a node-environment suite can render the
+// component, so none of the tests above would fail if someone changed it back —
+// they lock the extracted logic, not the wiring that consumes it.
+//
+// This is the guard for the wiring itself. It is a source assertion rather than
+// a behavioural one, which is unusual and deliberate: the alternative is a DOM
+// test environment the project does not otherwise need. If the component moves,
+// update the path here rather than deleting the test — the invariant is that a
+// filter control's displayed value comes from state that resyncs with the URL,
+// and an uncontrolled input cannot do that.
+describe("the filter controls stay controlled", () => {
+  const source = readFileSync(
+    new URL(
+      "../app/admin/(shell)/members/_components/member-filters.tsx",
+      import.meta.url
+    ),
+    "utf8"
+  );
+
+  it("uses no defaultValue, which React reads only at mount", () => {
+    // CLEAR is a client-side push with no remount, so a defaultValue here
+    // leaves the officer's typed number on screen above a count ignoring it.
+    // Matching the JSX attribute form, so prose about the bug stays allowed.
+    expect(source).not.toContain("defaultValue=");
+  });
+
+  it("drives every numeric box from the shared field translation", () => {
+    expect(source).toContain("memberFilterFields");
+    for (const field of [
+      "minPoints",
+      "maxPoints",
+      "minEvents",
+      "maxEvents",
+      "minRate",
+    ]) {
+      expect(source).toContain(`value={fields.${field}}`);
+    }
+  });
+
+  it("builds its URLs through lib/filters rather than by hand", () => {
+    expect(source).toContain("memberFilterUrl");
+    // Assembling from the incoming URL text is what let a stale control and the
+    // query disagree in the first place.
+    expect(source).not.toContain("new URLSearchParams");
   });
 });
