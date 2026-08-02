@@ -9,7 +9,7 @@ Deployed from `main` to **https://misa-website-beta.vercel.app**.
 | Audience | What they get | Auth |
 |---|---|---|
 | Public | Org info, upcoming events | none |
-| Members | Check in at an event, see standings and their own history | none — identity-based (student ID + matching email), no accounts in v1 |
+| Members | Check in at an event, see standings and their own history | none — identity-based (EID + matching email), no accounts in v1 |
 | Officers | Schedule, attendance review, point adjustments, roster | Supabase Auth session + a matching `admin_profiles` row |
 
 The core idea: a member checks in from their phone in about twenty seconds, and anything the system can't resolve confidently goes to an officer to fix rather than being guessed at or dropped.
@@ -80,4 +80,4 @@ Everything is meant to be handed over, not inherited as a mystery:
 - The Supabase free tier pauses after inactivity and needs a manual resume. Check before the first event of each semester; it is the single most likely operational surprise.
 
 > [!IMPORTANT]
-> **This repository is public.** Seed and test data must stay obviously fake — never a real roster export, real student IDs, or real emails. Photos of identifiable students need their okay before being committed.
+> **This repository is public.** Seed and test data must stay obviously fake — never a real roster export, real EIDs, or real emails. Photos of identifiable students need their okay before being committed.

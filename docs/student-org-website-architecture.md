@@ -1,8 +1,50 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.26
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phase 1 of 9 built, stage re-planned 2026-08-01
+**Version:** 1.27
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1–2 of 9 built
 **Last updated:** August 2026
+
+> **v1.27: an anon read of `member_directory`, closed; and the EID rename,
+> applied.** Migrations 15 and 16. The first was not planned work — it was found
+> while reading the schema to write the second.
+>
+> - 🔓 **`member_directory` was readable by the anon key, in production.**
+>   Every member's student ID and email, exposed to anyone holding the
+>   publishable key — which is inlined into the client bundle of a public site.
+>   Verified at the PostgREST boundary before and after (`206` with
+>   `Content-Range: */33`, then `401`), not inferred. Migration 15 revokes it.
+> - **The cause is structural and belongs in §6 rather than in a bug list.**
+>   `20260730000012_api_role_grants.sql` grants `all privileges on all tables in
+>   schema public` to anon, arguing it is safe because "RLS is the security
+>   boundary". That holds for tables and **fails for views**: `grant all on all
+>   tables` covers views, a view has no RLS, and `member_directory` deliberately
+>   runs as owner so it can aggregate *past* the deny-all tables beneath it.
+>   Every non-public view now needs an explicit revoke, and — because
+>   `alter default privileges` re-grants at creation — **every recreate must
+>   re-issue it**. `tests/security.test.ts` enumerates the views and enforces an
+>   allowlist of exactly one, `leaderboard`, which carries no identifier.
+> - **Why it survived review:** `members` itself denies correctly, RLS is on
+>   everywhere, and there are no policies. Every check aimed at the table came
+>   back clean. Checking a table proves nothing about a view over it.
+> - **"Student ID" is now "EID"** — a real UT EID (`ao1234`), not a relabel.
+>   Migration 16 renames the columns, constraints, and indexes, and folds the
+>   normalization to **`lower`** rather than upper, because EIDs are written
+>   lowercase and the review screen renders the normalized form back at the
+>   reader. §4's DDL is updated to match.
+> - **The ranker's calibration did not survive the format change.**
+>   `id_contains` (+35) is **removed**: it existed only to catch a dropped `UT`
+>   prefix and degrades into a broad substring match on short alphanumerics.
+>   The distance-2 floor stays — but for a *new* reason, which is the part worth
+>   carrying: EIDs are derived from name initials, so the near-miss population
+>   is **correlated with the roster** rather than spread across a numeric range.
+>   That is the sequential-ID problem from the other direction, and arguably
+>   worse, since a typo now lands on a plausibly-confusable real person more
+>   often. `seed.sql` reproduces the cluster deliberately and
+>   `tests/seed-fixtures.test.ts` asserts the empty suggestion state holds.
+> - **`seed.sql` now asserts its own documented counts** and aborts if they
+>   drift. Regenerating the EIDs silently changed the seeded `random()` draw
+>   order and dropped a review-queue fixture and an audit row while still
+>   producing 208 attendance rows — a shape the old seed had no way to notice.
 
 > **v1.26: Stage 6 re-planned, after phase 1 had already shipped.** Four
 > decisions landed on top of a stage that was already one phase in. Together
@@ -10,7 +52,7 @@
 > rather than patched — six phases become nine. `tasks.md` carries the phase
 > detail; what follows is what became normative.
 >
-> - **"Student ID" becomes "EID", and not only as a label.** The identifier
+> - **"EID" becomes "EID", and not only as a label.** The identifier
 >   itself becomes a real UT EID — alphanumeric, `abc1234` — replacing the
 >   `UT` + six-sequential-digit format the seed, the fixtures, and the
 >   suggestion ranker were all built around. Stage 6 phase 2 does the rename;
@@ -40,7 +82,7 @@
 > - **A view may be dropped to rename an output column.** `create or replace`
 >   can only append, and migration 14 chose it precisely to keep
 >   `member_directory`'s `authenticated` grant — the §6 security boundary.
->   Renaming `student_id` → `eid` cannot be done that way, so a drop is now
+>   Renaming `eid` → `eid` cannot be done that way, so a drop is now
 >   permitted *provided the same migration re-issues the grant*. DDL is
 >   transactional, so there is no window; the hazard is forgetting the re-grant,
 >   which surfaces at the next non-service-role read rather than at migration
@@ -150,10 +192,10 @@
 >   never created.
 > - **The membership oracle is accepted, and it contradicts §6's login stance on
 >   purpose.** The re-prompt says "we don't have that info on file", so anyone can
->   probe a student ID for roster membership. Officer sign-in deliberately returns
+>   probe a EID for roster membership. Officer sign-in deliberately returns
 >   one identical failure for "wrong password" and "no such user"; the two look
 >   inconsistent unless the difference is written down. The roster is a club list,
->   not a security boundary, and UT student IDs are semi-public. Event resolution
+>   not a security boundary, and UT EIDs are semi-public. Event resolution
 >   runs first, so the oracle is closed entirely outside check-in windows.
 > - **`RATE_LIMIT_MAX` 30 → 90.** A first-timer now spends two slots and the
 >   re-prompt invites retries; at a recruiting event behind one venue NAT the old
@@ -171,7 +213,9 @@
 >   which meant a submission from someone on no roster at all was offered three
 >   confident-looking strangers. Student IDs issued in sequence put roughly three
 >   members within distance 2 of *any* six-digit number, so at that distance the
->   similarity carries no information. Distance 2 now scores below the floor and
+>   similarity carries no information. (v1.27 note: the identifiers are EIDs now
+>   and are not sequential — but see that entry, because the rule survives for a
+>   different reason rather than lapsing.) Distance 2 now scores below the floor and
 >   must be joined by a second reason (email, a shared name token, a matching
 >   surname); distance 1 still stands on its own, because that is a typo rather
 >   than a coincidence. This is the "don't auto-resolve near-misses" rule applied
@@ -343,12 +387,12 @@
 >   Postgres semantics, no clock mocking. 37 tests across 4 files.
 > - **Duplicate rule** (§4.2 addendum): a submission is a duplicate iff
 >   (a) a non-rejected row exists for the same `(event_id,
->   normalized_student_id)` — the partial unique index, caught as 23505; or
+>   normalized_eid)` — the partial unique index, caught as 23505; or
 >   (b) a non-rejected row exists for the same `(event_id, member_id)` after
 >   member resolution — an application check closing the double-credit hole
 >   the index cannot see, where the same member is reached via two different
 >   raw IDs (email-matched typo, then the correct ID); or (c) the submission
->   is an orphan and a pending orphan with the same `normalized_student_id`
+>   is an orphan and a pending orphan with the same `normalized_eid`
 >   exists within `ORPHAN_WINDOW_HOURS` — an application check, since the
 >   index ignores `event_id is null` rows. A prior pending orphan **never**
 >   blocks a new event-resolved submission: the new row inserts as `present`
@@ -381,7 +425,7 @@
 >   **RLS remains the security boundary**, and deny-all-until-Stage-8 still
 >   holds because grants are not what does the denying.
 > - The success screen shows the event title only — never a roster email or
->   student ID (§6).
+>   EID (§6).
 
 > **v1.17:** Stage 2's scope is now **recreating the existing Squarespace site**
 > ([txmisa.org](https://www.txmisa.org/)) rather than writing a landing page
@@ -477,7 +521,7 @@
 >
 > **v1.6:** the five schema-affecting open decisions are resolved (§9) and §4
 > updated to match. The roster **self-registers with no officer confirmation**;
-> `members` gains `normalized_student_id` and `source`.
+> `members` gains `normalized_eid` and `source`.
 >
 > **v1.5:** §2.3 now covers Supabase account moves alongside Vercel's. Added
 > §2.4 (account inventory — what exists, who owns it, where credentials are)
@@ -704,9 +748,9 @@ The Stage 9 handoff guide should amount to: §2.4 filled in, the vault handed ov
 -- (Open Decision #2, resolved). See 4.2 for how typos are contained.
 create table members (
   id           uuid primary key default gen_random_uuid(),
-  student_id   text not null,
-  normalized_student_id text generated always as
-                 (upper(regexp_replace(student_id, '\s|-', '', 'g'))) stored,
+  eid   text not null,
+  normalized_eid text generated always as
+                 (upper(regexp_replace(eid, '\s|-', '', 'g'))) stored,
   full_name    text not null,
   email        text not null,
   active       boolean not null default true,
@@ -722,7 +766,7 @@ create table members (
 -- Identity is the normalized ID, not the raw one, so 'ut-123', 'UT 123', and
 -- 'UT123' cannot become three members. Email is matched case-insensitively
 -- for the same reason.
-create unique index members_normalized_id on members (normalized_student_id);
+create unique index members_normalized_id on members (normalized_eid);
 create unique index members_email_lower   on members (lower(email));
 
 -- The schedule. Created in advance, but editable at any time — see 4.6.
@@ -756,9 +800,9 @@ create table attendance (
   event_id             uuid references events(id) on delete set null,
   member_id            uuid references members(id) on delete set null,
   submitted_name       text not null,
-  submitted_student_id text not null,
-  normalized_student_id text generated always as
-                         (upper(regexp_replace(submitted_student_id, '\s|-', '', 'g'))) stored,
+  submitted_eid text not null,
+  normalized_eid text generated always as
+                         (upper(regexp_replace(submitted_eid, '\s|-', '', 'g'))) stored,
   submitted_email      text not null,
   submitted_at         timestamptz not null default now(),
   source               text not null default 'self_checkin'
@@ -789,7 +833,7 @@ create trigger attendance_set_updated_at
 -- an officer manually assigns an orphan to an event the member already attended.
 -- Partial so that rejected rows don't block a corrected re-entry.
 create unique index attendance_one_per_event
-  on attendance (event_id, normalized_student_id)
+  on attendance (event_id, normalized_eid)
   where event_id is not null and status <> 'rejected';
 
 -- Discretionary points awarded outside of event attendance: volunteering,
@@ -874,7 +918,7 @@ create table admin_profiles (
   - **Narrowed in v1.22 for the member half.** Someone the roster does not recognize *at all*, who did not tick "first time", produces nothing — see the self-registration bullet below. The event half is unchanged: an unresolved event link is always queued.
 - **Two independent failure modes, one status.** A pending row is missing an event link, a member link, or both. The admin UI distinguishes them; the database doesn't need to, because `present_requires_resolution` guarantees a row can't count until both are filled in.
 - **`present_requires_resolution` is the load-bearing constraint.** It means the leaderboard query can trust `status = 'present'` without re-checking for nulls, and an officer cannot approve a half-resolved row by mistake.
-- **`normalized_student_id`** is a generated column stripping whitespace, hyphens, and casing. Duplicate detection and roster matching both key off it, so `ut-12345`, `UT 12345`, and `UT12345` are the same person.
+- **`normalized_eid`** is a generated column stripping whitespace, hyphens, and casing. Duplicate detection and roster matching both key off it, so `ut-12345`, `UT 12345`, and `UT12345` are the same person.
 - **The partial unique index excludes rejected rows**, so an officer can reject a bad submission and enter a corrected one for the same person and event.
 - **`source`** separates member self-check-ins from officer-created rows, which matters when auditing why someone's count looks unusual.
 - **`points` on events** allows weighting (a general meeting vs. a flagship event) without a schema change later.
@@ -884,13 +928,13 @@ create table admin_profiles (
 - **Negative adjustments are allowed**, which makes this one mechanism for bonuses, penalties, and corrections rather than three.
 - **One audit table, not several.** `admin_audit` keys on `(entity_type, entity_id)` so event edits, point grants, and attendance overrides all land in the same place. This makes "show me everything this officer did last month" a single query.
 - **`checkin_opens_at` / `checkin_closes_at`** decouple the check-in window from the event's actual time — useful for a grace period for late arrivals. Widening these is the *preferred* fix for a systematically late crowd; manual override is for individuals.
-- **Member lookup is resolution order; creating a member is a separate, confirmed step** (v1.22). A check-in resolves its member link by trying, in order: `normalized_student_id`, then `lower(email)`. Matching on email second is what contains the common failure — someone who typos their student ID is recognized by their email and linked to their existing record instead of becoming a duplicate person.
+- **Member lookup is resolution order; creating a member is a separate, confirmed step** (v1.22). A check-in resolves its member link by trying, in order: `normalized_eid`, then `lower(email)`. Matching on email second is what contains the common failure — someone who typos their EID is recognized by their email and linked to their existing record instead of becoming a duplicate person.
 
   What happens when *both* miss depends on one checkbox on the form, "this is my first MISA event":
 
   | Member lookup | First-time box | Written? | Screen |
   |---|---|---|---|
-  | Matched by `normalized_student_id` | unchecked | yes, immediately | Success |
+  | Matched by `normalized_eid` | unchecked | yes, immediately | Success |
   | Matched by `lower(email)` | unchecked | yes, immediately | Success |
   | No match | unchecked | **nothing** | "We don't have that info on file" + re-prompt |
   | Matched (either key) | checked | not yet | Review → confirm **links** the existing member |
@@ -959,7 +1003,7 @@ The three-way `case` matters: a timestamp *inside* an event's run has a gap of z
 
 If `nearby_events()` returns nothing, the check-in is refused outright with a message. If it returns rows, the submission is stored as `pending` and those rows become the ranked suggestions an officer sees in the review queue.
 
-**Event resolution runs before member resolution, and refusal short-circuits it** (v1.22). Nothing about the submitter is looked up until an event or a grace window has been established, which is worth stating because it is load-bearing twice over: a refused submission touches the roster not at all, and the membership oracle §6 accepts (§4.2's re-prompt tells you whether an ID is on the roster) is closed entirely outside check-in windows. Someone probing student IDs in July learns only that there is no event on.
+**Event resolution runs before member resolution, and refusal short-circuits it** (v1.22). Nothing about the submitter is looked up until an event or a grace window has been established, which is worth stating because it is load-bearing twice over: a refused submission touches the roster not at all, and the membership oracle §6 accepts (§4.2's re-prompt tells you whether an ID is on the roster) is closed entirely outside check-in windows. Someone probing EIDs in July learns only that there is no event on.
 
 Two properties of this function shape the review screen, and both are easy to get wrong (v1.20):
 
@@ -1014,7 +1058,7 @@ The one rough edge is early August, when the new term is live but has no events 
 
 **Anon reaches this view, not the tables under it.** Postgres views run as their owner by default (`security_invoker = false`), which is what lets the anon role read aggregated standings while RLS still denies it direct access to `members`, `attendance`, `events`, and `app_settings`. The view *is* the security boundary — do not set `security_invoker = true` on it without re-checking §6.
 
-**Privacy note:** the view deliberately excludes `student_id` and `email`. A public leaderboard should never expose identifiers that are used elsewhere as credentials.
+**Privacy note:** the view deliberately excludes `eid` and `email`. A public leaderboard should never expose identifiers that are used elsewhere as credentials.
 
 **Public, but never indexed** (§9 #1, resolved 2026-07-31). The remaining exposure after dropping IDs and emails is real names against point totals on a crawlable page — low-stakes in itself, but a search engine's cache outlives the deploy that created it, so it is not a decision that can be undone later. `/leaderboard` is therefore reachable by anyone with the link and carries `robots: { index: false, follow: false }`. That keeps the board doing its actual job — a member glances at where they stand, an officer screenshots it for the group chat — without putting students into a permanent public index. A display-name field or per-member opt-out is the escalation if someone objects; both are view changes with no migration.
 
@@ -1062,7 +1106,7 @@ bonus_agg as (
 )
 select
   m.id,
-  m.student_id,
+  m.eid,
   m.full_name,
   m.email,
   m.active,
@@ -1207,10 +1251,10 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Anon key over-permission | RLS: anon role can `select` only from `leaderboard` and published `events`. All writes go through Server Actions. |
 | Spam / bot submissions | Honeypot field, per-IP rate limit on the check-in action, submissions rejected outside any open window |
 | Check-in on behalf of someone else | Accepted risk for v1 — same as a paper sign-in sheet. Mitigate later with a rotating per-event code displayed at the venue. |
-| Attendance data enumeration | `/lookup` requires student ID **and** matching email before returning history |
-| Roster PII exposure | Emails and student IDs never returned to unauthenticated clients under any route |
+| Attendance data enumeration | `/lookup` requires EID **and** matching email before returning history |
+| Roster PII exposure | Emails and EIDs never returned to unauthenticated clients under any route |
 | Roster pollution via self-registration | The check-in form can create members (§4.2), so junk rows are reachable by anyone who can submit during an open window. Bounded by the window, honeypot, and rate limit; contained by matching on ID and then email before creating, and since v1.22 by requiring an explicit "this is my first MISA event" claim plus a confirmation pass. Visible via `members.source = 'self_checkin'` in the directory. Impact is cleanup, not data loss. **Note what the confirmation is:** a guard against honest typos, not a control. A scripted POST carrying `step=confirm` creates a member in one request without the review screen ever rendering — correct, because the server re-derives the whole outcome rather than trusting the previewed payload, but it means the throttle is still the only thing standing in an attacker's way. |
-| Roster membership is probeable | **Accepted, and it contradicts the officer-login row on purpose** (v1.22). §4.2's re-prompt says "we don't have that info on file", so anyone submitting during a check-in window learns whether a given student ID is on the roster. Officer sign-in deliberately does the opposite — one identical failure for "wrong password" and "no such user" — and the two will read as an inconsistency to whoever finds them next unless the difference is written down. The roster is a club list, not a security boundary, and UT student IDs are semi-public; the alternative was an indistinguishable failure that gives a member with a typo no way to tell what went wrong. Bounded three ways: event resolution runs first, so the oracle is closed outside check-in windows entirely; the per-IP throttle applies to both passes; and the answer is a bare boolean — no name, email, or ID of the matched member ever reaches the client, including on the confirmation screen. |
+| Roster membership is probeable | **Accepted, and it contradicts the officer-login row on purpose** (v1.22). §4.2's re-prompt says "we don't have that info on file", so anyone submitting during a check-in window learns whether a given EID is on the roster. Officer sign-in deliberately does the opposite — one identical failure for "wrong password" and "no such user" — and the two will read as an inconsistency to whoever finds them next unless the difference is written down. The roster is a club list, not a security boundary, and UT EIDs are semi-public; the alternative was an indistinguishable failure that gives a member with a typo no way to tell what went wrong. Bounded three ways: event resolution runs first, so the oracle is closed outside check-in windows entirely; the per-IP throttle applies to both passes; and the answer is a bare boolean — no name, email, or ID of the matched member ever reaches the client, including on the confirmation screen. |
 | Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. Triggers reject `UPDATE` and `DELETE`, so the log is append-only for the app and every client role. **Note the limit:** a table owner can disable the trigger, so this constrains the application, not someone with direct database access. Stage 8's RLS policies are what close the client-role path properly. |
 | Bulk roster export leaks member PII | Export is the largest PII egress point in the system. Gate it behind an authenticated session, log every export to `admin_audit` with the filter used and row count, and consider restricting it to the `admin` role. |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
@@ -1285,7 +1329,7 @@ contact form's backend — it renders disabled, with email as the working path.
 ### Stage 3 — Attendance Capture ✅ built & tested (v1.18)
 **Goal:** The core feature. This is the reason the project exists.
 
-- `/attend` form: name, student ID, email — live, linked from the nav and the home page's events section
+- `/attend` form: name, EID, email — live, linked from the nav and the home page's events section
 - Server Action `submitCheckin` (`app/actions/attendance.ts`) resolving via `open_event_at()`; the testable core is `resolveCheckin` in `lib/checkin.ts`, using the service-role client (`lib/supabase/admin.ts`, guarded by `server-only`)
 - Both links resolved → `present`. Every submission this action *writes* has a member link — matched, or created behind the v1.22 confirmation — so the only pending rows it produces are **orphans** (no event link); the member sees the received-awaiting-review message
 - No published event within the 48-hour orphan window → refused outright, nothing written
@@ -1298,10 +1342,10 @@ contact form's backend — it renders disabled, with email as the working path.
 - Before window opens / during / after window closes
 - Just outside the window vs. far outside the orphan grace window
 - Two events back to back with adjacent windows
-- Duplicate submission by the same student ID
+- Duplicate submission by the same EID
 - Duplicate where the first submission is still `pending`
-- Student ID not on the roster
-- Whitespace, casing, and formatting variance in student IDs
+- EID not on the roster
+- Whitespace, casing, and formatting variance in EIDs
 
 ---
 
@@ -1362,7 +1406,7 @@ contact form's backend — it renders disabled, with email as the working path.
 **Submission detail (`/admin/attendance/[id]`)**
 - Raw form data exactly as the member typed it, with the submission timestamp shown to the minute
 - **Suggested events** from `nearby_events()`, ranked by proximity and annotated with the gap — "General Meeting, closed 41 minutes before this submission"
-- **Suggested members** when the student ID doesn't match: fuzzy matches on name and email, with the near-miss ID shown for comparison
+- **Suggested members** when the EID doesn't match: fuzzy matches on name and email, with the near-miss ID shown for comparison
 - Actions: assign event, link member, approve, reject, edit submitted fields, add a note
 - Approving is blocked in the UI until both links are set — the database would reject it anyway via `present_requires_resolution`, but the UI should say so before the officer clicks
 
@@ -1445,11 +1489,11 @@ contact form's backend — it renders disabled, with email as the working path.
 
 **Two consequences of §4.2's exact-match check-in land here** (recorded v1.21, while building Stage 5). Neither is a defect in the check-in path — both are the deliberate design's bill, and the directory is where it comes due.
 
-**1. Duplicate members still accumulate, and nothing merges them — but the main source is gone** (revised v1.22). Check-in used to match on `normalized_student_id`, then `lower(email)`, then *create*, so a member who mistyped **both** was indistinguishable from a genuinely new person — the two were the same insert — and someone mistyping repeatedly could leave several ghosts. Under §4.2's confirmation flow that submission is refused and re-prompted, writing nothing. What remains is narrower: someone who ticks "this is my first MISA event" *and* types badly, which is a single row rather than a stream, plus the officer-queued collision noted below. Ghosts stay findable — `members.source = 'self_checkin'` marks every auto-created row. What is still missing is the merge itself, and it is not trivial: merging must repoint `attendance.member_id` and `point_adjustments.member_id`, and can hit `attendance_one_per_event` when both identities attended the same event, which is a real conflict needing a decision (keep one, reject the other) rather than a silent drop. Expect a preview-and-confirm flow like the CSV import, and one `admin_audit` row naming both sides. Smaller in expectation than it was, so it can follow the directory rather than gate it.
+**1. Duplicate members still accumulate, and nothing merges them — but the main source is gone** (revised v1.22). Check-in used to match on `normalized_eid`, then `lower(email)`, then *create*, so a member who mistyped **both** was indistinguishable from a genuinely new person — the two were the same insert — and someone mistyping repeatedly could leave several ghosts. Under §4.2's confirmation flow that submission is refused and re-prompted, writing nothing. What remains is narrower: someone who ticks "this is my first MISA event" *and* types badly, which is a single row rather than a stream, plus the officer-queued collision noted below. Ghosts stay findable — `members.source = 'self_checkin'` marks every auto-created row. What is still missing is the merge itself, and it is not trivial: merging must repoint `attendance.member_id` and `point_adjustments.member_id`, and can hit `attendance_one_per_event` when both identities attended the same event, which is a real conflict needing a decision (keep one, reject the other) rather than a silent drop. Expect a preview-and-confirm flow like the CSV import, and one `admin_audit` row naming both sides. Smaller in expectation than it was, so it can follow the directory rather than gate it.
 
-**1a. A confirmed first-timer can leave a member row with no attendance.** If an officer has already queued a manual row carrying that student ID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`, leaving a `self_checkin` row credited with nothing. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check, against §4.2's "three checks, not one". Another row for the directory to surface, and another reason merge tooling should assume the roster is untidy.
+**1a. A confirmed first-timer can leave a member row with no attendance.** If an officer has already queued a manual row carrying that EID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`, leaving a `self_checkin` row credited with nothing. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check, against §4.2's "three checks, not one". Another row for the directory to surface, and another reason merge tooling should assume the roster is untidy.
 
-**2. A valid-but-wrong student ID silently credits the wrong member.** The ID lookup runs *before* the email lookup, so someone who mistypes into **another member's** real student ID is recorded as that person, even though their own email was correct and would have matched. It is rare and it is not obviously fixable by reordering — people mistype and share emails too, so email-first trades one silent mis-credit for another — but it is the one path where the exact-match design attributes attendance to the wrong human with nothing surfaced to anyone. The directory is where it would be noticed ("why does this member have an event they didn't attend?"), so the member detail page should make a member's attendance easy to scan, and any merge tooling should assume mis-credits exist. Revisit if it ever actually happens; a cheap partial mitigation is to flag, at check-in, when the matched member's email differs from the submitted one.
+**2. A valid-but-wrong EID silently credits the wrong member.** The ID lookup runs *before* the email lookup, so someone who mistypes into **another member's** real EID is recorded as that person, even though their own email was correct and would have matched. It is rare and it is not obviously fixable by reordering — people mistype and share emails too, so email-first trades one silent mis-credit for another — but it is the one path where the exact-match design attributes attendance to the wrong human with nothing surfaced to anyone. The directory is where it would be noticed ("why does this member have an event they didn't attend?"), so the member detail page should make a member's attendance easy to scan, and any merge tooling should assume mis-credits exist. Revisit if it ever actually happens; a cheap partial mitigation is to flag, at check-in, when the matched member's email differs from the submitted one.
 
 ⚠️ **The EID switch makes this materially more likely, for a reason worth stating plainly** (v1.26). UT EIDs are derived from name initials, so the near-miss population is *correlated with the roster* rather than scattered across a numeric range — students with similar names hold similar EIDs. Under `UT` + a sequential number, a one-character typo landed on a real person only by coincidence and on a plausibly-confusable person almost never. Under EIDs it does both more often. The mitigation does not change — the detail page is still where it surfaces — but this moves from "revisit if it ever happens" toward "expect it", and it is the strongest argument for the email-mismatch flag at check-in.
 
@@ -1467,7 +1511,7 @@ The criterion previously read "attended fewer than three events this term". That
 - `/leaderboard` — one row per member for the current term, ranked on `total_points`, ties alphabetical (§4.4)
 - **`/leaderboard` must set `robots: { index: false, follow: false }`** (§9 #1, resolved). The page is reachable by anyone with the link; it must not be crawlable. `app/admin/(shell)/layout.tsx` already does exactly this and is the pattern to copy. Getting this wrong is not a bug you can fix afterwards — once students' names are indexed against their point totals, the cache outlives the deploy that caused it
 - **The active term shown prominently on the page.** It is officer-set with no automatic rollover, so a stale term must be visible rather than silently assumed correct
-- `/lookup` — student ID + email, returns per-event attended/missed summary
+- `/lookup` — EID + email, returns per-event attended/missed summary
 - Any point adjustments shown with their reason. The public board is a bare total, so this is the *only* place a member can see why their total exceeds their attendance count — which makes it more important here, not less
 - Pending submissions shown distinctly from confirmed ones, so a member who checked in late knows their form was received and is awaiting review rather than assuming it vanished
 - Attendance-rate calculation and a visual summary of the semester
@@ -1555,7 +1599,7 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 
 The five that affect the schema. Decided together; the schema in §4 reflects them.
 
-2. **Roster policy** — ✅ **Self-registering, confirmed by the member** (revised v1.22; originally "self-registering, no confirmation"). Lookup order is `normalized_student_id`, then `lower(email)`; matching on email second contains the common typo case. What happens when both miss depends on the member's own "this is my first MISA event" claim: ticked, they confirm their details on a review screen and are added immediately as `source = 'self_checkin'`, active, with no officer approval; unticked, nothing is written and they are re-prompted. The original decision created a member unconditionally, which made a double typo and a genuinely new person the same insert. The residual risk moved with it — no longer a duplicate person, but someone who cannot get their details right getting no attendance at all, recovered by officer manual entry. `members.source` still marks self-registered rows for review. Zero-friction check-in at recruiting events is preserved for everyone the roster already knows: their path is unchanged and still a single submit.
+2. **Roster policy** — ✅ **Self-registering, confirmed by the member** (revised v1.22; originally "self-registering, no confirmation"). Lookup order is `normalized_eid`, then `lower(email)`; matching on email second contains the common typo case. What happens when both miss depends on the member's own "this is my first MISA event" claim: ticked, they confirm their details on a review screen and are added immediately as `source = 'self_checkin'`, active, with no officer approval; unticked, nothing is written and they are re-prompted. The original decision created a member unconditionally, which made a double typo and a genuinely new person the same insert. The residual risk moved with it — no longer a duplicate person, but someone who cannot get their details right getting no attendance at all, recovered by officer manual entry. `members.source` still marks self-registered rows for review. Zero-friction check-in at recruiting events is preserved for everyone the roster already knows: their path is unchanged and still a single submit.
 3. **Points weighting** — ✅ **Per-event `points`, default 1.** Flat scoring in practice, weighting available without a migration.
 4. **Semester boundaries** — ✅ **One leaderboard, current term only, terms derived from dates.** One row per member ranked on a single `total_points` figure with no attendance/bonus breakdown; ties alphabetical. `events.term` is a generated column computing `'Fall YYYY'` / `'Spring YYYY'` from `starts_at` (§4.7), so terms are never typed and rollover happens on its own each August and January. `app_settings.current_term` is a nullable override for pinning the board on a finished term. This reverses the split-column position earlier versions argued for; see §4.4 for what that costs and where the oversight moved.
 5. **Excused absences** — ✅ **Deferred to post-v1.** Attendance rate stays raw `attended / possible`. `point_adjustments` already handles the standing side with a required reason, so the gap is cosmetic rather than punitive.
@@ -1570,7 +1614,7 @@ They share a premise, and the consistency is the point: **the audit log and the 
 6. **Override authority** — ✅ **Any officer may approve a pending row.** A gate funnels every correction through one person, which in a student org means corrections wait for whoever is busiest; and the failure it guards against is visible in `admin_audit` either way.
 8. **Resolution deadline** — ✅ **None enforced in v1.** The mitigations are the dashboard pending badge and the oldest-first default sort on `/admin/attendance`, both built in phase 1. A hard deadline would silently destroy credit for a member who did attend, which is the one failure mode §4.2 exists to make impossible.
 9. **Point grant caps** — ✅ **No restrictions.** Any officer may grant any amount; no `admin`-role threshold. A cap invites splitting a grant in two, which leaves the total unchanged and the ledger *less* readable. The required reason and the ledger are the control. `lib/points.ts` carries `MAX_POINTS_PER_GRANT = 500`, which is an input-sanity guard against a fat-fingered 5000 and explicitly **not** this policy — do not let it drift into being cited as one.
-10. **Self-grants** — ✅ **Allowed**, always visible in the ledger with the granting officer named. Blocking it outright doesn't prevent the behaviour, it relocates it to "could you grant me these" — after which the ledger shows a grant from someone with no visible stake, which is harder to audit rather than easier. `grantPoints` therefore carries no self-grant check, and no officer↔member linkage is needed (there is no FK between `auth.users` and `members`, so such a check would have to match on email or student ID — an inference this decision makes unnecessary).
+10. **Self-grants** — ✅ **Allowed**, always visible in the ledger with the granting officer named. Blocking it outright doesn't prevent the behaviour, it relocates it to "could you grant me these" — after which the ledger shows a grant from someone with no visible stake, which is harder to audit rather than easier. `grantPoints` therefore carries no self-grant check, and no officer↔member linkage is needed (there is no FK between `auth.users` and `members`, so such a check would have to match on email or EID — an inference this decision makes unnecessary).
 
 **Revisit all four together if points ever decide something material** — officer eligibility, a funded trip, a leadership slot. Every one of them is defensible because standings are currently social rather than consequential; that premise is what changes, not the individual arguments.
 

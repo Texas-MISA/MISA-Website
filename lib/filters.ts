@@ -24,7 +24,7 @@ export const PAGE_SIZE = 25;
  * is not meant to be sortable. */
 export const MEMBER_SORTS = [
   "name",
-  "student_id",
+  "eid",
   "joined_at",
   "events_attended",
   "attendance_points",
@@ -39,7 +39,7 @@ export type MemberSort = (typeof MEMBER_SORTS)[number];
 
 const SORT_COLUMNS: Record<MemberSort, string> = {
   name: "full_name",
-  student_id: "student_id",
+  eid: "eid",
   joined_at: "joined_at",
   events_attended: "events_attended",
   attendance_points: "attendance_points",

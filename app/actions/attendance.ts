@@ -23,7 +23,7 @@ import { checkinSchema } from "@/lib/validation";
  */
 export type SubmittedValues = {
   fullName: string;
-  studentId: string;
+  eid: string;
   email: string;
   declaredNew: boolean;
 };
@@ -34,7 +34,7 @@ export type CheckinState = (
   | { status: "rate_limited" }
   | {
       status: "invalid";
-      fieldErrors: Partial<Record<"fullName" | "studentId" | "email", string[]>>;
+      fieldErrors: Partial<Record<"fullName" | "eid" | "email", string[]>>;
     }
 ) & { submitted?: SubmittedValues };
 
@@ -44,7 +44,7 @@ export type CheckinState = (
  * POST could otherwise have the server reflect a megabyte back into its own
  * response.
  */
-const ECHO_LIMITS = { fullName: 120, studentId: 32, email: 254 } as const;
+const ECHO_LIMITS = { fullName: 120, eid: 32, email: 254 } as const;
 
 function echoField(value: FormDataEntryValue | null, max: number): string {
   // FormData.get can return a File; anything not a string echoes as empty.
@@ -78,7 +78,7 @@ export async function submitCheckin(
   const declaredNew = typeof firstTime === "string" && firstTime.length > 0;
   const raw: SubmittedValues = {
     fullName: echoField(formData.get("fullName"), ECHO_LIMITS.fullName),
-    studentId: echoField(formData.get("studentId"), ECHO_LIMITS.studentId),
+    eid: echoField(formData.get("eid"), ECHO_LIMITS.eid),
     email: echoField(formData.get("email"), ECHO_LIMITS.email),
     declaredNew,
   };
@@ -91,7 +91,7 @@ export async function submitCheckin(
 
   const parsed = checkinSchema.safeParse({
     fullName: formData.get("fullName"),
-    studentId: formData.get("studentId"),
+    eid: formData.get("eid"),
     email: formData.get("email"),
   });
   if (!parsed.success) {

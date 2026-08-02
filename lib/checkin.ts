@@ -31,16 +31,25 @@ export const RATE_LIMIT_MAX = 90;
 export const RATE_LIMIT_WINDOW_MINUTES = 10;
 
 /**
- * JS mirror of the SQL normalization on members.normalized_student_id and
- * attendance.normalized_student_id:
+ * JS mirror of the SQL normalization on members.normalized_eid and
+ * attendance.normalized_eid:
  *
- *   upper(regexp_replace(x, '\s|-', '', 'g'))
+ *   lower(regexp_replace(x, '\s|-', '', 'g'))
  *
  * The two must strip identically — tests/normalization.test.ts asserts the
  * generated column equals this function for pathological inputs.
+ *
+ * Folds to LOWER, not upper. EIDs are conventionally written lowercase, and
+ * the review screen renders the normalized form back at the officer ("matches
+ * as ...") — uppercasing it shouted ABC1234 at someone who typed abc1234.
+ *
+ * The whitespace and hyphen stripping stays even though a real EID contains
+ * neither. It no longer models the four roster formats it was written for, but
+ * people still paste from badges and spreadsheets, and dropping it would
+ * rewrite every stored value to buy nothing.
  */
-export function normalizeStudentId(raw: string): string {
-  return raw.toUpperCase().replace(/[\s-]/g, "");
+export function normalizeEid(raw: string): string {
+  return raw.toLowerCase().replace(/[\s-]/g, "");
 }
 
 /**
@@ -54,7 +63,7 @@ export function escapeIlike(raw: string): string {
 
 export type CheckinInput = {
   fullName: string;
-  studentId: string;
+  eid: string;
   email: string;
   /**
    * The member's own claim that they are new — the one bit of information the
@@ -106,7 +115,7 @@ const UNIQUE_VIOLATION = "23505";
  *      and the app (the CLAUDE.md three-places invariant).
  *   2. No open event and nothing within ORPHAN_WINDOW_HOURS → refused, and
  *      nothing is written.
- *   3. Member *lookup* — normalized_student_id, then lower(email). Creating a
+ *   3. Member *lookup* — normalized_eid, then lower(email). Creating a
  *      member is no longer part of resolution; it happens only behind an
  *      explicit confirmation (§4.2, docs/attend-confirmation-flow.md). A
  *      lookup miss is `unmatched` and writes nothing.
@@ -125,7 +134,7 @@ export async function resolveCheckin(
   now: Date
 ): Promise<CheckinResult> {
   const ts = now.toISOString();
-  const normalized = normalizeStudentId(input.studentId);
+  const normalized = normalizeEid(input.eid);
 
   // 1. Which event, if any, is open at this instant?
   const openEvent = await db.rpc("open_event_at", { ts });
@@ -140,7 +149,7 @@ export async function resolveCheckin(
   //    attendance in the middle of summer).
   //
   //    Refusing here, before any member lookup, also closes the membership
-  //    oracle outside event windows: someone probing a student ID off-season
+  //    oracle outside event windows: someone probing a EID off-season
   //    learns only that there is no event on.
   if (!event) {
     const nearby = await db.rpc("nearby_events", {
@@ -210,7 +219,7 @@ export async function resolveCheckin(
       event_id: event.id,
       member_id: memberId,
       submitted_name: input.fullName,
-      submitted_student_id: input.studentId,
+      submitted_eid: input.eid,
       submitted_email: input.email,
       submitted_at: ts,
       // Both links resolved, so present — satisfies present_requires_resolution
@@ -219,7 +228,7 @@ export async function resolveCheckin(
     });
     if (inserted.error) {
       if (inserted.error.code === UNIQUE_VIOLATION) {
-        // attendance_one_per_event: same (event_id, normalized_student_id)
+        // attendance_one_per_event: same (event_id, normalized_eid)
         // already recorded. Fetch the blocking row's status for the message.
         return duplicateFromIndex(db, event.id, normalized);
       }
@@ -239,7 +248,7 @@ export async function resolveCheckin(
     .select("id")
     .is("event_id", null)
     .eq("status", "pending")
-    .eq("normalized_student_id", normalized)
+    .eq("normalized_eid", normalized)
     .gte("submitted_at", windowStart)
     .limit(1);
   if (priorOrphan.error) {
@@ -254,7 +263,7 @@ export async function resolveCheckin(
     event_id: null,
     member_id: memberId,
     submitted_name: input.fullName,
-    submitted_student_id: input.studentId,
+    submitted_eid: input.eid,
     submitted_email: input.email,
     submitted_at: ts,
     status: "pending",
@@ -290,7 +299,7 @@ async function createMember(
   const created = await db
     .from("members")
     .insert({
-      student_id: input.studentId,
+      eid: input.eid,
       full_name: input.fullName,
       email: input.email,
       source: "self_checkin",
@@ -311,7 +320,7 @@ async function createMember(
   return null;
 }
 
-/** §4.2 lookup order: normalized_student_id, then lower(email). Never writes. */
+/** §4.2 lookup order: normalized_eid, then lower(email). Never writes. */
 async function findMember(
   db: Client,
   input: CheckinInput,
@@ -320,7 +329,7 @@ async function findMember(
   const byId = await db
     .from("members")
     .select("id")
-    .eq("normalized_student_id", normalized)
+    .eq("normalized_eid", normalized)
     .maybeSingle();
   if (byId.error) {
     console.error("member lookup by id failed:", byId.error.message);
@@ -328,7 +337,7 @@ async function findMember(
   }
   if (byId.data) return { kind: "found", id: byId.data.id };
 
-  // Email second: contains the common typo — a botched student ID is still
+  // Email second: contains the common typo — a botched EID is still
   // recognized by email and linked instead of becoming a duplicate person.
   // This fallback is what keeps `unmatched` rare, so it has to run before any
   // miss is reported.
@@ -355,7 +364,7 @@ async function duplicateFromIndex(
     .from("attendance")
     .select("status")
     .eq("event_id", eventId)
-    .eq("normalized_student_id", normalized)
+    .eq("normalized_eid", normalized)
     .neq("status", "rejected")
     .limit(1);
   if (blocking.error || blocking.data.length === 0) {

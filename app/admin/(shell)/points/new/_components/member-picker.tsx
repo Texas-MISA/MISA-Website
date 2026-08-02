@@ -119,7 +119,7 @@ export function MemberPicker({
         // the action.
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Filter by name or student ID"
+        placeholder="Filter by name or EID"
         aria-label="Filter members"
         className="w-full border border-black/70 bg-white px-3 py-2 text-sm"
       />

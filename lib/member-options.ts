@@ -40,7 +40,7 @@ export async function fetchMemberOptions(
 
   const { data, error } = await db
     .from("members")
-    .select("id, full_name, student_id, active")
+    .select("id, full_name, eid, active")
     // With no linked id this collapses to `active.eq.true`, which is exactly
     // what a picker with nothing preselected wants. With one, it keeps whoever
     // is currently linked even if they have been deactivated since — dropping
@@ -56,7 +56,7 @@ export async function fetchMemberOptions(
 
   return data.map((member) => ({
     id: member.id,
-    label: `${member.full_name} (${member.student_id})${member.active ? "" : " — inactive"}`,
+    label: `${member.full_name} (${member.eid})${member.active ? "" : " — inactive"}`,
     active: member.active,
   }));
 }

@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeAudit } from "@/app/actions/audit";
 import { planBulkAssign } from "@/lib/attendance";
+import { normalizeEid } from "@/lib/checkin";
 
 import {
   at,
@@ -48,7 +49,7 @@ describe("the updated_at compare-and-set", () => {
     const identity = testIdentity();
     const row = await createTestAttendance(db, track, {
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: at(claimSlot(), 20),
     });
@@ -67,7 +68,7 @@ describe("the updated_at compare-and-set", () => {
     const identity = testIdentity();
     const row = await createTestAttendance(db, track, {
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: at(claimSlot(), 20),
     });
@@ -109,7 +110,7 @@ describe("the updated_at compare-and-set", () => {
     const identity = testIdentity();
     const row = await createTestAttendance(db, track, {
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: at(claimSlot(), 20),
     });
@@ -150,7 +151,7 @@ describe("approving", () => {
     const row = await createTestAttendance(db, track, {
       eventId: event.id,
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: at(slot, 20),
     });
@@ -179,7 +180,7 @@ describe("approving", () => {
       eventId: event.id,
       memberId,
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: new Date(),
     });
@@ -204,7 +205,7 @@ describe("approving", () => {
     const memberId = await createTestMember(db, track, identity);
     const row = await createTestAttendance(db, track, {
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: new Date(),
     });
@@ -249,18 +250,18 @@ describe("reopening a rejected row", () => {
       eventId: event.id,
       memberId,
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: at(slot, 18.1),
       status: "rejected",
     });
 
-    // The corrected entry that now holds (event_id, normalized_student_id).
+    // The corrected entry that now holds (event_id, normalized_eid).
     const kept = await createTestAttendance(db, track, {
       eventId: event.id,
       memberId,
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: at(slot, 18.2),
       status: "present",
@@ -279,7 +280,10 @@ describe("reopening a rejected row", () => {
       .from("attendance")
       .select("id")
       .eq("event_id", event.id)
-      .eq("normalized_student_id", identity.studentId.toUpperCase().replace(/[\s-]/g, ""))
+      // Imported, not re-implemented. This line used to inline
+      // `.toUpperCase().replace(...)`, and the fold to lower() in migration 16
+      // turned that stale copy into a silent no-match.
+      .eq("normalized_eid", normalizeEid(identity.eid))
       .neq("status", "rejected")
       .neq("id", rejected.id)
       .maybeSingle();
@@ -296,7 +300,7 @@ describe("reopening a rejected row", () => {
     const row = await createTestAttendance(db, track, {
       eventId: event.id,
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: at(slot, 18.1),
       status: "rejected",
@@ -329,20 +333,20 @@ describe("bulk assignment", () => {
     // unguarded bulk assign fail halfway.
     const first = await createTestAttendance(db, track, {
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: at(slot, 20),
     });
     const second = await createTestAttendance(db, track, {
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId.replace("-", " "),
+      submittedEid: identity.eid.replace("-", " "),
       submittedEmail: identity.email,
       submittedAt: at(slot, 21),
     });
 
     const { data: selected } = await db
       .from("attendance")
-      .select("id, submitted_name, submitted_at, status, normalized_student_id, member_id")
+      .select("id, submitted_name, submitted_at, status, normalized_eid, member_id")
       .in("id", [first.id, second.id]);
 
     const plan = planBulkAssign({
@@ -351,7 +355,7 @@ describe("bulk assignment", () => {
         submittedName: r.submitted_name,
         submittedAt: r.submitted_at,
         status: r.status,
-        normalizedStudentId: r.normalized_student_id,
+        normalizedEid: r.normalized_eid,
         memberId: r.member_id,
       })),
       existingOnEvent: [],
@@ -391,13 +395,13 @@ describe("bulk assignment", () => {
 
     const stillPending = await createTestAttendance(db, track, {
       submittedName: identityA.fullName,
-      submittedStudentId: identityA.studentId,
+      submittedEid: identityA.eid,
       submittedEmail: identityA.email,
       submittedAt: at(slot, 20),
     });
     const alreadyRejected = await createTestAttendance(db, track, {
       submittedName: identityB.fullName,
-      submittedStudentId: identityB.studentId,
+      submittedEid: identityB.eid,
       submittedEmail: identityB.email,
       submittedAt: at(slot, 21),
       status: "rejected",
@@ -430,7 +434,7 @@ describe("manual entry", () => {
         event_id: event.id,
         member_id: memberId,
         submitted_name: identity.fullName,
-        submitted_student_id: identity.studentId,
+        submitted_eid: identity.eid,
         submitted_email: identity.email,
         submitted_at: new Date().toISOString(),
         source: "admin_manual",
@@ -462,7 +466,7 @@ describe("manual entry", () => {
       event_id: event.id,
       member_id: memberId,
       submitted_name: identity.fullName,
-      submitted_student_id: identity.studentId,
+      submitted_eid: identity.eid,
       submitted_email: identity.email,
       source: "admin_manual",
       status: "present",

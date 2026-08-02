@@ -139,10 +139,10 @@ function Fields({
               className={fieldClass}
             />
           </Field>
-          <Field label="Student ID" error={errors.submittedStudentId}>
+          <Field label="EID" error={errors.submittedEid}>
             <input
-              name="submittedStudentId"
-              defaultValue={values.submittedStudentId}
+              name="submittedEid"
+              defaultValue={values.submittedEid}
               className={`${fieldClass} font-mono`}
             />
           </Field>

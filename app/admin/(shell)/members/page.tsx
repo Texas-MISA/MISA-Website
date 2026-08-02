@@ -21,7 +21,7 @@ import { Pagination } from "./_components/pagination";
 // leaderboard deliberately drops (§4.4, §4.5).
 //
 // Service-role read behind requireOfficer(), like every other admin screen.
-// member_directory carries student_id and email, so it is granted to
+// member_directory carries eid and email, so it is granted to
 // `authenticated` only and must never be read from a Client Component with the
 // anon key (§6).
 //
@@ -38,7 +38,7 @@ export const metadata: Metadata = { title: "Members" };
 // collapses the result into an untyped error shape. The wrapped-and-concatenated
 // version of this line cost a build here too.
 const COLUMNS =
-  "id, student_id, full_name, email, active, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate" as const;
+  "id, eid, full_name, email, active, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate" as const;
 
 type DirectoryQueryResult =
   | { kind: "ok"; rows: MemberRow[]; total: number }
@@ -70,7 +70,7 @@ async function fetchDirectory(
   // mismatch.
   const rows: MemberRow[] = data.map((row) => ({
     id: row.id ?? "",
-    studentId: row.student_id ?? "",
+    eid: row.eid ?? "",
     fullName: row.full_name ?? "",
     email: row.email ?? "",
     active: row.active ?? true,

@@ -73,7 +73,7 @@ describe("parseMemberFilter", () => {
   it("gives count-like columns a descending default", () => {
     expect(parseMemberFilter({ sort: "total_points" }).dir).toBe("desc");
     expect(parseMemberFilter({ sort: "attendance_rate" }).dir).toBe("desc");
-    expect(parseMemberFilter({ sort: "student_id" }).dir).toBe("asc");
+    expect(parseMemberFilter({ sort: "eid" }).dir).toBe("asc");
     // An explicit direction always wins over the default.
     expect(parseMemberFilter({ sort: "total_points", dir: "asc" }).dir).toBe(
       "asc"
@@ -170,7 +170,7 @@ describe("memberFilterToParams", () => {
   });
 
   it("defaultDirection agrees with what the parser would have chosen", () => {
-    for (const sort of ["name", "total_points", "last_seen_at", "student_id"] as const) {
+    for (const sort of ["name", "total_points", "last_seen_at", "eid"] as const) {
       expect(defaultDirection(sort)).toBe(parseMemberFilter({ sort }).dir);
     }
   });

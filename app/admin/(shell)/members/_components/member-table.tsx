@@ -16,7 +16,7 @@ import {
 
 export type MemberRow = {
   id: string;
-  studentId: string;
+  eid: string;
   fullName: string;
   email: string;
   active: boolean;
@@ -59,8 +59,8 @@ export function MemberTable({
             <SortHeader filter={filter} column="name" align="left">
               Member
             </SortHeader>
-            <SortHeader filter={filter} column="student_id" align="left">
-              Student ID
+            <SortHeader filter={filter} column="eid" align="left">
+              EID
             </SortHeader>
             <SortHeader filter={filter} column="joined_at" align="left">
               Joined
@@ -115,7 +115,7 @@ export function MemberTable({
                 </div>
                 <div className="text-xs text-foreground/60">{row.email}</div>
               </td>
-              <td className={`${text} tabular-nums`}>{row.studentId}</td>
+              <td className={text}>{row.eid}</td>
               <td className={text}>{row.joinedLabel}</td>
               <td className={numeric}>
                 {row.eventsAttended}

@@ -372,7 +372,7 @@ describe("previewEventEdit", () => {
 
   it("counts distinct members, not attendance rows", () => {
     // Two rows can share a member: the unique index is on
-    // (event_id, normalized_student_id), not member_id.
+    // (event_id, normalized_eid), not member_id.
     const warnings = previewEventEdit({
       current,
       proposed: { ...current, points: 2 },

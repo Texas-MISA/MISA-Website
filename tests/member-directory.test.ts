@@ -199,7 +199,7 @@ describe("attendance_rate", () => {
       eventId: sharedEventId,
       memberId,
       submittedName: identity.fullName,
-      submittedStudentId: identity.studentId,
+      submittedEid: identity.eid,
       submittedEmail: identity.email,
       submittedAt: new Date(),
       status: "present",

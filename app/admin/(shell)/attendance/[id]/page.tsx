@@ -14,7 +14,7 @@ import {
   type ResolutionWarning,
 } from "@/lib/attendance";
 import { requireOfficer } from "@/lib/auth";
-import { normalizeStudentId, ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
+import { normalizeEid, ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 import { fetchEventOptions } from "@/lib/event-options";
 import { formatInstant } from "@/lib/events";
 import { fetchMemberOptions } from "@/lib/member-options";
@@ -38,10 +38,10 @@ type SubmissionDetail = {
   event_id: string | null;
   member_id: string | null;
   submitted_name: string;
-  submitted_student_id: string;
+  submitted_eid: string;
   submitted_email: string;
   submitted_at: string;
-  normalized_student_id: string | null;
+  normalized_eid: string | null;
   status: string;
   source: string;
   resolution_note: string | null;
@@ -62,7 +62,7 @@ type SubmissionDetail = {
     id: string;
     full_name: string;
     email: string;
-    student_id: string;
+    eid: string;
     active: boolean;
   } | null;
 };
@@ -72,11 +72,11 @@ async function fetchSubmission(id: string): Promise<SubmissionDetail | null> {
   const { data, error } = await db
     .from("attendance")
     .select(
-      "id, event_id, member_id, submitted_name, submitted_student_id, " +
-        "submitted_email, submitted_at, normalized_student_id, status, source, " +
+      "id, event_id, member_id, submitted_name, submitted_eid, " +
+        "submitted_email, submitted_at, normalized_eid, status, source, " +
         "resolution_note, resolved_at, updated_at, " +
         "events(id, title, status, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, term), " +
-        "members(id, full_name, email, student_id, active)"
+        "members(id, full_name, email, eid, active)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -141,7 +141,7 @@ async function fetchMemberSuggestions(
   // candidate set structurally excludes the row we are looking for.
   const { data, error } = await db
     .from("members")
-    .select("id, full_name, email, student_id, normalized_student_id, active")
+    .select("id, full_name, email, eid, normalized_eid, active")
     .eq("active", true)
     .limit(MEMBER_SCAN_LIMIT);
 
@@ -154,8 +154,8 @@ async function fetchMemberSuggestions(
     id: row.id,
     fullName: row.full_name,
     email: row.email,
-    studentId: row.student_id,
-    normalizedStudentId: row.normalized_student_id ?? "",
+    eid: row.eid,
+    normalizedEid: row.normalized_eid ?? "",
     active: row.active,
   }));
 
@@ -163,10 +163,10 @@ async function fetchMemberSuggestions(
     {
       fullName: submission.submitted_name,
       email: submission.submitted_email,
-      studentId: submission.submitted_student_id,
-      normalizedStudentId:
-        submission.normalized_student_id ??
-        normalizeStudentId(submission.submitted_student_id),
+      eid: submission.submitted_eid,
+      normalizedEid:
+        submission.normalized_eid ??
+        normalizeEid(submission.submitted_eid),
     },
     candidates
   );
@@ -234,13 +234,13 @@ export default async function SubmissionDetailPage({
         </p>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Name">{submission.submitted_name}</Row>
-          <Row label="Student ID">
-            <span className="font-mono">{submission.submitted_student_id}</span>
-            {submission.normalized_student_id &&
-              submission.normalized_student_id !==
-                submission.submitted_student_id && (
+          <Row label="EID">
+            <span className="font-mono">{submission.submitted_eid}</span>
+            {submission.normalized_eid &&
+              submission.normalized_eid !==
+                submission.submitted_eid && (
                 <span className="ml-2 text-xs text-foreground/60">
-                  matches as {submission.normalized_student_id}
+                  matches as {submission.normalized_eid}
                 </span>
               )}
           </Row>
@@ -284,7 +284,7 @@ export default async function SubmissionDetailPage({
               <>
                 {submission.members.full_name}{" "}
                 <span className="text-xs text-foreground/60">
-                  ({submission.members.student_id})
+                  ({submission.members.eid})
                 </span>
               </>
             ) : (
@@ -331,13 +331,13 @@ export default async function SubmissionDetailPage({
         <section className="mt-12 max-w-3xl">
           <h2 className="font-display text-xl font-bold">Which member?</h2>
           <p className="mt-2 text-sm text-foreground/70">
-            Closest roster matches on email, student ID, and name. The
+            Closest roster matches on email, EID, and name. The
             highlighted character is where the submitted ID first differs.
           </p>
           <div className="mt-4">
             <MemberSuggestions
               suggestions={memberSuggestions}
-              submittedStudentId={submission.submitted_student_id}
+              submittedEid={submission.submitted_eid}
             />
           </div>
         </section>
@@ -361,7 +361,7 @@ export default async function SubmissionDetailPage({
             members={memberOptions}
             current={{
               submittedName: submission.submitted_name,
-              submittedStudentId: submission.submitted_student_id,
+              submittedEid: submission.submitted_eid,
               submittedEmail: submission.submitted_email,
               eventId: submission.event_id ?? "",
               memberId: submission.member_id ?? "",

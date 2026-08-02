@@ -13,7 +13,7 @@ const LIMIT = 12;
 type CheckinRow = {
   id: string;
   submitted_name: string;
-  submitted_student_id: string;
+  submitted_eid: string;
   submitted_at: string;
   status: string;
   events: { title: string } | null;
@@ -26,7 +26,7 @@ async function fetchRecentCheckins(): Promise<
   const { data, error } = await db
     .from("attendance")
     .select(
-      "id, submitted_name, submitted_student_id, submitted_at, status, events(title)"
+      "id, submitted_name, submitted_eid, submitted_at, status, events(title)"
     )
     .order("submitted_at", { ascending: false })
     .limit(LIMIT);
@@ -62,7 +62,7 @@ export async function RecentCheckins() {
         <thead>
           <tr className="border-b-2 border-black text-left">
             <th className="py-2 pr-4 font-medium">Name</th>
-            <th className="py-2 pr-4 font-medium">Student ID</th>
+            <th className="py-2 pr-4 font-medium">EID</th>
             <th className="py-2 pr-4 font-medium">Event</th>
             <th className="py-2 pr-4 font-medium">Submitted</th>
             <th className="py-2 font-medium">Status</th>
@@ -73,7 +73,7 @@ export async function RecentCheckins() {
             <tr key={row.id} className="border-b border-black/15">
               <td className="py-2 pr-4">{row.submitted_name}</td>
               <td className="py-2 pr-4 font-mono text-xs">
-                {row.submitted_student_id}
+                {row.submitted_eid}
               </td>
               <td className="py-2 pr-4">
                 {row.events?.title ?? (
