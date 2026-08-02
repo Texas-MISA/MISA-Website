@@ -1,9 +1,31 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.27
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1–2 of 9 built
+**Version:** 1.28
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a and 2 of 9 built, merged and deployed
 **Last updated:** August 2026
 
+> **v1.28: the remote is not a scratch database.** Migration 17 backfills the
+> pre-rename EID values on the linked project, because the planned re-seed was
+> refused — and the refusal turned out to be load-bearing.
+>
+> - **`seed.sql` guards itself against wiping a database whose `auth.users`
+>   holds a real account, and the linked project trips that guard.** It has a
+>   real officer *and* a real member: `Christian A Gonzales / cag7284`,
+>   self-registered through the live check-in form. A full re-seed would have
+>   destroyed a real person's row. **Do not work around that guard**; do what
+>   migration 17 does instead — a targeted, idempotent backfill keyed so it can
+>   only match the old shape, which touches no account, audit row, or link.
+> - **This also revises §2.2 and §6 in spirit:** the linked project stopped
+>   being a scratch copy of `seed.sql` the moment the check-in form went live.
+>   Its totals (33 members / 16 events / 209 attendance / 12 audit) are not the
+>   seed's 32/15/208/2, and code or docs that assume they match are wrong.
+> - **It is also the concrete subject of the v1.27 exposure.** The anon read of
+>   `member_directory` was returning a real name, email, and EID — not only
+>   fabricated rows. The privacy cost in §6 was realised, not hypothetical.
+> - `scripts/seed-remote.sh` stopping cleanly at the first chunk is why no
+>   partial seed landed on live data. It has `set -euo pipefail` and exits per
+>   chunk; keep both if that script is ever rewritten.
+>
 > **v1.27: an anon read of `member_directory`, closed; and the EID rename,
 > applied.** Migrations 15 and 16. The first was not planned work — it was found
 > while reading the schema to write the second.
@@ -1434,15 +1456,16 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 6 — Member Directory 🔨 phase 1 of 9 built · re-planned 2026-08-01 (v1.26)
+### Stage 6 — Member Directory 🔨 phases 1, 2a and 2 of 9 built · re-planned 2026-08-01 (v1.26)
 **Goal:** Officers can slice the roster any way they need and get the result out of the system in one action. This is the screen officers will actually live in.
 
 **Nine phases** — six originally, re-planned after phase 1 shipped (see the v1.26 note at the top of this document for the four decisions and their reasoning). Same shape as Stage 5: each ends in something demonstrable and merges to `main` as it lands. `tasks.md` carries the working detail.
 
 | Phase | Scope | State |
 |---|---|---|
-| 1 | Migration 14, `lib/filters.ts`, read-only `/admin/members` — sorting, pagination, view-column filters | ✅ built, partly superseded by 3 |
-| 2 | The EID switch — migration 15, the ranker retune, seed and fixture regeneration | |
+| 1 | Migration 14, `lib/filters.ts`, read-only `/admin/members` — sorting, pagination, view-column filters | ✅ built & browser-verified, partly superseded by 3 |
+| 2a | Migration 15 — close the anon read of `member_directory`; `tests/security.test.ts` | ✅ built & deployed |
+| 2 | The EID switch — migrations 16 and 17, the ranker retune, seed and fixture regeneration | ✅ built & deployed |
 | 3 | The reshaped four-column directory **and** `/admin/members/[id]` | |
 | 4 | Custom fields — definitions, dropdown values, inline editing, sorting | |
 | 5 | Selection and extraction — copy emails / names / TSV, CSV download, export auditing | **exit criteria met here** |
@@ -1451,7 +1474,9 @@ contact form's backend — it renders disabled, with email as the working path.
 | 8 | The merge tool — its own estimate, see below | |
 | 9 | Docs and a closing read-through | |
 
-⚠️ **Phase 1 has not been walked through a browser.** The auth gate is confirmed and the query behaviour is covered by tests, but no human has looked at the screen. Each of Stage 5's phases found defects that way that no test caught — a control deriving its enabled state from the wrong source, a selection count outliving its checkboxes, an audit diff inventing changes — and all three were in screens of exactly this kind. **Do it before the phase-2 rework**, so anything found is attributable to phase 1 rather than to the change layered on top.
+✅ **Phase 1 was walked through a browser (2026-08-01), and it earned its keep.** Sorting, the tie-break across a page boundary, pagination, and the rate-threshold arithmetic were all correct. The screen was not: the five numeric filter boxes were uncontrolled (`defaultValue`), which React reads only at mount, so CLEAR — a client-side push with no remount — left the officer's typed numbers on screen above a count that no longer applied them. Displayed filter and applied filter disagreed, which is the same partial-list failure phase 5's export exists to avoid, arriving through the filter instead of through pagination. Fixed by moving both translations into `lib/filters.ts` (`memberFilterFields`, `memberFilterUrl`).
+
+That is now four consecutive phases where a browser pass found something the suite could not — and this one **could not** have been caught by a test, since `vitest` runs `environment: "node"` and cannot render a component. The guard is a source assertion instead. Keep doing the walkthrough.
 
 **Two phases that must not be separated.** Phase 3 reduces the directory to four columns and builds the member detail page in the same phase, because the detail page is where the removed columns go. Shipping the reduction first would make attendance rate, pending count, and last seen unreachable from the UI entirely.
 

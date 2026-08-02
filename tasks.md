@@ -2,22 +2,23 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–5 are complete. Stage 6 (member directory) is in progress — phase 1 of 9 built, and the stage was re-planned on 2026-08-01 after four design decisions landed on top of it.** Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–5 are complete. Stage 6 (member directory) is in progress — phases 1, 2a, and 2 of 9 built, merged, and deployed.** The stage was re-planned on 2026-08-01 after four design decisions landed on top of phase 1. Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
-## 🔖 Picking this up cold (as of 2026-08-01)
+## 🔖 Picking this up cold (as of 2026-08-02)
 
 Read this before touching anything; it is the state no file can tell you on its own.
 
 | | |
 |---|---|
-| **Branch** | `main` is current and clean — Stage 5 closed with the phase-5 read-through (`2292bbc`, 2026-08-01) and both it and `stage-5-attendance-review` are pushed. **Stage 6 starts on a new branch, `stage-6-member-directory`, off `main`**; merge at the end of each phase, as Stage 5 did. |
-| **Production** | **All of Stage 5 is live** on https://misa-website-beta.vercel.app. `/admin/points`, `/admin/points/new`, and `/admin/points/[id]` are all in the deployed build (confirmed in the build log, not from the 307 — the proxy redirects *any* `/admin/*` path including ones that don't exist, so a 307 proves nothing about whether a route shipped). The Points nav entry is live. |
-| **Database** | All 15 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`). Stage 6 phase 1 added `20260730000014_member_directory.sql` — `attendance_rate`, `members.notes`, and `'roster'` as an `admin_audit` entity type — pushed to both, types regenerated from `--linked`. |
-| ⚠️ **Merged mid-stage** | Merged at the end of each phase rather than at the end of the stage, deliberately, so the work is visible in production. It worked — the queue was resolving real submissions while `/admin/points` was still being written. Do the same in Stage 6. |
-| **Next task** | **Push migration 16 + merge, in one window** (see the end of Stage 6 phase 2), then phase 3. **Start by walking phase 1 through a browser**: `/admin/members` is built, tested, and lint/build clean, but no human has looked at it, and doing it *before* the rework keeps any defect attributable to phase 1. ⚠️ **The stage was re-planned on 2026-08-01** and now runs to nine phases — read "What changed and why" in the Stage 6 section before picking up anything; the old phase 2 (selection and extraction) is now phase 5. |
-| **Local database** | **Freshly reset 2026-08-01** and back to the documented seed exactly: 32 members, 15 events, 208 attendance, 6 adjustments, 2 audit rows, 29 leaderboard rows, `current_term()` = Spring 2026. ⚠️ The reset wiped local `auth.users`, so **re-create the dev officer before signing in to `/admin`** — see the command below. |
+| **Branch** | `main` and `stage-6-member-directory` are both at `c21327f`, in sync with `origin`, clean. Stage 6 merges to `main` **at the end of each phase** rather than at the end of the stage — keep doing that. |
+| **Production** | **Everything through Stage 6 phase 2 is live** on https://misa-website-beta.vercel.app. Verified by response, not assumed: `/`, `/attend`, `/officers` all 200; anon is **401** on `member_directory` and 200 on `leaderboard`. ⚠️ A 307 on an `/admin/*` path proves nothing about whether a route shipped — the proxy redirects paths that do not exist. |
+| **Database** | **18 migration files (through `…000017`), identical on local and the remote** (`gbxypeofjnhrhotlhyzs`) — confirmed with `npx supabase migration list --linked`. Phase 2 added **15** (anon revoke), **16** (the EID rename), and **17** (a data backfill rewriting the remote's pre-rename values). Types regenerated. |
+| 🔴 **Production is NOT purely fake data** | It carries **one real member** — `Christian A Gonzales / cag7284`, `source = 'self_checkin'`, one attendance row — who self-registered through the live check-in form, plus a real officer account. This is why `seed.sql`'s guard refuses to run against it, and the guard is **right**: a wipe would destroy a real person's row. Production totals (33 members / 16 events / 209 attendance / 12 audit) therefore do **not** match the seed's 32/15/208/2, and are not supposed to. |
+| **Next task** | **Stage 6 phase 3 — the reshaped four-column directory and `/admin/members/[id]`.** They land in the same phase deliberately: removing six columns before the detail page exists makes that data unreachable. Read "What changed and why" in the Stage 6 section first — the stage runs to nine phases and the old phase 2 (selection and extraction) is now **phase 5**. |
+| **Local database** | **Reset 2026-08-02** and at the documented seed exactly: 32 members, 15 events, 202 present + 5 pending + 1 rejected attendance, 6 adjustments, 2 audit rows, 29 leaderboard rows, `current_term()` = Spring 2026. `seed.sql` now **asserts these counts itself** and aborts if any drifts. ⚠️ `admin_audit` climbs after that: `cleanup()` deliberately leaves audit rows behind (they cannot be deleted — P0001), so a local database that has run `npm test` shows ~10, not 2. Members stay at 32; the suite is member-neutral. ⚠️ The reset wiped local `auth.users`, so **re-create the dev officer before signing in** — command below. |
+| **Tests** | **264 across 14 files**, lint and build clean. Two files are new in phase 2: `tests/security.test.ts` (anon boundary) and `tests/seed-fixtures.test.ts` (the seeded near-miss fixtures against the real ranker). |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
 
@@ -428,7 +429,7 @@ The original four were found by reading `20260730000008_views.sql` and `20260730
   - **Verified the test fails against the unpatched schema first** (it named `member_directory` as readable), then passes after. 256 tests total.
 - [x] ⚠️ **Carry into the EID rename:** `alter default privileges … grant all on tables` means a newly *created* view inherits anon access. `create or replace` does not re-trigger it; **`drop` + `create` does** — and migration 16 must drop and recreate this view to rename its output column. **The recreate must re-issue the revoke**, and re-running the anon check afterwards is the step that catches forgetting it.
 
-### ✅ Phase 2 — the EID switch (2026-08-02, local only — remote deploy pending)
+### ✅ Phase 2 — the EID switch (2026-08-02, deployed)
 
 *Cross-cutting, mechanical, and wide — **39 code / SQL / test files carrying 480 occurrences**, plus 4 markdown files, measured 2026-08-01 with `grep -riE "student_?id"` excluding `.next` and `node_modules`. Deliberately first and deliberately alone: it touches the public check-in path, the attendance review screens, and the suggestion ranker, and mixing it with the directory rework would leave both unreviewable. First also means every later phase writes `eid` from the start instead of renaming twice.*
 
@@ -456,7 +457,21 @@ The original four were found by reading `20260730000008_views.sql` and `20260730
 - [x] Docs: architecture doc → **v1.27** with §4 DDL, `CLAUDE.md`, `docs/attend-confirmation-flow.md`, `README.md`
 - [x] **264 tests** across 14 files, lint and build clean
 
-**⚠️ Not done, and deliberately left for a single deploy window:** migration 16 is **not yet pushed to the remote**, and the remote has not been re-seeded. Renaming the columns breaks the deployed build until the code deploys with it, so the two must go together: `npx supabase db push`, then merge to `main` immediately, then `bash scripts/seed-remote.sh`. Production is pre-launch, so the window is acceptable — but it is a window, and `/attend` is live in it.
+- [x] **Deployed 2026-08-02.** `db push` then merge in one window, because the rename breaks the deployed build until the code ships with it. The gap was ~40 seconds, measured by polling `/attend` for the `UT EID` label; production is pre-launch so nobody was in it. Verified after: public pages 200, anon **401** on `member_directory`, leaderboard 200.
+- [x] 🪤 **The remote re-seed was refused, correctly, and the plan changed because of it.** `bash scripts/seed-remote.sh` aborted at chunk one with `P0001: Refusing to seed: auth.users contains real accounts`. Nothing was deleted or inserted — the script has `set -euo pipefail` and exits per chunk, which is the only reason a partial seed did not land on top of live data. **Do not work around that guard.** Instead, **migration 17** backfills the remote's pre-rename values: idempotent (keyed on `normalized_eid like 'ut1000%'`, which no new EID matches), a no-op on a fresh database (migrations run before `seed.sql`), and it leaves accounts, audit rows, and links untouched.
+- [x] 🔴 **The guard was right for a reason nobody had noticed.** The remote holds a **real member** — `Christian A Gonzales / cag7284`, self-registered through the live form — not just a real officer account. A wipe would have destroyed a real person's row. Migration 17 deliberately skips it (already in real EID format). See the cold-start table.
+  - **This is also the concrete subject of the phase-2a exposure.** The anon read of `member_directory` was returning a real name, email, and EID, not only fabricated seed rows.
+
+### 🔎 Open questions raised in phase 2, deliberately not acted on
+
+Neither blocks phase 3. Both were found by reading the code and would otherwise be lost.
+
+- **The member-less attendance row is nearly unreachable now, and the seed pretends otherwise.** Under the v1.22 confirmation flow, all three `attendance` inserts in the codebase write a **non-null `member_id`** (`lib/checkin.ts:220` and `:264`, `app/actions/attendance-review.ts:655`) — a submission matching no roster member is re-prompted and never stored. So the check-in form can no longer produce the shape the review screen's member-suggestion half exists for. It is **not** dead code; three paths remain:
+  1. an officer clears the picker (`memberId: optionalUuid("member")` in `lib/validation.ts`, written straight into `saveSubmission`'s patch);
+  2. `member_id … on delete set null` — deleting a member silently orphans their rows;
+  3. rows predating v1.22, which production may hold.
+  - **What is actually wrong is the seed:** the three unmatched fixtures omit `source`, so they default to `'self_checkin'`, asserting a provenance the code cannot produce. A reader would reasonably conclude the form still does that. Fix is a comment or an explicit `source`, not a behaviour change.
+- ⚠️ **`on delete set null` turns a merge-tool bug into silent data loss** (phase 8). Merge repoints `attendance.member_id` and `point_adjustments.member_id`, then deletes the losing member. If it misses a row, Postgres will **not** raise — it nulls the link, and the attendance survives while the credit does not. That is the §4.2 failure mode arriving through the back door. Decide before phase 8 whether the FK should be `on delete restrict` with an explicit repoint-then-delete, so a miss fails loudly.
 
 ### Phase 3 — the reshaped directory and `/admin/members/[id]`
 
