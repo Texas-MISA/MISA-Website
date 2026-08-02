@@ -279,7 +279,11 @@ export function testIdentity(): {
 export async function createTestMember(
   db: SupabaseClient<Database>,
   track: Tracker,
-  identity: { fullName: string; studentId: string; email: string }
+  identity: { fullName: string; studentId: string; email: string },
+  // The directory tests need members that seed rows cannot be confused with,
+  // and `joined_at` is the only column phase 1 can filter on that the seed does
+  // not already populate across a wide range. Everything else defaults.
+  opts: { joinedAt?: Date; active?: boolean; source?: string } = {}
 ): Promise<string> {
   const { data, error } = await db
     .from("members")
@@ -287,6 +291,9 @@ export async function createTestMember(
       full_name: identity.fullName,
       student_id: identity.studentId,
       email: identity.email,
+      joined_at: opts.joinedAt?.toISOString(),
+      active: opts.active,
+      source: opts.source,
     })
     .select("id")
     .single();

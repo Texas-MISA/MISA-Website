@@ -169,6 +169,18 @@ export function formatInstant(at: string): string {
   }).format(new Date(at));
 }
 
+/** "Jan 28, 2026" — a date with no time, for things like a join date where the
+ * clock time is noise and the year is not. formatInstant deliberately omits the
+ * year, which is right for a check-in and wrong for a roster column. */
+export function formatDay(at: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: CENTRAL,
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(at));
+}
+
 /** "general_meeting" -> "General meeting". */
 export function formatCategory(category: string | null): string {
   if (!category) return "—";
