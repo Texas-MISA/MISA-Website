@@ -1,8 +1,16 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-import { MEMBER_SOURCES, MEMBER_STATES, type MemberFilter } from "@/lib/filters";
+import {
+  MEMBER_SOURCES,
+  MEMBER_STATES,
+  memberFilterFields,
+  memberFilterUrl,
+  type MemberFilter,
+  type MemberFilterFields,
+} from "@/lib/filters";
 
 // Same contract as attendance-filters.tsx: no submit button, every choice in
 // the URL, so a filtered view is shareable, survives a reload, and — the part
@@ -16,19 +24,40 @@ const smallNumber = `${controlClass} w-24`;
 
 export function MemberFilters({ filter }: { filter: MemberFilter }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
+
+  // ⚠️ These five are controlled, and that is load-bearing rather than a style
+  // choice. They were `defaultValue` + `onBlur`, which React reads only at
+  // mount — so CLEAR (a router.push, no remount) left the officer's typed
+  // numbers on screen while the query no longer carried them. The selects and
+  // date inputs never had the bug because they were already controlled.
+  //
+  // They are *not* committed on every keystroke: onChange keeps the text local
+  // and onBlur navigates, so typing "15" does not fire a request at "1".
+  const [fields, setFields] = useState(() => memberFilterFields(filter));
+
+  // Resync when the URL's filter changes underneath us — CLEAR, the back
+  // button, or a value the server clamped. Reset-during-render rather than an
+  // effect, matching review-queue.tsx; comparing the derived strings because
+  // `filter` is a fresh object on every render and would never compare equal.
+  const incoming = memberFilterFields(filter);
+  const [seen, setSeen] = useState(incoming);
+  if (
+    seen.minPoints !== incoming.minPoints ||
+    seen.maxPoints !== incoming.maxPoints ||
+    seen.minEvents !== incoming.minEvents ||
+    seen.maxEvents !== incoming.maxEvents ||
+    seen.minRate !== incoming.minRate
+  ) {
+    setSeen(incoming);
+    setFields(incoming);
+  }
+
+  function set(key: keyof MemberFilterFields, value: string) {
+    setFields((current) => ({ ...current, [key]: value }));
+  }
 
   function update(changes: Record<string, string>) {
-    const next = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(changes)) {
-      if (value) next.set(key, value);
-      else next.delete(key);
-    }
-    // Any change to what is being filtered invalidates the offset. Staying on
-    // page 3 of a narrower result set shows an officer an empty table and no
-    // reason for it.
-    next.delete("page");
-    router.push(`/admin/members?${next.toString()}`);
+    router.push(`/admin/members?${memberFilterUrl(filter, changes)}`);
   }
 
   const anyNarrowing =
@@ -84,7 +113,8 @@ export function MemberFilters({ filter }: { filter: MemberFilter }) {
             inputMode="numeric"
             placeholder="min"
             className={smallNumber}
-            defaultValue={filter.minPoints ?? ""}
+            value={fields.minPoints}
+            onChange={(e) => set("minPoints", e.target.value)}
             onBlur={(e) => update({ minPoints: e.target.value })}
           />
           <span className="text-foreground/50">–</span>
@@ -93,7 +123,8 @@ export function MemberFilters({ filter }: { filter: MemberFilter }) {
             inputMode="numeric"
             placeholder="max"
             className={smallNumber}
-            defaultValue={filter.maxPoints ?? ""}
+            value={fields.maxPoints}
+            onChange={(e) => set("maxPoints", e.target.value)}
             onBlur={(e) => update({ maxPoints: e.target.value })}
           />
         </div>
@@ -106,7 +137,8 @@ export function MemberFilters({ filter }: { filter: MemberFilter }) {
             inputMode="numeric"
             placeholder="min"
             className={smallNumber}
-            defaultValue={filter.minEvents ?? ""}
+            value={fields.minEvents}
+            onChange={(e) => set("minEvents", e.target.value)}
             onBlur={(e) => update({ minEvents: e.target.value })}
           />
           <span className="text-foreground/50">–</span>
@@ -115,7 +147,8 @@ export function MemberFilters({ filter }: { filter: MemberFilter }) {
             inputMode="numeric"
             placeholder="max"
             className={smallNumber}
-            defaultValue={filter.maxEvents ?? ""}
+            value={fields.maxEvents}
+            onChange={(e) => set("maxEvents", e.target.value)}
             onBlur={(e) => update({ maxEvents: e.target.value })}
           />
         </div>
@@ -130,7 +163,8 @@ export function MemberFilters({ filter }: { filter: MemberFilter }) {
             max={100}
             placeholder="0"
             className={smallNumber}
-            defaultValue={filter.minRate ?? ""}
+            value={fields.minRate}
+            onChange={(e) => set("minRate", e.target.value)}
             onBlur={(e) => update({ minRate: e.target.value })}
           />
           <span className="text-sm text-foreground/50">%</span>
