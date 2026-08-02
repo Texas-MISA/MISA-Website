@@ -415,6 +415,19 @@ The original four were found by reading `20260730000008_views.sql` and `20260730
 
 **Not done in this phase, deliberately:** the browser walkthrough. Every Stage 5 phase was verified in a real browser and each one found something the tests could not, so this is a genuine gap rather than a skipped formality — see the note under phase 2.
 
+### ✅ Phase 2a — the anon exposure on `member_directory` (2026-08-02, deployed)
+
+*Found while reading the schema to write the EID migration, and split out because it outranked the rename and needed to ship in minutes rather than after a wide refactor. **Migration 15**; the EID rename becomes migration 16.*
+
+- [x] 🔓 **The anon key could read every member's student ID and email**, on local **and production**. Verified at the PostgREST boundary before and after, not inferred — production answered `206` with `Content-Range: */33` and now answers `401 permission denied for view member_directory`.
+- [x] **Cause, which is structural and will recur.** `20260730000012_api_role_grants.sql` grants `all privileges on all tables in schema public` to anon and argues it is safe because "RLS is the security boundary". True for tables; **false for views** — `grant all on all tables` includes views, and `member_directory` deliberately runs as owner (`security_invoker` off) so it can aggregate *past* the deny-all tables beneath it. That is what makes it useful and what made an unguarded select on it a total bypass.
+- [x] **Why it survived review, which is the part worth remembering:** `members` itself denies correctly (anon gets `[]`), RLS is enabled everywhere, and there are no policies. Every check aimed at the table came back clean. Checking a table proves nothing about a view over it.
+- [x] **Migration 15** — `revoke all on public.member_directory from anon`, plus restating the intended grant set for `authenticated` (select only; the write privileges were inert on a non-updatable aggregate view but implied someone had considered them). Applied to local and remote.
+- [x] **`tests/security.test.ts`** — enumerates every view the migrations declare, by parsing `supabase/migrations/*.sql`, and asserts anon can select from none but `leaderboard`. Deliberately not a test for this one view: the point is that the **next** view fails here instead of in production. Also asserts `leaderboard` exposes exactly `id`/`full_name`/`total_points`, so it cannot quietly become the next `member_directory`.
+  - Needed an anon client in the harness, which did not exist — every other test runs as service_role and therefore cannot observe whether the boundary holds. `global-setup.ts` now exports `ANON_KEY`, and `helpers.ts` has `anonClient()`. The non-local guard is unchanged.
+  - **Verified the test fails against the unpatched schema first** (it named `member_directory` as readable), then passes after. 256 tests total.
+- [x] ⚠️ **Carry into the EID rename:** `alter default privileges … grant all on tables` means a newly *created* view inherits anon access. `create or replace` does not re-trigger it; **`drop` + `create` does** — and migration 16 must drop and recreate this view to rename its output column. **The recreate must re-issue the revoke**, and re-running the anon check afterwards is the step that catches forgetting it.
+
 ### Phase 2 — the EID switch
 
 *Cross-cutting, mechanical, and wide — **39 code / SQL / test files carrying 480 occurrences**, plus 4 markdown files, measured 2026-08-01 with `grep -riE "student_?id"` excluding `.next` and `node_modules`. Deliberately first and deliberately alone: it touches the public check-in path, the attendance review screens, and the suggestion ranker, and mixing it with the directory rework would leave both unreviewable. First also means every later phase writes `eid` from the start instead of renaming twice.*

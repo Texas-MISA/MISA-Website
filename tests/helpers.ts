@@ -19,6 +19,21 @@ export function testClient(): SupabaseClient<Database> {
   );
 }
 
+/**
+ * A client holding the **anon** key — the hostile role RLS is written against.
+ *
+ * Every other client in this suite is service_role, which bypasses RLS and
+ * therefore cannot observe whether the boundary holds. Anything asserting what
+ * an unauthenticated visitor can reach has to come through here.
+ */
+export function anonClient(): SupabaseClient<Database> {
+  return createClient<Database>(
+    process.env.SUPABASE_TEST_URL!,
+    process.env.SUPABASE_TEST_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+}
+
 // One random base day per run keeps reruns from colliding with leftovers of
 // a crashed earlier run; slots within a run never collide with each other.
 const RUN_BASE = Date.UTC(2030, 0, 6) + Math.floor(Math.random() * 300) * DAY();

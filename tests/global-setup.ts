@@ -35,9 +35,13 @@ export default async function setup() {
 
   const url = env.API_URL;
   const serviceKey = env.SERVICE_ROLE_KEY;
-  if (!url || !serviceKey) {
+  // The anon key is what tests/security.test.ts uses to check the boundary
+  // from the outside. Everything else in the suite runs as service_role, which
+  // by construction cannot observe whether anon is denied.
+  const anonKey = env.ANON_KEY;
+  if (!url || !serviceKey || !anonKey) {
     throw new Error(
-      `Could not read API_URL / SERVICE_ROLE_KEY from \`supabase status\`. Got keys: ${Object.keys(env).join(", ")}`
+      `Could not read API_URL / SERVICE_ROLE_KEY / ANON_KEY from \`supabase status\`. Got keys: ${Object.keys(env).join(", ")}`
     );
   }
   if (!url.includes("127.0.0.1") && !url.includes("localhost")) {
@@ -48,6 +52,7 @@ export default async function setup() {
 
   process.env.SUPABASE_TEST_URL = url;
   process.env.SUPABASE_TEST_SERVICE_KEY = serviceKey;
+  process.env.SUPABASE_TEST_ANON_KEY = anonKey;
 
   return clearTermPin(url, serviceKey);
 }
