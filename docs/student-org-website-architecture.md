@@ -1,9 +1,36 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.28
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a and 2 of 9 built, merged and deployed
+**Version:** 1.29
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2 and 3 of 9 built
 **Last updated:** August 2026
 
+> **v1.29: the directory is four columns, and the member detail page exists.**
+> Stage 6 phase 3, and the first phase of this stage that needed **no
+> migration** — `member_directory` already carried everything, which is what
+> migration 14 was for.
+>
+> - **Two decisions worth carrying, both about what "filtering narrows to what
+>   is displayed" actually costs.** The six retired filters (`source`,
+>   `minEvents`, `maxEvents`, `minRate`, `joinedFrom`, `joinedTo`) were removed
+>   from `MemberFilter` outright rather than having their controls hidden. A
+>   filter that still applies with no control on screen is the phase-1 defect
+>   arriving from the other direction: a count the officer cannot account for.
+>   An old bookmark now narrows nothing, which is visible and safe.
+> - **Free-text search replaces most of what left**, across name / email / EID —
+>   the displayed columns, so it stays inside the rule. Sanitized once in
+>   `parseMemberFilter` and emitted as a single **double-quoted** PostgREST `or`
+>   group: `.` and `,` are filter syntax and every email is full of both, so an
+>   unquoted value parses as a malformed operator rather than as a search. No
+>   pure test can catch that, which is why it is asserted against real PostgREST.
+> - **The events grid has three states, not two.** `events_possible` counts only
+>   events that have ended, so an event that has not happened yet is `upcoming`,
+>   never a miss — anything else contradicts the rate printed above it. §4.5 now
+>   says so, and `classifyTermEvents` in `lib/members.ts` owns it.
+> - **The grid and the view can legitimately disagree.** `member_directory`
+>   counts present rows against any non-cancelled current-term event, drafts
+>   included; the grid is published-only. The view is the authority on the
+>   numbers, the grid is the breakdown, and neither is derived from the other.
+>
 > **v1.28: the remote is not a scratch database.** Migration 17 backfills the
 > pre-rename EID values on the linked project, because the planned re-seed was
 > refused — and the refusal turned out to be load-bearing.
@@ -1157,7 +1184,11 @@ left join bonus_agg      ba on ba.member_id = m.id;
 
 **Null, not zero, when the denominator is zero.** A term with no completed events has no attendance rate. Rendering that as 0% would read as "attended nothing", and would sort below a member with a real 5% — exactly backwards, and at the start of every semester. Callers must render null as "—", and a threshold filter correctly excludes those rows, because "no rate" is not "meets the threshold". A member who genuinely attended nothing is a real `0` and must not be confused with it.
 
-**Two columns here are deliberately *not* term-scoped**, unlike everything around them: `pending_count` and `last_seen_at`. A pending submission from last term still needs an officer, and "when did we last see this person" is an all-time question. Both are defensible, but they sit beside current-term point columns, so the UI has to label them or they will be read as current-term figures.
+**Two columns here are deliberately *not* term-scoped**, unlike everything around them: `pending_count` and `last_seen_at`. A pending submission from last term still needs an officer, and "when did we last see this person" is an all-time question. Both are defensible, but they sit beside current-term point columns, so the UI has to label them or they will be read as current-term figures. **Resolved in phase 3** (v1.29): both moved off the directory table onto `/admin/members/[id]`, into their own block headed "All-time", apart from the term-scoped figures. Phase 6's "not seen since" filter must carry the same label.
+
+**`events_possible` counts only events that have ended, and the UI has to say the same thing in three states rather than two** (v1.29). The member detail page's events grid marks each of the term's published events attended, missed, or **upcoming** — an event that has not happened yet is in nobody's denominator, and painting it as a miss would contradict the rate rendered directly above it and make every member look worst at the start of a term, when the roster is most under scrutiny. `classifyTermEvents` in `lib/members.ts` owns the classification, takes `now` as an argument so it is testable, and uses the same half-open boundary as the view.
+
+⚠️ **The grid and this view can legitimately disagree, and neither is derived from the other.** `attendance_agg` above counts present rows against any non-cancelled current-term event — **drafts and not-yet-ended events included** — while the grid is published-only. A member marked present at a draft event therefore raises `events_attended` without appearing in the grid. Rare, and it will read as a bug to whoever finds it, so: the view is the authority on the numbers, the grid is the per-event breakdown. The integration test pins that the grid's attended + missed equals `events_possible`.
 
 `source` is exposed so officers can filter to self-registered members and review what the check-in form has added (§4.2).
 
@@ -1456,7 +1487,7 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 6 — Member Directory 🔨 phases 1, 2a and 2 of 9 built · re-planned 2026-08-01 (v1.26)
+### Stage 6 — Member Directory 🔨 phases 1, 2a, 2 and 3 of 9 built · re-planned 2026-08-01 (v1.26)
 **Goal:** Officers can slice the roster any way they need and get the result out of the system in one action. This is the screen officers will actually live in.
 
 **Nine phases** — six originally, re-planned after phase 1 shipped (see the v1.26 note at the top of this document for the four decisions and their reasoning). Same shape as Stage 5: each ends in something demonstrable and merges to `main` as it lands. `tasks.md` carries the working detail.
@@ -1466,7 +1497,7 @@ contact form's backend — it renders disabled, with email as the working path.
 | 1 | Migration 14, `lib/filters.ts`, read-only `/admin/members` — sorting, pagination, view-column filters | ✅ built & browser-verified, partly superseded by 3 |
 | 2a | Migration 15 — close the anon read of `member_directory`; `tests/security.test.ts` | ✅ built & deployed |
 | 2 | The EID switch — migrations 16 and 17, the ranker retune, seed and fixture regeneration | ✅ built & deployed |
-| 3 | The reshaped four-column directory **and** `/admin/members/[id]` | |
+| 3 | The reshaped four-column directory **and** `/admin/members/[id]` | ✅ built — no migration needed |
 | 4 | Custom fields — definitions, dropdown values, inline editing, sorting | |
 | 5 | Selection and extraction — copy emails / names / TSV, CSV download, export auditing | **exit criteria met here** |
 | 6 | Relational filters (attended or missed a given event, has pending, not seen since) | |
