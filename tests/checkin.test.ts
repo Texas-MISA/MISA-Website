@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 
-import { normalizeStudentId, resolveCheckin } from "@/lib/checkin";
+import { normalizeEid, resolveCheckin } from "@/lib/checkin";
 
 import {
   adoptMemberByNormalizedId,
@@ -23,7 +23,7 @@ const track = newTracker();
 
 afterAll(() => cleanup(db, track));
 
-type Identity = { fullName: string; studentId: string; email: string };
+type Identity = { fullName: string; eid: string; email: string };
 
 // The three ways a submission can arrive, spelled out at every call site.
 // Deliberately local rather than folded into testIdentity(): that helper is
@@ -51,7 +51,7 @@ async function attendanceRows(filter: {
 }) {
   let q = db
     .from("attendance")
-    .select("id, event_id, member_id, status, submitted_student_id");
+    .select("id, event_id, member_id, status, submitted_eid");
   if (filter.eventId !== undefined) {
     q =
       filter.eventId === null ? q.is("event_id", null) : q.eq("event_id", filter.eventId);
@@ -255,7 +255,7 @@ describe("duplicates", () => {
       event_id: event.id,
       member_id: null,
       submitted_name: identity.fullName,
-      submitted_student_id: identity.studentId,
+      submitted_eid: identity.eid,
       submitted_email: identity.email,
       submitted_at: at(slot, 18.1).toISOString(),
       source: "admin_manual",
@@ -327,7 +327,7 @@ describe("duplicates", () => {
     // `unmatched` and the member is turned away instead of recognized.
     const typo = await resolveCheckin(
       db,
-      returning({ ...identity, studentId: `${identity.studentId}9` }),
+      returning({ ...identity, eid: `${identity.eid}9` }),
       at(slot, 18.2)
     );
     expect(typo.status).toBe("present");
@@ -355,7 +355,7 @@ describe("member resolution", () => {
 
     const submitted = {
       ...identity,
-      studentId: `${identity.studentId}7`, // wrong ID
+      eid: `${identity.eid}7`, // wrong ID
       email: identity.email.toUpperCase(), // and case-mangled email
     };
     const result = await resolveCheckin(db, returning(submitted), at(slot, 18.5));
@@ -367,7 +367,7 @@ describe("member resolution", () => {
     const { count } = await db
       .from("members")
       .select("id", { count: "exact", head: true })
-      .eq("normalized_student_id", normalizeStudentId(submitted.studentId));
+      .eq("normalized_eid", normalizeEid(submitted.eid));
     expect(count).toBe(0);
   });
 
@@ -377,14 +377,18 @@ describe("member resolution", () => {
       starts: at(slot, 18),
       ends: at(slot, 19),
     });
-    const identity = testIdentity(); // studentId like T3-123456
+    const identity = testIdentity(); // eid like t3q1234560
     const memberId = await createTestMember(db, track, identity);
-    const digits = identity.studentId.replace(/^T3-/, "");
+    const body = identity.eid.replace(/^t3q/, "");
 
+    // Case is the axis that matters now — a real EID contains no punctuation,
+    // and members type theirs in whatever case their keyboard was in. The
+    // stray space and hyphen are still exercised because the generated column
+    // still strips them and pasted values still carry them.
     const variants = [
-      `t3 ${digits}`,
-      `T3${digits}`,
-      ` t3-${digits} `,
+      `T3Q${body}`,
+      `t3q ${body}`,
+      ` T3q-${body} `,
     ];
 
     // The literal email is safe only because every call here is `returning()`
@@ -393,7 +397,7 @@ describe("member resolution", () => {
     // between runs, so one created row would poison every later run.
     const first = await resolveCheckin(
       db,
-      returning({ ...identity, studentId: variants[0], email: "other@example.edu" }),
+      returning({ ...identity, eid: variants[0], email: "other@example.edu" }),
       at(slot, 18.2)
     );
     expect(first.status).toBe("present");
@@ -404,7 +408,7 @@ describe("member resolution", () => {
     for (const variant of variants.slice(1)) {
       const result = await resolveCheckin(
         db,
-        returning({ ...identity, studentId: variant, email: "other@example.edu" }),
+        returning({ ...identity, eid: variant, email: "other@example.edu" }),
         at(slot, 18.5)
       );
       expect(result).toEqual({ status: "duplicate", prior: "present" });
@@ -510,18 +514,18 @@ describe("first-time confirmation (§4.2, docs/attend-confirmation-flow.md)", ()
     const result = await resolveCheckin(db, confirmedNew(identity), at(slot, 18.5));
     expect(result).toEqual({ status: "present", eventTitle: event.title });
 
-    const normalized = normalizeStudentId(identity.studentId);
+    const normalized = normalizeEid(identity.eid);
     const { data: member } = await db
       .from("members")
-      .select("id, source, active, full_name, student_id, email")
-      .eq("normalized_student_id", normalized)
+      .select("id, source, active, full_name, eid, email")
+      .eq("normalized_eid", normalized)
       .single();
     await adoptMemberByNormalizedId(db, track, normalized);
 
     expect(member?.source).toBe("self_checkin");
     expect(member?.active).toBe(true);
     expect(member?.full_name).toBe(identity.fullName);
-    expect(member?.student_id).toBe(identity.studentId);
+    expect(member?.eid).toBe(identity.eid);
     expect(member?.email).toBe(identity.email);
 
     const rows = await attendanceRows({ eventId: event.id });
@@ -567,7 +571,7 @@ describe("first-time confirmation (§4.2, docs/attend-confirmation-flow.md)", ()
 
     // Right email, ID they've never used here — the email fallback has to be
     // consulted before the confirmed path is allowed to create.
-    const submitted = { ...identity, studentId: `${identity.studentId}4` };
+    const submitted = { ...identity, eid: `${identity.eid}4` };
     const membersBefore = await countRows("members");
 
     const preview = await resolveCheckin(db, asNew(submitted), at(slot, 18.4));
@@ -596,12 +600,12 @@ describe("first-time confirmation (§4.2, docs/attend-confirmation-flow.md)", ()
     const result = await resolveCheckin(db, confirmedNew(identity), at(slot, 20));
     expect(result).toEqual({ status: "pending" });
 
-    const normalized = normalizeStudentId(identity.studentId);
+    const normalized = normalizeEid(identity.eid);
     await adoptMemberByNormalizedId(db, track, normalized);
     const { data: member } = await db
       .from("members")
       .select("id")
-      .eq("normalized_student_id", normalized)
+      .eq("normalized_eid", normalized)
       .single();
 
     const rows = await attendanceRows({ memberId: member!.id });

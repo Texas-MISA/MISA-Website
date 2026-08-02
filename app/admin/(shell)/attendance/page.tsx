@@ -46,7 +46,7 @@ async function fetchSubmissions(
   let query = db
     .from("attendance")
     .select(
-      "id, submitted_name, submitted_student_id, submitted_email, submitted_at, " +
+      "id, submitted_name, submitted_eid, submitted_email, submitted_at, " +
         "status, source, event_id, member_id, " +
         "events(id, title, status), members(id, full_name, active)",
       { count: "exact" }

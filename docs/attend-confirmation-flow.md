@@ -15,7 +15,7 @@ only lever that did not weaken the property.
 
 ## Context
 
-Check-in resolves a member by exact match only: `normalized_student_id`, then
+Check-in resolves a member by exact match only: `normalized_eid`, then
 `lower(email)`, then it **creates a new member**. Someone who mistypes *both*
 fields is therefore indistinguishable from a genuinely new person — they are
 literally the same insert — so typos quietly pollute the roster, and the
@@ -35,9 +35,9 @@ Settled with the officer on 2026-07-31. Do not re-litigate these while
 implementing; raise them separately if they turn out to be wrong.
 
 - **The membership oracle is accepted.** The screen says "we don't have that
-  info on file", which lets anyone probe a student ID for roster membership.
+  info on file", which lets anyone probe a EID for roster membership.
   Deliberate: the roster is a club list rather than a security boundary, and UT
-  student IDs are semi-public. Recorded *as a decision* because §6 took the
+  EIDs are semi-public. Recorded *as a decision* because §6 took the
   opposite stance for the officer login on purpose (one identical failure for
   "wrong password" and "no such user"), and the two will otherwise look
   inconsistent to whoever reads them next.
@@ -57,7 +57,7 @@ written. Everything below concerns the member half.
 
 | Member lookup | First-time box | Written? | Screen |
 |---|---|---|---|
-| Matched by `normalized_student_id` | unchecked | **yes, immediately** | Success |
+| Matched by `normalized_eid` | unchecked | **yes, immediately** | Success |
 | Matched by `lower(email)` | unchecked | **yes, immediately** | Success |
 | No match | unchecked | **nothing** | "We don't have that info on file" + re-prompt |
 | Matched (either key) | checked | not yet | Review → on confirm, **link** the existing member (never create a second) |

@@ -351,7 +351,7 @@ describe("granting and voiding move the leaderboard", () => {
       event_id: event.id,
       member_id: memberId,
       submitted_name: "Test Person",
-      submitted_student_id: `T3-${Date.now() % 1_000_000}`,
+      submitted_eid: `t3q${Date.now() % 10_000}`,
       submitted_email: "test.person@example.edu",
       submitted_at: new Date().toISOString(),
       status: "present",

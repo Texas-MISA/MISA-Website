@@ -1,10 +1,10 @@
 import { afterAll, describe, expect, it } from "vitest";
 
-import { normalizeStudentId } from "@/lib/checkin";
+import { normalizeEid } from "@/lib/checkin";
 
 import { cleanup, newTracker, testClient } from "./helpers";
 
-// The JS normalizeStudentId() mirrors the SQL generated-column expression
+// The JS normalizeEid() mirrors the SQL generated-column expression
 //   upper(regexp_replace(x, '\s|-', '', 'g'))
 // and the two are matched against each other at check-in, so they must strip
 // identically. This suite inserts pathological raw IDs and asserts the
@@ -13,7 +13,7 @@ import { cleanup, newTracker, testClient } from "./helpers";
 //
 // Inputs stay within ASCII whitespace (space, tab, CR, LF) — JS \s also
 // matches exotic Unicode spaces (NBSP etc.) where Postgres [[:space:]] is
-// locale-dependent, and no student ID legitimately contains them.
+// locale-dependent, and no EID legitimately contains them.
 
 const db = testClient();
 const track = newTracker();
@@ -21,14 +21,14 @@ const track = newTracker();
 afterAll(() => cleanup(db, track));
 
 const PATHOLOGICAL = [
-  "t3-987001",
-  "T3 987002",
-  " t3  987003 ",
-  "T3--98-70-04",
-  "t3\t987005",
-  "T3-9870-06\r",
-  "t 3 9 8 7 0 0 7",
-  "--t3987008--",
+  "t3q7001",
+  "T3Q7002",
+  " t3  q7003 ",
+  "T3--q7-00-4",
+  "t3\tq7005",
+  "T3-q700-6\r",
+  "t 3 q 7 0 0 7",
+  "--t3q7008--",
 ];
 
 describe("normalization lockstep (JS mirror vs SQL generated column)", () => {
@@ -37,14 +37,14 @@ describe("normalization lockstep (JS mirror vs SQL generated column)", () => {
       .from("members")
       .insert({
         full_name: "Lockstep Test",
-        student_id: raw,
-        email: `lockstep.${normalizeStudentId(raw).toLowerCase()}@example.edu`,
+        eid: raw,
+        email: `lockstep.${normalizeEid(raw).toLowerCase()}@example.edu`,
       })
-      .select("id, normalized_student_id")
+      .select("id, normalized_eid")
       .single();
     if (error) throw new Error(error.message);
     track.memberIds.push(data.id);
 
-    expect(data.normalized_student_id).toBe(normalizeStudentId(raw));
+    expect(data.normalized_eid).toBe(normalizeEid(raw));
   });
 });

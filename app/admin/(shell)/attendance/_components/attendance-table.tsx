@@ -16,7 +16,7 @@ import { StatusPill } from "@/app/admin/(shell)/_components/status-pill";
 export type SubmissionRow = {
   id: string;
   submitted_name: string;
-  submitted_student_id: string;
+  submitted_eid: string;
   submitted_email: string;
   submittedLabel: string;
   status: string;
@@ -78,7 +78,7 @@ export function AttendanceTable({
             </th>
             <th className="py-2 pr-4 font-medium">Submitted</th>
             <th className="py-2 pr-4 font-medium">Name</th>
-            <th className="py-2 pr-4 font-medium">Student ID</th>
+            <th className="py-2 pr-4 font-medium">EID</th>
             <th className="py-2 pr-4 font-medium">Event</th>
             <th className="py-2 pr-4 font-medium">Member</th>
             <th className="py-2 font-medium">Status</th>
@@ -116,7 +116,7 @@ export function AttendanceTable({
                 )}
               </td>
               <td className="py-2 pr-4 font-mono text-xs">
-                {row.submitted_student_id}
+                {row.submitted_eid}
               </td>
               <td className="py-2 pr-4">
                 <Unlinked value={row.events?.title} label="no event" />

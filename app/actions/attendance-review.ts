@@ -46,7 +46,7 @@ const QUEUE = "/admin/attendance";
 
 type ResolutionField =
   | "submittedName"
-  | "submittedStudentId"
+  | "submittedEid"
   | "submittedEmail"
   | "eventId"
   | "memberId"
@@ -135,7 +135,7 @@ export async function saveSubmission(
     const { data: before, error: readError } = await db
       .from("attendance")
       .select(
-        "id, event_id, member_id, submitted_name, submitted_student_id, " +
+        "id, event_id, member_id, submitted_name, submitted_eid, " +
           "submitted_email, submitted_at, status, source, resolution_note, " +
           "resolved_by, resolved_at, updated_at"
       )
@@ -147,12 +147,12 @@ export async function saveSubmission(
       return { status: "error" };
     }
 
-    // normalized_student_id is generated — writing it is a 428C9. Editing
-    // submitted_student_id is what moves it, which is also how this update can
+    // normalized_eid is generated — writing it is a 428C9. Editing
+    // submitted_eid is what moves it, which is also how this update can
     // collide with the partial unique index below.
     const patch = {
       submitted_name: fields.submittedName,
-      submitted_student_id: fields.submittedStudentId,
+      submitted_eid: fields.submittedEid,
       submitted_email: fields.submittedEmail,
       event_id: fields.eventId,
       member_id: fields.memberId,
@@ -176,7 +176,7 @@ export async function saveSubmission(
       .eq("id", id)
       .eq("updated_at", updatedAt)
       .select(
-        "id, event_id, member_id, submitted_name, submitted_student_id, " +
+        "id, event_id, member_id, submitted_name, submitted_eid, " +
           "submitted_email, status, resolution_note, resolved_by, resolved_at"
       )
       .maybeSingle();
@@ -299,7 +299,7 @@ export async function rejectSubmission(
  *
  * ⚠️ This is the one review mutation that can fail on a duplicate. The partial
  * unique index excludes `rejected` rows, so while this row sat rejected a
- * corrected entry may have taken its `(event_id, normalized_student_id)` slot —
+ * corrected entry may have taken its `(event_id, normalized_eid)` slot —
  * reopening it then collides with a row the officer probably created on
  * purpose. The seed's `Mira Petrova` on `Alumni Panel` is exactly this shape.
  * Naming the holder is the difference between a fixable message and a SQLSTATE.
@@ -321,7 +321,7 @@ export async function reopenSubmission(
     const { data: before, error: readError } = await db
       .from("attendance")
       .select(
-        "id, event_id, member_id, normalized_student_id, status, resolved_by, resolved_at"
+        "id, event_id, member_id, normalized_eid, status, resolved_by, resolved_at"
       )
       .eq("id", id)
       .single();
@@ -343,7 +343,7 @@ export async function reopenSubmission(
         const holder = await findSlotHolder(
           db,
           before.event_id,
-          before.normalized_student_id,
+          before.normalized_eid,
           id
         );
         return {
@@ -377,20 +377,20 @@ export async function reopenSubmission(
   }
 }
 
-/** Who currently holds the `(event_id, normalized_student_id)` slot a reopen
+/** Who currently holds the `(event_id, normalized_eid)` slot a reopen
  * wanted. Best effort — a null name degrades the message, not the outcome. */
 async function findSlotHolder(
   db: ReturnType<typeof createAdminClient>,
   eventId: string | null,
-  normalizedStudentId: string | null,
+  normalizedEid: string | null,
   excludeId: string
 ): Promise<{ id: string; submitted_name: string } | null> {
-  if (!eventId || !normalizedStudentId) return null;
+  if (!eventId || !normalizedEid) return null;
   const { data } = await db
     .from("attendance")
     .select("id, submitted_name")
     .eq("event_id", eventId)
-    .eq("normalized_student_id", normalizedStudentId)
+    .eq("normalized_eid", normalizedEid)
     .neq("status", "rejected")
     .neq("id", excludeId)
     .maybeSingle();
@@ -454,7 +454,7 @@ export async function bulkAssignEvent(
     const { data: selected, error: selectedError } = await db
       .from("attendance")
       .select(
-        "id, submitted_name, submitted_at, status, normalized_student_id, member_id"
+        "id, submitted_name, submitted_at, status, normalized_eid, member_id"
       )
       .in("id", ids);
     if (selectedError) {
@@ -467,7 +467,7 @@ export async function bulkAssignEvent(
     // `rejected` is excluded because the partial index excludes it too.
     const { data: existing, error: existingError } = await db
       .from("attendance")
-      .select("normalized_student_id, member_id")
+      .select("normalized_eid, member_id")
       .eq("event_id", eventId)
       .neq("status", "rejected");
     if (existingError) {
@@ -480,14 +480,14 @@ export async function bulkAssignEvent(
       submittedName: row.submitted_name,
       submittedAt: row.submitted_at,
       status: row.status,
-      normalizedStudentId: row.normalized_student_id,
+      normalizedEid: row.normalized_eid,
       memberId: row.member_id,
     }));
 
     const plan = planBulkAssign({
       selected: candidates,
       existingOnEvent: (existing ?? []).map((row) => ({
-        normalizedStudentId: row.normalized_student_id,
+        normalizedEid: row.normalized_eid,
         memberId: row.member_id,
       })),
       approve,
@@ -634,7 +634,7 @@ export async function createManualAttendance(
     // manual row copies them from the roster rather than leaving them blank.
     const { data: member, error: memberError } = await db
       .from("members")
-      .select("id, full_name, student_id, email")
+      .select("id, full_name, eid, email")
       .eq("id", fields.memberId)
       .single();
     if (memberError || !member) {
@@ -654,7 +654,7 @@ export async function createManualAttendance(
         event_id: fields.eventId,
         member_id: member.id,
         submitted_name: member.full_name,
-        submitted_student_id: member.student_id,
+        submitted_eid: member.eid,
         submitted_email: member.email,
         submitted_at: submittedAt.toISOString(),
         source: "admin_manual",
@@ -714,7 +714,7 @@ function echoResolution(formData: FormData): SubmittedResolutionValues {
   };
   return {
     submittedName: read("submittedName"),
-    submittedStudentId: read("submittedStudentId"),
+    submittedEid: read("submittedEid"),
     submittedEmail: read("submittedEmail"),
     eventId: read("eventId"),
     memberId: read("memberId"),

@@ -119,48 +119,48 @@ export type Database = {
           event_id: string | null
           id: string
           member_id: string | null
-          normalized_student_id: string | null
+          normalized_eid: string | null
           resolution_note: string | null
           resolved_at: string | null
           resolved_by: string | null
           source: string
           status: string
           submitted_at: string
+          submitted_eid: string
           submitted_email: string
           submitted_name: string
-          submitted_student_id: string
           updated_at: string
         }
         Insert: {
           event_id?: string | null
           id?: string
           member_id?: string | null
-          normalized_student_id?: string | null
+          normalized_eid?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           source?: string
           status?: string
           submitted_at?: string
+          submitted_eid: string
           submitted_email: string
           submitted_name: string
-          submitted_student_id: string
           updated_at?: string
         }
         Update: {
           event_id?: string | null
           id?: string
           member_id?: string | null
-          normalized_student_id?: string | null
+          normalized_eid?: string | null
           resolution_note?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
           source?: string
           status?: string
           submitted_at?: string
+          submitted_eid?: string
           submitted_email?: string
           submitted_name?: string
-          submitted_student_id?: string
           updated_at?: string
         }
         Relationships: [
@@ -272,36 +272,36 @@ export type Database = {
       members: {
         Row: {
           active: boolean
+          eid: string
           email: string
           full_name: string
           id: string
           joined_at: string
-          normalized_student_id: string | null
+          normalized_eid: string | null
           notes: string | null
           source: string
-          student_id: string
         }
         Insert: {
           active?: boolean
+          eid: string
           email: string
           full_name: string
           id?: string
           joined_at?: string
-          normalized_student_id?: string | null
+          normalized_eid?: string | null
           notes?: string | null
           source?: string
-          student_id: string
         }
         Update: {
           active?: boolean
+          eid?: string
           email?: string
           full_name?: string
           id?: string
           joined_at?: string
-          normalized_student_id?: string | null
+          normalized_eid?: string | null
           notes?: string | null
           source?: string
-          student_id?: string
         }
         Relationships: []
       }
@@ -395,6 +395,7 @@ export type Database = {
           attendance_points: number | null
           attendance_rate: number | null
           bonus_points: number | null
+          eid: string | null
           email: string | null
           events_attended: number | null
           events_possible: number | null
@@ -404,7 +405,6 @@ export type Database = {
           last_seen_at: string | null
           pending_count: number | null
           source: string | null
-          student_id: string | null
           total_points: number | null
         }
         Relationships: []
@@ -585,3 +585,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+

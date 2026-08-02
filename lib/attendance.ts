@@ -1,4 +1,4 @@
-import { normalizeStudentId } from "@/lib/checkin";
+import { normalizeEid } from "@/lib/checkin";
 import { effectiveWindow, type EventWindowRow } from "@/lib/events";
 
 // Attendance-resolution core (§4.2, §4.3, §7 Stage 5). Like lib/events.ts and
@@ -184,16 +184,16 @@ export type MemberCandidate = {
   id: string;
   fullName: string;
   email: string;
-  studentId: string;
-  normalizedStudentId: string;
+  eid: string;
+  normalizedEid: string;
   active: boolean;
 };
 
 export type SubmissionIdentity = {
   fullName: string;
   email: string;
-  studentId: string;
-  normalizedStudentId: string;
+  eid: string;
+  normalizedEid: string;
 };
 
 export type MatchReason =
@@ -201,7 +201,6 @@ export type MatchReason =
   | { kind: "email_local" }
   | { kind: "id_exact" }
   | { kind: "id_near_miss"; distance: number }
-  | { kind: "id_contains" }
   | { kind: "name_exact" }
   | { kind: "name_tokens"; shared: string[] }
   | { kind: "name_near"; distance: number }
@@ -271,7 +270,7 @@ export function editDistance(a: string, b: string, cap = 4): number {
 /**
  * Score one roster candidate against one submission.
  *
- * The weights encode §4.2's resolution order — email and student ID are the
+ * The weights encode §4.2's resolution order — email and EID are the
  * decisive keys, names are corroboration — and every contribution is recorded
  * as a reason so the UI can explain the ranking rather than assert it.
  */
@@ -292,8 +291,8 @@ export function scoreMemberMatch(
     reasons.push({ kind: "email_local" });
   }
 
-  const subId = submission.normalizedStudentId;
-  const candId = candidate.normalizedStudentId;
+  const subId = submission.normalizedEid;
+  const candId = candidate.normalizedEid;
   if (subId !== "" && subId === candId) {
     score += 100;
     reasons.push({ kind: "id_exact" });
@@ -303,21 +302,29 @@ export function scoreMemberMatch(
       score += 45;
       reasons.push({ kind: "id_near_miss", distance });
     } else if (distance === 2) {
-      // Deliberately below MIN_SUGGESTION_SCORE, so two digits of similarity
-      // is corroboration and never a suggestion on its own. Six-digit IDs
-      // issued in sequence mean a roster of 30 people contains three members
-      // within distance 2 of *any* number, so before this the review screen
-      // offered three confident-looking strangers for a submission from
-      // someone who was on no roster at all. Distance 1 still stands alone —
-      // that is a typo, not a coincidence.
+      // Deliberately below MIN_SUGGESTION_SCORE, so two characters of
+      // similarity is corroboration and never a suggestion on its own.
+      //
+      // The original reason was that sequentially issued six-digit IDs put
+      // roughly three members within distance 2 of *any* number, so the review
+      // screen offered three confident-looking strangers for a submission from
+      // someone on no roster at all. EIDs are not sequential, but they are
+      // derived from name initials, which reintroduces the same problem from
+      // the other direction: the near-miss population is correlated with the
+      // roster rather than spread across a numeric range. The seed reproduces
+      // it deliberately — mp8570, pn8571, and ro8574 all sit at distance 2
+      // from Rowan Pike's rp8571, and that row must render no suggestions.
+      //
+      // Distance 1 still stands alone: that is a typo, not a coincidence.
       score += 15;
       reasons.push({ kind: "id_near_miss", distance });
     }
-    // A missing "UT" prefix is a containment, not an edit-distance, match.
-    if (subId.includes(candId) || candId.includes(subId)) {
-      score += 35;
-      reasons.push({ kind: "id_contains" });
-    }
+    // There used to be an `id_contains` rule worth +35 here, on the reasoning
+    // that a dropped "UT" prefix is a containment rather than an edit. Removed
+    // with the EID switch: there is no prefix to drop, and against short
+    // alphanumerics `includes` degrades into a broad substring match that
+    // clears MIN_SUGGESTION_SCORE on its own — the exact failure the floor
+    // above exists to prevent.
   }
 
   const subTokens = nameTokens(submission.fullName);
@@ -378,7 +385,7 @@ export function rankMemberSuggestions(
 }
 
 /**
- * Where two student IDs first diverge, so the UI can highlight the character
+ * Where two EIDs first diverge, so the UI can highlight the character
  * instead of leaving the officer to compare them by eye — the "near-miss ID
  * shown for comparison" the review screen calls for.
  *
@@ -392,12 +399,12 @@ export function rankMemberSuggestions(
  * formatting), and also when `member` is the shorter of the two and has no
  * character at the divergence point. Both mean "nothing to highlight".
  */
-export function diffStudentId(
+export function diffEid(
   submitted: string,
   member: string
 ): { submitted: string; member: string; firstDifferenceAt: number | null } {
-  const submittedNormalized = normalizeStudentId(submitted);
-  const memberNormalized = normalizeStudentId(member);
+  const submittedNormalized = normalizeEid(submitted);
+  const memberNormalized = normalizeEid(member);
   if (submittedNormalized === memberNormalized) {
     return { submitted, member, firstDifferenceAt: null };
   }
@@ -417,7 +424,7 @@ export function diffStudentId(
 }
 
 /**
- * Translate an index into `normalizeStudentId(raw)` back into an index into
+ * Translate an index into `normalizeEid(raw)` back into an index into
  * `raw`. Normalization only ever uppercases and deletes, never reorders or
  * inserts, so the normalized string is a subsequence of the raw one and the
  * mapping is a single walk skipping the dropped characters.
@@ -425,7 +432,7 @@ export function diffStudentId(
 function rawIndexOf(raw: string, normalizedIndex: number): number | null {
   let kept = 0;
   for (let i = 0; i < raw.length; i++) {
-    // The characters normalizeStudentId strips.
+    // The characters normalizeEid strips.
     if (/[\s-]/.test(raw[i])) continue;
     if (kept === normalizedIndex) return i;
     kept++;
@@ -514,7 +521,7 @@ export type BulkCandidate = {
   submittedName: string;
   submittedAt: string;
   status: string;
-  normalizedStudentId: string | null;
+  normalizedEid: string | null;
   memberId: string | null;
 };
 
@@ -547,10 +554,10 @@ export type BulkPlan = {
  *
  *   1. **Dedupe within the selection.** Two checked rows can be the same
  *      person — that is the whole reason they are both sitting in the queue —
- *      and the `(event_id, normalized_student_id)` partial index would take the
+ *      and the `(event_id, normalized_eid)` partial index would take the
  *      first and 23505 the second, failing a batch the officer thought was
  *      fine. Deduped on *both* keys the §4.2 duplicate rule names: the
- *      normalized student ID, and the resolved `member_id` (the same member
+ *      normalized EID, and the resolved `member_id` (the same member
  *      reached through two differently-typed raw IDs).
  *   2. **A row with no member cannot go `present`**, whatever the officer
  *      ticked — `present_requires_resolution` would reject it. Those rows take
@@ -568,7 +575,7 @@ export function planBulkAssign(input: {
   /** Rows already attached to the target event — pending or present, since the
    *  partial unique index ignores only `rejected`. */
   existingOnEvent: {
-    normalizedStudentId: string | null;
+    normalizedEid: string | null;
     memberId: string | null;
   }[];
   approve: boolean;
@@ -576,7 +583,7 @@ export function planBulkAssign(input: {
   const claimedIds = new Set<string>();
   const claimedMembers = new Set<string>();
   for (const row of input.existingOnEvent) {
-    if (row.normalizedStudentId) claimedIds.add(row.normalizedStudentId);
+    if (row.normalizedEid) claimedIds.add(row.normalizedEid);
     if (row.memberId) claimedMembers.add(row.memberId);
   }
 
@@ -603,7 +610,7 @@ export function planBulkAssign(input: {
     }
 
     const keys = [
-      row.normalizedStudentId && `sid:${row.normalizedStudentId}`,
+      row.normalizedEid && `sid:${row.normalizedEid}`,
       row.memberId && `member:${row.memberId}`,
     ].filter((key): key is string => Boolean(key));
 

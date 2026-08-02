@@ -17,7 +17,7 @@ import {
 
 const VALID = {
   fullName: "  Test Person  ",
-  studentId: " T3-123456 ",
+  eid: " t3q1234 ",
   email: " test.person@example.edu ",
 };
 
@@ -26,7 +26,7 @@ describe("checkinSchema", () => {
     const parsed = checkinSchema.parse(VALID);
     expect(parsed).toEqual({
       fullName: "Test Person",
-      studentId: "T3-123456",
+      eid: "t3q1234",
       email: "test.person@example.edu",
     });
   });
@@ -34,10 +34,14 @@ describe("checkinSchema", () => {
   it.each([
     ["blank name", { ...VALID, fullName: "   " }, "fullName"],
     ["name too long", { ...VALID, fullName: "x".repeat(121) }, "fullName"],
-    ["blank student ID", { ...VALID, studentId: "" }, "studentId"],
-    ["ID normalizing to nothing", { ...VALID, studentId: " - " }, "studentId"],
-    ["ID normalizing to one char", { ...VALID, studentId: "- 7 -" }, "studentId"],
-    ["ID too long", { ...VALID, studentId: "9".repeat(33) }, "studentId"],
+    ["blank EID", { ...VALID, eid: "" }, "eid"],
+    ["EID normalizing to nothing", { ...VALID, eid: " - " }, "eid"],
+    ["EID normalizing to one char", { ...VALID, eid: "- 7 -" }, "eid"],
+    // The floor moved 2 -> 3 with the EID switch: the shortest real UT EIDs
+    // are three characters, and a two-character floor is what made the old
+    // substring-containment rule in the ranker dangerous.
+    ["EID normalizing to two chars", { ...VALID, eid: "a-1" }, "eid"],
+    ["ID too long", { ...VALID, eid: "9".repeat(33) }, "eid"],
     ["bad email", { ...VALID, email: "not-an-email" }, "email"],
     ["blank email", { ...VALID, email: "  " }, "email"],
   ])("rejects %s with an error on the right field", (_label, input, field) => {
@@ -50,8 +54,8 @@ describe("checkinSchema", () => {
   });
 
   it("keeps mixed-format IDs untouched (normalization happens later)", () => {
-    const parsed = checkinSchema.parse({ ...VALID, studentId: "ut 100003" });
-    expect(parsed.studentId).toBe("ut 100003");
+    const parsed = checkinSchema.parse({ ...VALID, eid: "ut 100003" });
+    expect(parsed.eid).toBe("ut 100003");
   });
 });
 
@@ -67,7 +71,7 @@ const UUID_B = "22222222-2222-4222-8222-222222222222";
 describe("attendanceEditSchema", () => {
   const VALID_EDIT = {
     submittedName: " Rowan Pike ",
-    submittedStudentId: " UT-100999 ",
+    submittedEid: " UT-100999 ",
     submittedEmail: " rowan.pike@example.edu ",
     eventId: UUID_A,
     memberId: UUID_B,
@@ -98,7 +102,7 @@ describe("attendanceEditSchema", () => {
   it.each([
     ["a malformed event id", { eventId: "not-a-uuid" }, "eventId"],
     ["a blank name", { submittedName: "  " }, "submittedName"],
-    ["an ID normalizing to nothing", { submittedStudentId: " - " }, "submittedStudentId"],
+    ["an ID normalizing to nothing", { submittedEid: " - " }, "submittedEid"],
     ["a bad email", { submittedEmail: "nope" }, "submittedEmail"],
   ])("rejects %s", (_label, over, field) => {
     const result = attendanceEditSchema.safeParse({ ...VALID_EDIT, ...over });

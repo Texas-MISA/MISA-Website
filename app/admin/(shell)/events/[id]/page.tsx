@@ -22,7 +22,7 @@ export const metadata: Metadata = { title: "Event" };
 type AttendanceRow = {
   id: string;
   submitted_name: string;
-  submitted_student_id: string;
+  submitted_eid: string;
   submitted_at: string;
   status: string;
 };
@@ -53,7 +53,7 @@ export default async function EventDetailPage({
 
   const { data: attendance } = await db
     .from("attendance")
-    .select("id, submitted_name, submitted_student_id, submitted_at, status")
+    .select("id, submitted_name, submitted_eid, submitted_at, status")
     .eq("event_id", id)
     .order("submitted_at", { ascending: true });
 
@@ -135,7 +135,7 @@ export default async function EventDetailPage({
                 <thead>
                   <tr className="border-b-2 border-black text-left">
                     <th className="py-2 pr-4 font-medium">Name</th>
-                    <th className="py-2 pr-4 font-medium">Student ID</th>
+                    <th className="py-2 pr-4 font-medium">EID</th>
                     <th className="py-2 pr-4 font-medium">Submitted (CT)</th>
                     <th className="py-2 font-medium">Status</th>
                   </tr>
@@ -145,7 +145,7 @@ export default async function EventDetailPage({
                     <tr key={row.id} className="border-b border-black/15">
                       <td className="py-2 pr-4">{row.submitted_name}</td>
                       <td className="py-2 pr-4 font-mono text-xs">
-                        {row.submitted_student_id}
+                        {row.submitted_eid}
                       </td>
                       <td className="py-2 pr-4 whitespace-nowrap">
                         {formatInstant(row.submitted_at)}

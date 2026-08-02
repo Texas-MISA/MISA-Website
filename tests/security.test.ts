@@ -9,7 +9,7 @@ import { anonClient, testClient } from "./helpers";
 // because one case was already wrong in production.
 //
 // 🪤 The bug this was written for: `member_directory` was anon-readable on both
-// databases, exposing every member's student ID and email. It survived review
+// databases, exposing every member's EID and email. It survived review
 // because the obvious check passes — `members` itself denies correctly, RLS is
 // enabled on every table, and there are no policies. The gap is that a **view
 // has no RLS**. `member_directory` runs as owner (security_invoker off)
@@ -31,7 +31,7 @@ import { anonClient, testClient } from "./helpers";
  * has no RLS to fall back on. Justify it in the migration.
  */
 const ANON_READABLE = new Set([
-  // Public standings (§4.4). Carries no student_id and no email — that
+  // Public standings (§4.4). Carries no eid and no email — that
   // omission is the entire reason it is allowed to be public.
   "leaderboard",
 ]);
@@ -60,7 +60,7 @@ function declaredViews(): string[] {
 }
 
 describe("anon access", () => {
-  it("cannot read member_directory, which carries student IDs and emails", async () => {
+  it("cannot read member_directory, which carries EIDs and emails", async () => {
     const anon = anonClient();
     const { data, error } = await anon
       .from("member_directory")
@@ -90,7 +90,7 @@ describe("anon access", () => {
   });
 
   it("gets no identifier columns from the leaderboard", async () => {
-    // Why leaderboard is allowed to be the one public view. If student_id or
+    // Why leaderboard is allowed to be the one public view. If eid or
     // email is ever added to it, this fails rather than quietly making it the
     // next member_directory.
     const anon = anonClient();
@@ -117,7 +117,13 @@ describe("anon access", () => {
 
     const readable: string[] = [];
     for (const view of views) {
-      const { error } = await anon.from(view).select("*").limit(1);
+      // Cast: the relation name comes from the migration files at runtime, so
+      // it cannot be one of the generated literal types. That is the point —
+      // a view added later must be probed without this file knowing its name.
+      const { error } = await anon
+        .from(view as "leaderboard")
+        .select("*")
+        .limit(1);
       if (error === null) readable.push(view);
     }
 

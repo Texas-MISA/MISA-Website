@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canApprove,
   describeGap,
-  diffStudentId,
+  diffEid,
   editDistance,
   formatDuration,
   MIN_SUGGESTION_SCORE,
@@ -16,7 +16,7 @@ import {
   type MemberCandidate,
   type SubmissionIdentity,
 } from "@/lib/attendance";
-import { normalizeStudentId } from "@/lib/checkin";
+import { normalizeEid } from "@/lib/checkin";
 
 // Pure suite — no database, no fixtures, no clock. Everything here is called
 // with injected values, matching tests/events.test.ts. The database-dependent
@@ -154,15 +154,18 @@ describe("describeGap", () => {
 
 describe("editDistance", () => {
   it("counts a transposition as one edit", () => {
-    // Damerau, not plain Levenshtein — a swapped pair is the commonest ID typo.
-    expect(editDistance("UT12345", "UT13245")).toBe(1);
+    // Damerau, not plain Levenshtein — a swapped pair is the commonest typo.
+    // On EIDs this matters more than it did: initials transpose too, so
+    // ds4392 and sd4392 are one edit apart, not two.
+    expect(editDistance("ao1234", "ao1324")).toBe(1);
+    expect(editDistance("ds4392", "sd4392")).toBe(1);
   });
 
   it("measures ordinary edits", () => {
-    expect(editDistance("UT12345", "UT12345")).toBe(0);
-    expect(editDistance("UT12345", "UT12346")).toBe(1);
-    expect(editDistance("JON", "JOHN")).toBe(1);
-    expect(editDistance("UT12345", "UT12")).toBe(3);
+    expect(editDistance("ao1234", "ao1234")).toBe(0);
+    expect(editDistance("ao1234", "ao1235")).toBe(1);
+    expect(editDistance("jon", "john")).toBe(1);
+    expect(editDistance("ao1234", "ao1")).toBe(3);
   });
 
   it("short-circuits at the cap", () => {
@@ -188,19 +191,19 @@ describe("member suggestions", () => {
     id: crypto.randomUUID(),
     fullName: "Hana Sato",
     email: "hana.sato@example.edu",
-    studentId: "UT-100200",
-    normalizedStudentId: "UT100200",
+    eid: "hs8260",
+    normalizedEid: "hs8260",
     active: true,
     ...over,
   });
 
   const submission = (over: Partial<SubmissionIdentity>): SubmissionIdentity => {
-    const studentId = over.studentId ?? "UT-100200";
+    const eid = over.eid ?? "hs8260";
     return {
       fullName: "Hana Sato",
       email: "hana.sato@example.edu",
-      studentId,
-      normalizedStudentId: normalizeStudentId(studentId),
+      eid,
+      normalizedEid: normalizeEid(eid),
       ...over,
     };
   };
@@ -209,16 +212,16 @@ describe("member suggestions", () => {
     const right = candidate({
       fullName: "H. Sato",
       email: "hana.sato@example.edu",
-      normalizedStudentId: "UT999999",
+      normalizedEid: "qa3291",
     });
     const wrong = candidate({
       fullName: "Hana Sato",
       email: "different.person@example.edu",
-      normalizedStudentId: "UT888888",
+      normalizedEid: "nf9326",
     });
 
     const ranked = rankMemberSuggestions(
-      submission({ studentId: "UT-000000" }),
+      submission({ eid: "os1458" }),
       [wrong, right]
     );
     expect(ranked[0].member.id).toBe(right.id);
@@ -226,18 +229,18 @@ describe("member suggestions", () => {
   });
 
   it("finds the member behind a one-character ID typo", () => {
-    const right = candidate({ normalizedStudentId: "UT100999" });
+    const right = candidate({ normalizedEid: "rp8571" });
     const other = candidate({
       fullName: "Luca Moretti",
       email: "luca.moretti@example.edu",
-      normalizedStudentId: "UT200000",
+      normalizedEid: "lm2647",
     });
 
     const ranked = rankMemberSuggestions(
       submission({
         fullName: "Rowan Pike",
         email: "rowan.pike@example.edu",
-        studentId: "UT-100998",
+        eid: "rp8570",
       }),
       [other, right]
     );
@@ -252,14 +255,14 @@ describe("member suggestions", () => {
     const john = candidate({
       fullName: "John Smith",
       email: "john.smith@example.edu",
-      normalizedStudentId: "UT500500",
+      normalizedEid: "js5120",
     });
 
     const ranked = rankMemberSuggestions(
       submission({
         fullName: "Jon Smith",
         email: "jsmith@other.example.edu",
-        studentId: "UT-999999",
+        eid: "wa3428",
       }),
       [john]
     );
@@ -268,10 +271,10 @@ describe("member suggestions", () => {
   });
 
   it("treats differently-formatted raw IDs as the same person", () => {
-    const member = candidate({ normalizedStudentId: "UT12345" });
+    const member = candidate({ normalizedEid: "ao4471" });
     const { reasons } = scoreMemberMatch(
       submission({
-        studentId: "ut 12345",
+        eid: "AO 4471",
         email: "someone.else@example.edu",
         fullName: "Someone Else",
       }),
@@ -297,14 +300,14 @@ describe("member suggestions", () => {
     const unrelated = candidate({
       fullName: "Tomas Novak",
       email: "tomas.novak@example.edu",
-      normalizedStudentId: "UT777777",
+      normalizedEid: "tn7146",
     });
 
     const ranked = rankMemberSuggestions(
       submission({
         fullName: "Wren Abbott",
         email: "wren.abbott@example.edu",
-        studentId: "UT-111111",
+        eid: "wa3428",
       }),
       [unrelated]
     );
@@ -314,7 +317,7 @@ describe("member suggestions", () => {
         submission({
           fullName: "Wren Abbott",
           email: "wren.abbott@example.edu",
-          studentId: "UT-111111",
+          eid: "wa3428",
         }),
         unrelated
       ).score
@@ -329,14 +332,14 @@ describe("member suggestions", () => {
     const stranger = candidate({
       fullName: "Dara Nolan",
       email: "dara.nolan@example.edu",
-      normalizedStudentId: "UT100019",
+      normalizedEid: "mp8570",
     });
 
     const ranked = rankMemberSuggestions(
       submission({
         fullName: "Rowan Pike",
         email: "rowan.pike@example.edu",
-        studentId: "UT-100999",
+        eid: "rp8571",
       }),
       [stranger]
     );
@@ -347,14 +350,14 @@ describe("member suggestions", () => {
     const sameSurname = candidate({
       fullName: "Rowan Pike",
       email: "r.pike@other.example.edu",
-      normalizedStudentId: "UT100019",
+      normalizedEid: "mp8570",
     });
 
     const ranked = rankMemberSuggestions(
       submission({
         fullName: "Rowan Pike",
         email: "rowan.pike@example.edu",
-        studentId: "UT-100999",
+        eid: "rp8571",
       }),
       [sameSurname]
     );
@@ -369,14 +372,14 @@ describe("member suggestions", () => {
     const typo = candidate({
       fullName: "Someone Unrelated",
       email: "someone.unrelated@example.edu",
-      normalizedStudentId: "UT100998",
+      normalizedEid: "rp8570",
     });
 
     const ranked = rankMemberSuggestions(
       submission({
         fullName: "Rowan Pike",
         email: "rowan.pike@example.edu",
-        studentId: "UT-100999",
+        eid: "rp8571",
       }),
       [typo]
     );
@@ -387,19 +390,19 @@ describe("member suggestions", () => {
     const zane = candidate({
       fullName: "Zane Okonkwo",
       email: "zane@example.edu",
-      normalizedStudentId: "UT300300",
+      normalizedEid: "zo5236",
     });
     const amara = candidate({
       fullName: "Amara Osei",
       email: "amara@example.edu",
-      normalizedStudentId: "UT300300",
+      normalizedEid: "zo5236",
     });
 
     const ranked = rankMemberSuggestions(
       submission({
         fullName: "Nobody Here",
         email: "nobody@example.edu",
-        studentId: "UT-300300",
+        eid: "zo5236",
       }),
       [zane, amara]
     );
@@ -410,45 +413,49 @@ describe("member suggestions", () => {
   });
 });
 
-describe("diffStudentId", () => {
+describe("diffEid", () => {
   it("points at the first differing character", () => {
-    expect(diffStudentId("UT100999", "UT100998").firstDifferenceAt).toBe(7);
-    expect(diffStudentId("UT100999", "UT200999").firstDifferenceAt).toBe(2);
+    expect(diffEid("rp8571", "rp8570").firstDifferenceAt).toBe(5);
+    expect(diffEid("rp8571", "ro8571").firstDifferenceAt).toBe(1);
   });
 
   it("reports no difference for identical ids", () => {
-    expect(diffStudentId("UT100999", "UT100999").firstDifferenceAt).toBeNull();
+    expect(diffEid("rp8571", "rp8571").firstDifferenceAt).toBeNull();
   });
 
   it("handles a length difference", () => {
-    expect(diffStudentId("UT100", "UT100999").firstDifferenceAt).toBe(5);
+    expect(diffEid("rp85", "rp8571").firstDifferenceAt).toBe(4);
   });
 
-  // The seed stores student IDs in four formats on purpose, so the two sides
-  // of a suggestion routinely disagree on punctuation and case. Comparing raw
-  // strings made every such pair "differ" at the formatting character and the
-  // UI highlighted that instead of the digit — visible on /admin/attendance
-  // as `roster UT100028` with the U marked.
-  it("ignores formatting differences and marks the digit that moved", () => {
-    // ut 100998 vs UT100028 — normalized, they diverge at index 5.
-    expect(diffStudentId("ut 100998", "UT100028").firstDifferenceAt).toBe(5);
-    // UT-100999 vs UT100019 — the hyphen must not count as the difference.
-    expect(diffStudentId("UT-100999", "UT100019").firstDifferenceAt).toBe(5);
+  // The roster stores EIDs in mixed case, and members type them however they
+  // like, so the two sides of a suggestion routinely disagree on case and on
+  // stray whitespace. Comparing raw strings made every such pair "differ" at
+  // the formatting character and the UI highlighted that instead of the
+  // character that actually moved — visible on /admin/attendance as
+  // `roster ds4392` with the first letter marked.
+  it("ignores formatting differences and marks the character that moved", () => {
+    // "Sd 4390" vs "ds4392" — normalized, they diverge at index 0, because the
+    // initials are transposed. The space must not be what gets reported.
+    expect(diffEid("Sd 4390", "ds4392").firstDifferenceAt).toBe(0);
+    // Same EID either side of a case difference, differing only in the last
+    // digit: the case must not count as the difference.
+    expect(diffEid("RP-8571", "rp8570").firstDifferenceAt).toBe(5);
   });
 
   it("maps the index onto the raw member string, not the normalized one", () => {
-    // Normalized index 5, but the hyphen pushes it to 6 in `UT-100019`.
-    const diff = diffStudentId("UT100999", "UT-100019");
+    // Normalized index 5, but the space in the member's raw form pushes it
+    // to 6. The raw string is what is on screen, so that is what gets marked.
+    const diff = diffEid("rp8571", "rp 8570");
     expect(diff.firstDifferenceAt).toBe(6);
     expect(diff.member[diff.firstDifferenceAt!]).toBe("0");
   });
 
   it("treats the same id in two formats as no difference at all", () => {
-    expect(diffStudentId("ut 100017", "UT-100017").firstDifferenceAt).toBeNull();
+    expect(diffEid("vi 9701", "VI-9701").firstDifferenceAt).toBeNull();
   });
 
   it("returns null when the member id runs out before the difference", () => {
-    expect(diffStudentId("UT1009991", "UT100").firstDifferenceAt).toBeNull();
+    expect(diffEid("rp85719", "rp85").firstDifferenceAt).toBeNull();
   });
 });
 
@@ -568,14 +575,14 @@ describe("planBulkAssign", () => {
     submittedName: "Hana Sato",
     submittedAt: "2026-04-07T20:15:00Z",
     status: "pending",
-    normalizedStudentId: "UT100027",
+    normalizedEid: "hs8260",
     memberId: null,
     ...over,
   });
 
   it("assigns and approves only the rows that have a member", () => {
-    const withMember = row({ memberId: "m1", normalizedStudentId: "UT1" });
-    const without = row({ memberId: null, normalizedStudentId: "UT2" });
+    const withMember = row({ memberId: "m1", normalizedEid: "hs8260" });
+    const without = row({ memberId: null, normalizedEid: "lm2647" });
 
     const plan = planBulkAssign({
       selected: [withMember, without],
@@ -606,7 +613,7 @@ describe("planBulkAssign", () => {
   // which is exactly why they are both sitting in the queue. Unhandled, the
   // partial unique index takes the first and 23505s the second, failing a batch
   // the officer thought was fine.
-  it("dedupes two selected rows that are the same student ID", () => {
+  it("dedupes two selected rows that are the same EID", () => {
     const first = row({ submittedAt: "2026-04-07T18:00:00Z" });
     const second = row({ submittedAt: "2026-04-07T20:15:00Z" });
 
@@ -628,12 +635,12 @@ describe("planBulkAssign", () => {
     ]);
   });
 
-  it("dedupes the same member reached through two raw student IDs", () => {
-    // `ut 100027` and `UT-100027` normalize alike, but two *different* raw IDs
+  it("dedupes the same member reached through two raw EIDs", () => {
+    // `HS 8260` and `hs-8260` normalize alike, but two *different* raw EIDs
     // can also resolve to one member — the app-level half of the §4.2 duplicate
     // rule, which the unique index alone does not cover.
-    const a = row({ normalizedStudentId: "UT100027", memberId: "same" });
-    const b = row({ normalizedStudentId: "UT999999", memberId: "same" });
+    const a = row({ normalizedEid: "hs8260", memberId: "same" });
+    const b = row({ normalizedEid: "zo5236", memberId: "same" });
 
     const plan = planBulkAssign({
       selected: [a, b],
@@ -649,11 +656,11 @@ describe("planBulkAssign", () => {
   });
 
   it("skips someone already on the target event", () => {
-    const already = row({ normalizedStudentId: "UT100027" });
+    const already = row({ normalizedEid: "hs8260" });
     const plan = planBulkAssign({
       selected: [already],
       existingOnEvent: [
-        { normalizedStudentId: "UT100027", memberId: null },
+        { normalizedEid: "hs8260", memberId: null },
       ],
       approve: false,
     });
@@ -674,10 +681,10 @@ describe("planBulkAssign", () => {
 
   it("accounts for every id it was given", () => {
     const rows = [
-      row({ normalizedStudentId: "UT1", memberId: "m1" }),
-      row({ normalizedStudentId: "UT1", memberId: "m2" }),
-      row({ normalizedStudentId: "UT3", status: "rejected" }),
-      row({ normalizedStudentId: "UT4" }),
+      row({ normalizedEid: "hs8260", memberId: "m1" }),
+      row({ normalizedEid: "hs8260", memberId: "m2" }),
+      row({ normalizedEid: "lm2647", status: "rejected" }),
+      row({ normalizedEid: "zo5236" }),
     ];
 
     const plan = planBulkAssign({

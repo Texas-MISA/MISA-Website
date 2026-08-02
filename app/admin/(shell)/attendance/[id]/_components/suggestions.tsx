@@ -1,6 +1,6 @@
 import {
   describeGap,
-  diffStudentId,
+  diffEid,
   type MatchReason,
   type MemberSuggestion,
 } from "@/lib/attendance";
@@ -109,10 +109,10 @@ export function EventSuggestions({
 
 export function MemberSuggestions({
   suggestions,
-  submittedStudentId,
+  submittedEid,
 }: {
   suggestions: MemberSuggestion[];
-  submittedStudentId: string;
+  submittedEid: string;
 }) {
   if (suggestions.length === 0) {
     return (
@@ -127,9 +127,9 @@ export function MemberSuggestions({
   return (
     <ol className="flex flex-col gap-3">
       {suggestions.map((suggestion) => {
-        const diff = diffStudentId(
-          submittedStudentId,
-          suggestion.member.studentId
+        const diff = diffEid(
+          submittedEid,
+          suggestion.member.eid
         );
         return (
           <li
@@ -144,11 +144,11 @@ export function MemberSuggestions({
             </p>
             <p className="mt-1 font-mono text-xs">
               <span className="text-foreground/60">submitted</span>{" "}
-              {submittedStudentId}
+              {submittedEid}
               {" · "}
               <span className="text-foreground/60">roster</span>{" "}
               <NearMiss
-                value={suggestion.member.studentId}
+                value={suggestion.member.eid}
                 at={diff.firstDifferenceAt}
               />
             </p>
@@ -185,11 +185,9 @@ function describeReason(reason: MatchReason): string {
     case "email_local":
       return "same email name, different domain";
     case "id_exact":
-      return "same student ID";
+      return "same EID";
     case "id_near_miss":
-      return `student ID off by ${reason.distance}`;
-    case "id_contains":
-      return "student ID contains the other";
+      return `EID off by ${reason.distance}`;
     case "name_exact":
       return "same name";
     case "name_tokens":

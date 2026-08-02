@@ -32,7 +32,7 @@ const bannerClass =
 
 const EMPTY: SubmittedValues = {
   fullName: "",
-  studentId: "",
+  eid: "",
   email: "",
   declaredNew: false,
 };
@@ -132,7 +132,7 @@ function CheckinFields({
     <form action={action} className="flex flex-col gap-5" noValidate>
       {state.status === "unmatched" && (
         <p role="alert" className={bannerClass}>
-          We don&apos;t have that info on file. Check your student ID and email
+          We don&apos;t have that info on file. Check your EID and email
           for a typo and try again — or, if this is your first MISA event, tick
           the box below.
         </p>
@@ -163,17 +163,18 @@ function CheckinFields({
         />
       </Field>
 
-      <Field label="UT student ID" error={fieldErrors?.studentId}>
+      <Field label="UT EID" error={fieldErrors?.eid}>
         <input
           type="text"
-          name="studentId"
+          name="eid"
           required
           autoComplete="off"
-          autoCapitalize="characters"
+          autoCapitalize="none"
+          autoCorrect="off"
           spellCheck={false}
-          defaultValue={submitted.studentId}
+          defaultValue={submitted.eid}
           className={inputClass}
-          aria-invalid={fieldErrors?.studentId ? true : undefined}
+          aria-invalid={fieldErrors?.eid ? true : undefined}
         />
       </Field>
 
@@ -262,13 +263,13 @@ function ReviewPanel({
         </p>
         <dl className="mt-4 flex flex-col gap-2 text-sm">
           <Row label="Full name" value={submitted.fullName} />
-          <Row label="UT student ID" value={submitted.studentId} />
+          <Row label="UT EID" value={submitted.eid} />
           <Row label="Email" value={submitted.email} />
         </dl>
       </div>
 
       <input type="hidden" name="fullName" value={submitted.fullName} readOnly />
-      <input type="hidden" name="studentId" value={submitted.studentId} readOnly />
+      <input type="hidden" name="eid" value={submitted.eid} readOnly />
       <input type="hidden" name="email" value={submitted.email} readOnly />
       <input type="hidden" name="firstTime" value="on" readOnly />
 

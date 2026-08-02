@@ -584,7 +584,7 @@ export function previewEventEdit(input: PreviewInput): EventWarning[] {
   const warnings: EventWarning[] = [];
 
   // Distinct members, not row count. PostgREST cannot count(distinct), and
-  // the unique index is on (event_id, normalized_student_id) rather than
+  // the unique index is on (event_id, normalized_eid) rather than
   // member_id — so two rows can legitimately share one member.
   const members = new Set(
     input.presentRows

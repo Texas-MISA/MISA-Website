@@ -6,7 +6,7 @@ import type { Database } from "@/lib/types/database";
 // stack (enforced by tests/global-setup.ts) with the service-role key, since
 // attendance/members are deny-all under RLS until Stage 8.
 //
-// Identities are obviously fake (T3-prefixed IDs, example.edu mailboxes) —
+// Identities are obviously fake (t3-prefixed EIDs, example.edu mailboxes) —
 // the repo is public. Events are placed in 2030, far from all seed data
 // (which lives in 2026), and each test slot is spaced 7 days apart so no
 // 48-hour orphan window can reach a neighbouring test's events.
@@ -59,7 +59,6 @@ export function at(slot: number, hours: number): Date {
 export type Tracker = {
   eventIds: string[];
   memberIds: string[];
-  studentIds: string[];
   /**
    * Attendance rows to delete by id.
    *
@@ -73,7 +72,7 @@ export type Tracker = {
 };
 
 export function newTracker(): Tracker {
-  return { eventIds: [], memberIds: [], studentIds: [], attendanceIds: [] };
+  return { eventIds: [], memberIds: [], attendanceIds: [] };
 }
 
 export async function createTestEvent(
@@ -280,13 +279,16 @@ let idCounter = 0;
 /** Obviously-fake identity, unique per call. */
 export function testIdentity(): {
   fullName: string;
-  studentId: string;
+  eid: string;
   email: string;
 } {
   const n = `${Date.now() % 1_000_000}${idCounter++}`;
   return {
     fullName: `Test Person ${n}`,
-    studentId: `T3-${n}`,
+    // EID-shaped: letters then digits, no punctuation, and a 't3q' marker no
+    // real UT EID carries. Longer than a real EID because it has to stay
+    // unique across a run — the validation cap is 32, so there is room.
+    eid: `t3q${n}`,
     email: `test.person.${n}@example.edu`,
   };
 }
@@ -294,7 +296,7 @@ export function testIdentity(): {
 export async function createTestMember(
   db: SupabaseClient<Database>,
   track: Tracker,
-  identity: { fullName: string; studentId: string; email: string },
+  identity: { fullName: string; eid: string; email: string },
   // The directory tests need members that seed rows cannot be confused with,
   // and `joined_at` is the only column phase 1 can filter on that the seed does
   // not already populate across a wide range. Everything else defaults.
@@ -304,7 +306,7 @@ export async function createTestMember(
     .from("members")
     .insert({
       full_name: identity.fullName,
-      student_id: identity.studentId,
+      eid: identity.eid,
       email: identity.email,
       joined_at: opts.joinedAt?.toISOString(),
       active: opts.active,
@@ -351,7 +353,7 @@ export async function createTestAttendance(
     eventId?: string | null;
     memberId?: string | null;
     submittedName: string;
-    submittedStudentId: string;
+    submittedEid: string;
     submittedEmail: string;
     submittedAt: Date;
     status?: string;
@@ -364,7 +366,7 @@ export async function createTestAttendance(
       event_id: row.eventId ?? null,
       member_id: row.memberId ?? null,
       submitted_name: row.submittedName,
-      submitted_student_id: row.submittedStudentId,
+      submitted_eid: row.submittedEid,
       submitted_email: row.submittedEmail,
       submitted_at: row.submittedAt.toISOString(),
       status: row.status ?? "pending",
@@ -441,7 +443,7 @@ export async function adoptMemberByNormalizedId(
   const { data } = await db
     .from("members")
     .select("id")
-    .eq("normalized_student_id", normalized)
+    .eq("normalized_eid", normalized)
     .maybeSingle();
   if (data) track.memberIds.push(data.id);
 }

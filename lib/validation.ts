@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { MAX_BULK_ASSIGN } from "@/lib/attendance";
-import { normalizeStudentId } from "@/lib/checkin";
+import { normalizeEid } from "@/lib/checkin";
 import {
   EVENT_CATEGORIES,
   EVENT_STATUSES,
@@ -23,15 +23,17 @@ export const checkinSchema = z.object({
     .trim()
     .min(1, "Name is required")
     .max(120, "Name is too long"),
-  studentId: z
+  eid: z
     .string()
     .trim()
-    .min(1, "Student ID is required")
-    .max(32, "Student ID is too long")
-    // A raw ID of "-" or "  " passes the database's not-blank check but
+    .min(1, "EID is required")
+    .max(32, "EID is too long")
+    // A raw EID of "-" or "  " passes the database's not-blank check but
     // normalizes to nothing, which would collide every such submission into
-    // one phantom identity. Require at least two normalized characters.
-    .refine((v) => normalizeStudentId(v).length >= 2, "Enter a valid student ID"),
+    // one phantom identity. Three normalized characters, because the shortest
+    // real UT EIDs are three, and a two-character floor is what made the old
+    // substring-containment rule dangerous.
+    .refine((v) => normalizeEid(v).length >= 3, "Enter a valid EID"),
   email: z
     .string()
     .trim()
@@ -183,12 +185,12 @@ export const attendanceEditSchema = z.object({
     .trim()
     .min(1, "Name is required")
     .max(120, "Name is too long"),
-  submittedStudentId: z
+  submittedEid: z
     .string()
     .trim()
-    .min(1, "Student ID is required")
-    .max(32, "Student ID is too long")
-    .refine((v) => normalizeStudentId(v).length >= 2, "Enter a valid student ID"),
+    .min(1, "EID is required")
+    .max(32, "EID is too long")
+    .refine((v) => normalizeEid(v).length >= 3, "Enter a valid EID"),
   submittedEmail: z
     .string()
     .trim()

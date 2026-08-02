@@ -310,7 +310,7 @@ describe("deleting an event with attendance", () => {
       event_id: event.id,
       member_id: memberId,
       submitted_name: identity.fullName,
-      submitted_student_id: identity.studentId,
+      submitted_eid: identity.eid,
       submitted_email: identity.email,
       status: "present",
     });
