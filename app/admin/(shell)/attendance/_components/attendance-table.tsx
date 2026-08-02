@@ -22,9 +22,7 @@ export type SubmissionRow = {
   status: string;
   source: string;
   event_id: string | null;
-  member_id: string | null;
   events: { id: string; title: string; status: string } | null;
-  members: { id: string; full_name: string; active: boolean } | null;
 };
 
 export function AttendanceTable({
@@ -80,7 +78,6 @@ export function AttendanceTable({
             <th className="py-2 pr-4 font-medium">Name</th>
             <th className="py-2 pr-4 font-medium">EID</th>
             <th className="py-2 pr-4 font-medium">Event</th>
-            <th className="py-2 pr-4 font-medium">Member</th>
             <th className="py-2 font-medium">Status</th>
           </tr>
         </thead>
@@ -120,14 +117,6 @@ export function AttendanceTable({
               </td>
               <td className="py-2 pr-4">
                 <Unlinked value={row.events?.title} label="no event" />
-              </td>
-              <td className="py-2 pr-4">
-                <Unlinked value={row.members?.full_name} label="no member" />
-                {row.members?.active === false && (
-                  <span className="ml-2 text-xs text-foreground/50">
-                    inactive
-                  </span>
-                )}
               </td>
               <td className="py-2">
                 <StatusPill status={row.status} />

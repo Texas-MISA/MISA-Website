@@ -46,9 +46,11 @@ async function fetchSubmissions(
   let query = db
     .from("attendance")
     .select(
+      // No members(...) join: the queue does not show the linked member. It is
+      // on the submission detail page, which is where it can also be changed.
       "id, submitted_name, submitted_eid, submitted_email, submitted_at, " +
-        "status, source, event_id, member_id, " +
-        "events(id, title, status), members(id, full_name, active)",
+        "status, source, event_id, " +
+        "events(id, title, status)",
       { count: "exact" }
     )
     .order("submitted_at", { ascending: filters.sort === "oldest" })
