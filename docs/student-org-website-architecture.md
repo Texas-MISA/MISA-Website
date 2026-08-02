@@ -1,7 +1,7 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
 **Version:** 1.29
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2 and 3 of 9 built
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2 and 3 of 9 built, merged and deployed
 **Last updated:** August 2026
 
 > **v1.29: the directory is four columns, and the member detail page exists.**
@@ -1487,7 +1487,7 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 6 — Member Directory 🔨 phases 1, 2a, 2 and 3 of 9 built · re-planned 2026-08-01 (v1.26)
+### Stage 6 — Member Directory 🔨 phases 1, 2a, 2 and 3 of 9 built & deployed · re-planned 2026-08-01 (v1.26)
 **Goal:** Officers can slice the roster any way they need and get the result out of the system in one action. This is the screen officers will actually live in.
 
 **Nine phases** — six originally, re-planned after phase 1 shipped (see the v1.26 note at the top of this document for the four decisions and their reasoning). Same shape as Stage 5: each ends in something demonstrable and merges to `main` as it lands. `tasks.md` carries the working detail.
@@ -1702,7 +1702,7 @@ The two member-facing decisions were settled in the same pass:
       /events/...
       /attendance/...
       /points/...
-      /members/...           Stage 6
+      /members/...           directory + /[id] detail page; /fields is phase 4
   /actions
     attendance.ts            submitCheckin ONLY — see note below
     attendance-review.ts     officer resolution mutations
@@ -1736,8 +1736,10 @@ The two member-facing decisions were settled in the same pass:
                              object, one translation; pagination stays outside
                              it so the export is the same query (§4.5)
   export.ts                  CSV / TSV / clipboard formatting (Stage 6 phase 5)
-  members.ts                 custom-field definitions, option validation, and
-                             AUDITED_MEMBER_COLUMNS (Stage 6 phase 4)
+  members.ts                 member domain core: classifyTermEvents (the detail
+                             page's three-state grid) and formatAttendanceRate.
+                             Phase 4 adds custom-field definitions, option
+                             validation, and AUDITED_MEMBER_COLUMNS here
 /supabase
   /migrations                versioned SQL
   seed.sql

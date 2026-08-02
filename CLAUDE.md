@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2, and 3 of 9 built (doc v1.28).** Stage 6 merges to `main` at the end of each phase rather than at the end of the stage, as Stage 5 did. Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row.
+**Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2, and 3 of 9 built, merged, and deployed 2026-08-02 (doc v1.29).** Stage 6 merges to `main` at the end of each phase rather than at the end of the stage, as Stage 5 did. Stage 4 added the officer admin section: sign-in at `/admin/login`, the schedule at `/admin/events` (create, edit, duplicate, recurring series, lifecycle), with every mutation writing an `admin_audit` row.
 
 ⚠️ **Stage 6 was re-planned on 2026-08-01, after phase 1 had shipped** (doc v1.26). "Student ID" becomes **EID** — a real alphanumeric UT EID, not a relabel; the directory shrinks to **Name, Email, EID, Total Points** plus **officer-defined custom fields** (dropdowns, inline-editable from the table); everything else moves to a per-member detail page; sorting and filtering narrow to what is displayed. Nine phases now — **custom fields (phase 4) are next**; selection/export, where the exit criteria are met, is phase 5. `tasks.md` has the plan, the "What changed and why" note, and the traps.
 

@@ -193,7 +193,7 @@ export function parseMemberFilter(params: RawParams): MemberFilter {
  * The inverse: a filter back to a query string.
  *
  * Round-trips with parseMemberFilter, which is what lets pagination links, the
- * sort headers, and phase 2's export all rebuild a URL from a filter without
+ * sort headers, and phase 5's export all rebuild a URL from a filter without
  * anyone hand-assembling one. Defaults are omitted so the common case stays a
  * clean URL, and because an omitted key and its default must mean the same
  * thing for the round trip to hold.
