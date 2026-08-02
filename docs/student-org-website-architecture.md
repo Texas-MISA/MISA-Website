@@ -1,8 +1,38 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.24
-**Status:** Stages 0–5 complete; Stage 6 (member directory) is next
+**Version:** 1.25
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phase 1 of 6 built
 **Last updated:** August 2026
+
+> **v1.25: the member directory, read-only.** Stage 6 phase 1 — migration 14,
+> `lib/filters.ts`, and `/admin/members` with server-side sorting, pagination,
+> and the filters that live on the view. 238 tests across 12 files. Decisions
+> now normative:
+>
+> - **`member_directory` gains `attendance_rate`, and it is null rather than
+>   zero when the denominator is.** §4.5 previously noted that `events_possible`
+>   *enables* a rate without a second round trip, which was true and not enough:
+>   PostgREST filters and orders by column and cannot be handed an expression,
+>   so a sortable rate column and a rate-threshold filter were both impossible
+>   while the rate was only implied. A term with no completed events has no
+>   rate — 0% would read as "attended nothing" and sort below a real 5%.
+> - **A roster export is audited as its own receipt.** §6 requires every export
+>   logged with its filter and row count, but `admin_audit.entity_id` is
+>   `uuid not null` and an export spans N members rather than naming one. Each
+>   export now generates a uuid that nothing else references, under the new
+>   `'roster'` entity type. Making `entity_id` nullable would have weakened the
+>   column for the four types that do have a real entity, and reusing a member's
+>   id would make an export read as an action taken against that person.
+> - **A paginated list needs a total order, not merely a sort.** Rows tied on
+>   the sort column can otherwise come back arranged differently per request,
+>   which makes pages skip and repeat members — and reads as missing data rather
+>   than as an ordering fault. Every directory query ends with `id`.
+> - **One filter object, one translation, and pagination outside it.**
+>   `applyMemberFilter` is the only thing that turns a filter into a query, and
+>   it deliberately does not paginate. Phase 2's "copy all N matching" applies
+>   the identical function and simply never calls `pageRange` — which is what
+>   makes the export provably the same query as the count beside it, rather than
+>   a second one someone has to keep in step.
 
 > **v1.24: Stage 5 closed.** Phase 5's final read-through, which is the last
 > item in the stage. No code changed and no decision moved; what changed is that
@@ -640,7 +670,11 @@ create table members (
   active       boolean not null default true,
   source       text not null default 'admin'
                  check (source in ('admin','self_checkin')),
-  joined_at    timestamptz not null default now()
+  joined_at    timestamptz not null default now(),
+  -- Officer notes, shown on the member detail page (§7 Stage 6). Nullable and
+  -- unconstrained: there is no meaningful empty-string state, so a not-blank
+  -- check would only force callers to send null for the same meaning.
+  notes        text
 );
 
 -- Identity is the normalized ID, not the raw one, so 'ut-123', 'UT 123', and
@@ -757,7 +791,8 @@ create table point_adjustments (
 create table admin_audit (
   id          bigserial primary key,
   entity_type text not null
-                check (entity_type in ('attendance','event','member','point_adjustment')),
+                check (entity_type in ('attendance','event','member',
+                                       'point_adjustment','roster')),
   entity_id   uuid not null,
   actor_id    uuid not null references auth.users(id),
   acted_at    timestamptz not null default now(),
@@ -959,6 +994,12 @@ create or replace view member_directory as
 with cur as (
   select current_term from app_settings
 ),
+possible as (
+  select count(*) as events_possible
+  from events e
+  where e.status = 'published' and e.ends_at < now()
+    and e.term = (select current_term from cur)
+),
 attendance_agg as (
   select a.member_id,
          count(*)                   as events_attended,
@@ -994,15 +1035,21 @@ select
     where a.member_id = m.id and a.status = 'pending')       as pending_count,
   (select max(a.submitted_at) from attendance a
     where a.member_id = m.id and a.status = 'present')       as last_seen_at,
-  (select count(*) from events e
-    where e.status = 'published' and e.ends_at < now()
-      and e.term = (select current_term from cur))           as events_possible
+  (select events_possible from possible)                     as events_possible,
+  round(coalesce(aa.events_attended, 0)::numeric
+    / nullif((select events_possible from possible), 0), 4)  as attendance_rate
 from members m
 left join attendance_agg aa on aa.member_id = m.id
 left join bonus_agg      ba on ba.member_id = m.id;
 ```
 
-`events_possible` enables an attendance-rate column (`events_attended::numeric / nullif(events_possible,0)`) without a second round trip. Note it is scoped to the current term too — an all-time denominator against a current-term numerator would understate every rate, and nobody would notice because the number still looks plausible.
+`events_possible` is scoped to the current term too — an all-time denominator against a current-term numerator would understate every rate, and nobody would notice because the number still looks plausible. It is computed once in a `possible` CTE rather than per row: it never depended on the member, and it is read twice, so computing it once is what stops the column and the rate's denominator from ever disagreeing.
+
+**`attendance_rate` is a column, not a computed expression, and that is the point** (migration 14, v1.25). Earlier versions of this section noted that `events_possible` *enables* a rate without a second round trip, which was true and insufficient: PostgREST filters and orders by column and cannot be handed an expression, so a sortable rate and a rate-threshold filter were both impossible until the rate existed in the view. It stores a fraction rather than a percentage — the view carries the number, the UI owns the presentation — and the URL's whole-percent threshold is converted at the point of querying.
+
+**Null, not zero, when the denominator is zero.** A term with no completed events has no attendance rate. Rendering that as 0% would read as "attended nothing", and would sort below a member with a real 5% — exactly backwards, and at the start of every semester. Callers must render null as "—", and a threshold filter correctly excludes those rows, because "no rate" is not "meets the threshold". A member who genuinely attended nothing is a real `0` and must not be confused with it.
+
+**Two columns here are deliberately *not* term-scoped**, unlike everything around them: `pending_count` and `last_seen_at`. A pending submission from last term still needs an officer, and "when did we last see this person" is an all-time question. Both are defensible, but they sit beside current-term point columns, so the UI has to label them or they will be read as current-term figures.
 
 `source` is exposed so officers can filter to self-registered members and review what the check-in form has added (§4.2).
 
@@ -1297,8 +1344,21 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 6 — Member Directory
+### Stage 6 — Member Directory 🔨 phase 1 of 6 built (v1.25)
 **Goal:** Officers can slice the roster any way they need and get the result out of the system in one action. This is the screen officers will actually live in.
+
+**Six phases**, same shape as Stage 5 — each ends in something demonstrable and merges to `main` as it lands. `tasks.md` carries the working detail.
+
+| Phase | Scope | State |
+|---|---|---|
+| 1 | Migration 14, `lib/filters.ts`, read-only `/admin/members` — sorting, pagination, view-column filters | ✅ built |
+| 2 | Selection and extraction — copy emails / names / TSV, CSV download, export auditing | **exit criteria met here** |
+| 3 | Relational filters (attended or missed a given event, has pending, free text) and `/admin/members/[id]` | |
+| 4 | Saved filter presets and CSV roster import | |
+| 5 | The merge tool — its own estimate, see below | |
+| 6 | Docs and a closing read-through | |
+
+⚠️ **Phase 1 has not been walked through a browser.** The auth gate is confirmed and the query behaviour is covered by tests, but no human has looked at the screen. Each of Stage 5's phases found defects that way that no test caught — a control deriving its enabled state from the wrong source, a selection count outliving its checkboxes, an audit diff inventing changes — and all three were in screens of exactly this kind. It is the first item of phase 2.
 
 **Sorting**
 - Every column sortable: name, student ID, join date, events attended, attendance points, bonus points, total points, attendance rate, last seen, pending count
@@ -1510,8 +1570,10 @@ The two member-facing decisions were settled in the same pass:
   admin-profiles.ts          fetchOfficerNames — actor_id FKs auth.users,
                              which has no PostgREST path to admin_profiles
   site.ts / officers.ts      org copy and the officer roster
-  filters.ts                 directory filter → SQL translation (Stage 6)
-  export.ts                  CSV / TSV / clipboard formatting (Stage 6)
+  filters.ts                 directory filter → SQL translation. One filter
+                             object, one translation; pagination stays outside
+                             it so the export is the same query (§4.5)
+  export.ts                  CSV / TSV / clipboard formatting (Stage 6 phase 2)
 /supabase
   /migrations                versioned SQL
   seed.sql
