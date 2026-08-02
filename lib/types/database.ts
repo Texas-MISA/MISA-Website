@@ -277,6 +277,7 @@ export type Database = {
           id: string
           joined_at: string
           normalized_student_id: string | null
+          notes: string | null
           source: string
           student_id: string
         }
@@ -287,6 +288,7 @@ export type Database = {
           id?: string
           joined_at?: string
           normalized_student_id?: string | null
+          notes?: string | null
           source?: string
           student_id: string
         }
@@ -297,6 +299,7 @@ export type Database = {
           id?: string
           joined_at?: string
           normalized_student_id?: string | null
+          notes?: string | null
           source?: string
           student_id?: string
         }
@@ -390,6 +393,7 @@ export type Database = {
         Row: {
           active: boolean | null
           attendance_points: number | null
+          attendance_rate: number | null
           bonus_points: number | null
           email: string | null
           events_attended: number | null
@@ -581,4 +585,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

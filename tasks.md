@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–5 are complete. Stage 6 (member directory) is next and is broken into six phases below — nothing is built yet.** Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–5 are complete. Stage 6 (member directory) is in progress — phase 1 of 6 built.** Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -14,9 +14,9 @@ Read this before touching anything; it is the state no file can tell you on its 
 |---|---|
 | **Branch** | `main` is current and clean — Stage 5 closed with the phase-5 read-through (`2292bbc`, 2026-08-01) and both it and `stage-5-attendance-review` are pushed. **Stage 6 starts on a new branch, `stage-6-member-directory`, off `main`**; merge at the end of each phase, as Stage 5 did. |
 | **Production** | **All of Stage 5 is live** on https://misa-website-beta.vercel.app. `/admin/points`, `/admin/points/new`, and `/admin/points/[id]` are all in the deployed build (confirmed in the build log, not from the 307 — the proxy redirects *any* `/admin/*` path including ones that don't exist, so a 307 proves nothing about whether a route shipped). The Points nav entry is live. |
-| **Database** | All 14 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`); `migration list --linked` re-verified in sync during the phase-5 read-through. Stage 6 phase 1 adds migration 15, the first schema change since 2026-07-31. |
+| **Database** | All 15 migrations applied to **both** local and the remote (`gbxypeofjnhrhotlhyzs`). Stage 6 phase 1 added `20260730000014_member_directory.sql` — `attendance_rate`, `members.notes`, and `'roster'` as an `admin_audit` entity type — pushed to both, types regenerated from `--linked`. |
 | ⚠️ **Merged mid-stage** | Merged at the end of each phase rather than at the end of the stage, deliberately, so the work is visible in production. It worked — the queue was resolving real submissions while `/admin/points` was still being written. Do the same in Stage 6. |
-| **Next task** | **Stage 6 phase 1 — migration 15, `lib/filters.ts`, read-only `/admin/members`.** Stage 5 is closed (doc **v1.24**) and nothing of it is outstanding. Stage 6 is broken into six phases below; **read the four-schema-gaps note before writing code** — the rate column, `members.notes`, and the audit shape for exports are all cheaper now than after the UI depends on them. |
+| **Next task** | **Stage 6 phase 2 — selection and extraction**, which is where the stage's exit criteria are met. **Start by walking phase 1 through a browser**: `/admin/members` is built, tested, and lint/build clean, but no human has looked at it. |
 | **Local database** | **Freshly reset 2026-08-01** and back to the documented seed exactly: 32 members, 15 events, 208 attendance, 6 adjustments, 2 audit rows, 29 leaderboard rows, `current_term()` = Spring 2026. ⚠️ The reset wiped local `auth.users`, so **re-create the dev officer before signing in to `/admin`** — see the command below. |
 
 **Before running anything:** Docker Desktop must be up, then `npx supabase start`. `npx supabase db reset` wipes local `auth.users`, so re-create a local officer afterwards with `node scripts/create-officer.mjs --local --email dev@example.edu --role admin` (password via stdin or `OFFICER_PASSWORD` — **never commit one; this repo is public**).
@@ -373,15 +373,34 @@ Found by reading `20260730000008_views.sql` and `20260730000002_members.sql` aga
 
 **One inconsistency to decide rather than inherit:** `pending_count` and `last_seen_at` in `member_directory` are **not** term-scoped, while every column beside them is. That is defensible — a pending row from last term still needs review, and "last seen" is a genuinely all-time question — but a "not seen since October" filter sitting next to term-scoped point columns will be read as term-scoped by whoever uses it. Pick one, and label the column in the UI to match.
 
-### Phase 1 — schema, `lib/filters.ts`, read-only `/admin/members`
+### ✅ Phase 1 — schema, `lib/filters.ts`, read-only `/admin/members` (2026-08-01)
 
-- [ ] **Migration 15** — `attendance_rate` on `member_directory` (`create or replace view`, so re-run the whole definition), `members.notes`, the `admin_audit` export decision above. Regenerate `lib/types/database.ts`; push to local **and** remote and confirm `migration list --linked` is in sync before merging.
-- [ ] **`lib/filters.ts`** — pure, no `next/*`, testable directly. This is the load-bearing module of the stage: `searchParams` → a typed `MemberFilter` object → a PostgREST query. **One serializable filter representation, applied by exactly one function**, because the directory query and the export must be provably the same query — see the phase 2 trap.
-- [ ] **`/admin/members`** read-only: server-side sort on every column, pagination, and the filters that live on the view (active, point range, events-attended range, rate threshold, joined-in-range, source). Reuse the queue's URL-driven filter pattern from `/admin/attendance`.
-- [ ] Nav entry unlocked in the same commit as the page (Stage 5's habit — a live nav link to a 404 is how the `/admin/attendance/new` bug shipped).
+*Numbering note: this is **migration 14** (`20260730000014_member_directory.sql`). The plan above called it "migration 15" by counting files rather than following the existing convention, where `…000013` is "migration 13".*
+
+- [x] **Migration 14** — `attendance_rate` on `member_directory`, `members.notes`, and `admin_audit`'s `entity_type` widened with `'roster'`. **Applied to local and the remote**; types regenerated from `--linked`, so the `__InternalSupabase` block is intact and the diff is purely additive.
+  - The view is `create or replace`, not drop-and-create: dropping would take the `authenticated` grant with it, and this view is a §6 security boundary. The replace form can only *append* columns, which is why `attendance_rate` sits last rather than beside the counts it comes from.
+  - `events_possible` moved into a CTE. It never depended on the member, and it is now read twice — once as its own column and once as the rate's denominator — so computing it once is what stops the two from ever disagreeing.
+- [x] **`lib/filters.ts`** — `parseMemberFilter` (total: every input yields a usable filter), `memberFilterToParams` (round-trips), `applyMemberFilter`, `pageRange`/`pageCount`. Pure, and the query builder is typed **structurally** rather than imported from supabase-js, so the tests hand it a recording fake.
+- [x] **`/admin/members`** — server-side sort on all ten columns, pagination, and the six view-column filters. The table is a **Server Component**: phase 1 has no interactivity beyond navigation, so sort headers are links and every date arrives pre-formatted, which sidesteps the hydration trap rather than working around it.
+- [x] Nav entry unlocked in the same commit as the page
+- [x] **30 new tests** (238 total, 12 files), lint and build clean
+
+**Verified against the local stack** — the whole suite runs member-neutral, leaving the seed at exactly 32/15/208 with the term pin restored:
+
+- **31 fixture members across two pages**: `count` reports 31 while the page returns 25, the two pages together contain all 31 ids exactly once, and repeated reads return the identical split. That last one is the real test — every fixture is tied on points and most share a `joined_at`, so without the `id` tie-break the split drifts between requests and a member vanishes between pages.
+- **A member who joined 10 PM Central on the last day of the range is included** — the UTC-midnight cut this invariant exists to prevent.
+- `attendance_rate` agrees with the two counts beside it; a member who attended nothing reads a real `0`, not null.
+- `minRate=100` becomes `0.5`-style fraction arithmetic, not `100.0` — a unit error there returns an empty list and looks like a legitimately empty result.
+
+🪤 **The `AUDITED_ADJUSTMENT_COLUMNS` trap caught the build again, in a new file.** The directory's column list was written wrapped across three lines with `+`, which widens the literal to `string`, so PostgREST typed the row as `GenericStringError` and `row.id` stopped existing. Same fix, same reason: one unbroken literal with `as const`. It is worth assuming this will happen once per screen that selects more than a handful of columns.
+
+🪤 **`memberFilterToParams` had to learn that `undefined` means "no opinion".** The sort headers pass `{ sort, dir, page }` overrides, and an early version spread `dir: undefined` straight into the filter, which put a literal `dir=undefined` in every column link. Overrides now skip undefined values, and there is a test for it.
+
+**Not done in this phase, deliberately:** the browser walkthrough. Every Stage 5 phase was verified in a real browser and each one found something the tests could not, so this is a genuine gap rather than a skipped formality — see the note under phase 2.
 
 ### Phase 2 — selection and extraction · **exit criteria met here**
 
+- [ ] **Walk phase 1 through a browser first.** `/admin/members` has never been looked at by a human — the auth gate was confirmed (signed out ⇒ 307 to `/admin/login` with `next` preserved) and everything else rests on tests and the build. Stage 5 found three defects this way that no test caught, all of them in exactly this kind of screen: a control whose enabled state came from the wrong source, a count that outlived its checkboxes, and an audit diff that invented changes. Sign in locally as `dev@example.edu` (recreate with `create-officer.mjs --local` after any `db reset`) and check the sort arrows, the paging links, the CLEAR button, and that the rate column reads `—` rather than `0%` where it should.
 - [ ] Row checkboxes plus **"select all N matching this filter"**, visibly distinct from "the 25 rows on this page"
 - [ ] Copy emails (comma-separated, ready for a To: field), copy names, copy TSV, download CSV — `lib/export.ts`, pure formatting
 - [ ] Every export writes an `admin_audit` row carrying the filter and the row count (§6)
