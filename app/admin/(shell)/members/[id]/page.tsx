@@ -6,6 +6,7 @@ import { AuditTrail } from "@/app/admin/(shell)/_components/audit-trail";
 import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
 import { requireOfficer } from "@/lib/auth";
 import { formatCategory, formatDay, formatInstant } from "@/lib/events";
+import { fetchFieldDefinitions } from "@/lib/member-fields";
 import {
   classifyTermEvents,
   formatAttendanceRate,
@@ -13,6 +14,8 @@ import {
 } from "@/lib/members";
 import { formatPointCategory, signedPoints } from "@/lib/points";
 import { createAdminClient } from "@/lib/supabase/admin";
+
+import { MemberEditor } from "./_components/member-editor";
 
 // One member: everything the phase-1 directory used to show in columns, plus
 // the per-event breakdown that never fitted in a table (§7 Stage 6 phase 3).
@@ -23,8 +26,10 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // "why does this member have an event they didn't attend?", which is why the
 // events grid is per-event rather than a count.
 //
-// Read-only. Inline field edits, the officer-notes editor, and the custom
-// fields all arrive in phase 4 on the same `member.updated` plumbing.
+// Mostly read-only: everything above the custom fields is a report. The
+// editable half — every live custom field (including ones the directory does
+// not offer inline) and the officer notes — lives in _components/member-editor.tsx,
+// which owns the one `members.updated_at` all of those forms compare against.
 //
 // Service-role read behind requireOfficer(), like every other admin screen.
 
@@ -34,7 +39,7 @@ export const metadata: Metadata = { title: "Member" };
 // lib/points.ts. Every column of the view, because this page is where the ones
 // the directory no longer shows have to land.
 const DIRECTORY_COLUMNS =
-  "id, eid, full_name, email, active, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate" as const;
+  "id, eid, full_name, email, active, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate, notes, custom_fields, updated_at" as const;
 
 const ATTENDANCE_COLUMNS =
   "id, event_id, status, submitted_at, submitted_name, submitted_eid, source" as const;
@@ -57,16 +62,19 @@ export default async function MemberDetailPage({
   const { id } = await params;
   const db = createAdminClient();
 
-  const [directory, memberRow, currentTerm, attendance, adjustments] =
+  // The separate `members.select("notes")` read that used to sit here is gone:
+  // migration 18 appended notes, custom_fields and updated_at to the view, which
+  // is exactly what that read's own comment anticipated.
+  const [directory, definitions, currentTerm, attendance, adjustments] =
     await Promise.all([
       db
         .from("member_directory")
         .select(DIRECTORY_COLUMNS)
         .eq("id", id)
         .maybeSingle(),
-      // `notes` is not on the view until phase 4 appends it, so it takes its own
-      // read. Cheap, and it keeps the view's column order untouched.
-      db.from("members").select("notes").eq("id", id).maybeSingle(),
+      // Archived definitions included: a member may still hold an answer given
+      // under one, and a value nobody can see is a value nobody can audit.
+      fetchFieldDefinitions(db, { includeArchived: true }),
       // Never type a term string (§4.7) — ask the database, so an officer's
       // app_settings override is honoured too.
       db.rpc("current_term"),
@@ -415,20 +423,15 @@ export default async function MemberDetailPage({
         )}
       </section>
 
-      <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">Officer notes</h2>
-        <div className="mt-4">
-          {memberRow.data?.notes ? (
-            <p className="border-l-4 border-black/20 pl-4 text-sm whitespace-pre-wrap">
-              {memberRow.data.notes}
-            </p>
-          ) : (
-            <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
-              No notes on this member.
-            </p>
-          )}
-        </div>
-      </section>
+      {/* The custom fields and the officer notes both write `members`, so they
+          share one compare-and-set token and therefore one client owner. */}
+      <MemberEditor
+        memberId={id}
+        definitions={definitions}
+        customFields={member.custom_fields}
+        notes={member.notes ?? ""}
+        updatedAt={member.updated_at ?? ""}
+      />
 
       <section className="mt-12 max-w-3xl">
         <h2 className="font-display text-xl font-bold">History</h2>

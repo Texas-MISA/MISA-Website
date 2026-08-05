@@ -11,13 +11,17 @@ import {
   memberFilterUrl,
   MAX_SEARCH_LENGTH,
   MEMBER_SORTS,
+  NO_CUSTOM_FIELDS,
   pageCount,
   pageRange,
   parseMemberFilter,
   PAGE_SIZE,
+  sortColumn,
   type FilterableQuery,
   type MemberFilter,
+  type SortableField,
 } from "@/lib/filters";
+import { customSortKey } from "@/lib/members";
 
 // Pure tests for the directory's filter core (§7 Stage 6 phase 1). No database:
 // applyMemberFilter is handed a recording fake in place of a PostgREST builder,
@@ -62,9 +66,18 @@ function recorder(): Recorder {
   return q;
 }
 
-function callsFor(filter: Partial<MemberFilter>): Call[] {
+/** Most tests here run against no definitions at all — the pre-phase-4 world,
+ * which is exactly what they were written to describe. Phase 4's custom sorting
+ * has its own blocks that pass real ones. Imported rather than redeclared so
+ * "no custom fields" means one thing in the tests and the source alike. */
+const NO_FIELDS = NO_CUSTOM_FIELDS;
+
+function callsFor(
+  filter: Partial<MemberFilter>,
+  fields: readonly SortableField[] = NO_FIELDS
+): Call[] {
   const full = parseMemberFilter({});
-  return applyMemberFilter(recorder(), { ...full, ...filter }).calls;
+  return applyMemberFilter(recorder(), { ...full, ...filter }, fields).calls;
 }
 
 describe("parseMemberFilter", () => {
@@ -107,6 +120,52 @@ describe("parseMemberFilter", () => {
     }
   });
 
+  // Phase 4. A `cf:` key is only a sort key if it names a live field that the
+  // directory actually shows.
+  it("accepts a cf: sort key naming a live directory field", () => {
+    const fields: SortableField[] = [
+      { key: "dues_paid", showInDirectory: true },
+    ];
+    expect(parseMemberFilter({ sort: "cf:dues_paid" }, fields).sort).toBe(
+      "cf:dues_paid"
+    );
+  });
+
+  it("falls back to name for a cf: key naming nothing sortable", () => {
+    const fields: SortableField[] = [
+      { key: "dues_paid", showInDirectory: true },
+      // Defined, editable on the detail page, but not a column — so not a sort.
+      { key: "shirt_size", showInDirectory: false },
+    ];
+    for (const sort of [
+      "cf:shirt_size",
+      // Archived since the officer bookmarked the URL, so absent from the list.
+      "cf:dues_2025",
+      "cf:",
+      // Would be a sort-injection surface if it ever reached the query.
+      "cf:dues,full_name",
+      "cf:full_name",
+    ]) {
+      expect(parseMemberFilter({ sort }, fields).sort, sort).toBe("name");
+    }
+  });
+
+  // The default argument is the pre-phase-4 world, not a shortcut: a caller
+  // with no definitions to hand must not be able to name one either.
+  it("knows no custom fields when none are passed", () => {
+    expect(parseMemberFilter({ sort: "cf:dues_paid" }).sort).toBe("name");
+  });
+
+  it("defaults a custom sort ascending, like the text columns it resembles", () => {
+    const fields: SortableField[] = [
+      { key: "dues_paid", showInDirectory: true },
+    ];
+    expect(parseMemberFilter({ sort: "cf:dues_paid" }, fields).dir).toBe("asc");
+    expect(
+      parseMemberFilter({ sort: "cf:dues_paid", dir: "desc" }, fields).dir
+    ).toBe("desc");
+  });
+
   it("falls back rather than throwing on values a human edited into the URL", () => {
     const filter = parseMemberFilter({
       state: "banana",
@@ -137,7 +196,7 @@ describe("parseMemberFilter", () => {
     // And it does not survive back into the URL.
     expect(memberFilterToParams(filter).toString()).toBe("");
     // Nor does it reach the query.
-    const calls = applyMemberFilter(recorder(), filter).calls;
+    const calls = applyMemberFilter(recorder(), filter, NO_FIELDS).calls;
     expect(
       calls.filter(
         ([, column]) =>
@@ -258,6 +317,39 @@ describe("memberFilterToParams", () => {
   });
 });
 
+describe("sortColumn", () => {
+  const fields: SortableField[] = [
+    { key: "dues_paid", showInDirectory: true },
+    { key: "shirt_size", showInDirectory: false },
+  ];
+
+  it("maps the built-ins to their real column names", () => {
+    expect(sortColumn("name", fields)).toBe("full_name");
+    expect(sortColumn("email", fields)).toBe("email");
+    expect(sortColumn("eid", fields)).toBe("eid");
+    expect(sortColumn("total_points", fields)).toBe("total_points");
+  });
+
+  it("maps a live directory field to its JSON path", () => {
+    expect(sortColumn(customSortKey("dues_paid"), fields)).toBe(
+      "custom_fields->>dues_paid"
+    );
+  });
+
+  // A field the officer chose not to show is not sortable either: sorting by a
+  // column nobody can see rearranges the list for no visible reason, which is
+  // the argument that cut phase 1's ten sort keys down to four.
+  it("refuses a field that is not a directory column", () => {
+    expect(sortColumn(customSortKey("shirt_size"), fields)).toBeNull();
+  });
+
+  it("returns null rather than guessing for anything unrecognized", () => {
+    for (const sort of ["", "joined_at", "cf:", "cf:gone", "full_name"]) {
+      expect(sortColumn(sort, fields), sort).toBeNull();
+    }
+  });
+});
+
 describe("applyMemberFilter", () => {
   it("scopes to active members by default and drops the clause for 'all'", () => {
     expect(callsFor({ state: "active" })).toContainEqual(["eq", "active", true]);
@@ -275,6 +367,62 @@ describe("applyMemberFilter", () => {
     const calls = callsFor({ minPoints: 3, maxPoints: 12 });
     expect(calls).toContainEqual(["gte", "total_points", 3]);
     expect(calls).toContainEqual(["lte", "total_points", 12]);
+  });
+
+  describe("custom-field sorting (phase 4)", () => {
+    const fields: SortableField[] = [
+      { key: "dues_paid", showInDirectory: true },
+      { key: "shirt_size", showInDirectory: false },
+    ];
+    const orders = (calls: Call[]) => calls.filter(([m]) => m === "order");
+
+    it("orders by the JSON path for a live directory field", () => {
+      const calls = callsFor({ sort: customSortKey("dues_paid") }, fields);
+      expect(orders(calls)[0]).toEqual([
+        "order",
+        "custom_fields->>dues_paid",
+        { ascending: true, nullsFirst: false },
+      ]);
+    });
+
+    // Sparse by nature: most members will hold no answer for most fields, and a
+    // missing key reads as SQL NULL. Nulls float to the top of a descending sort
+    // unless told otherwise, which would bury everyone who HAS an answer.
+    it("keeps members with no answer last in both directions", () => {
+      for (const dir of ["asc", "desc"] as const) {
+        const calls = callsFor(
+          { sort: customSortKey("dues_paid"), dir },
+          fields
+        );
+        expect(orders(calls)[0][2]).toEqual({
+          ascending: dir === "asc",
+          nullsFirst: false,
+        });
+      }
+    });
+
+    it("still ends on a total order, so pages cannot skip or repeat", () => {
+      const calls = orders(callsFor({ sort: customSortKey("dues_paid") }, fields));
+      // A dropdown has a handful of options over the whole roster, so ties are
+      // the rule rather than the exception here — the spike reproduced exactly
+      // this, losing a row across a page boundary without the id tie-break.
+      expect(calls.at(-1)).toEqual(["order", "id", { ascending: true }]);
+      expect(calls.map((c) => c[1])).toContain("full_name");
+    });
+
+    // 🔓 applyMemberFilter re-checks rather than trusting that parseMemberFilter
+    // sanitized first, because this is the function that builds the query string.
+    it("falls back to full_name rather than interpolating an unsafe key", () => {
+      for (const sort of [
+        "cf:dues,full_name",
+        "cf:dues paid",
+        "cf:shirt_size",
+        "cf:never_defined",
+      ]) {
+        const first = orders(callsFor({ sort }, fields))[0];
+        expect(first[1], sort).toBe("full_name");
+      }
+    });
   });
 
   it("searches the three displayed identity columns as ONE or-group", () => {
@@ -414,29 +562,29 @@ describe("filter control state", () => {
     // The walkthrough repro, in its phase-3 shape. The filter carries no search
     // term — whatever the box may still be showing — so editing points must not
     // resurrect one.
-    const url = memberFilterUrl(base, { minPoints: "15" });
+    const url = memberFilterUrl(base, { minPoints: "15" }, NO_CUSTOM_FIELDS);
     expect(url).toBe("minPoints=15");
     expect(url).not.toContain("q=");
   });
 
   it("drops a field when its box is emptied", () => {
     const withSearch: MemberFilter = { ...base, q: "dara" };
-    expect(memberFilterUrl(withSearch, { q: "" })).toBe("");
+    expect(memberFilterUrl(withSearch, { q: "" }, NO_CUSTOM_FIELDS)).toBe("");
     // And leaves the others alone while doing it.
-    expect(memberFilterUrl({ ...withSearch, minPoints: 15 }, { q: "" })).toBe(
+    expect(memberFilterUrl({ ...withSearch, minPoints: 15 }, { q: "" }, NO_CUSTOM_FIELDS)).toBe(
       "minPoints=15"
     );
   });
 
   it("always drops page, because a narrower filter invalidates the offset", () => {
     const onPage3: MemberFilter = { ...base, page: 3, minPoints: 15 };
-    expect(memberFilterUrl(onPage3, { minPoints: "20" })).toBe("minPoints=20");
+    expect(memberFilterUrl(onPage3, { minPoints: "20" }, NO_CUSTOM_FIELDS)).toBe("minPoints=20");
   });
 
   it("preserves sort and direction across a filter change", () => {
     const sorted: MemberFilter = { ...base, sort: "total_points", dir: "asc" };
     // total_points defaults to desc, so an explicit asc has to survive.
-    const url = memberFilterUrl(sorted, { state: "all" });
+    const url = memberFilterUrl(sorted, { state: "all" }, NO_CUSTOM_FIELDS);
     const params = new URLSearchParams(url);
     expect(params.get("sort")).toBe("total_points");
     expect(params.get("dir")).toBe("asc");
@@ -447,20 +595,84 @@ describe("filter control state", () => {
     // A `%` is stripped on the next request either way; putting the sanitized
     // value in the URL is what stops the box from reading "ni%all" over results
     // matched on "niall" — the same class of lie as the original defect.
-    expect(memberFilterUrl(base, { q: "ni%all" })).toBe("q=niall");
+    expect(memberFilterUrl(base, { q: "ni%all" }, NO_CUSTOM_FIELDS)).toBe("q=niall");
     // Junk narrows nothing at all, and must not reach the query string.
-    expect(memberFilterUrl(base, { minPoints: "abc" })).toBe("");
-    expect(memberFilterUrl(base, { minPoints: "-5" })).toBe("");
-    expect(memberFilterUrl(base, { q: "   " })).toBe("");
+    expect(memberFilterUrl(base, { minPoints: "abc" }, NO_CUSTOM_FIELDS)).toBe("");
+    expect(memberFilterUrl(base, { minPoints: "-5" }, NO_CUSTOM_FIELDS)).toBe("");
+    expect(memberFilterUrl(base, { q: "   " }, NO_CUSTOM_FIELDS)).toBe("");
   });
 
   it("round-trips: the URL it emits parses back to the fields it displays", () => {
-    const url = memberFilterUrl(base, { q: "  Dara  Nolan ", minPoints: "7" });
+    const url = memberFilterUrl(base, { q: "  Dara  Nolan ", minPoints: "7" }, NO_CUSTOM_FIELDS);
     const reparsed = parseMemberFilter(
       Object.fromEntries(new URLSearchParams(url))
     );
     expect(memberFilterFields(reparsed).q).toBe("Dara Nolan");
     expect(memberFilterFields(reparsed).minPoints).toBe("7");
+  });
+
+  // 🪤 Regression, named for the bug it was written after. memberFilterUrl
+  // re-parses what it built, and re-parsing without the definitions makes a
+  // `cf:` sort key name nothing — so it degraded to `name` on EVERY filter
+  // change. Typing one character in the search box silently reset the column
+  // the officer had sorted by, and only the URL showed it.
+  describe("a custom sort survives a filter change (phase 4)", () => {
+    const fields: SortableField[] = [
+      { key: "dues_paid", showInDirectory: true },
+      { key: "shirt_size", showInDirectory: false },
+    ];
+    const sorted = parseMemberFilter(
+      { sort: customSortKey("dues_paid") },
+      fields
+    );
+
+    it("keeps the cf: sort when the field is live", () => {
+      const url = memberFilterUrl(sorted, { q: "dara" }, fields);
+      expect(new URLSearchParams(url).get("sort")).toBe("cf:dues_paid");
+      expect(new URLSearchParams(url).get("q")).toBe("dara");
+    });
+
+    it("keeps it across every other control too", () => {
+      const changes: Record<string, string>[] = [
+        { state: "all" },
+        { minPoints: "3" },
+        { maxPoints: "40" },
+      ];
+      for (const change of changes) {
+        const url = memberFilterUrl(sorted, change, fields);
+        expect(new URLSearchParams(url).get("sort"), JSON.stringify(change)).toBe(
+          "cf:dues_paid"
+        );
+      }
+    });
+
+    it("drops a sort naming a field that is gone or not a column", () => {
+      // Archived between the officer's bookmark and now, so absent from the
+      // list — and one that exists but is not a directory column.
+      for (const stale of ["cf:dues_2025", "cf:shirt_size"]) {
+        const filter = { ...sorted, sort: stale };
+        const url = memberFilterUrl(filter, { q: "dara" }, fields);
+        expect(new URLSearchParams(url).get("sort"), stale).toBeNull();
+      }
+    });
+
+    it("does not leave a stale direction behind when the sort degrades", () => {
+      // total_points defaults desc; name defaults asc. A dropped sort that kept
+      // `dir=desc` would silently reverse the fallback column.
+      const filter = { ...sorted, sort: "cf:gone", dir: "desc" as const };
+      const url = memberFilterUrl(filter, { q: "dara" }, fields);
+      const params = new URLSearchParams(url);
+      expect(params.get("sort")).toBeNull();
+      expect(params.get("dir")).toBe("desc");
+      // …and that `dir` is a real, honoured choice on the fallback column
+      // rather than a leftover: re-parsing yields a descending name sort.
+      const reparsed = parseMemberFilter(
+        Object.fromEntries(params),
+        fields
+      );
+      expect(reparsed.sort).toBe("name");
+      expect(reparsed.dir).toBe("desc");
+    });
   });
 });
 

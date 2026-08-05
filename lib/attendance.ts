@@ -20,14 +20,21 @@ export const ATTENDANCE_SOURCES = ["self_checkin", "admin_manual"] as const;
 export type AttendanceSource = (typeof ATTENDANCE_SOURCES)[number];
 
 /**
- * Above this many active members the detail page stops scanning the roster and
- * falls back to bounded ILIKE probes.
+ * How many active members the roster scan will pull.
  *
- * Scanning is deliberate below it: the canonical near-miss is `Jon` vs `John`,
- * and `ilike '%jon%'` cannot match `John` — a probe-based candidate set
- * structurally excludes the row the officer is looking for. At 400 rows the
+ * Scanning rather than probing is deliberate: the canonical near-miss is `Jon`
+ * vs `John`, and `ilike '%jon%'` cannot match `John` — a probe-based candidate
+ * set structurally excludes the row the officer is looking for. At 400 rows the
  * payload is tens of kilobytes on an officer-only page, and the ranking stays
- * unit-testable. If the roster outgrows this, pg_trgm is the growth path.
+ * unit-testable.
+ *
+ * ⚠️ There is NO fallback above this limit. An earlier version of this comment
+ * promised one ("falls back to bounded ILIKE probes") and none was ever built;
+ * every caller is a bare `.limit(MEMBER_SCAN_LIMIT)`. Past 400 active members
+ * the pickers and the near-miss ranker silently see a subset — and the
+ * candidate query in attendance/[id] does not order, so it is an arbitrary
+ * subset. pg_trgm is the growth path and it has to be built before the roster
+ * reaches this number, not after. See §2.2's capacity check.
  */
 export const MEMBER_SCAN_LIMIT = 400;
 export const MAX_SUGGESTED_MEMBERS = 5;

@@ -45,6 +45,17 @@ function formatAuditAction(action: string): string {
     "event.cancelled": "Cancelled",
     "event.reopened": "Reopened",
     "event.deleted": "Deleted",
+    // Series operations write one row per event (admin_audit has no 'series'
+    // entity type), so these appear in an ordinary event's trail and were
+    // rendering as the raw verb.
+    "series.created": "Created with a series",
+    "series.published": "Published with a series",
+    "series.cancelled": "Cancelled with a series",
+    // Stage 6 phase 4.
+    "member.updated": "Updated",
+    "member_field.created": "Field created",
+    "member_field.updated": "Field updated",
+    "member_field.archived": "Field archived",
   };
   return LABELS[action] ?? action;
 }
@@ -81,7 +92,14 @@ export async function AuditTrail({
   entityType,
   entityId,
 }: {
-  entityType: "attendance" | "event" | "member" | "point_adjustment";
+  // Mirrors AuditEntityType in app/actions/audit.ts, minus 'roster' — an export
+  // receipt is not an entity anyone can open a page for.
+  entityType:
+    | "attendance"
+    | "event"
+    | "member"
+    | "member_field"
+    | "point_adjustment";
   entityId: string;
 }) {
   const result = await fetchTrail(entityType, entityId);

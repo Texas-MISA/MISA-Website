@@ -139,6 +139,12 @@ async function fetchMemberSuggestions(
   const db = createAdminClient();
   // Scanned, not probed: `ilike '%jon%'` cannot match `John`, so a probe-based
   // candidate set structurally excludes the row we are looking for.
+  //
+  // ⚠️ Unordered on purpose today (the ranker sorts anyway) — which means that
+  // once the active roster passes MEMBER_SCAN_LIMIT this scores an *arbitrary*
+  // subset and the right member can be absent with nothing on screen to say so.
+  // Fix the limit (pg_trgm) rather than adding an order here; an order would
+  // only make the truncation deterministic, not correct. See §2.2.
   const { data, error } = await db
     .from("members")
     .select("id, full_name, email, eid, normalized_eid, active")

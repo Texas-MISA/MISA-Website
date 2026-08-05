@@ -1,8 +1,21 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import {
+  AUDITED_FIELD_COLUMNS,
+  AUDITED_MEMBER_COLUMNS,
   classifyTermEvents,
+  customSortColumn,
+  customSortKey,
+  fieldOptions,
+  fieldValue,
   formatAttendanceRate,
+  isAllowedFieldValue,
+  isValidFieldKey,
+  parseCustomSortKey,
+  setFieldValue,
+  withoutToken,
   type TermEventInput,
 } from "@/lib/members";
 
@@ -121,4 +134,307 @@ describe("formatAttendanceRate", () => {
     expect(formatAttendanceRate(1)).toBe("100%");
     expect(formatAttendanceRate(0.6667)).toBe("67%");
   });
+});
+
+// ---------------------------------------------------------------------------
+// Custom fields (phase 4)
+// ---------------------------------------------------------------------------
+
+describe("isValidFieldKey", () => {
+  it("accepts the documented shape", () => {
+    for (const key of ["dues_paid", "a", "tshirt_size", "x9", "a".repeat(40)]) {
+      expect(isValidFieldKey(key)).toBe(true);
+    }
+  });
+
+  // 🔓 These are the ones that matter. The key is interpolated into a PostgREST
+  // `order=` term, and the phase-4 spike showed a comma is read as a SECOND
+  // order column while a space and a `"` are accepted silently with no error at
+  // all — so "PostgREST would have rejected it" is not a boundary. The same
+  // pattern is enforced again by member_field_definitions_key_format.
+  it("rejects everything that could break out of an order term", () => {
+    for (const key of [
+      "dues,full_name",
+      "dues.paid",
+      "dues paid",
+      'du"es',
+      "dues)paid",
+      "dues-paid",
+      "dues*",
+      "dues%",
+      "cf:dues",
+      "",
+      "1dues",
+      "_dues",
+      "DUES",
+      "duesPaid",
+      "a".repeat(41),
+      "dues\nfull_name",
+    ]) {
+      expect(isValidFieldKey(key), key).toBe(false);
+    }
+  });
+
+  it("rejects keys that collide with a built-in column", () => {
+    for (const key of ["email", "eid", "full_name", "total_points", "notes"]) {
+      expect(isValidFieldKey(key), key).toBe(false);
+    }
+  });
+});
+
+describe("custom sort keys", () => {
+  it("round-trips through the cf: namespace", () => {
+    expect(customSortKey("dues_paid")).toBe("cf:dues_paid");
+    expect(parseCustomSortKey("cf:dues_paid")).toBe("dues_paid");
+  });
+
+  it("reports a built-in sort key as not custom", () => {
+    for (const sort of ["name", "email", "eid", "total_points"]) {
+      expect(parseCustomSortKey(sort)).toBeNull();
+    }
+  });
+
+  it("treats a bare prefix as naming nothing", () => {
+    expect(parseCustomSortKey("cf:")).toBeNull();
+  });
+
+  // The namespace is what makes a field keyed `email` unable to shadow the
+  // column — and `:` cannot appear in a key at all, so the split is unambiguous
+  // in both directions.
+  it("cannot collide with a built-in even for a reserved-looking key", () => {
+    expect(customSortKey("email")).toBe("cf:email");
+    expect(parseCustomSortKey("email")).toBeNull();
+  });
+
+  it("refuses to build a column expression for an unsafe key", () => {
+    expect(customSortColumn("dues_paid")).toBe("custom_fields->>dues_paid");
+    for (const key of ["dues,full_name", "dues paid", 'du"es', "email"]) {
+      expect(customSortColumn(key), key).toBeNull();
+    }
+  });
+});
+
+describe("fieldValue", () => {
+  it("reads a stored answer", () => {
+    expect(fieldValue({ dues_paid: "Paid" }, "dues_paid")).toBe("Paid");
+  });
+
+  // A missing key and an empty string are one state — "no answer" — because
+  // clearing a dropdown deletes the key rather than storing "". Collapsing them
+  // here is what stops two states rendering alike and sorting differently.
+  it("reads a missing key and an empty string alike", () => {
+    expect(fieldValue({}, "dues_paid")).toBeNull();
+    expect(fieldValue({ dues_paid: "" }, "dues_paid")).toBeNull();
+  });
+
+  it("survives anything that is not an object of strings", () => {
+    expect(fieldValue(null, "k")).toBeNull();
+    expect(fieldValue(undefined, "k")).toBeNull();
+    expect(fieldValue("scalar", "k")).toBeNull();
+    expect(fieldValue([1, 2], "k")).toBeNull();
+    expect(fieldValue({ k: 42 }, "k")).toBeNull();
+    expect(fieldValue({ k: null }, "k")).toBeNull();
+  });
+});
+
+describe("setFieldValue", () => {
+  it("sets a value without disturbing the others", () => {
+    expect(
+      setFieldValue({ dues_paid: "Paid", size: "M" }, "size", "L")
+    ).toEqual({ dues_paid: "Paid", size: "L" });
+  });
+
+  it("deletes the key rather than storing an empty string", () => {
+    expect(setFieldValue({ dues_paid: "Paid", size: "M" }, "size", "")).toEqual({
+      dues_paid: "Paid",
+    });
+    expect(
+      setFieldValue({ dues_paid: "Paid", size: "M" }, "size", null)
+    ).toEqual({ dues_paid: "Paid" });
+  });
+
+  it("returns a whole object, since PostgREST writes the column wholesale", () => {
+    expect(setFieldValue({}, "size", "M")).toEqual({ size: "M" });
+    expect(setFieldValue(null, "size", "M")).toEqual({ size: "M" });
+  });
+
+  it("drops junk already in the column rather than propagating it", () => {
+    expect(setFieldValue({ good: "A", bad: 42, blank: "" }, "x", "y")).toEqual({
+      good: "A",
+      x: "y",
+    });
+  });
+
+  it("does not mutate its input", () => {
+    const before = { dues_paid: "Paid" };
+    setFieldValue(before, "dues_paid", "Unpaid");
+    expect(before).toEqual({ dues_paid: "Paid" });
+  });
+});
+
+describe("fieldOptions", () => {
+  const definition = { options: ["Paid", "Unpaid", "Waived"] };
+
+  it("offers the definition's options, unchanged, when the value is one", () => {
+    const options = fieldOptions(definition, "Paid");
+    expect(options.map((o) => o.value)).toEqual(["Paid", "Unpaid", "Waived"]);
+    expect(options.every((o) => !o.orphan)).toBe(true);
+  });
+
+  it("offers no orphan when the member holds nothing", () => {
+    for (const current of [null, ""]) {
+      expect(fieldOptions(definition, current)).toHaveLength(3);
+    }
+  });
+
+  // ⚠️ The case this function exists for. Nothing in the database ties a stored
+  // value to its definition's options, so editing the option list orphans every
+  // member holding a value that just left it. A <select> whose value matches no
+  // <option> renders blank in every browser — the member would look like they
+  // hold nothing, and the officer's next edit would destroy a real answer that
+  // was never displayed.
+  it("appends the member's value when the definition no longer offers it", () => {
+    const options = fieldOptions(definition, "Deferred");
+    expect(options).toHaveLength(4);
+    expect(options.at(-1)).toEqual({
+      value: "Deferred",
+      label: "Deferred (no longer an option)",
+      orphan: true,
+    });
+  });
+
+  it("never appends a duplicate for a value that is still an option", () => {
+    expect(fieldOptions(definition, "Waived")).toHaveLength(3);
+  });
+});
+
+describe("isAllowedFieldValue", () => {
+  const definition = { options: ["Paid", "Unpaid", "Waived"] };
+
+  it("accepts an option and the empty clear", () => {
+    expect(isAllowedFieldValue(definition, "Paid")).toBe(true);
+    expect(isAllowedFieldValue(definition, "")).toBe(true);
+  });
+
+  // Exact, not case-insensitive: the stored value IS the option text, and the
+  // option list already rejects two entries differing only in case, so a value
+  // differing in case did not come from the dropdown.
+  it("rejects anything that is not an option, case included", () => {
+    expect(isAllowedFieldValue(definition, "paid")).toBe(false);
+    expect(isAllowedFieldValue(definition, "Pending")).toBe(false);
+    expect(isAllowedFieldValue(definition, " Paid")).toBe(false);
+  });
+});
+
+describe("the audited column lists", () => {
+  // Cheap guards against a future trim silently breaking the diff. Both sides of
+  // an audit before/after select the SAME literal, and AuditTrail renders a key
+  // present on one side only as "—" — so a column leaving one of these lists
+  // invents an erasure that never happened.
+  it("carry the token, because the action returns it as the next CAS anchor", () => {
+    expect(AUDITED_MEMBER_COLUMNS).toContain("updated_at");
+    expect(AUDITED_FIELD_COLUMNS).toContain("updated_at");
+  });
+
+  it("carry the columns the member editors actually move", () => {
+    expect(AUDITED_MEMBER_COLUMNS).toContain("custom_fields");
+    expect(AUDITED_MEMBER_COLUMNS).toContain("notes");
+    expect(AUDITED_FIELD_COLUMNS).toContain("archived_at");
+    expect(AUDITED_FIELD_COLUMNS).toContain("options");
+  });
+
+  it("are single unbroken literals", () => {
+    // PostgREST types the returned row off the string literal, so a wrapped or
+    // concatenated list widens to plain `string` and collapses the result into
+    // an untyped error shape — every field access failing at once, which reads
+    // as a schema fault. A newline here is the symptom of that mistake.
+    expect(AUDITED_MEMBER_COLUMNS).not.toContain("\n");
+    expect(AUDITED_FIELD_COLUMNS).not.toContain("\n");
+  });
+});
+
+describe("withoutToken", () => {
+  it("drops updated_at and nothing else", () => {
+    expect(
+      withoutToken({ id: "m1", notes: "x", updated_at: "2026-08-02T00:00:00Z" })
+    ).toEqual({ id: "m1", notes: "x" });
+  });
+
+  it("leaves a row that has no token alone", () => {
+    expect(withoutToken({ id: "m1" })).toEqual({ id: "m1" });
+  });
+
+  it("does not mutate its input", () => {
+    const before = { id: "m1", updated_at: "2026-08-02T00:00:00Z" };
+    withoutToken(before);
+    expect(before.updated_at).toBe("2026-08-02T00:00:00Z");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Source assertions for the phase-4 components
+// ---------------------------------------------------------------------------
+//
+// Same reasoning as the block at the end of tests/filters.test.ts: these are
+// wiring invariants that live in JSX, and a node-environment suite cannot render
+// the component to check them behaviourally. If a file moves, update the path
+// rather than deleting the test.
+
+const read = (path: string) =>
+  readFileSync(new URL(path, import.meta.url), "utf8");
+
+describe("the directory row is the client boundary, not the table", () => {
+  const table = read("../app/admin/(shell)/members/_components/member-table.tsx");
+  const row = read("../app/admin/(shell)/members/_components/directory-row.tsx");
+
+  // Matching the DIRECTIVE — first non-empty line — rather than the bare
+  // string, so both files can go on explaining the boundary in prose. The
+  // header of member-table.tsx does exactly that, which is how this test failed
+  // the first time it was written.
+  const directive = (source: string) =>
+    source.split("\n").find((line) => line.trim() !== "")?.trim();
+
+  it("keeps the table on the server", () => {
+    // The shell, the sort headers and the empty check have no interactivity
+    // beyond navigation. Moving them client-side ships them for nothing.
+    expect(directive(table)).not.toBe('"use client";');
+  });
+
+  it("makes the row a Client Component", () => {
+    expect(directive(row)).toBe('"use client";');
+  });
+
+  it("keeps the CAS token in the row rather than in each cell", () => {
+    // ⚠️ The invariant this file exists to pin. members.updated_at is
+    // row-level, so if each cell held its own copy the first save would strand
+    // its siblings on a stale token and the officer's next edit in that row
+    // would report a phantom conflict. The failure is a client-side timing
+    // window and no behavioural test in this suite would catch it.
+    expect(row).toContain("useState(row.updatedAt)");
+    expect(row).toContain("onSaved");
+  });
+});
+
+describe("the phase-4 client components format no dates", () => {
+  // Intl inside a Client Component runs on both sides of hydration, and Node
+  // and Chrome ship different ICU data for the space before "PM" — the React
+  // diff then shows two strings that look character-for-character identical.
+  // None of these renders a date today, which is exactly how the trap gets
+  // sprung later: a date must arrive pre-formatted as a prop.
+  const files = [
+    "../app/admin/(shell)/members/_components/directory-row.tsx",
+    "../app/admin/(shell)/members/_components/member-field-cell.tsx",
+    "../app/admin/(shell)/members/[id]/_components/member-editor.tsx",
+    "../app/admin/(shell)/members/fields/_components/field-form.tsx",
+  ];
+
+  for (const path of files) {
+    it(`${path.split("/").pop()} calls no locale formatter`, () => {
+      // Matching the CALL form, so the headers can keep warning about the trap
+      // in prose — which is how this test failed the first time it was written.
+      const source = read(path);
+      expect(source).not.toMatch(/Intl\.\w+\(/);
+      expect(source).not.toMatch(/toLocale\w*\(/);
+    });
+  }
 });

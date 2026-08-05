@@ -6,8 +6,9 @@ import {
   pageRange,
   parseMemberFilter,
   PAGE_SIZE,
+  type SortableField,
 } from "@/lib/filters";
-import { classifyTermEvents } from "@/lib/members";
+import { classifyTermEvents, customSortKey } from "@/lib/members";
 
 import {
   cleanup,
@@ -60,13 +61,17 @@ const isolated = () =>
   parseMemberFilter({ q: FIXTURE_MARKER, state: "all" });
 
 const ROW_COLUMNS =
-  "id, full_name, email, eid, active, source, events_attended, events_possible, attendance_rate, total_points" as const;
+  "id, full_name, email, eid, active, source, events_attended, events_possible, attendance_rate, total_points, notes, custom_fields" as const;
 
-async function page(filter: ReturnType<typeof parseMemberFilter>) {
+async function page(
+  filter: ReturnType<typeof parseMemberFilter>,
+  fields: SortableField[] = []
+) {
   const { from, to } = pageRange(filter.page);
   const { data, error, count } = await applyMemberFilter(
     db.from("member_directory").select(ROW_COLUMNS, { count: "exact" }),
-    filter
+    filter,
+    fields
   ).range(from, to);
   if (error) throw new Error(`directory query failed: ${error.message}`);
   return { rows: data, count: count ?? 0 };
@@ -335,4 +340,157 @@ describe("attendance_rate", () => {
     expect(data.attendance_rate).toBe(0);
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// Custom fields (phase 4)
+// ---------------------------------------------------------------------------
+//
+// ⚠️ These belong here, in front of real PostgREST, and not in the pure suite.
+// A recording fake proves applyMemberFilter *emits* `custom_fields->>key`; only
+// the real gateway proves PostgREST accepts it, orders by it through a VIEW,
+// and keeps that order across .range() boundaries. That is exactly the property
+// the phase-4 spike went looking for, and the same class of thing as the search
+// quoting a pure test cannot catch.
+
+const FIELD_KEY = "t3q_dues";
+const FIELD_OPTIONS = ["Paid", "Unpaid", "Waived"];
+
+/**
+ * This block's own marker, and its own fixtures.
+ *
+ * It cannot share the file's: `t3q` matches every member the earlier describes
+ * created, several of which add rows of their own as they run, so a count
+ * asserted here against FIXTURE_COUNT is a count of somebody else's fixtures
+ * plus mine. `t3qcf` is a strict narrowing of `t3q`, so those blocks keep
+ * seeing everything they expect and this one sees only what it made.
+ */
+const CF_MARKER = "t3qcf";
+const CF_COUNT = PAGE_SIZE + 6;
+
+describe("custom-field sorting through the view", () => {
+  const fields: SortableField[] = [
+    { key: FIELD_KEY, showInDirectory: true },
+  ];
+  let fieldId = "";
+  const cfIds: string[] = [];
+  /** Which fixtures got an answer, and what. The rest hold none, which is the
+   * sparse case a dropdown always produces. */
+  const answers = new Map<string, string>();
+
+  beforeAll(async () => {
+    const { data, error } = await db
+      .from("member_field_definitions")
+      .insert({
+        key: FIELD_KEY,
+        label: "Dues (test fixture)",
+        kind: "select",
+        options: FIELD_OPTIONS,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(`field definition insert failed: ${error.message}`);
+    fieldId = data.id;
+
+    for (let i = 0; i < CF_COUNT; i++) {
+      const base = testIdentity();
+      const id = await createTestMember(db, track, {
+        ...base,
+        eid: base.eid.replace("t3q", CF_MARKER),
+      });
+      cfIds.push(id);
+
+      // Two thirds answered, one third left blank, so nulls-last is observable.
+      if (i % 3 === 2) continue;
+      const value = FIELD_OPTIONS[i % FIELD_OPTIONS.length];
+      answers.set(id, value);
+      const { error: updateError } = await db
+        .from("members")
+        .update({ custom_fields: { [FIELD_KEY]: value } })
+        .eq("id", id);
+      if (updateError) {
+        throw new Error(`value write failed: ${updateError.message}`);
+      }
+    }
+  }, 60_000);
+
+  afterAll(async () => {
+    // The members go with the tracker's cleanup; the definition is not a
+    // tracked entity and has to be removed by hand or it collides with the next
+    // run's insert on the unique key.
+    if (fieldId) {
+      await db.from("member_field_definitions").delete().eq("id", fieldId);
+    }
+  });
+
+  const sorted = (dir: "asc" | "desc") =>
+    parseMemberFilter(
+      { q: CF_MARKER, state: "all", sort: customSortKey(FIELD_KEY), dir },
+      fields
+    );
+
+  it("orders by the JSON path, with unanswered members last either way", async () => {
+    for (const dir of ["asc", "desc"] as const) {
+      const seen: (string | null)[] = [];
+      for (let p = 1; p <= pageCount(CF_COUNT); p++) {
+        const { rows } = await page({ ...sorted(dir), page: p }, fields);
+        for (const row of rows) {
+          const cf = row.custom_fields as Record<string, string> | null;
+          seen.push(cf?.[FIELD_KEY] ?? null);
+        }
+      }
+
+      expect(seen).toHaveLength(CF_COUNT);
+
+      // Nulls last in BOTH directions, which is not what Postgres does unless
+      // asked: a descending sort puts them first by default, burying everyone
+      // who actually has an answer.
+      const firstNull = seen.indexOf(null);
+      expect(firstNull).toBeGreaterThan(-1);
+      expect(seen.slice(firstNull).every((v) => v === null)).toBe(true);
+
+      // And the answered run is genuinely ordered — across page boundaries,
+      // which is the half a single-page assertion would miss.
+      const answered = seen.slice(0, firstNull) as string[];
+      const expected = [...answered].sort();
+      if (dir === "desc") expected.reverse();
+      expect(answered).toEqual(expected);
+    }
+  });
+
+  it("covers every member exactly once when the sort column is mostly ties", async () => {
+    // Three options over 31 members: ties are the rule here, not the exception.
+    // Without the id tie-break applyMemberFilter appends, pages drop and repeat
+    // rows — the spike reproduced precisely this, losing one row in thirty.
+    const seen: string[] = [];
+    for (let p = 1; p <= pageCount(CF_COUNT); p++) {
+      const { rows } = await page({ ...sorted("asc"), page: p }, fields);
+      seen.push(...rows.map((r) => r.id!));
+    }
+
+    expect(seen).toHaveLength(CF_COUNT);
+    expect(new Set(seen).size).toBe(CF_COUNT);
+    expect([...seen].sort()).toEqual([...cfIds].sort());
+  });
+
+  it("counts the same rows the sort returns", async () => {
+    const { rows, count } = await page(sorted("asc"), fields);
+    expect(count).toBe(CF_COUNT);
+    expect(rows).toHaveLength(PAGE_SIZE);
+  });
+
+  it("surfaces the stored value on the view", async () => {
+    const [memberId, value] = [...answers.entries()][0];
+    const { data, error } = await db
+      .from("member_directory")
+      .select("custom_fields, notes")
+      .eq("id", memberId)
+      .single();
+    if (error) throw new Error(error.message);
+
+    expect((data.custom_fields as Record<string, string>)[FIELD_KEY]).toBe(value);
+    // notes is appended by the same migration and was previously reachable only
+    // by a second read against members.
+    expect(data).toHaveProperty("notes");
+  });
 });

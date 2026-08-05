@@ -6,18 +6,27 @@ import {
   type MemberFilter,
   type MemberSort,
 } from "@/lib/filters";
+import { customSortKey, type FieldDefinition } from "@/lib/members";
 
-// A Server Component, deliberately. Phase 3 still has no interactivity beyond
-// navigation, so the sort headers are plain links and nothing here formats a
-// date — which sidesteps the hydration trap entirely rather than working around
-// it. Phase 4 adds the inline <select> cells for custom fields and will need a
-// Client Component for them; the row markup should move wholesale rather than
-// this file gaining "use client".
+import { DirectoryRow } from "./directory-row";
+
+// A Server Component, and it stays one. Phase 4 added the inline <select> cells
+// for custom fields, and — as the phase-3 note here predicted — the row markup
+// moved wholesale into directory-row.tsx rather than this file gaining
+// "use client". The table shell, the sort headers and the empty check have no
+// interactivity beyond navigation and are cheaper left on the server; the row
+// has to be a Client Component because it owns the compare-and-set token its
+// cells share (the reason is written out in directory-row.tsx).
 //
-// Four columns (phase 3): Name, Email, EID, Total Points. Everything the phase-1
-// table showed beside them — joined, source, events, rate, the attendance/bonus
-// split, pending, last seen — lives on /admin/members/[id] now, which is why
-// the name links there.
+// Four built-in columns (phase 3): Name, Email, EID, Total Points. Everything
+// the phase-1 table showed beside them — joined, source, events, rate, the
+// attendance/bonus split, pending, last seen — lives on /admin/members/[id],
+// which is why the name links there. Officer-defined columns follow them, in
+// the order officers arranged.
+
+/** This table renders at exactly one route. Hoisted rather than parameterised:
+ * a `basePath` prop would invent a seam nothing uses. */
+const DIRECTORY = "/admin/members";
 
 export type MemberRow = {
   id: string;
@@ -32,26 +41,37 @@ export type MemberRow = {
    * §4.2's roster-cleanup signal. */
   source: string;
   totalPoints: number;
+  /** The member's answers, keyed by definition key. Raw jsonb from the view —
+   * read it with fieldValue(), which collapses a missing key and an empty
+   * string to the one "no answer" state. */
+  customFields: unknown;
+  /** The row's compare-and-set token, as the raw PostgREST string. */
+  updatedAt: string;
 };
-
-const numeric = "px-3 py-2 text-right tabular-nums";
-const text = "px-3 py-2 text-left";
 
 export function MemberTable({
   rows,
   filter,
+  fields,
 }: {
   rows: MemberRow[];
   filter: MemberFilter;
+  /** Every live definition. The directory columns are filtered out of it here,
+   * so the header list and the cell list cannot disagree. */
+  fields: FieldDefinition[];
 }) {
   if (rows.length === 0) return null;
+
+  // The same predicate sortColumn() applies, and that is the point: a header
+  // only exists for a column that is actually sortable.
+  const columns = fields.filter((field) => field.showInDirectory);
 
   // The filter rides along to the detail page so its back link returns to the
   // view the officer was working, not the unfiltered default — the same idiom
   // the points ledger uses for its adjustment pages.
   const context = memberFilterToParams(filter).toString();
   const detailHref = (id: string) =>
-    `/admin/members/${id}${context ? `?${context}` : ""}`;
+    `${DIRECTORY}/${id}${context ? `?${context}` : ""}`;
 
   return (
     <div className="overflow-x-auto border-2 border-black">
@@ -70,41 +90,26 @@ export function MemberTable({
             <SortHeader filter={filter} column="total_points">
               Total points
             </SortHeader>
+            {columns.map((field) => (
+              <SortHeader
+                key={field.key}
+                filter={filter}
+                column={customSortKey(field.key)}
+                align="left"
+              >
+                {field.label}
+              </SortHeader>
+            ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr
+            <DirectoryRow
               key={row.id}
-              className={`border-b border-black/20 last:border-b-0 ${
-                row.active ? "" : "bg-black/[0.03] text-foreground/60"
-              }`}
-            >
-              <td className={text}>
-                <Link
-                  href={detailHref(row.id)}
-                  className="font-medium underline decoration-1 underline-offset-2"
-                >
-                  {row.fullName}
-                </Link>
-                {!row.active && (
-                  <span className="ml-2 border border-black/40 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider">
-                    inactive
-                  </span>
-                )}
-                {row.source === "self_checkin" && (
-                  <span
-                    title="Created by the check-in form rather than an officer"
-                    className="ml-2 border border-black/40 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider"
-                  >
-                    self
-                  </span>
-                )}
-              </td>
-              <td className={text}>{row.email}</td>
-              <td className={text}>{row.eid}</td>
-              <td className={`${numeric} font-medium`}>{row.totalPoints}</td>
-            </tr>
+              row={row}
+              fields={columns}
+              detailHref={detailHref(row.id)}
+            />
           ))}
         </tbody>
       </table>
