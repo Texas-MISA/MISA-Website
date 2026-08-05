@@ -1,9 +1,198 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.29
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2 and 3 of 9 built, merged and deployed
+**Version:** 1.34
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2 and 3 of 9 built, merged and deployed; **phase 4 built end to end and browser-verified, but local-only and unmerged**. **Stage 6.5 (dues & membership status) is planned and unbuilt** — see the v1.34 note below.
 **Last updated:** August 2026
 
+> **v1.34: dues stop being something an officer ticks and become something the
+> system calculates.** Planning only — no schema, no code. MISA is splitting
+> attendees into **official** and **unofficial** members on whether they have
+> paid dues, which turns this document's canonical custom-field example
+> ("Paid Dues → Yes/No") into the wrong mechanism rather than merely a stale
+> one. Dues status is now derived from actual payments, reconciled from Venmo
+> statements, and it gets a **dedicated column** in the directory. New
+> **Stage 6.5**, slotted between Stage 6 phases 5 and 6; new spec at
+> [`docs/dues-and-membership.md`](dues-and-membership.md).
+>
+> - **The input is a monthly CSV, because Venmo has no API and no
+>   year-to-date export.** Statements will be uploaded on overlapping ranges to
+>   keep the data fresher than monthly, which makes de-duplication a
+>   **correctness requirement rather than a nicety**. The dedupe key is
+>   Venmo's own per-transaction ID, unique-indexed, so an August 28 statement
+>   re-covering August 1–10 collides and skips — in any order, any number of
+>   times. 🪤 Amount + date + payer is *not* unique: two members can send $30
+>   in the same minute, and a fingerprint over those fields would silently
+>   collapse one of them. ✅ **Confirmed against a real export on 2026-08-05** —
+>   the ID column is there, so the design stands and the fingerprint fallback
+>   never has to be built.
+> - **The link between a payment and a member is the note**, where the payer
+>   writes their EID. Matching needs no EID regex: tokenize the note, apply the
+>   same fold `members.normalized_eid` uses, and look for a token that *is* a
+>   roster member's normalized EID. Exactly one → linked. Zero → unmatched.
+>   Two or more → queued. Exact match only — §7's "don't auto-resolve
+>   near-misses" carries over intact, and a payment note never creates a member.
+> - **§4.2's invariant extends: nothing that arrived as money is dropped on the
+>   floor either.** An odd amount, an unreadable note, no note at all — the row
+>   is stored and queued, never discarded. The review axis is a **nullable
+>   `terms_covered`**, not a status enum: null means "an officer has not decided
+>   yet", so a $35 payment (someone tipped) or a $60 one (someone covered a
+>   friend) parses, links, and waits. `covered_terms` is generated from it, so a
+>   row awaiting a decision counts for nothing until the decision is made.
+> - **Prices live in `app_settings`, and are read at import time only.** Dues
+>   change between years and a hardcoded 30/50 becomes a migration the day the
+>   org raises them. `terms_covered` is *stored* on the row, so a later price
+>   change never rewrites what last year's payments bought.
+> - **`member_directory` gains exactly one dues column** —
+>   `dues_paid_current_term boolean`. It **appends**, so `create or replace`
+>   suffices and migration 15's anon hole stays shut. No "paid through" column:
+>   terms do not sort lexicographically (`Fall` precedes `Spring`
+>   alphabetically and follows it chronologically), so a latest-term column
+>   needs a sort key it does not otherwise need. The detail page reads the
+>   member's payment rows directly, as it already does for adjustments.
+> - ⚠️ **`dues`, `dues_paid`, and `dues_paid_current_term` all become reserved
+>   keys**, in the migration's CHECK and in `RESERVED_FIELD_KEYS`. Without that
+>   an officer can recreate the hand-ticked dropdown beside the calculated
+>   column, and the roster then has two answers to one question. Reserving
+>   `dues` alone is not enough — `dues_paid` is the name somebody actually
+>   reaches for, and it is the one the phase-4 walkthrough itself used.
+>   ✅ **That walkthrough fixture was deleted from the local database on
+>   2026-08-05**, so migration 19's CHECK has nothing left to trip over. It
+>   would have: archiving would not have helped, because migration 18's unique
+>   key index spans archived rows on purpose.
+> - 🔓 **The threat-model boundary below had to be rewritten.** "It holds no
+>   financial or highly sensitive data" stopped being true as written. No card
+>   or bank data ever enters the system — money moves in Venmo and what is
+>   stored is a transaction ID, an amount, a note, and a display handle — but
+>   that is a narrower claim than the one §6 used to make, and §1.3's
+>   "payment processing" non-goal now has to distinguish *processing* from
+>   *reconciliation*. §2.2's Vercel Hobby commercial-use line turns on the same
+>   distinction.
+> - **Official status gates nothing** (§9 #12). It is a column, a filter, and a
+>   line on the member's own lookup; check-in, points, and the leaderboard are
+>   untouched. Chosen because it is the reversible option — gating can be added
+>   later without a migration, and gating the leaderboard would have made the
+>   public board reveal who has paid, which §9 #1 says is the one privacy
+>   choice that cannot be undone.
+
+> **v1.33: custom fields become editable — the mutations and the screens.**
+> Walked through a browser clean on 2026-08-03, with no application defect
+> found. Still **local-only**: migration 18 is unpushed and nothing is
+> committed, so local and the remote have diverged for the first time in the
+> project (19 migration files against 18) — deliberately, and pending a
+> `db push` before the merge.
+>
+> - **`app/actions/members.ts`** carries all four mutations — one field value,
+>   the officer notes, a definition, and archive/restore. **No role check
+>   anywhere in it**: §9 #6's "the audit log is the control, not a role gate"
+>   settled for phase 4 as *any officer may both define a field and edit a
+>   value*, and the file says so, so nobody re-adds a gate as an oversight.
+> - **The row, not the cell, owns the compare-and-set token.** `members.updated_at`
+>   is a single row-level value that every inline cell and the notes editor posts
+>   back. Per-cell copies would strand siblings on a stale token after the first
+>   save, and the officer's second edit in that row would report a phantom
+>   conflict. This is why `member_directory` had to grow `updated_at` — both
+>   editing screens read the view and compare against the table.
+> - 🔓 **Nothing ties a stored value to its definition's option list**, and that
+>   is deliberate: editing the list orphans values rather than rewriting members'
+>   answers. The obligation that follows is a rendering one — a `<select>` with
+>   no matching `<option>` shows blank, so an orphan is displayed as a disabled
+>   "no longer an option" entry rather than silently looking like no answer.
+> - **Archiving never deletes**, a definition or a value; keys stay reserved
+>   even when archived, so a new field cannot adopt the answers stored under an
+>   old one. Restoring is filed as `member_field.updated` rather than a new verb.
+> - **A bug shipped and fixed inside one session, worth the note:**
+>   `memberFilterUrl` re-parsed what it built without the definitions, so a
+>   `cf:` sort degraded to `name` on every filter change. A "re-parse to
+>   normalize" round trip inherits every argument the parser needs, and omitting
+>   one fails quietly.
+
+> **v1.32: custom fields get their storage, and a sorting spike decides its
+> shape.** Migration 18 is applied to the local database only — not pushed, not
+> merged, not deployed — and nothing on the roster is editable yet.
+>
+> - **Values live in `members.custom_fields jsonb`, keyed by definition key,
+>   with the definitions in `member_field_definitions`.** The choice was forced
+>   by sorting rather than taste, and was settled by a spike before any code:
+>   supabase-js `.order("custom_fields->>key")` is accepted on a table *and
+>   through a view*, on both the local stack and the hosted project (both
+>   `postgrest/14.5`), and survives `.range()` pagination. The fallback that was
+>   on the table — fixed generic `custom_1 … custom_n` columns — is not needed.
+> - 🔓 **The key format check is a security control.** The key is interpolated
+>   into an `order=` term, and an unconstrained one is a sort-injection surface:
+>   a comma is parsed as a second order column, while a space and a `"` are
+>   accepted *silently*. `^[a-z][a-z0-9_]{0,39}$` is enforced in the zod schema,
+>   in the migration's CHECK, and again where the order string is built.
+> - **Sort keys are namespaced `cf:<key>`**, so an officer-defined field can
+>   never shadow one of the four built-in sorts. `applyMemberFilter` now takes
+>   the definition list as a *required* argument, so forgetting to load it is a
+>   compile error rather than a directory that quietly sorts by name.
+> - **`members` gains `updated_at`** — the compare-and-set anchor inline editing
+>   needs, which it never had because nothing edited a member before.
+> - Also closed: `AuditEntityType` was missing `'roster'`, which migration 14
+>   added to the SQL check back in phase 1 — phase 5's export receipt depends on
+>   it.
+
+> **v1.31: a worst-case capacity check — the free tiers hold, the constants do
+> not.** Run against 500 members, 3 events a week, 150 attendees each. §2.2 has
+> the arithmetic; nothing is built or changed.
+>
+> - **No service tier needs upgrading, and it is not close** — ~7 MB of
+>   attendance a year against a 500 MB database, and Supabase MAU counts *auth
+>   users*, so it stays at ~13 officers however large the roster grows. The
+>   limit everyone assumes they will hit is the one the no-accounts design (§3)
+>   already removed.
+> - **Two application constants break first, and both break silently.**
+>   `RATE_LIMIT_MAX = 90` per IP per 10 minutes refuses the 91st person in a
+>   150-person room behind one NAT; `MEMBER_SCAN_LIMIT = 400` truncates the
+>   roster scan under every picker and the near-miss ranker at 500 members.
+>   Neither surfaces an error.
+> - **The lesson generalises past these two.** Every cap in this codebase was
+>   sized against the org as it is now and carries a comment explaining that
+>   size. A capacity question is therefore a question about *constants*, not
+>   about bills — and the constants are the part with no monitoring behind
+>   them. §2.2 is where that check lives from now on; re-run it when the roster
+>   or the cadence changes materially.
+> - 📌 **A stale comment was corrected in the same pass.** `MEMBER_SCAN_LIMIT`
+>   claimed the detail page "falls back to bounded ILIKE probes" above the
+>   limit. There is no such fallback — the query is a bare `.limit(400)`. The
+>   comment described an intention as though it were behaviour, which is how a
+>   silent truncation stays unnoticed.
+>
+> **v1.30: phase 5 gains a real `.xlsx` download, alongside CSV.** A planning
+> change only — nothing is built. Requested 2026-08-02: officers want a
+> spreadsheet file of *certain or all* members with *selected fields*, not only
+> a CSV.
+>
+> - **The three extraction paths stay distinct, and the file ones now number
+>   two.** Clipboard (emails, names, TSV) is for pasting somewhere; **CSV** is
+>   the interchange format anything can read; **XLSX** is the one that opens in
+>   Excel already typed, with a header row and column widths, and without the
+>   import dialog. CSV is not dropped — it is the format that survives when the
+>   xlsx writer does not.
+> - **Which rows and which columns both become explicit choices.** "Certain or
+>   all members" is the phase-5 selection model already planned — the checked
+>   rows, or *select all N matching this filter*. What is new is the **field
+>   picker**: the export is no longer the four displayed columns but a chosen
+>   subset of everything the directory and detail page know, custom fields
+>   included. Both choices go in the audit receipt, because "who exported what"
+>   is now two questions.
+> - **A file download is a Route Handler, not a Server Action** — the first one
+>   in this codebase. An xlsx is binary and needs `Content-Disposition`; a
+>   Server Action cannot set response headers. It opens with `getOfficer()` and
+>   returns **403**, not a redirect, and it reaches the rows through
+>   `applyMemberFilter` like every other caller. §4.5's one-translation rule is
+>   exactly what makes "the file matches the count on screen" provable.
+> - 🪤 **A spreadsheet export is a code-execution surface, and member data is
+>   attacker-supplied.** Anyone who can check in picks their own name, so a
+>   member called `=HYPERLINK(...)` is reachable by design (§6's
+>   self-registration row). Excel evaluates a leading `=`, `+`, `-`, or `@` in a
+>   **CSV** cell; the risk is the CSV, not the xlsx, where cells are written as
+>   typed text and stay inert. §6 carries the row now.
+> - **The writer is an open decision, deliberately deferred to phase 5.** Every
+>   dependency here is one the next officer inherits, and this project has none
+>   beyond the framework and Supabase. Evaluate at build time; do not assume the
+>   package you remember is still the maintained one.
+>
 > **v1.29: the directory is four columns, and the member detail page exists.**
 > Stage 6 phase 3, and the first phase of this stage that needed **no
 > migration** — `member_directory` already carried everything, which is what
@@ -621,7 +810,7 @@ Spreadsheet-based tracking breaks down at three points: manual event-to-timestam
 Scoping these out keeps v1 shippable. They are candidates for later stages, not omissions:
 
 - Member accounts with passwords
-- Payment processing for dues
+- **Payment *processing* for dues** — no card details, no bank details, and no money moving through this system at any point. Dues are paid in Venmo and the site *reconciles* what arrived (§7 Stage 6.5, v1.34). The distinction is load-bearing in two other places: §2.2's Vercel Hobby commercial-use clause, and §6's threat-model boundary.
 - Email/SMS notifications
 - Native mobile app
 - Public-facing officer directory or blog/CMS
@@ -647,7 +836,7 @@ Scoping these out keeps v1 shippable. They are candidates for later stages, not 
 - **vs. a Google Sheets + Apps Script upgrade:** no real access control, no schema constraints, and no clean public-facing UI.
 - **vs. Django/Rails + managed Postgres:** more capable, but requires a paid always-on host and adds an operational surface the next officer would have to inherit.
 
-### 2.2 Cost model
+### 2.2 Cost model and capacity
 
 | Service | Tier | Relevant limits | Projected usage |
 |---|---|---|---|
@@ -656,6 +845,33 @@ Scoping these out keeps v1 shippable. They are candidates for later stages, not 
 | Domain | Optional | — | ~$12/year |
 
 **Note on the Supabase free tier:** projects pause after a period of inactivity and need a manual resume from the dashboard. For an org with events during the semester this is rarely an issue, but plan a wake-up check before the first meeting of each semester. This is the single most likely operational surprise.
+
+#### The worst-case capacity check (v1.31)
+
+Run against a deliberately pessimistic year: **500 registered members, 3 events a week, 150 attendees at every one of them.** Roughly triple the org's current size and cadence.
+
+**Conclusion: no service tier needs upgrading, and it is not close.** But four *application* ceilings are crossed at those numbers, two of them silently, so "can we afford it" and "does it work" have different answers. That is the finding worth carrying — the constants below were each sized against a smaller room and none of them announce themselves when exceeded.
+
+| Limit | Headroom at 500 / 450-per-week |
+|---|---|
+| Supabase database — 500 MB | ~13,500 attendance rows/year at roughly half a KB with indexes is **~7 MB/year**; add members, events, adjustments and audit and call it 10–15 MB. Decades of headroom. |
+| Supabase MAU — 50k | **~13, and it does not grow with the roster.** MAU counts Supabase *Auth* users, and members have no accounts (§3) — only officers sign in. This is the limit people assume they will hit and the one the design has already removed. |
+| Supabase egress — 5 GB/mo | Small payloads throughout; the directory is paginated at 25 and the largest single response in the system is a full-roster export measured in tens of KB. |
+| Vercel bandwidth / invocations | ~2,000 check-ins a month plus casual browsing — single-digit GB, tens of thousands of invocations. **Verify against the dashboard's usage page rather than a remembered number:** Vercel restructured Hobby around Fast Data Transfer, edge requests, and Fluid Active CPU, and the allowances have moved. |
+| Peak load | 150 submissions inside ten minutes is ~0.25 req/s average and maybe 5–10/s at the door, each a small indexed lookup. Not a concern on the free instance. |
+
+**What actually breaks, in order:**
+
+1. 🔴 **`RATE_LIMIT_MAX = 90` per IP per 10 minutes fails at exactly this size.** A venue's WiFi puts the whole room behind one address, so the 91st person through the door is refused. The constant's own comment says it is "sized for the room" — the room it was sized for was about ninety people. At a recruiting event it is half that, because a first-timer spends two slots (submit, then confirm). Staggered arrivals soften it in practice; as a worst case it is a hard wall. It fails *open* on error, so only the limit working correctly turns anyone away.
+2. 🔴 **`MEMBER_SCAN_LIMIT = 400` is below 500 and truncates silently.** The roster scan feeding the resolution form, manual entry, the grant picker, and the near-miss ranker takes the first 400 active members and reports nothing. The candidate query does not even order, so it is an arbitrary 400 of 500. **`pg_trgm` is the documented growth path and 500 members crosses into it.**
+3. 🟡 **`MAX_GRANT_MEMBERS = 50`** turns crediting a 150-person event into three grants. It refuses rather than truncating (§9's rule for oversized selections), so it is friction, not a defect.
+4. 🟡 **Near-miss ranking gets denser with the roster.** EIDs are name-derived, so the distance-2 population scales with membership — the exact load the `MIN_SUGGESTION_SCORE` floor carries. At 500 the floor is doing more work than the calibration it was set against, and recalibration is empirical (§7's stage trap), not arithmetic.
+
+Two already-recorded items that this scenario makes concrete rather than hypothetical: the hosted PostgREST row cap, which a 500-row export can brush where the local stack has none; and the free-tier pause, irrelevant at three events a week during term and certain every summer.
+
+**One non-technical limit worth knowing:** Vercel Hobby prohibits commercial use. A student org is fine, and stays fine right up until the site **handles** dues, ticketing, or sponsorship — at which point the constraint is the plan's terms, not any of the numbers above.
+
+**Stage 6.5 walks up to that line without crossing it, and it is worth being precise about why** (v1.34). Recording that a payment arrived is not handling a payment. No card or bank details enter the system, no money moves through it, and there is no checkout: dues are paid in Venmo, and the site reconciles a CSV statement after the fact. The clause bites the day this site takes a payment — a Stripe button, a ticketing flow — not the day it reads a spreadsheet about one. Keep the distinction in mind if in-app payment ever gets proposed (§7 Stage 10 lists it as deliberately out of scope); that proposal is a plan change as much as a feature.
 
 ### 2.6 Function region
 
@@ -798,8 +1014,13 @@ The Stage 9 handoff guide should amount to: §2.4 filled in, the vault handed ov
 create table members (
   id           uuid primary key default gen_random_uuid(),
   eid   text not null,
+  -- Folded to LOWER, not upper (migration 16). EIDs are conventionally
+  -- lowercase, and a review screen that shouts ABC1234 back at someone who
+  -- typed abc1234 reads as a correction that was never made. The whitespace
+  -- and hyphen stripping is vestigial — real EIDs contain neither — but it
+  -- still catches pasted junk and removing it would rewrite every stored value.
   normalized_eid text generated always as
-                 (upper(regexp_replace(eid, '\s|-', '', 'g'))) stored,
+                 (lower(regexp_replace(eid, '\s|-', '', 'g'))) stored,
   full_name    text not null,
   email        text not null,
   active       boolean not null default true,
@@ -809,7 +1030,18 @@ create table members (
   -- Officer notes, shown on the member detail page (§7 Stage 6). Nullable and
   -- unconstrained: there is no meaningful empty-string state, so a not-blank
   -- check would only force callers to send null for the same meaning.
-  notes        text
+  notes        text,
+  -- Officer-defined field values (migration 18), a flat key → option-text map
+  -- keyed by member_field_definitions.key. JSONB rather than columns so
+  -- PostgREST can order by `custom_fields->>key` — see 4.5 and §7 Stage 6.
+  -- A missing key is SQL NULL and means "no answer"; nothing here ties a value
+  -- to its definition's option list, deliberately (§7 Stage 6, phase 4).
+  custom_fields jsonb not null default '{}'
+                 check (jsonb_typeof(custom_fields) = 'object'),
+  -- The compare-and-set token, added in migration 18 because nothing edited a
+  -- member until custom fields did. Row-level, so every inline cell and the
+  -- notes editor on one row post the same value back.
+  updated_at   timestamptz not null default now()
 );
 
 -- Identity is the normalized ID, not the raw one, so 'ut-123', 'UT 123', and
@@ -817,6 +1049,7 @@ create table members (
 -- for the same reason.
 create unique index members_normalized_id on members (normalized_eid);
 create unique index members_email_lower   on members (lower(email));
+create index members_custom_fields_gin on members using gin (custom_fields);
 
 -- The schedule. Created in advance, but editable at any time — see 4.6.
 create table events (
@@ -920,6 +1153,98 @@ create table point_adjustments (
 -- already a complete concurrency guard: zero rows back means someone voided it
 -- first. The asymmetry with attendance is intentional.
 
+-- Dues payments, reconciled from Venmo statement CSVs (§7 Stage 6.5). One row
+-- per transaction in the statement. This is the only source of membership
+-- status: 4.5's dues_paid_current_term is derived from these rows and nothing
+-- else, which is why a hand-ticked "Paid Dues" custom field is forbidden by
+-- the reserved-key check below.
+--
+-- Shape is the union of the two patterns already here: editable like
+-- attendance (the parser can attribute a payment wrongly, and correcting that
+-- is legitimate) and voidable like point_adjustments (money arriving is not
+-- erasable, so a void is one-way and carries a reason).
+create table dues_payments (
+  id             uuid primary key default gen_random_uuid(),
+  -- Venmo's own transaction id, and the entire de-duplication story. Officers
+  -- upload overlapping statements on purpose to keep the data fresher than
+  -- monthly, so a payment is seen many times and must be stored once. Order
+  -- and upload count do not matter: re-importing is a no-op.
+  --
+  -- A fingerprint over (datetime, amount, payer, note) is NOT an acceptable
+  -- substitute — two members can send the same amount in the same minute, and
+  -- collapsing them silently loses a payment somebody made.
+  venmo_txn_id   text not null,
+  -- Null means the note resolved to no member, or to more than one. Such a row
+  -- is stored and queued, never discarded (4.2), and never creates a member.
+  --
+  -- RESTRICT, not CASCADE, diverging from point_adjustments on purpose: this
+  -- row records that money arrived, and losing it because a member row went
+  -- away is the wrong trade. It also makes the merge tool (§7 Stage 6 phase 8)
+  -- fail loudly if it forgets to repoint dues alongside attendance and points.
+  member_id      uuid references members(id) on delete restrict,
+  paid_at        timestamptz not null,
+  -- Cents, never a float, and never a numeric the app might round differently
+  -- from Postgres. Positive only: a refund is a void with a reason, not a
+  -- negative payment (the asymmetry with point_adjustments is deliberate —
+  -- points are a score, this is a receipt).
+  amount_cents   integer not null check (amount_cents > 0),
+  note           text,
+  -- From the statement, and the only way an officer can reconcile a payment
+  -- whose note carried no usable EID. See §6 for what storing it costs.
+  payer_name     text,
+  payer_handle   text,
+  -- The token parsed out of the note, stored raw beside its fold, exactly as
+  -- attendance stores submitted_eid beside normalized_eid. Same expression as
+  -- members.normalized_eid, because the match is an equality against it.
+  submitted_eid  text,
+  normalized_eid text generated always as
+                 (lower(regexp_replace(coalesce(submitted_eid, ''),
+                                       '\s|-', '', 'g'))) stored,
+  -- Which term the payment starts covering. Defaulted from term_of(paid_at),
+  -- not generated, because an officer must be able to override it: 4.7's
+  -- boundaries put summer in Spring, so a July payment for the coming year
+  -- would otherwise buy a term that is nearly over.
+  start_term     text not null default term_of(now()),
+  -- NULLABLE, and that is the whole review mechanism — null means "no officer
+  -- has decided how many terms this bought". An amount matching neither
+  -- configured price (someone tipped, someone covered a friend, someone
+  -- underpaid) parses fine, links to its member, and waits. A status enum
+  -- would be a second way to say the same thing.
+  terms_covered  smallint check (terms_covered is null
+                                 or terms_covered between 1 and 4),
+  -- Generated, so a row awaiting a decision covers nothing and counts for
+  -- nothing. terms_from() is immutable — see 4.7.
+  covered_terms  text[] generated always as
+                 (terms_from(start_term, terms_covered)) stored,
+  -- Which uploaded statement this arrived in, so a bad import is reviewable
+  -- and bulk-voidable in one action without a staging table.
+  import_batch_id uuid not null,
+  imported_by    uuid not null references auth.users(id),
+  imported_at    timestamptz not null default now(),
+  voided_at      timestamptz,
+  voided_by      uuid references auth.users(id),
+  void_reason    text,
+  constraint dues_void_is_complete check (
+    (voided_at is null and voided_by is null) or
+    (voided_at is not null and voided_by is not null)
+  ),
+  constraint dues_void_requires_reason check (
+    (voided_at is null) = (void_reason is null)
+  ),
+  -- Editable, unlike a point adjustment, so it needs a real CAS token.
+  updated_at     timestamptz not null default now()
+);
+
+-- The dedupe. Spans voided rows on purpose: re-importing a statement whose
+-- payment an officer already voided must stay a no-op, not resurrect it.
+create unique index dues_payments_txn on dues_payments (venmo_txn_id);
+create index dues_payments_member  on dues_payments (member_id);
+create index dues_payments_covered on dues_payments using gin (covered_terms);
+create index dues_payments_batch   on dues_payments (import_batch_id);
+-- The needs-review queue: unmatched, or matched but undecided.
+create index dues_payments_review on dues_payments (imported_at desc)
+  where voided_at is null and (member_id is null or terms_covered is null);
+
 -- Single append-only audit log across every entity an officer can modify.
 -- Replaces the attendance-specific table from v1.1: event edits and point
 -- grants need the same accountability, and three parallel tables would drift.
@@ -927,7 +1252,8 @@ create table admin_audit (
   id          bigserial primary key,
   entity_type text not null
                 check (entity_type in ('attendance','event','member',
-                                       'point_adjustment','roster')),
+                                       'point_adjustment','roster',
+                                       'member_field','dues_payment')),
   entity_id   uuid not null,
   actor_id    uuid not null references auth.users(id),
   acted_at    timestamptz not null default now(),
@@ -948,6 +1274,16 @@ create index admin_audit_actor_idx
 create table app_settings (
   id           boolean primary key default true check (id),
   current_term text,
+  -- Dues prices, in cents (§7 Stage 6.5). Configurable rather than constants
+  -- because they change between years and a hardcoded 30/50 becomes a
+  -- migration the day the org raises them.
+  --
+  -- Read at IMPORT time only. terms_covered is stored on the payment row, so
+  -- raising the price never rewrites what last year's payments bought — and
+  -- re-importing an old statement after a change would land differently,
+  -- which is one more reason the dedupe has to hold.
+  dues_one_term_cents  integer not null default 3000 check (dues_one_term_cents  > 0),
+  dues_two_term_cents  integer not null default 5000 check (dues_two_term_cents  > 0),
   updated_by   uuid references auth.users(id),
   updated_at   timestamptz not null default now()
 );
@@ -965,6 +1301,7 @@ create table admin_profiles (
 
 - **Nothing that resolves to a known member is ever dropped on the floor.** `attendance` stores the raw submission *and* the resolved links separately. A member who forgets to check in during the window, or typos an ID the email lookup still recognizes, produces a row — it just arrives as `pending` instead of `present`. A member who showed up and got no credit is the failure mode that erodes trust in the whole system, so the schema is built to make that outcome impossible.
   - **Narrowed in v1.22 for the member half.** Someone the roster does not recognize *at all*, who did not tick "first time", produces nothing — see the self-registration bullet below. The event half is unchanged: an unresolved event link is always queued.
+  - **Extended in v1.34 to money.** A dues payment is stored whether or not it resolves — an odd amount, an unreadable note, a note naming two members, no note at all. `dues_payments.member_id` and `terms_covered` are both nullable and either being null puts the row in the review queue. The reasoning is the same one that produced this rule for attendance and it is stronger here: somebody sent real money, and a payment silently discarded because the parser could not read it is worse than a check-in silently discarded, because the member has a receipt and the system does not. Same corollary too — **a payment note never creates a member**, exactly as check-in resolution never does.
 - **Two independent failure modes, one status.** A pending row is missing an event link, a member link, or both. The admin UI distinguishes them; the database doesn't need to, because `present_requires_resolution` guarantees a row can't count until both are filled in.
 - **`present_requires_resolution` is the load-bearing constraint.** It means the leaderboard query can trust `status = 'present'` without re-checking for nulls, and an officer cannot approve a half-resolved row by mistake.
 - **`normalized_eid`** is a generated column stripping whitespace, hyphens, and casing. Duplicate detection and roster matching both key off it, so `ut-12345`, `UT 12345`, and `UT12345` are the same person.
@@ -1172,7 +1509,21 @@ select
     where a.member_id = m.id and a.status = 'present')       as last_seen_at,
   (select events_possible from possible)                     as events_possible,
   round(coalesce(aa.events_attended, 0)::numeric
-    / nullif((select events_possible from possible), 0), 4)  as attendance_rate
+    / nullif((select events_possible from possible), 0), 4)  as attendance_rate,
+  -- Appended by migration 18. notes and custom_fields are what the two editing
+  -- screens render; updated_at is the compare-and-set token, carried here so
+  -- the render side has one without a second read of `members`.
+  m.notes,
+  m.custom_fields,
+  m.updated_at,
+  -- Appended by migration 19 (§7 Stage 6.5). The only dues column, and the
+  -- whole of "is this an official member" — see the note below.
+  exists (
+    select 1 from dues_payments dp
+    where dp.member_id = m.id
+      and dp.voided_at is null
+      and dp.covered_terms @> array[(select current_term from cur)]
+  )                                                          as dues_paid_current_term
 from members m
 left join attendance_agg aa on aa.member_id = m.id
 left join bonus_agg      ba on ba.member_id = m.id;
@@ -1191,6 +1542,14 @@ left join bonus_agg      ba on ba.member_id = m.id;
 ⚠️ **The grid and this view can legitimately disagree, and neither is derived from the other.** `attendance_agg` above counts present rows against any non-cancelled current-term event — **drafts and not-yet-ended events included** — while the grid is published-only. A member marked present at a draft event therefore raises `events_attended` without appearing in the grid. Rare, and it will read as a bug to whoever finds it, so: the view is the authority on the numbers, the grid is the per-event breakdown. The integration test pins that the grid's attended + missed equals `events_possible`.
 
 `source` is exposed so officers can filter to self-registered members and review what the check-in form has added (§4.2).
+
+**One dues column, and it is a boolean** (migration 19, v1.34). `dues_paid_current_term` is the entire answer to "official or unofficial", scoped to `current_term()` like everything else here, and derived from `dues_payments` and nothing else. The directory renders it **Paid / Not Paid** — one word, no coverage detail — for the same reason the phase-3 trim exists: the table answers the question officers filter on, and the member detail page answers everything else.
+
+**There is deliberately no "paid through" column, and the reason is that terms do not sort.** `'Fall 2026'` precedes `'Spring 2026'` alphabetically and follows it chronologically, so `max(term)` over a member's covered terms is wrong in a way that reads as right — it returns "Spring" for someone paid through Fall. A latest-covered-term column would therefore need a sortable key that nothing else in the schema wants. The member detail page reads that member's `dues_payments` rows directly instead, exactly as it already does for point adjustments, and orders them with `terms_from` semantics rather than a string compare (§4.7).
+
+**A voided payment can make a member unofficial retroactively**, and that is correct rather than a bug: the boolean is a live derivation, not a stored flag, so correcting a mis-parsed payment corrects the status in the same instant. Officers should expect it, which is why the void flow requires a reason and writes an audit row.
+
+⚠️ **This column appends, and that is load-bearing.** `create or replace view` can only add columns at the end (see the rule below), so `dues_paid_current_term` sits last and migration 19 needs no `drop`. That matters more here than the tidiness suggests: a `drop` + `create` silently re-opens the anon read that migration 15 closed, because `alter default privileges` grants new tables *and views* to `anon`. Any future change to this view that cannot be expressed as an append must re-issue both the `revoke` and the `grant` in the same migration.
 
 ### 4.6 Event edit semantics
 
@@ -1257,6 +1616,46 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 - It cannot be overridden. Moving an event across a boundary re-tags it automatically, which also means an event rescheduled from July to August moves between terms and changes both members' standings — the §4.6 edit-impact warning should say so.
 - `point_adjustments.term` is **defaulted, not generated**, precisely because it does need overriding: a bonus awarded in Spring for Fall work belongs to Fall. This is the independence §4.4 relies on.
 
+**Terms also have to advance, not just be named** (migration 19, v1.34). A dues payment buys one term or two, so "the term after this one" becomes a schema-level question for the first time. Two more immutable functions, beside `term_of` and derived from the same two-season rule:
+
+```sql
+-- 'Fall 2026' → 'Spring 2027';  'Spring 2027' → 'Fall 2027'.
+create or replace function next_term(t text)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when t like 'Fall %'
+      then 'Spring ' || (split_part(t, ' ', 2)::int + 1)
+      else 'Fall '   ||  split_part(t, ' ', 2)::int
+  end
+$$;
+
+-- The n consecutive terms starting at `start`. Null n yields null, which is
+-- what makes dues_payments.covered_terms cover nothing until an officer
+-- decides how many terms a payment bought.
+create or replace function terms_from(start text, n int)
+returns text[]
+language sql
+immutable
+as $$
+  select case when n is null then null else
+    (select array_agg(t order by i)
+     from generate_series(1, n) as i,
+     lateral (select case when i = 1 then start
+                          else (select …)  -- iterated next_term, i-1 times
+                     end as t) s)
+  end
+$$;
+```
+
+*(`terms_from` is shown in outline — the migration is the authority, as everywhere in §4.1. The contract is what matters: `terms_from('Fall 2026', 2)` is `{'Fall 2026','Spring 2027'}`, and `terms_from(anything, null)` is null.)*
+
+🪤 **Terms do not sort lexicographically, and this is the trap the two functions exist to avoid.** `'Fall 2026' < 'Spring 2026'` is true as a string compare and false as a calendar fact. Any "which term is later" question — the latest term a member is paid through, the ordering of a payment history — must go through `terms_from` ordering or the array's own position, never `max()` or `order by term`. It is the same class of error as `new Date("2026-09-01T18:00")`: plausible output, wrong answer, no error anywhere.
+
+**A payment's covered terms are derived, never typed** — the same rule this section opens with, applied to money. `dues_payments.start_term` defaults from `term_of(paid_at)` and `covered_terms` is generated from it, so no officer types a term string into a payment. `start_term` is nonetheless **overridable**, like `point_adjustments.term` and for a related reason: summer falls in Spring under the boundaries above, so a July payment for the coming academic year would otherwise buy a term with three weeks left in it. The import preview flags May–July payments for exactly this.
+
 ## 5. Route Structure
 
 ```
@@ -1276,6 +1675,9 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 /admin/events/series   Create a recurring series — expanded to one draft per date
 /admin/events/[id]     Edit event, view its attendance, duplicate, cancel
 /admin/members         Roster directory — sort, filter, select, copy, export
+/admin/members/export  Route Handler — CSV or .xlsx of the selected rows and
+                       chosen fields; writes the 'roster' audit receipt
+                       (Stage 6 phase 5)
 /admin/members/[id]    Member detail — full history, adjustments, notes,
                        and the current term's events with an attendance
                        indicator (Stage 6 phase 3)
@@ -1284,6 +1686,15 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 /admin/points          Point adjustment ledger — every grant, filterable by officer
 /admin/points/new      Grant points to one or more members in a single action
 /admin/points/[id]     Adjustment detail — void it with a reason, and its history
+/admin/dues            Dues ledger — every payment, filterable by state, term,
+                       member, and date; the needs-review count is the number
+                       an officer acts on            (Stage 6.5 phase 3)
+/admin/dues/import     Upload a Venmo statement CSV — parse, preview, confirm.
+                       A Server Action, not a Route Handler: only downloads
+                       need Content-Disposition      (Stage 6.5 phase 2)
+/admin/dues/[id]       Payment detail — reassign the member, correct the term
+                       or the term count, void it with a reason, and its
+                       history                       (Stage 6.5 phase 3)
 /admin/attendance      Review queue — all submissions, filterable by status
 /admin/attendance/[id] Submission detail: raw form data, suggestions, override actions
 /admin/audit           Full activity log across all entities
@@ -1309,12 +1720,19 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Roster pollution via self-registration | The check-in form can create members (§4.2), so junk rows are reachable by anyone who can submit during an open window. Bounded by the window, honeypot, and rate limit; contained by matching on ID and then email before creating, and since v1.22 by requiring an explicit "this is my first MISA event" claim plus a confirmation pass. Visible via `members.source = 'self_checkin'` in the directory. Impact is cleanup, not data loss. **Note what the confirmation is:** a guard against honest typos, not a control. A scripted POST carrying `step=confirm` creates a member in one request without the review screen ever rendering — correct, because the server re-derives the whole outcome rather than trusting the previewed payload, but it means the throttle is still the only thing standing in an attacker's way. |
 | Roster membership is probeable | **Accepted, and it contradicts the officer-login row on purpose** (v1.22). §4.2's re-prompt says "we don't have that info on file", so anyone submitting during a check-in window learns whether a given EID is on the roster. Officer sign-in deliberately does the opposite — one identical failure for "wrong password" and "no such user" — and the two will read as an inconsistency to whoever finds them next unless the difference is written down. The roster is a club list, not a security boundary, and UT EIDs are semi-public; the alternative was an indistinguishable failure that gives a member with a typo no way to tell what went wrong. Bounded three ways: event resolution runs first, so the oracle is closed outside check-in windows entirely; the per-IP throttle applies to both passes; and the answer is a bare boolean — no name, email, or ID of the matched member ever reaches the client, including on the confirmation screen. |
 | Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. Triggers reject `UPDATE` and `DELETE`, so the log is append-only for the app and every client role. **Note the limit:** a table owner can disable the trigger, so this constrains the application, not someone with direct database access. Stage 8's RLS policies are what close the client-role path properly. |
-| Bulk roster export leaks member PII | Export is the largest PII egress point in the system. Gate it behind an authenticated session, log every export to `admin_audit` with the filter used and row count, and consider restricting it to the `admin` role. |
+| Bulk roster export leaks member PII | Export is the largest PII egress point in the system, and a downloaded `.xlsx` or CSV outlives the session that produced it — it lands on a personal laptop and is never revoked. Gate it behind an authenticated session (`getOfficer()` in the Route Handler, 403 on failure), log every export to `admin_audit` with the filter, the **chosen field list**, the format, and the row count, and consider restricting it to the `admin` role. The field picker is a small mitigation as well as a feature: an officer who needs t-shirt sizes should not have to download every email to get them. |
+| Spreadsheet formula injection via member-supplied text | Member names and emails are attacker-chosen — anyone who can check in during an open window supplies their own (see the self-registration row above), so a member named `=HYPERLINK("http://…"&A1,"click")` is reachable by design. Excel and Sheets evaluate a cell beginning `=`, `+`, `-`, or `@` when parsing **CSV**; the officer who opens the export is the victim, not the server. Mitigate in `lib/export.ts` at the CSV writer: prefix any cell matching that pattern with a single quote, or refuse the leading character. **The `.xlsx` path is not exposed** — cells are written as typed strings and stay inert — which is one more reason the two writers must not share a "just join with commas" shortcut. |
+| Dues records are financial-adjacent PII | `dues_payments` holds who paid, how much, when, their Venmo display name and handle, and their free-text note — a category of data nothing else in this system carries, and the reason the threat-model boundary below had to be narrowed. **What it deliberately does not hold: no card numbers, no bank details, no Venmo credentials, and no ability to move money.** The site reads a statement after the fact; the payment happened elsewhere (§1.3, §2.2). Mitigations are the ones already in place rather than new machinery — RLS deny-all on the table, reachable only through `member_directory` (which exposes a **boolean**, never an amount) and officer-authenticated screens, every correction and void audited. Treat a dump of this table as materially worse than a roster dump when scoping Stage 8. |
+| The uploaded statement is the whole org's payment history in one file | An officer uploads a CSV that, by construction, contains every dues transaction for a month — a larger single artifact than anything else that enters this system. **Never persist the file**: parse it, keep the rows, discard the text. Bound the accepted size and row count and refuse rather than truncate (the §2.2 cap rule). The two-step preview keeps the text in the browser between steps rather than in a staging table, so there is no server-side copy to leak or forget. Parse defensively — an uploaded CSV is untrusted input even when the officer uploading it is not. |
+| Payment notes are member-supplied text | The note is written by the payer, so it is attacker-chosen in exactly the way member names are (see the formula-injection row above), and it reaches both the officer's screen and any export that includes it. Same mitigation, same writer: escape it in `lib/export.ts`'s CSV path, render it as text and never as markup. A note can also *name another member's EID* — that is a reconciliation hazard rather than an injection one, and it is why matching requires exactly one resolving token and queues anything ambiguous. |
+| `/lookup` reveals dues status | Stage 7's member self-service page will show the member their own dues status, which widens the accepted "is this EID on the roster" oracle (see the row above) to "has this person paid". **Materially more sensitive than roster membership**, and accepted only because `/lookup` already requires EID **and** matching email — a stricter gate than the check-in oracle, which needs the EID alone. Do not relax that gate, and do not add dues status to any surface reachable with the EID alone, `/leaderboard` included (§9 #1, #12). |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
 | Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. **Verified July 2026** — check it by response behaviour rather than by the dashboard label: the production alias must return `200` while a per-deployment URL returns `302` to `vercel.com/sso-api`. If both return `200`, protection is Disabled and every preview is publicly writable. |
 | Admin privilege escalation | `admin_profiles` is not writable by any client role; officers are added via the Supabase dashboard or a seeded SQL script |
 
-**Threat model boundary:** this system protects against casual abuse and accidental data exposure. It is not designed to withstand a determined attacker, and it holds no financial or highly sensitive data. Scope the security work accordingly — the RLS policies matter far more than, say, elaborate bot detection.
+**Threat model boundary:** this system protects against casual abuse and accidental data exposure. It is not designed to withstand a determined attacker. Scope the security work accordingly — the RLS policies matter far more than, say, elaborate bot detection.
+
+⚠️ **This paragraph used to end "and it holds no financial or highly sensitive data", and Stage 6.5 made that false** (v1.34). The narrower claim that replaces it: **no credential, card, or bank detail ever enters this system, and it cannot move money.** What it now holds is a record that money arrived — amounts, dates, Venmo display handles, and payer notes — which is financial *information* without being financial *access*. That is still the low-stakes end of the spectrum, and it does not change the conclusion above about where the effort goes. It does change two things concretely: a `dues_payments` dump is worse than a roster dump and should be weighted that way in Stage 8, and the sentence is no longer available as a reason to skip a security question. If a future change adds a checkout, this boundary needs rewriting again rather than stretching.
 
 ---
 
@@ -1498,8 +1916,9 @@ contact form's backend — it renders disabled, with email as the working path.
 | 2a | Migration 15 — close the anon read of `member_directory`; `tests/security.test.ts` | ✅ built & deployed |
 | 2 | The EID switch — migrations 16 and 17, the ranker retune, seed and fixture regeneration | ✅ built & deployed |
 | 3 | The reshaped four-column directory **and** `/admin/members/[id]` | ✅ built — no migration needed |
-| 4 | Custom fields — definitions, dropdown values, inline editing, sorting | |
-| 5 | Selection and extraction — copy emails / names / TSV, CSV download, export auditing | **exit criteria met here** |
+| 4 | Custom fields — definitions, dropdown values, inline editing, sorting | ✅ built & browser-verified — **migration 18 unpushed, unmerged** |
+| 5 | Selection and extraction — copy emails / names / TSV, CSV **and `.xlsx`** download with a field picker, export auditing | |
+| — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | |
 | 6 | Relational filters (attended or missed a given event, has pending, not seen since) | |
 | 7 | Saved filter presets and CSV roster import | |
 | 8 | The merge tool — its own estimate, see below | |
@@ -1508,6 +1927,10 @@ contact form's backend — it renders disabled, with email as the working path.
 ✅ **Phase 1 was walked through a browser (2026-08-01), and it earned its keep.** Sorting, the tie-break across a page boundary, pagination, and the rate-threshold arithmetic were all correct. The screen was not: the five numeric filter boxes were uncontrolled (`defaultValue`), which React reads only at mount, so CLEAR — a client-side push with no remount — left the officer's typed numbers on screen above a count that no longer applied them. Displayed filter and applied filter disagreed, which is the same partial-list failure phase 5's export exists to avoid, arriving through the filter instead of through pagination. Fixed by moving both translations into `lib/filters.ts` (`memberFilterFields`, `memberFilterUrl`).
 
 That is now four consecutive phases where a browser pass found something the suite could not — and this one **could not** have been caught by a test, since `vitest` runs `environment: "node"` and cannot render a component. The guard is a source assertion instead. Keep doing the walkthrough.
+
+✅ **Phase 4's walkthrough (2026-08-03) was the first to come through clean** — no application defect. Worth recording *why*, because it is not luck: the two failure modes most likely to appear were designed against explicitly and then verified head-on. Two custom fields set back to back on one row produced no phantom conflict (the compare-and-set token is owned by the row rather than copied into each cell); and a custom sort survived typing in the search box (`memberFilterUrl` re-parses what it builds, and had to be given the field definitions to do it). Both had been caught earlier — the first in design, the second as a live bug found and fixed within the same session. **This does not argue for dropping the walkthrough**; it argues that a phase whose hazards are written down in advance is the one that survives it.
+
+🪤 **The walkthrough did find something, and it was in the tooling rather than the app.** A dev server started as a background task died on an uncaught `EPIPE` when its stdout pipe closed — without exiting. It spun while every request hung, so the browser kept rendering a *stale DOM* that looked exactly like a real rendering defect, and produced a confident and completely wrong bug report before anyone thought to `curl` the server. The operational rule now recorded in `tasks.md`: **when the UI shows something impossible, verify the server is answering before believing the screen.**
 
 **Two phases that must not be separated.** Phase 3 reduces the directory to four columns and builds the member detail page in the same phase, because the detail page is where the removed columns go. Shipping the reduction first would make attendance rate, pending count, and last seen unreachable from the UI entirely.
 
@@ -1525,18 +1948,47 @@ That is now four consecutive phases where a browser pass found something the sui
 - Point adjustment history, officer notes, and the shared audit trail
 
 **Custom fields (phase 4)**
-- Officer-defined, dropdown-first: Paid Dues → Yes/No, T-shirt size → S/M/L. A definition carries its options, its display order, whether it appears in the directory, and **whether it is editable inline** — chosen at creation.
-- Non-calculated fields are edited directly from the directory table, which is what makes them worth having: the alternative is opening 40 member pages to record who paid dues.
+- Officer-defined, dropdown-first: T-shirt size → S/M/L, Major → a list, Committee → a list. A definition carries its options, its display order, whether it appears in the directory, and **whether it is editable inline** — chosen at creation.
+- ⚠️ **This example used to be "Paid Dues → Yes/No", and it is not one any more** (v1.34). Dues stopped being something an officer ticks and became something the system calculates from real payments — see Stage 6.5 below. The keys `dues`, `dues_paid`, and `dues_paid_current_term` are now **reserved**, in migration 19's CHECK and in `RESERVED_FIELD_KEYS`, specifically so nobody can recreate the hand-ticked dropdown beside the calculated column and leave the roster with two answers to one question. Reserving `dues` alone would not do it: `dues_paid` is the name somebody reaches for first, and it is the one phase 4's own walkthrough used — that fixture was deleted from the local database on 2026-08-05, when dues stopped being a custom field. The custom-field mechanism is unchanged and still correct; what changed is that dues turned out to be the wrong thing to build on it.
+- Non-calculated fields are edited directly from the directory table, which is what makes them worth having: the alternative is opening 40 member pages to record who ordered which shirt size.
 - Values are stored as JSONB on `members` so PostgREST can sort on them; definitions live in their own table and are **archived, never deleted**, since deleting one would silently rewrite what the audit log refers to.
-- Every edit is an audited member mutation with a compare-and-set on `members.updated_at` — a column the table does not have today, because nothing edited a member until now.
+- Every edit is an audited member mutation with a compare-and-set on `members.updated_at` — a column the table did not have before migration 18, because nothing edited a member until now.
+
+*What building it actually settled (2026-08-03):*
+- **The compare-and-set token is row-level, so the row owns it, not the cell.** Every inline cell in a row posts the same `updated_at`. Per-cell copies would strand the siblings the moment one saved, and the officer's next edit in that row would report a conflict it had no business reporting. The row holds it in state and adopts the fresh one each save returns — which is why the table stays a Server Component and the *row* is the client boundary. `member_directory` grew `updated_at` for the same reason: both editing screens read the view and compare against the table.
+- 🔓 **The definition key is a security control.** It is interpolated into an `order=` term, and an unconstrained one is a sort-injection surface — a comma is parsed as a second order column, while a space or a `"` is accepted *silently*, so "PostgREST rejected it when I tried" is not a boundary. `^[a-z][a-z0-9_]{0,39}$` is enforced in the zod schema, in the migration's CHECK, and again where the order string is built. Sort keys are additionally namespaced `cf:` so an officer-defined field can never shadow a built-in.
+- **Nothing ties a stored value to its definition's option list, deliberately.** Editing a list orphans values rather than rewriting members' answers. That creates a rendering obligation, because a `<select>` matching no `<option>` shows blank: an orphan renders as a disabled "no longer an option" entry, so it can be read and cleared but not re-applied.
+- **Any officer may define a field and edit a value** (§9 #6 — the audit log is the control, not a role gate). `app/actions/members.ts` carries no role check and says so, so it does not get added back as an oversight.
+- **`editable_inline` is a placement flag, not an authorization boundary.** The detail page edits fields with it off, through the same action.
 
 **Selection and extraction (phase 5)**
+
+Three paths out of the system, and they are not redundant: the clipboard is for pasting into something already open, CSV is the interchange format anything can read, and xlsx is the file an officer double-clicks.
+
+*Which rows* — the same answer for all of them:
 - Row checkboxes plus **"select all N matching this filter"** — explicitly distinct from "select the 25 rows on this page." Getting this wrong is the classic bug in this kind of screen, and it silently produces a partial email list.
+
+*Which columns* — a **field picker**, new in v1.30 and shared by both file formats:
+- The export is not the four columns the directory displays. It is a chosen subset of everything known about a member — the directory columns, the detail page's aggregates (attendance rate, events attended and possible, last seen, joined, source, status), and every custom field.
+- Defaults to the displayed columns plus email, which is the common case; the picker is for the officer who wants names and t-shirt sizes and nothing else. Stage 6.5 phase 4 adds dues status to the catalogue as one more entry.
+- The chosen field list goes in the audit receipt alongside the filter. Once columns are a choice, "who exported what" stops being answerable from the filter alone.
+
+*Clipboard*
 - **Copy emails** as a comma-separated string, ready to paste into a To: field. This is the workflow officers care about most; make it one click with a visible confirmation of how many addresses were copied.
 - **Copy as TSV** — pastes directly into Sheets or Excel with columns intact
 - **Copy names** for announcements or shoutouts
-- **Download CSV** for the current filter and column selection, custom fields included
-- Exports logged to `admin_audit` per §6, each as its own receipt row carrying the filter and the row count
+
+*Files*
+- **Download CSV** — the interchange format, and the one that keeps working if the xlsx writer is ever removed. Pure string formatting in `lib/export.ts`, no dependency.
+- **Download `.xlsx`** (v1.30) — a real Excel workbook, not a CSV with the extension changed: one sheet named for the filter, a header row, sensible column widths, points and counts written as **numbers** rather than text, and dates as dates. The point is that it opens ready to sort and pivot, with no import dialog and no "convert to number" pass. Empty `attendance_rate` stays empty, never `0` — the §4.5 null-is-not-zero rule survives the export.
+- **Both formats carry the same rows**, because both go through `applyMemberFilter` — the file cannot disagree with the count beside the button unless someone writes a second query, which §4.5 exists to prevent. Columns are the one thing that legitimately differs from the screen, and only because the officer chose them.
+- Exports logged to `admin_audit` per §6, each as its own receipt row carrying the filter, the chosen fields, the format, and the row count
+
+*How it is served* — a **Route Handler** (`GET /admin/members/export`), the first in this codebase:
+- An xlsx is binary and the download needs `Content-Disposition`; a Server Action returns a value, not a response, so it cannot set either. CSV goes the same way for consistency and because both need the same audit write.
+- It starts with `getOfficer()` and returns **403** on failure — not `requireOfficer()`, whose `redirect()` would answer a download request with a login page.
+- It writes the audit row **before** streaming, so a client that disconnects mid-download still leaves a receipt. An export that reached the query is an export.
+- Generation is buffered in memory (a workbook is a zip; there is no meaningful streaming path). Fine at club scale — a few hundred members — and the reason a hard row cap on the export is a sensible guard rather than a limitation.
 
 **Supporting work**
 - Saved filter presets, shared across officers — "award eligible", "missed last 3 meetings", "inactive since October" (phase 7)
@@ -1553,11 +2005,66 @@ That is now four consecutive phases where a browser pass found something the sui
 
 ⚠️ **The EID switch makes this materially more likely, for a reason worth stating plainly** (v1.26). UT EIDs are derived from name initials, so the near-miss population is *correlated with the roster* rather than scattered across a numeric range — students with similar names hold similar EIDs. Under `UT` + a sequential number, a one-character typo landed on a real person only by coincidence and on a plausibly-confusable person almost never. Under EIDs it does both more often. The mitigation does not change — the detail page is still where it surfaces — but this moves from "revisit if it ever happens" toward "expect it", and it is the strongest argument for the email-mismatch flag at check-in.
 
-**Exit criteria** (revised v1.26): an officer filters the directory to members whose **Paid Dues = No**, sees an accurate count, clicks copy-emails, and pastes a complete list into an email client — with the list containing every matching member, not just the visible page. Met at the end of phase 5.
+**Exit criteria** (revised v1.26, re-pointed v1.34): an officer filters the directory to members who have **not paid dues for the current term**, sees an accurate count, clicks copy-emails, and pastes a complete list into an email client — with the list containing every matching member, not just the visible page.
 
-The criterion previously read "attended fewer than three events this term". That query no longer fits the screen it is meant to demonstrate: `events_attended` is not a directory column after phase 3, and filtering narrows to what is displayed. It moves to the relational filters in phase 6. The replacement exercises the custom-field machinery as well as the select-all semantics, which makes it the stronger demonstration of the two.
+**The criterion is unchanged in substance and changed in mechanism, which affects when it can be claimed.** It has read "Paid Dues = No" since v1.26, when that was a hand-ticked custom field and the query would have been met at the end of phase 5. Under Stage 6.5 dues is a calculated column, so the filter it names does not exist until 6.5 phase 4 — and 6.5 slots between phases 5 and 6 precisely so this stays honest. Phase 5 ships the selection and export machinery; 6.5 makes dues real; the criterion is then demonstrated against the real column at the end of 6.5 phase 4. Demonstrating it against a hand-ticked dropdown in the interim would prove the export works and prove nothing about the question officers are actually asking.
+
+The criterion previously read "attended fewer than three events this term". That query no longer fits the screen it is meant to demonstrate: `events_attended` is not a directory column after phase 3, and filtering narrows to what is displayed. It moves to the relational filters in phase 6.
 
 **Effort:** 4–5 days as originally scoped, and the re-plan adds materially to it — the EID switch is wide and mechanical rather than hard (roughly 41 files, and the seed and fixture regeneration is the bulk of it), while custom fields are a genuine subsystem: a definitions table, an editing surface in a table that was a Server Component, and sorting on values the view cannot hold as columns. The merge tool remains its own estimate on top; that one *is* new domain logic. Otherwise mostly query and UI-state work, but the select-all-matching semantics, the import preview, the inline-edit compare-and-set, and any merge all deserve real test coverage.
+
+---
+
+### Stage 6.5 — Dues & Membership Status 📋 planned, unbuilt (v1.34)
+**Goal:** Officers can answer "is this an official member?" from the directory, and the answer comes from money that actually arrived rather than from a box somebody remembered to tick.
+
+**Numbered 6.5 rather than 7 on purpose.** It is stage-sized — a migration, a ledger, an import flow, an editor, a derived column — but renumbering Stages 7 through 10 would touch every stage reference in this document, `tasks.md`, `CLAUDE.md`, and the changelog above, for no gain. It **interrupts Stage 6 between phases 5 and 6**: phase 5 ships the export machinery, 6.5 makes dues real, and Stage 6's exit criterion is then demonstrated against the real column.
+
+| Phase | Scope | State |
+|---|---|---|
+| 1 | Migration 19, `next_term` / `terms_from`, `lib/dues.ts` (parse, term math, matching), the `member_directory` column, the reserved-key widening, tests | |
+| 2 | The import — `/admin/dues/import`, the two-step parse-preview-commit flow, `app/actions/dues.ts`, batch receipts, audit | |
+| 3 | The ledger and the editor — `/admin/dues`, `/admin/dues/[id]`, reassign / correct / void, the needs-review queue | |
+| 4 | The directory column and filter, the detail page's payment history, and dues added to phase 5's export catalogue | **Stage 6 exit criteria met here** |
+
+Full spec, including the parse decision table: [`docs/dues-and-membership.md`](dues-and-membership.md).
+
+**Official and unofficial**
+- The difference is dues, and **dues means a non-voided payment covering the current term** — `member_directory.dues_paid_current_term` (§4.5), rendered **Paid / Not Paid**, filterable, sortable, and nothing more elaborate than that in the table.
+- **It gates nothing** (§9 #12). Check-in, points, the leaderboard, and every existing rule are untouched. This is the reversible choice: gating can be added later without a migration, and gating the *leaderboard* would have made the public board reveal who has paid, which §9 #1 identifies as the one privacy decision that cannot be walked back once a search engine has cached it.
+
+**Why a CSV upload rather than an integration**
+- Venmo has no API, and its statement export has no year-to-date option — a monthly CSV is genuinely the best available input, not a shortcut. Accept that and design for its consequences instead of around them.
+- Officers will upload **overlapping** statements (the 10th and the 28th) to keep the data fresher than monthly. De-duplication is therefore a correctness requirement of the normal path, not an edge case, and the whole design turns on the dedupe key being right.
+- 🪤 **Dedupe on Venmo's transaction ID or not at all.** A fingerprint over amount, date, and payer *looks* sufficient and is not: two members can send $30 in the same minute, and collapsing them loses a payment somebody made and can prove they made. ✅ **A real export was checked on 2026-08-05 and carries the ID column**, which is what closed the one open question this stage had. Record the exact header names and the amount format in the spec doc when phase 1 starts — the parser is written against a real header, not a remembered one.
+
+**Matching a payment to a member**
+- The link is the **note**, where the payer writes their EID. Matching needs no EID regex: tokenize the note, apply the same fold `members.normalized_eid` uses, and look for a token that *is* some member's normalized EID. Exactly one → linked. Zero → unmatched. Two or more distinct members → queued. The schema has never constrained EID shape and this design does not start.
+- **Exact match only.** Stage 5's "don't auto-resolve near-misses" carries over intact and for the same reason. The review queue may *offer* ranked suggestions — reusing `scoreMemberCandidates` from `lib/attendance.ts` rather than growing a second ranker — with nothing preselected.
+- **A payment note never creates a member.** Direct extension of §4.2's rule that creating a member is not part of check-in resolution; `createMember` in `lib/checkin.ts` stays the only unauthenticated path that inserts a member.
+- **Nothing that arrived as money is dropped on the floor** (§4.2, extended). An odd amount, an unreadable note, no note — the row is stored and queued.
+
+**The review axis is a nullable column, not a status enum**
+- `terms_covered` null means "no officer has decided how many terms this bought". $30 and $50 (configured, §4.1) resolve automatically; $35 because somebody tipped, $60 because somebody covered a friend, $20 because somebody underpaid — all parse, all link, all wait.
+- `covered_terms` is generated from it, so an undecided row covers nothing and counts for nothing until it is decided. That is the safe default: it under-reports membership rather than over-reporting it, and the queue makes the gap visible.
+- Needs-review is `voided_at is null and (member_id is null or terms_covered is null)` — one predicate, two nullable columns, no third concept.
+
+**The import flow — two steps, and the file stays in the browser**
+1. A client component reads the CSV with `FileReader` and posts the text to a **parse-only** Server Action, which returns counts and rows: matched, duplicate-skipped, unmatched, needs review. Nothing is written.
+2. The same component posts the same text to the commit action, which **re-parses server-side** and writes.
+- The server re-derives the whole outcome rather than trusting the previewed payload — the same posture, and for the same reason, as `/attend`'s `step=confirm` (§4.2). A preview is a courtesy to the officer, never an input to the decision.
+- No staging table and no base64 round trip. The CSV text lives in client memory between the two steps, which is fine at monthly-statement size and means there is no server-side copy of the org's payment history sitting around (§6).
+- Upload is a **Server Action**, not a Route Handler. A Server Action accepts a `File` in `FormData`; the Route Handler rule in this codebase is about *downloads* needing `Content-Disposition`, which is the opposite direction.
+- Each import writes one `admin_audit` receipt under entity type `'dues_payment'`, carrying the batch id, the file name, and the four counts. `import_batch_id` on every row makes a bad import reviewable and bulk-voidable without a staging table.
+
+**Correcting what the parser got wrong**
+- `/admin/dues/[id]` reassigns the member, sets or corrects `terms_covered` and `start_term`, and voids with a reason. Compare-and-set on `updated_at`, audited like every other officer mutation.
+- **Editable *and* voidable**, which is the union of the two patterns already in the schema and worth stating: a payment is editable because the parser can attribute it wrongly and correcting that is legitimate; it is voidable rather than deletable because money arriving is a fact. `point_adjustments` is voidable but not editable; `attendance` is editable but not voidable; this is both, deliberately.
+- ⚠️ **Voiding a payment can make a member unofficial retroactively.** Correct — the status is a live derivation, not a stored flag — and surprising, which is why the void requires a reason.
+
+**Exit criteria:** an officer uploads two overlapping Venmo statements back to back; the second reports the earlier payments as duplicates and adds only what is new; a payment whose note carried a typo'd EID appears in the review queue, is assigned to the right member in one action, and that member's row in the directory flips to **Paid** — after which filtering the directory to Not Paid and clicking copy-emails produces a complete list, which is Stage 6's criterion met against the real column.
+
+**Effort:** 3–4 days. The parse and term math are pure and testable and will not be where the time goes; the import preview, the needs-review queue, and getting the dedupe genuinely right will be. Budget real test coverage for the overlapping-statement case specifically — it is the normal path here, it is the one a demo will not exercise, and it is the one whose failure silently double-counts somebody's dues.
 
 ---
 
@@ -1568,6 +2075,7 @@ The criterion previously read "attended fewer than three events this term". That
 - **`/leaderboard` must set `robots: { index: false, follow: false }`** (§9 #1, resolved). The page is reachable by anyone with the link; it must not be crawlable. `app/admin/(shell)/layout.tsx` already does exactly this and is the pattern to copy. Getting this wrong is not a bug you can fix afterwards — once students' names are indexed against their point totals, the cache outlives the deploy that caused it
 - **The active term shown prominently on the page.** It is officer-set with no automatic rollover, so a stale term must be visible rather than silently assumed correct
 - `/lookup` — EID + email, returns per-event attended/missed summary
+- **Dues status on `/lookup`, and only there** (v1.34). The member sees whether they are an official member for the current term and what they are paid through — the question they will otherwise ask an officer by text message. 🔓 **It stays behind the EID + email gate and goes nowhere else.** §6 accepts that check-in makes roster membership probeable with an EID alone; extending that to "has this person paid" is a different order of exposure, and the double gate is the entire reason this is acceptable. It must never reach `/leaderboard`, which is public and (§9 #1) uncorrectable once indexed
 - Any point adjustments shown with their reason. The public board is a bare total, so this is the *only* place a member can see why their total exceeds their attendance count — which makes it more important here, not less
 - Pending submissions shown distinctly from confirmed ones, so a member who checked in late knows their form was received and is awaiting review rather than assuming it vanished
 - Attendance-rate calculation and a visual summary of the semester
@@ -1613,12 +2121,18 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 - Rotating per-event check-in code to prevent remote check-ins
 - Email the member automatically when their pending submission is approved or rejected
 - Member-initiated attendance appeal from `/lookup`, which opens a pending row directly in the review queue
-- Dues tracking and payment status
 - Email reminders before events and end-of-semester standing summaries
 - Officer roles with differentiated permissions
 - Attendance analytics: trends over time, retention curves, event-type comparison
 - Member accounts with saved profiles
 - Public event calendar feed (iCal)
+
+**"Dues tracking and payment status" was on this list and is now Stage 6.5** (v1.34). What remains deliberately out of scope, and should stay on this list rather than creeping into 6.5:
+
+- **In-app payment.** A checkout button is not a bigger version of what 6.5 builds — it is a different system with card data, a processor, refunds, and chargebacks in it, and it converts §1.3's non-goal and §2.2's Vercel Hobby clause from "does not apply" to "applies". Proposing it is a hosting-plan decision as much as a feature request.
+- **Automated reminders to unpaid members.** Cheap to build on top of the dues column and easy to get wrong in a way that emails somebody who paid in cash last week. Wants a human in the loop until the data has been trusted for a semester; copy-emails from the directory is that human loop.
+- **Refund handling as its own concept.** A refund is currently a void with a reason, which records that the payment no longer counts without pretending the system moved money. A first-class refund only makes sense alongside in-app payment.
+- **Partial-payment tracking and payment plans.** An underpayment is an undecided row today (nullable `terms_covered`) and an officer resolves it. Modelling a balance is a real feature and nobody has asked for it.
 
 ---
 
@@ -1679,9 +2193,17 @@ The two member-facing decisions were settled in the same pass:
 1. **Leaderboard visibility** — ✅ **Public, but never indexed.** Reachable by anyone with the link; `robots: { index: false, follow: false }` on the route. The board has to be glanceable to be worth building, but a search cache outlives the deploy that filled it, so indexing real names against point totals is the one part of this that cannot be walked back. See §4.4 and the Stage 7 checklist.
 11. **Bonus points in public standings** — ✅ **A single total, attendance and bonus added silently.** This confirms §4.4 rather than changing it, and closes the contradiction the row had carried since v1.16: it was written expecting a separate public column, which §4.4 later resolved against. The doc is now self-consistent, and the split stays officer-only in `member_directory` and the `/admin/points` ledger. Accepted cost, stated plainly: a member sees a number and cannot tell that five of their thirteen points were granted rather than earned. The underlying data is unchanged, so restoring a split later is a view change with no migration.
 
+### Resolved at Stage 6.5 (2026-08-05)
+
+One decision, and it earns a place here rather than in Stage 10 because it constrains the schema and the security model rather than describing a feature.
+
+12. **Membership status and what it gates** — ✅ **Official membership is dues-paid for the current term, and it gates nothing.** It is a directory column, a filter, and a line on the member's own `/lookup`; check-in, point accrual, and the leaderboard are untouched. Three alternatives were considered and all three were rejected on the same grounds — that they are hard to walk back. Gating the **leaderboard** would make the public board reveal who has paid, and §9 #1 above establishes that a public board is the one privacy choice this project cannot undo once a search engine has cached it. Gating **check-in** would contradict §4.2's rule that nothing resolving to a known member is dropped on the floor, turning an unpaid member away at the door with no record they attended. Gating **point accrual** would need retroactive backfill the moment somebody paid late, which is real complexity bought for a policy nobody has asked for. The reporting-only choice costs nothing and is reversible: adding a gate later is application logic over a column that already exists, and needs no migration. **Revisit if dues ever decide something material** — an officer-eligibility rule, a funded trip — which is the same trigger the four Stage 5 decisions above share, and for the same reason: these are all social until they are not.
+
+---
+
 ### Still open
 
-**None.** All eleven are resolved. Anything new belongs in §7 Stage 10 as backlog rather than being appended here — this section is the record of what was decided, not a running inbox.
+**None.** All twelve are resolved. Anything new belongs in §7 Stage 10 as backlog rather than being appended here — this section is the record of what was decided, not a running inbox. #12 was added deliberately, under its own heading, because Stage 6.5 raised a genuine schema-and-security decision; that is the bar, and "we should note this somewhere" is not it.
 
 ---
 
@@ -1702,14 +2224,34 @@ The two member-facing decisions were settled in the same pass:
       /events/...
       /attendance/...
       /points/...
-      /members/...           directory + /[id] detail page; /fields is phase 4
+      /members/...           directory, /[id] detail page, and /fields (list,
+                             /new, /[id]) for the custom-field definitions.
+                             /export/route.ts is phase 5 — the one Route
+                             Handler, because a download needs response headers.
+                             _components: member-table.tsx stays a SERVER
+                             component; directory-row.tsx is the client row that
+                             owns the compare-and-set token; member-field-cell.tsx
+                             is the one editable cell, shared with /[id]
+      /dues/...              Stage 6.5 — the ledger, /[id] payment detail, and
+                             /import. The import is a Server Action, NOT a route
+                             handler: a Server Action takes a File in FormData,
+                             and only downloads need response headers. Its client
+                             component holds the CSV text between the preview
+                             step and the commit step, so nothing is staged
+                             server-side
   /actions
     attendance.ts            submitCheckin ONLY — see note below
     attendance-review.ts     officer resolution mutations
     events.ts
     points.ts                grantPoints, voidAdjustment — and nothing else
     auth.ts                  sign in / sign out
-    members.ts               Stage 6
+    members.ts               setMemberFieldValue, saveMemberNotes,
+                             saveFieldDefinition, setFieldArchived. No role
+                             check anywhere in it, deliberately (§9 #6)
+    dues.ts                  Stage 6.5 — previewImport (parse only, writes
+                             nothing), commitImport (re-parses server-side
+                             rather than trusting the preview), and the
+                             corrections: reassign, set terms, void
     audit.ts                 shared admin_audit writer (no "use server")
 /lib
   supabase/
@@ -1735,11 +2277,33 @@ The two member-facing decisions were settled in the same pass:
   filters.ts                 directory filter → SQL translation. One filter
                              object, one translation; pagination stays outside
                              it so the export is the same query (§4.5)
-  export.ts                  CSV / TSV / clipboard formatting (Stage 6 phase 5)
+  export.ts                  CSV / TSV / clipboard formatting, the exportable
+                             field catalogue, and the xlsx workbook builder
+                             (Stage 6 phase 5). Pure — takes rows and a field
+                             list, returns a string or a byte array; the audit
+                             write and the response headers belong to the
+                             Route Handler
   members.ts                 member domain core: classifyTermEvents (the detail
-                             page's three-state grid) and formatAttendanceRate.
-                             Phase 4 adds custom-field definitions, option
-                             validation, and AUDITED_MEMBER_COLUMNS here
+                             page's three-state grid), formatAttendanceRate,
+                             and the custom-field core — FIELD_KEY_PATTERN (a
+                             security control, not a naming rule), the `cf:`
+                             sort namespace, fieldValue / setFieldValue,
+                             fieldOptions (the orphan case), isAllowedFieldValue,
+                             withoutToken, and the two AUDITED_*_COLUMNS lists
+  member-fields.ts           fetchFieldDefinitions — the live definitions, read
+                             once per request and shared by the directory's
+                             columns and sort, the detail page, the fields admin
+                             screen, and phase 5's field catalogue. Deliberately
+                             uncapped: nobody hand-creates 500 dropdowns, and
+                             show_in_directory is the bound that matters
+  dues.ts                    Stage 6.5 — the dues domain core, and pure like the
+                             rest of this list: Venmo CSV parsing, the note →
+                             EID token match, the amount → terms_covered rule
+                             (prices injected, never read from here), and the
+                             term arithmetic mirroring next_term / terms_from.
+                             🪤 Terms do not sort lexicographically — any
+                             "which term is later" comparison lives here, and
+                             never as a string compare at a call site
 /supabase
   /migrations                versioned SQL
   seed.sql
