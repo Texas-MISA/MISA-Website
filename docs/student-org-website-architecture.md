@@ -1,8 +1,32 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.34
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2 and 3 of 9 built, merged and deployed; **phase 4 built end to end and browser-verified, but local-only and unmerged**. **Stage 6.5 (dues & membership status) is planned and unbuilt** — see the v1.34 note below.
+**Version:** 1.35
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2, 3 and 4 of 9 built, merged and deployed; **phase 5 (selection and extraction) is next**. **Stage 6.5 (dues & membership status) is planned and unbuilt** — see the v1.34 note below.
 **Last updated:** August 2026
+
+> **v1.35: Stage 6 phase 4 shipped** (2026-08-05, merge `3931d99`). Migration 18
+> was pushed to the remote, so **local and remote are level again at 19
+> migration files** — they had differed for three days, the only time in this
+> project they have. Bookkeeping only: nothing in the design changed, and the
+> phase-4 sections below already described the code as built.
+>
+> Two things were confirmed against production after the deploy rather than
+> assumed, and both are worth repeating on every deploy that touches a view:
+>
+> - **anon is still 401 on `member_directory`.** Migration 18 recreates the view,
+>   and a recreate is precisely what silently re-inherited anon access in
+>   phase 2a. `create or replace` preserves grants and the migration re-issues
+>   the revoke anyway; the check confirms it landed. `anon` holds no grant on
+>   the view at all, and `authenticated` keeps its `SELECT`.
+> - 🪤 **`200` is the correct anon response for an RLS-protected table, and it
+>   is not a leak — read the body, not the status.** `members` and the new
+>   `member_field_definitions` both answer `200 []`, because RLS-enabled with no
+>   policies filters every row rather than refusing the request. Only the
+>   *view* answers `401`, and it does so because it has no grant — views have no
+>   RLS. Anyone spot-checking this will see two `200`s next to a `401` and
+>   should not read the difference as a hole. `events` legitimately returns
+>   rows: the `events_public_read` policy, confirmed to expose published events
+>   only.
 
 > **v1.34: dues stop being something an officer ticks and become something the
 > system calculates.** Planning only — no schema, no code. MISA is splitting
@@ -79,7 +103,8 @@
 > found. Still **local-only**: migration 18 is unpushed and nothing is
 > committed, so local and the remote have diverged for the first time in the
 > project (19 migration files against 18) — deliberately, and pending a
-> `db push` before the merge.
+> `db push` before the merge. *(Superseded by v1.35: pushed, merged and
+> deployed 2026-08-05. The local-only status above is history, not current.)*
 >
 > - **`app/actions/members.ts`** carries all four mutations — one field value,
 >   the officer notes, a definition, and archive/restore. **No role check
@@ -109,6 +134,7 @@
 > **v1.32: custom fields get their storage, and a sorting spike decides its
 > shape.** Migration 18 is applied to the local database only — not pushed, not
 > merged, not deployed — and nothing on the roster is editable yet.
+> *(Superseded by v1.35: pushed, merged and deployed 2026-08-05.)*
 >
 > - **Values live in `members.custom_fields jsonb`, keyed by definition key,
 >   with the definitions in `member_field_definitions`.** The choice was forced
