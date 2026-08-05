@@ -24,6 +24,11 @@
 // needs it back for "not seen since"; the pattern to copy is the awarded-date
 // range in app/admin/(shell)/points/page.tsx.
 
+// The only import here, and deliberately a pure one: lib/members.ts owns the
+// key format and the `cf:` namespace, so both modules cannot drift on what a
+// custom sort key looks like. Still no next/* and no supabase-js.
+import { customSortColumn, parseCustomSortKey } from "@/lib/members";
+
 /** Rows per page in the directory. Small enough that the seeded roster of 32
  * actually paginates — a page size that fits the whole fixture set hides every
  * bug this screen is prone to. */
@@ -41,14 +46,62 @@ export const PAGE_SIZE = 25;
  */
 export const MEMBER_SORTS = ["name", "email", "eid", "total_points"] as const;
 
-export type MemberSort = (typeof MEMBER_SORTS)[number];
+export type MemberBuiltinSort = (typeof MEMBER_SORTS)[number];
 
-const SORT_COLUMNS: Record<MemberSort, string> = {
+/**
+ * A sort key, as the URL spells it: one of the four built-ins, or `cf:<key>`
+ * naming a custom field.
+ *
+ * A bare string rather than a union, because the custom half is officer-defined
+ * at runtime and cannot be enumerated at compile time. That is exactly why the
+ * namespace exists — a field keyed `email` would otherwise shadow the real
+ * column — and why parseMemberFilter takes the definition list: an unrecognized
+ * key must degrade to `name`, not reach the query.
+ */
+export type MemberSort = string;
+
+const SORT_COLUMNS: Record<MemberBuiltinSort, string> = {
   name: "full_name",
   email: "email",
   eid: "eid",
   total_points: "total_points",
 };
+
+/**
+ * The definition list parseMemberFilter needs to validate a `cf:` sort key.
+ *
+ * Just the sortable identity of a field — the whole FieldDefinition is not
+ * needed, and keeping this module free of the richer type is what lets tests
+ * pass a two-line fake.
+ */
+export type SortableField = { key: string; showInDirectory: boolean };
+
+/**
+ * Resolve a sort key to the column PostgREST should order by, or null if the
+ * key names nothing sortable.
+ *
+ * 🔓 Custom keys go through customSortColumn(), which re-applies the key format
+ * check. That is the one place a definition key becomes part of a query string,
+ * so it re-checks rather than trusting that the value came from the database —
+ * see FIELD_KEY_PATTERN in lib/members.ts for what an unchecked key does to an
+ * `order=` term.
+ *
+ * A field that is not shown in the directory is not sortable either: sorting by
+ * a column nobody can see rearranges the list for no visible reason, which is
+ * the same argument that cut phase 1's ten sort keys down to four.
+ */
+export function sortColumn(
+  sort: MemberSort,
+  fields: readonly SortableField[]
+): string | null {
+  const custom = parseCustomSortKey(sort);
+  if (custom === null) {
+    return SORT_COLUMNS[sort as MemberBuiltinSort] ?? null;
+  }
+  const field = fields.find((f) => f.key === custom);
+  if (!field || !field.showInDirectory) return null;
+  return customSortColumn(custom);
+}
 
 export const MEMBER_STATES = ["active", "inactive", "all"] as const;
 export type MemberState = (typeof MEMBER_STATES)[number];
@@ -85,10 +138,16 @@ export type MemberFilter = {
   page: number;
 };
 
-/** Sorts that read better largest-first when the officer has not said. */
+/** Sorts that read better largest-first when the officer has not said. A custom
+ * field is never in here: its values are option text, which sorts A–Z. */
 const DESC_BY_DEFAULT: ReadonlySet<MemberSort> = new Set<MemberSort>([
   "total_points",
 ]);
+
+/** "No custom fields are defined" — the pre-phase-4 world, and what the pure
+ * tests pass. Named rather than written as a literal `[]` at each call site so
+ * it is obvious at a glance that the absence is deliberate. */
+export const NO_CUSTOM_FIELDS: readonly SortableField[] = [];
 
 /** Which way a column sorts when the officer picks it but says nothing about
  * direction. Exported because the table's sort headers need the same answer
@@ -152,7 +211,20 @@ function searchTerm(raw: string): string {
  * page query and the export query cannot diverge by one of them reading a
  * default the other did not.
  */
-export function parseMemberFilter(params: RawParams): MemberFilter {
+export function parseMemberFilter(
+  params: RawParams,
+  /**
+   * The live custom-field definitions, so a `cf:` sort key can be checked
+   * against what actually exists.
+   *
+   * Defaults to none, which is the correct reading for every caller that has no
+   * definitions to hand — the pure tests, and any code path predating phase 4.
+   * The query side does NOT get a default: applyMemberFilter takes the same
+   * list as a required argument, so a page that forgets to load definitions is
+   * a compile error rather than a directory that quietly cannot sort.
+   */
+  fields: readonly SortableField[] = NO_CUSTOM_FIELDS
+): MemberFilter {
   const rawState = one(params, "state");
   const state: MemberState = (MEMBER_STATES as readonly string[]).includes(
     rawState
@@ -160,10 +232,13 @@ export function parseMemberFilter(params: RawParams): MemberFilter {
     ? (rawState as MemberState)
     : "active";
 
+  // A sort key is either one of the four built-ins or `cf:<key>` naming a
+  // definition that exists and is shown in the directory. Anything else — a
+  // retired phase-1 key, a field archived since the officer bookmarked the URL,
+  // or typed nonsense — degrades to `name` rather than reaching the query.
   const rawSort = one(params, "sort");
-  const sort: MemberSort = (MEMBER_SORTS as readonly string[]).includes(rawSort)
-    ? (rawSort as MemberSort)
-    : "name";
+  const sort: MemberSort =
+    sortColumn(rawSort, fields) !== null ? rawSort : "name";
 
   const rawDir = one(params, "dir");
   const dir: "asc" | "desc" =
@@ -302,7 +377,20 @@ export function memberFilterFields(filter: MemberFilter): MemberFilterFields {
  */
 export function memberFilterUrl(
   filter: MemberFilter,
-  changes: Record<string, string>
+  changes: Record<string, string>,
+  /**
+   * Required, unlike parseMemberFilter's own — and the asymmetry is the same
+   * one applyMemberFilter carries, for the same reason.
+   *
+   * 🪤 This was a live bug. The round trip below re-parses, and re-parsing
+   * without the definitions makes `sortColumn("cf:dues", [])` null, which
+   * degrades the sort to `name`. So a custom-field sort died the instant the
+   * officer touched ANY filter control — typing in the search box silently
+   * reset the column they had sorted by. Defaulting this parameter would leave
+   * that trap armed for the next caller, and there is only one caller, so it
+   * costs nothing to require it.
+   */
+  fields: readonly SortableField[]
 ): string {
   const params = memberFilterToParams(filter);
   for (const [key, value] of Object.entries(changes)) {
@@ -313,7 +401,7 @@ export function memberFilterUrl(
 
   const raw: RawParams = {};
   for (const [key, value] of params.entries()) raw[key] = value;
-  return memberFilterToParams(parseMemberFilter(raw)).toString();
+  return memberFilterToParams(parseMemberFilter(raw, fields)).toString();
 }
 
 /**
@@ -351,7 +439,9 @@ export type FilterableQuery<Q> = {
  */
 export function applyMemberFilter<Q extends FilterableQuery<Q>>(
   query: Q,
-  filter: MemberFilter
+  filter: MemberFilter,
+  /** Required, unlike parseMemberFilter's — see the note there. */
+  fields: readonly SortableField[]
 ): Q {
   let q = query;
 
@@ -378,12 +468,19 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
   if (filter.minPoints !== null) q = q.gte("total_points", filter.minPoints);
   if (filter.maxPoints !== null) q = q.lte("total_points", filter.maxPoints);
 
-  // Nulls last in both directions. None of the four sortable columns is nullable
-  // today — that went with attendance_rate and last_seen_at in the phase-3 trim
-  // — but the option is kept rather than dropped: it is the correct default for
-  // this screen, and phase 4's custom fields are sparse by nature, so a member
-  // with no answer for a dropdown belongs at the bottom either way.
-  q = q.order(SORT_COLUMNS[filter.sort], {
+  // Nulls last in both directions. None of the four BUILT-IN sortable columns is
+  // nullable — that went with attendance_rate and last_seen_at in the phase-3
+  // trim — but phase 4's custom fields are sparse by nature: a member who has no
+  // answer for a dropdown reads as SQL NULL through `custom_fields->>key` and
+  // belongs at the bottom in either direction, not floating to the top of a
+  // descending sort.
+  //
+  // A `cf:` key that no longer resolves falls back to the default sort rather
+  // than being interpolated anyway. parseMemberFilter has normally caught this
+  // already; the second check is here because this is the function that builds
+  // the query string, and it must not depend on a caller having sanitized first.
+  const column = sortColumn(filter.sort, fields) ?? SORT_COLUMNS.name;
+  q = q.order(column, {
     ascending: filter.dir === "asc",
     nullsFirst: false,
   });

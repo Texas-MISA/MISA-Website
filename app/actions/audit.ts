@@ -19,11 +19,30 @@ import type { Database, Json } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
 
+/**
+ * The entities an officer action can be filed against.
+ *
+ * ⚠️ This union is the only thing enforcing entity types on the TypeScript
+ * side, and it has drifted from the SQL check once already: `'roster'` was
+ * added to the constraint by migration 14 and never added here, so the export
+ * receipt phase 5 is built on could not have been written without a cast. Keep
+ * this list and `admin_audit_entity_type_check` in step — and because
+ * admin_audit is append-only (P0001 on UPDATE and DELETE alike), a row filed
+ * under the wrong type can never be corrected.
+ *
+ * `roster` is not an entity at all: an export spans N members, so each one
+ * generates a receipt uuid that nothing else references (migration 14).
+ * `member_field` is a custom-field definition (migration 18) — its own type
+ * rather than `member`, because "someone renamed the dues column" is not an
+ * event in any individual member's history.
+ */
 export type AuditEntityType =
   | "attendance"
   | "event"
   | "member"
-  | "point_adjustment";
+  | "member_field"
+  | "point_adjustment"
+  | "roster";
 
 /**
  * The action vocabulary. Fixed here rather than passed as free text because
@@ -64,7 +83,18 @@ export type AuditAction =
   | "attendance.reopened"
   // No points.updated: an adjustment is immutable except for voiding.
   | "points.granted"
-  | "points.voided";
+  | "points.voided"
+  // Stage 6 phase 4. member.updated covers every edit to a member row —
+  // a custom-field value, the officer notes, or both at once — for the same
+  // reason attendance.updated is one verb: before/after already say which
+  // columns moved, and splitting by column adds rows without adding meaning.
+  // A field DEFINITION is a different entity and gets its own three.
+  | "member.updated"
+  | "member_field.created"
+  | "member_field.updated"
+  // Archived, never deleted: stored values stay keyed to the definition, and a
+  // hard delete would rewrite what the roster said at the time.
+  | "member_field.archived";
 
 export type AuditEntry = {
   entityType: AuditEntityType;

@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_BULK_ASSIGN } from "@/lib/attendance";
+import { MAX_FIELD_OPTIONS, MAX_OPTION_LENGTH } from "@/lib/members";
 import { MAX_GRANT_MEMBERS, MAX_POINTS_PER_GRANT } from "@/lib/points";
 import {
   attendanceEditSchema,
   bulkAssignSchema,
   checkinSchema,
+  fieldDefinitionEditSchema,
+  fieldDefinitionSchema,
+  memberFieldValueSchema,
+  memberNotesSchema,
   pointGrantSchema,
   pointVoidSchema,
 } from "@/lib/validation";
@@ -202,5 +207,214 @@ describe("pointVoidSchema", () => {
       pointVoidSchema.parse({ id: UUID_A, voidReason: " Wrong member " })
         .voidReason
     ).toBe("Wrong member");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Custom fields (§7 Stage 6 phase 4)
+// ---------------------------------------------------------------------------
+//
+// Every rule below is ALSO a constraint in migration 18, deliberately rather
+// than redundantly: these give the officer a sentence explaining what went
+// wrong, and the database makes the rule true for anything that skipped them.
+
+const FIELD_BASE = {
+  label: "Dues paid",
+  kind: "select" as const,
+  options: "Paid\nUnpaid\nWaived",
+  editableInline: true,
+  showInDirectory: true,
+  sortOrder: 0,
+};
+
+describe("fieldDefinitionSchema", () => {
+  it("accepts a well-formed definition and splits the options", () => {
+    const parsed = fieldDefinitionSchema.parse({
+      ...FIELD_BASE,
+      key: "dues_paid",
+    });
+    expect(parsed.options).toEqual(["Paid", "Unpaid", "Waived"]);
+    expect(parsed.key).toBe("dues_paid");
+  });
+
+  it("tolerates what a textarea actually submits", () => {
+    // A trailing newline is what every textarea gives you, and an officer
+    // pasting from a spreadsheet brings blank lines and stray indentation.
+    const parsed = fieldDefinitionSchema.parse({
+      ...FIELD_BASE,
+      key: "dues_paid",
+      options: "  Paid  \n\n\tUnpaid\n\n",
+    });
+    expect(parsed.options).toEqual(["Paid", "Unpaid"]);
+  });
+
+  // 🔓 The key refinement is a security control, not a naming rule: the key is
+  // interpolated into a PostgREST `order=` term, where a comma is read as a
+  // second order column and a space is accepted silently.
+  it("refuses a key that could break out of an order term", () => {
+    for (const key of [
+      "dues,full_name",
+      "dues paid",
+      'du"es',
+      "dues-paid",
+      "Dues",
+      "1dues",
+      "",
+    ]) {
+      const result = fieldDefinitionSchema.safeParse({ ...FIELD_BASE, key });
+      expect(result.success, key).toBe(false);
+    }
+  });
+
+  it("refuses a key that collides with a built-in column", () => {
+    const result = fieldDefinitionSchema.safeParse({
+      ...FIELD_BASE,
+      key: "email",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toMatch(/built-in/);
+  });
+
+  it("refuses two options that differ only in case", () => {
+    // The stored value IS the option text, so "Paid" and "paid" would be
+    // indistinguishable once written into members.custom_fields — which is
+    // exactly what valid_field_options() enforces on the other side.
+    const result = fieldDefinitionSchema.safeParse({
+      ...FIELD_BASE,
+      key: "dues_paid",
+      options: "Paid\npaid",
+    });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0].message).toMatch(/same/);
+  });
+
+  it("refuses an empty, oversized, or over-long option list", () => {
+    const cases = [
+      "",
+      "\n\n  \n",
+      Array.from({ length: MAX_FIELD_OPTIONS + 1 }, (_, i) => `o${i}`).join("\n"),
+      "x".repeat(MAX_OPTION_LENGTH + 1),
+    ];
+    for (const options of cases) {
+      const result = fieldDefinitionSchema.safeParse({
+        ...FIELD_BASE,
+        key: "dues_paid",
+        options,
+      });
+      expect(result.success, options.slice(0, 20)).toBe(false);
+    }
+  });
+
+  it("accepts exactly the maximum option count", () => {
+    const options = Array.from(
+      { length: MAX_FIELD_OPTIONS },
+      (_, i) => `o${i}`
+    ).join("\n");
+    expect(
+      fieldDefinitionSchema.parse({ ...FIELD_BASE, key: "dues_paid", options })
+        .options
+    ).toHaveLength(MAX_FIELD_OPTIONS);
+  });
+
+  it("requires a label", () => {
+    const result = fieldDefinitionSchema.safeParse({
+      ...FIELD_BASE,
+      key: "dues_paid",
+      label: "   ",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("fieldDefinitionEditSchema", () => {
+  // The key is omitted rather than optional, and that is the point: renaming a
+  // key would orphan every answer stored under it, so the edit form cannot
+  // express a rename at all.
+  it("produces no key, even when one is submitted", () => {
+    const parsed = fieldDefinitionEditSchema.parse({
+      ...FIELD_BASE,
+      key: "something_else",
+    });
+    expect(parsed).not.toHaveProperty("key");
+  });
+
+  it("still validates everything else", () => {
+    expect(
+      fieldDefinitionEditSchema.safeParse({ ...FIELD_BASE, options: "" }).success
+    ).toBe(false);
+  });
+});
+
+describe("memberFieldValueSchema", () => {
+  const VALUE_BASE = {
+    memberId: UUID_A,
+    key: "dues_paid",
+    value: "Paid",
+    expectedUpdatedAt: "2026-08-02T22:34:16.934133+00:00",
+  };
+
+  it("accepts a value and an empty clear alike", () => {
+    expect(memberFieldValueSchema.parse(VALUE_BASE).value).toBe("Paid");
+    // Clearing is always allowed — the action turns "" into a deleted key.
+    expect(
+      memberFieldValueSchema.parse({ ...VALUE_BASE, value: "" }).value
+    ).toBe("");
+  });
+
+  it("refuses a key that did not come from a definition", () => {
+    for (const key of ["cf:dues_paid", "dues,full_name", "email", ""]) {
+      expect(
+        memberFieldValueSchema.safeParse({ ...VALUE_BASE, key }).success,
+        key
+      ).toBe(false);
+    }
+  });
+
+  it("requires the compare-and-set anchor", () => {
+    expect(
+      memberFieldValueSchema.safeParse({ ...VALUE_BASE, expectedUpdatedAt: "" })
+        .success
+    ).toBe(false);
+  });
+
+  // Not checked against the option list here, on purpose: the schema does not
+  // know the definition. The action loads it and calls isAllowedFieldValue(),
+  // so the value is judged against the definition as STORED rather than as the
+  // form claimed it to be.
+  it("does not judge the value against any option list", () => {
+    expect(
+      memberFieldValueSchema.safeParse({ ...VALUE_BASE, value: "Banana" })
+        .success
+    ).toBe(true);
+  });
+});
+
+describe("memberNotesSchema", () => {
+  const NOTES_BASE = {
+    memberId: UUID_A,
+    expectedUpdatedAt: "2026-08-02T22:34:16.934133+00:00",
+  };
+
+  it("turns an empty box into null, never an empty string", () => {
+    // members.notes has no not-blank check, so '' would be storable — and would
+    // render exactly like "no notes" while behaving differently everywhere else.
+    expect(memberNotesSchema.parse({ ...NOTES_BASE, notes: "" }).notes).toBeNull();
+    expect(
+      memberNotesSchema.parse({ ...NOTES_BASE, notes: "   " }).notes
+    ).toBeNull();
+  });
+
+  it("trims but otherwise keeps what was written", () => {
+    expect(
+      memberNotesSchema.parse({ ...NOTES_BASE, notes: "  Transfers in\nspring  " })
+        .notes
+    ).toBe("Transfers in\nspring");
+  });
+
+  it("refuses an essay", () => {
+    expect(
+      memberNotesSchema.safeParse({ ...NOTES_BASE, notes: "x".repeat(2001) })
+        .success
+    ).toBe(false);
   });
 });

@@ -269,9 +269,55 @@ export type Database = {
         }
         Relationships: []
       }
+      member_field_definitions: {
+        Row: {
+          archived_at: string | null
+          created_at: string
+          created_by: string | null
+          editable_inline: boolean
+          id: string
+          key: string
+          kind: string
+          label: string
+          options: string[]
+          show_in_directory: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          editable_inline?: boolean
+          id?: string
+          key: string
+          kind?: string
+          label: string
+          options: string[]
+          show_in_directory?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          archived_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          editable_inline?: boolean
+          id?: string
+          key?: string
+          kind?: string
+          label?: string
+          options?: string[]
+          show_in_directory?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       members: {
         Row: {
           active: boolean
+          custom_fields: Json
           eid: string
           email: string
           full_name: string
@@ -280,9 +326,11 @@ export type Database = {
           normalized_eid: string | null
           notes: string | null
           source: string
+          updated_at: string
         }
         Insert: {
           active?: boolean
+          custom_fields?: Json
           eid: string
           email: string
           full_name: string
@@ -291,9 +339,11 @@ export type Database = {
           normalized_eid?: string | null
           notes?: string | null
           source?: string
+          updated_at?: string
         }
         Update: {
           active?: boolean
+          custom_fields?: Json
           eid?: string
           email?: string
           full_name?: string
@@ -302,6 +352,7 @@ export type Database = {
           normalized_eid?: string | null
           notes?: string | null
           source?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -395,6 +446,7 @@ export type Database = {
           attendance_points: number | null
           attendance_rate: number | null
           bonus_points: number | null
+          custom_fields: Json | null
           eid: string | null
           email: string | null
           events_attended: number | null
@@ -403,9 +455,11 @@ export type Database = {
           id: string | null
           joined_at: string | null
           last_seen_at: string | null
+          notes: string | null
           pending_count: number | null
           source: string | null
           total_points: number | null
+          updated_at: string | null
         }
         Relationships: []
       }
@@ -450,6 +504,7 @@ export type Database = {
         }
       }
       term_of: { Args: { ts: string }; Returns: string }
+      valid_field_options: { Args: { options: string[] }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never

@@ -8,6 +8,13 @@ import {
   MAX_SERIES_EVENTS,
 } from "@/lib/events";
 import {
+  FIELD_KEY_PATTERN,
+  MAX_FIELD_LABEL_LENGTH,
+  MAX_FIELD_OPTIONS,
+  MAX_OPTION_LENGTH,
+  RESERVED_FIELD_KEYS,
+} from "@/lib/members";
+import {
   MAX_GRANT_MEMBERS,
   MAX_POINTS_PER_GRANT,
   POINT_CATEGORIES,
@@ -269,3 +276,129 @@ export const pointVoidSchema = z.object({
     .min(1, "A reason is required")
     .max(500, "Reason is too long"),
 });
+
+// Custom fields (§7 Stage 6 phase 4). Every rule below is also a constraint in
+// migration 18 — deliberately, not redundantly. These schemas give the officer
+// a sentence explaining what went wrong; the database constraints make the rule
+// true for anything that skipped them, including a hand-run SQL statement.
+
+/**
+ * 🔓 The definition key, and this refinement is a security control.
+ *
+ * The key ends up interpolated into a PostgREST `order=` term. An unconstrained
+ * one is a sort-injection surface — a comma is read as a second order column,
+ * and a space or a `"` is accepted silently with no error at all. FIELD_KEY_PATTERN
+ * is the escape; see its note in lib/members.ts for what the spike found.
+ *
+ * The message names the shape rather than showing the regex, because an officer
+ * naming a column should not have to read one.
+ */
+const fieldKey = z
+  .string()
+  .trim()
+  .min(1, "A key is required")
+  .refine(
+    (v) => FIELD_KEY_PATTERN.test(v),
+    "Use lowercase letters, numbers and underscores, starting with a letter"
+  )
+  .refine(
+    (v) => !RESERVED_FIELD_KEYS.has(v),
+    "That key is already used by a built-in column"
+  );
+
+/**
+ * The dropdown's options, arriving as one per line from a <textarea>.
+ *
+ * A textarea rather than a repeating input set: an officer pasting a list from
+ * a spreadsheet is the common case, and the alternative is N form fields whose
+ * count has to be managed client-side. Blank lines are dropped rather than
+ * rejected, since a trailing newline is what a textarea always gives you.
+ */
+const fieldOptions = z
+  .string()
+  .transform((raw) =>
+    raw
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line !== "")
+  )
+  .refine((options) => options.length >= 1, "Add at least one option")
+  .refine(
+    (options) => options.length <= MAX_FIELD_OPTIONS,
+    `Use at most ${MAX_FIELD_OPTIONS} options`
+  )
+  .refine(
+    (options) => options.every((o) => o.length <= MAX_OPTION_LENGTH),
+    `An option can be at most ${MAX_OPTION_LENGTH} characters`
+  )
+  .refine(
+    // Case-insensitive, matching valid_field_options(). The stored value IS the
+    // option text, so "Paid" and "paid" would be indistinguishable once written.
+    (options) =>
+      new Set(options.map((o) => o.toLowerCase())).size === options.length,
+    "Two options are the same"
+  );
+
+const fieldLabel = z
+  .string()
+  .trim()
+  .min(1, "A label is required")
+  .max(MAX_FIELD_LABEL_LENGTH, "Label is too long");
+
+export const fieldDefinitionSchema = z.object({
+  key: fieldKey,
+  label: fieldLabel,
+  // Dropdown only for now. Present in the schema rather than hardcoded at the
+  // insert so widening the CHECK later is a one-line change here too.
+  kind: z.literal("select"),
+  options: fieldOptions,
+  editableInline: z.boolean(),
+  showInDirectory: z.boolean(),
+  sortOrder: z.number().int().min(0).max(9999),
+});
+
+export type FieldDefinitionFields = z.infer<typeof fieldDefinitionSchema>;
+
+/**
+ * Editing a definition. The key is NOT editable and is absent by design.
+ *
+ * Values in `members.custom_fields` are keyed by it, so renaming a key would
+ * orphan every stored answer — the rename would have to rewrite every member
+ * row, and a half-finished rewrite is unrecoverable. Officers change the
+ * *label*, which is the thing they actually see.
+ */
+export const fieldDefinitionEditSchema = fieldDefinitionSchema.omit({
+  key: true,
+});
+
+/**
+ * One inline edit: this member, this field, this value.
+ *
+ * `value` is deliberately NOT checked against the option list here — the schema
+ * does not know the definition. The action loads it and calls
+ * isAllowedFieldValue(), so a value that is not an option is rejected server-side
+ * against the definition as stored, not as the form claimed it to be.
+ *
+ * `expectedUpdatedAt` is the compare-and-set anchor, carried as the raw
+ * PostgREST string. A JS Date round trip truncates the microseconds and the CAS
+ * then never matches, reporting a phantom conflict on every save.
+ */
+export const memberFieldValueSchema = z.object({
+  memberId: z.uuid(),
+  key: fieldKey,
+  value: z.string().trim().max(MAX_OPTION_LENGTH, "Value is too long"),
+  expectedUpdatedAt: z.string().min(1),
+});
+
+export type MemberFieldValueFields = z.infer<typeof memberFieldValueSchema>;
+
+/** Officer notes on a member. Nullable in the schema, so clearing the box
+ * stores NULL rather than '' — members.notes has no not-blank check, but an
+ * empty string and "no notes" must not become two states that render alike. */
+export const memberNotesSchema = z.object({
+  memberId: z.uuid(),
+  notes: optionalText(2000, "Notes"),
+  expectedUpdatedAt: z.string().min(1),
+});
+
+export type MemberNotesFields = z.infer<typeof memberNotesSchema>;

@@ -10,6 +10,7 @@ import {
   memberFilterUrl,
   type MemberFilter,
   type MemberFilterFields,
+  type SortableField,
 } from "@/lib/filters";
 
 // Same contract as attendance-filters.tsx: no submit button, every choice in
@@ -25,7 +26,23 @@ import {
 const controlClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
 const smallNumber = `${controlClass} w-24`;
 
-export function MemberFilters({ filter }: { filter: MemberFilter }) {
+export function MemberFilters({
+  filter,
+  definitions,
+}: {
+  filter: MemberFilter;
+  /**
+   * The live custom-field definitions, passed only so memberFilterUrl can keep
+   * a `cf:` sort alive across a filter change.
+   *
+   * 🪤 Without them the URL builder re-parses with no definitions, decides the
+   * sort names nothing, and silently drops the officer back to sorting by name
+   * — so typing one character in the search box used to reset the column they
+   * had sorted by. Named `definitions` rather than `fields` because `fields`
+   * below is the filter boxes' text.
+   */
+  definitions: readonly SortableField[];
+}) {
   const router = useRouter();
 
   // ⚠️ These are controlled, and that is load-bearing rather than a style
@@ -59,7 +76,9 @@ export function MemberFilters({ filter }: { filter: MemberFilter }) {
   }
 
   function update(changes: Record<string, string>) {
-    router.push(`/admin/members?${memberFilterUrl(filter, changes)}`);
+    router.push(
+      `/admin/members?${memberFilterUrl(filter, changes, definitions)}`
+    );
   }
 
   const anyNarrowing =

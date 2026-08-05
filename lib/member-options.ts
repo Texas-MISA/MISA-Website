@@ -13,7 +13,13 @@ import type { Database } from "@/lib/types/database";
 // a search, for the reason recorded on that constant — `ilike '%jon%'` cannot
 // match `John`, so a probe-based candidate set structurally excludes the row the
 // officer is looking for. Callers that need to filter do it over the returned
-// list; pg_trgm is the growth path if the roster ever outgrows the limit.
+// list.
+//
+// ⚠️ The limit truncates silently — no error, no marker in the list. Past
+// MEMBER_SCAN_LIMIT active members, names sorting after the cut simply are not
+// offered by any picker, which reads to an officer as "that member doesn't
+// exist". pg_trgm is the growth path and it is due before the roster gets
+// there; §2.2's capacity check has the numbers.
 
 type Client = SupabaseClient<Database>;
 

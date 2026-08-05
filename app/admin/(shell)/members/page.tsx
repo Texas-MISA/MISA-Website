@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { requireOfficer } from "@/lib/auth";
 import {
@@ -9,6 +10,8 @@ import {
   parseMemberFilter,
   PAGE_SIZE,
 } from "@/lib/filters";
+import { fetchFieldDefinitions } from "@/lib/member-fields";
+import type { FieldDefinition } from "@/lib/members";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { MemberFilters } from "./_components/member-filters";
@@ -43,25 +46,31 @@ export const metadata: Metadata = { title: "Members" };
 // SELF badges beside the name. The view keeps every other column for the detail
 // page; nothing was dropped from the schema by this trim.
 const COLUMNS =
-  "id, eid, full_name, email, active, source, total_points" as const;
+  "id, eid, full_name, email, active, source, total_points, custom_fields, updated_at" as const;
 
 type DirectoryQueryResult =
   | { kind: "ok"; rows: MemberRow[]; total: number }
   | { kind: "error" };
 
 async function fetchDirectory(
-  filter: ReturnType<typeof parseMemberFilter>
+  db: ReturnType<typeof createAdminClient>,
+  filter: ReturnType<typeof parseMemberFilter>,
+  fields: readonly FieldDefinition[]
 ): Promise<DirectoryQueryResult> {
-  const db = createAdminClient();
-
   const { from, to } = pageRange(filter.page);
 
   // applyMemberFilter is the only thing that translates a filter into a query.
   // Phase 5's export will call it on the same filter and skip the .range()
   // below — that separation is what keeps "copy all N matching" honest.
+  //
+  // The definitions go in because a `cf:` sort key resolves against them.
+  // applyMemberFilter takes them as a required argument on purpose: forgetting
+  // to load them is then a compile error rather than a directory that silently
+  // falls back to sorting by name.
   const { data, error, count } = await applyMemberFilter(
     db.from("member_directory").select(COLUMNS, { count: "exact" }),
-    filter
+    filter,
+    fields
   ).range(from, to);
 
   if (error) {
@@ -80,6 +89,11 @@ async function fetchDirectory(
     active: row.active ?? true,
     source: row.source ?? "admin",
     totalPoints: row.total_points ?? 0,
+    customFields: row.custom_fields ?? {},
+    // The compare-and-set anchor every inline cell posts back. Carried as the
+    // raw PostgREST string all the way to the hidden input — a Date round trip
+    // truncates the microseconds and the CAS then never matches.
+    updatedAt: row.updated_at ?? "",
   }));
 
   return { kind: "ok", rows, total: count ?? rows.length };
@@ -94,16 +108,35 @@ export default async function AdminMembersPage({
   await requireOfficer();
 
   const params = await searchParams;
-  const filter = parseMemberFilter(params);
-  const result = await fetchDirectory(filter);
+
+  // Definitions first: parseMemberFilter needs them to tell a live `cf:` sort
+  // key from one naming a field that has since been archived. One client for
+  // both reads.
+  const db = createAdminClient();
+  const fields = await fetchFieldDefinitions(db);
+
+  const filter = parseMemberFilter(params, fields);
+  const result = await fetchDirectory(db, filter, fields);
 
   const pages = result.kind === "ok" ? pageCount(result.total) : 1;
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
-        Members
-      </h1>
+      <div className="flex flex-wrap items-baseline justify-between gap-4">
+        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+          Members
+        </h1>
+        {/* Not an admin-nav entry: admin-nav.tsx marks an item active with
+            pathname.startsWith, so a Fields link there would light "Members" up
+            alongside it. This is the same in-page idiom the events form uses
+            for "Create a recurring series instead". */}
+        <Link
+          href="/admin/members/fields"
+          className="text-sm underline underline-offset-4"
+        >
+          Custom fields ({fields.length})
+        </Link>
+      </div>
 
       <p className="mt-3 max-w-2xl text-sm text-foreground/70">
         The roster. <span className="font-medium">Total points are scoped to
@@ -112,7 +145,7 @@ export default async function AdminMembersPage({
       </p>
 
       <div className="mt-6">
-        <MemberFilters filter={filter} />
+        <MemberFilters filter={filter} definitions={fields} />
       </div>
 
       <div className="mt-8">
@@ -132,7 +165,7 @@ export default async function AdminMembersPage({
                   : `${result.total} matching member${result.total === 1 ? "" : "s"}.`}
             </p>
 
-            <MemberTable rows={result.rows} filter={filter} />
+            <MemberTable rows={result.rows} filter={filter} fields={fields} />
 
             <Pagination filter={filter} pages={pages} total={result.total} />
           </>
