@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–5 complete; Stage 6 (member directory) — phases 1, 2a, 2, 3, 4 and 5 of 9 built and browser-verified. Stage 6.5 (dues) interrupts here, before phase 6, and its phase 1 of 4 is built (2026-08-06, doc v1.38).** Stage 6 merges to `main` at the end of each phase rather than at the end of the stage, as Stage 5 did.
+**Stages 0–5 complete; Stage 6 (member directory) — phases 1, 2a, 2, 3, 4 and 5 of 9 built and browser-verified. Stage 6.5 (dues) interrupts here, before phase 6, and its phases 1 and 2 of 4 are built (2026-08-06, doc v1.39); phase 3 is next.** Stage 6 merges to `main` at the end of each phase rather than at the end of the stage, as Stage 5 did.
 
 📋 **A new Stage 6 phase 5c is planned and unbuilt** — **filter the directory by categorical fields**: officer-defined custom fields, `dues_paid_current_term`, and `source` (which phase 3 removed as a *column* and which belongs back as a *filter*). Requested directly — *"filter the members to those with M size and export as an Excel file"* — and phase 5 built only the export half of that sentence. ⚠️ It is sequenced **after Stage 6.5**, not before, because the dues column has to exist before it can be filtered on. Every predicate goes in `applyMemberFilter` and nowhere else, so the CSV, xlsx and clipboard all inherit it with no second code path.
 
@@ -76,6 +76,13 @@ npx supabase db reset                   # wipe, re-run migrations + seed.sql (lo
 npx supabase db query --linked "<sql>"  # ad-hoc SQL against the remote
 npx supabase gen types typescript --linked > lib/types/database.ts
 bash scripts/seed-remote.sh             # apply seed.sql to the remote (no Docker needed)
+
+# 🪤 When the Supabase CLI will not run but the containers are fine, talk to
+# Postgres directly. This takes MULTI-LINE SQL and heredocs, unlike `db query`,
+# which reads only the first line of its argument.
+docker exec -i supabase_db_MISA-Website psql -U postgres -d postgres -tA <<'SQL'
+select count(*) from members;
+SQL
 ```
 
 ```bash
