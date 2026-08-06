@@ -23,6 +23,7 @@ import {
   type ExportSourceRow,
 } from "@/lib/export";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { toXlsx } from "@/lib/xlsx";
 
 // The roster export (§6, §7 Stage 6 phase 5) — the first Route Handler in this
 // codebase, and it is a route rather than a Server Action for one reason: a
@@ -208,7 +209,7 @@ export async function GET(request: Request): Promise<Response> {
       } (${exported.length} field${exported.length === 1 ? "" : "s"})`,
     });
 
-    return respond(format, chosen, rows, today);
+    return respond(format, chosen, rows, today, sheetLabelOf(filter));
   } catch (e) {
     console.error(
       "roster export failed:",
@@ -218,11 +219,24 @@ export async function GET(request: Request): Promise<Response> {
   }
 }
 
+/**
+ * A human label for the workbook's sheet tab, so a saved file says what it is.
+ * `sheetName()` in lib/xlsx.ts does the sanitizing — Excel forbids several
+ * characters and caps the name at 31 — so this only has to be descriptive.
+ */
+function sheetLabelOf(filter: ReturnType<typeof parseMemberFilter>): string {
+  const parts = ["Members"];
+  if (filter.state !== "active") parts.push(filter.state);
+  if (filter.q) parts.push(filter.q);
+  return parts.join(" - ");
+}
+
 function respond(
   format: ExportFormat,
   chosen: ReturnType<typeof parseFieldSelection>,
   rows: ExportSourceRow[],
-  today: string
+  today: string,
+  sheetLabel: string
 ): Response {
   // The clipboard formats are read by fetch and pasted by the browser, so they
   // carry no Content-Disposition — an attachment header would download a file
@@ -239,6 +253,23 @@ function respond(
 
   if (format === "tsv") {
     return text(toTsv(chosen, cells));
+  }
+
+  if (format === "xlsx") {
+    // The same cells CSV gets — only the formatting differs, which is the whole
+    // design and the reason xlsx is not CSV with another extension. Buffered
+    // whole, because a zip writes its central directory last and has no
+    // incremental path worth having; MAX_EXPORT_ROWS is what keeps that inside
+    // Vercel's 4.5 MB non-streaming response limit.
+    const book = toXlsx(chosen, cells, sheetLabel);
+    return new Response(new Uint8Array(book), {
+      headers: {
+        "content-type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "content-disposition": `attachment; filename="misa-members-${today}.xlsx"`,
+        "cache-control": "no-store",
+      },
+    });
   }
 
   // A UTF-8 BOM, and not decoration: without it Excel on Windows decodes a CSV

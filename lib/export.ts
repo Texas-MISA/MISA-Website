@@ -150,12 +150,14 @@ export const DEFAULT_EXPORT_FIELDS: readonly string[] = [
 ];
 
 /**
- * The formats the export serves. `xlsx` joins them in phase 5b.
+ * The formats the export serves.
  *
  * Lives here rather than in the route because which columns a format actually
- * emits is a domain fact, and `exportedFields` below turns on it.
+ * emits is a domain fact, and `exportedFields` below turns on it. `xlsx` is
+ * first because it is the default the toolbar offers — CSV stays beside it as
+ * the format that keeps working if the xlsx writer is ever pulled.
  */
-export const EXPORT_FORMATS = ["csv", "tsv", "emails", "names"] as const;
+export const EXPORT_FORMATS = ["xlsx", "csv", "tsv", "emails", "names"] as const;
 export type ExportFormat = (typeof EXPORT_FORMATS)[number];
 
 export function isExportFormat(value: string): value is ExportFormat {
