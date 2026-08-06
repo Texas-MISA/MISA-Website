@@ -124,26 +124,26 @@ describe("parseMemberFilter", () => {
   // directory actually shows.
   it("accepts a cf: sort key naming a live directory field", () => {
     const fields: SortableField[] = [
-      { key: "dues_paid", showInDirectory: true },
+      { key: "committee_paid", showInDirectory: true },
     ];
-    expect(parseMemberFilter({ sort: "cf:dues_paid" }, fields).sort).toBe(
-      "cf:dues_paid"
+    expect(parseMemberFilter({ sort: "cf:committee_paid" }, fields).sort).toBe(
+      "cf:committee_paid"
     );
   });
 
   it("falls back to name for a cf: key naming nothing sortable", () => {
     const fields: SortableField[] = [
-      { key: "dues_paid", showInDirectory: true },
+      { key: "committee_paid", showInDirectory: true },
       // Defined, editable on the detail page, but not a column — so not a sort.
       { key: "shirt_size", showInDirectory: false },
     ];
     for (const sort of [
       "cf:shirt_size",
       // Archived since the officer bookmarked the URL, so absent from the list.
-      "cf:dues_2025",
+      "cf:committee_2025",
       "cf:",
       // Would be a sort-injection surface if it ever reached the query.
-      "cf:dues,full_name",
+      "cf:committee,full_name",
       "cf:full_name",
     ]) {
       expect(parseMemberFilter({ sort }, fields).sort, sort).toBe("name");
@@ -153,16 +153,16 @@ describe("parseMemberFilter", () => {
   // The default argument is the pre-phase-4 world, not a shortcut: a caller
   // with no definitions to hand must not be able to name one either.
   it("knows no custom fields when none are passed", () => {
-    expect(parseMemberFilter({ sort: "cf:dues_paid" }).sort).toBe("name");
+    expect(parseMemberFilter({ sort: "cf:committee_paid" }).sort).toBe("name");
   });
 
   it("defaults a custom sort ascending, like the text columns it resembles", () => {
     const fields: SortableField[] = [
-      { key: "dues_paid", showInDirectory: true },
+      { key: "committee_paid", showInDirectory: true },
     ];
-    expect(parseMemberFilter({ sort: "cf:dues_paid" }, fields).dir).toBe("asc");
+    expect(parseMemberFilter({ sort: "cf:committee_paid" }, fields).dir).toBe("asc");
     expect(
-      parseMemberFilter({ sort: "cf:dues_paid", dir: "desc" }, fields).dir
+      parseMemberFilter({ sort: "cf:committee_paid", dir: "desc" }, fields).dir
     ).toBe("desc");
   });
 
@@ -319,7 +319,7 @@ describe("memberFilterToParams", () => {
 
 describe("sortColumn", () => {
   const fields: SortableField[] = [
-    { key: "dues_paid", showInDirectory: true },
+    { key: "committee_paid", showInDirectory: true },
     { key: "shirt_size", showInDirectory: false },
   ];
 
@@ -331,8 +331,8 @@ describe("sortColumn", () => {
   });
 
   it("maps a live directory field to its JSON path", () => {
-    expect(sortColumn(customSortKey("dues_paid"), fields)).toBe(
-      "custom_fields->>dues_paid"
+    expect(sortColumn(customSortKey("committee_paid"), fields)).toBe(
+      "custom_fields->>committee_paid"
     );
   });
 
@@ -371,16 +371,16 @@ describe("applyMemberFilter", () => {
 
   describe("custom-field sorting (phase 4)", () => {
     const fields: SortableField[] = [
-      { key: "dues_paid", showInDirectory: true },
+      { key: "committee_paid", showInDirectory: true },
       { key: "shirt_size", showInDirectory: false },
     ];
     const orders = (calls: Call[]) => calls.filter(([m]) => m === "order");
 
     it("orders by the JSON path for a live directory field", () => {
-      const calls = callsFor({ sort: customSortKey("dues_paid") }, fields);
+      const calls = callsFor({ sort: customSortKey("committee_paid") }, fields);
       expect(orders(calls)[0]).toEqual([
         "order",
-        "custom_fields->>dues_paid",
+        "custom_fields->>committee_paid",
         { ascending: true, nullsFirst: false },
       ]);
     });
@@ -391,7 +391,7 @@ describe("applyMemberFilter", () => {
     it("keeps members with no answer last in both directions", () => {
       for (const dir of ["asc", "desc"] as const) {
         const calls = callsFor(
-          { sort: customSortKey("dues_paid"), dir },
+          { sort: customSortKey("committee_paid"), dir },
           fields
         );
         expect(orders(calls)[0][2]).toEqual({
@@ -402,7 +402,7 @@ describe("applyMemberFilter", () => {
     });
 
     it("still ends on a total order, so pages cannot skip or repeat", () => {
-      const calls = orders(callsFor({ sort: customSortKey("dues_paid") }, fields));
+      const calls = orders(callsFor({ sort: customSortKey("committee_paid") }, fields));
       // A dropdown has a handful of options over the whole roster, so ties are
       // the rule rather than the exception here — the spike reproduced exactly
       // this, losing a row across a page boundary without the id tie-break.
@@ -414,8 +414,8 @@ describe("applyMemberFilter", () => {
     // sanitized first, because this is the function that builds the query string.
     it("falls back to full_name rather than interpolating an unsafe key", () => {
       for (const sort of [
-        "cf:dues,full_name",
-        "cf:dues paid",
+        "cf:committee,full_name",
+        "cf:committee paid",
         "cf:shirt_size",
         "cf:never_defined",
       ]) {
@@ -618,17 +618,17 @@ describe("filter control state", () => {
   // the officer had sorted by, and only the URL showed it.
   describe("a custom sort survives a filter change (phase 4)", () => {
     const fields: SortableField[] = [
-      { key: "dues_paid", showInDirectory: true },
+      { key: "committee_paid", showInDirectory: true },
       { key: "shirt_size", showInDirectory: false },
     ];
     const sorted = parseMemberFilter(
-      { sort: customSortKey("dues_paid") },
+      { sort: customSortKey("committee_paid") },
       fields
     );
 
     it("keeps the cf: sort when the field is live", () => {
       const url = memberFilterUrl(sorted, { q: "dara" }, fields);
-      expect(new URLSearchParams(url).get("sort")).toBe("cf:dues_paid");
+      expect(new URLSearchParams(url).get("sort")).toBe("cf:committee_paid");
       expect(new URLSearchParams(url).get("q")).toBe("dara");
     });
 
@@ -641,7 +641,7 @@ describe("filter control state", () => {
       for (const change of changes) {
         const url = memberFilterUrl(sorted, change, fields);
         expect(new URLSearchParams(url).get("sort"), JSON.stringify(change)).toBe(
-          "cf:dues_paid"
+          "cf:committee_paid"
         );
       }
     });
@@ -649,7 +649,7 @@ describe("filter control state", () => {
     it("drops a sort naming a field that is gone or not a column", () => {
       // Archived between the officer's bookmark and now, so absent from the
       // list — and one that exists but is not a directory column.
-      for (const stale of ["cf:dues_2025", "cf:shirt_size"]) {
+      for (const stale of ["cf:committee_2025", "cf:shirt_size"]) {
         const filter = { ...sorted, sort: stale };
         const url = memberFilterUrl(filter, { q: "dara" }, fields);
         expect(new URLSearchParams(url).get("sort"), stale).toBeNull();

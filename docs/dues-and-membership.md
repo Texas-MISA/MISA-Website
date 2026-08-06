@@ -1,9 +1,10 @@
 # Dues & membership status — Venmo reconciliation
 
-**Status:** **planned, unbuilt**, decided 2026-08-05. Nothing in this document
-exists yet: no migration, no `lib/dues.ts`, no screens. It is the reference for
-*why* Stage 6.5 is shaped the way it is; the normative summary lives in the
-architecture doc (§4.1, §4.5, §4.7, §5, §6, §7 Stage 6.5, §9 #12, v1.34).
+**Status:** **phase 1 of 4 built, 2026-08-06** — migration 19 and `lib/dues.ts`
+exist. Phases 2–4 (the import, the ledger screens, the directory column's UI)
+are unbuilt. Decided 2026-08-05. This document is the reference for *why*
+Stage 6.5 is shaped the way it is; the normative summary lives in the
+architecture doc (§4.1, §4.5, §4.7, §5, §6, §7 Stage 6.5, §9 #12).
 
 ✅ **The one open question is closed.** The entire de-duplication design rested
 on the Venmo statement CSV carrying a stable per-transaction `ID` column; a
@@ -11,9 +12,56 @@ real export was checked on **2026-08-05** and it is there. The fingerprint
 fallback never has to be built — see the note at the end of the consequences
 section for why that is worth being glad about.
 
-One thing still to do at the top of phase 1: record the **exact header names
-and the amount format** from that export in this document. The parser is
-written against a real header, not a remembered one.
+## ✅ The real export format, recorded 2026-08-06
+
+The obligation this document carried into phase 1 — *"record the exact header
+names and the amount format; the parser is written against a real header, not a
+remembered one"* — is discharged. It was worth doing: **every part of the real
+shape was a surprise**, and three of them would have produced a parser that
+looked right and was wrong.
+
+| | |
+|---|---|
+| **Header row** | **Line 3**, not line 1. Lines 1–2 are `Account Statement - (@handle)` and `Account Activity`. |
+| **Columns** | A **leading empty column**, then 22 fields: `ID, Datetime, Type, Status, Note, From, To, Amount (total), Amount (tip), Amount (tax), Amount (fee), Tax Rate, Tax Exempt, Funding Source, Destination, Beginning Balance, Ending Balance, Statement Period Venmo Fees, Terminal Location, Year to Date Venmo Fees, Disclaimer`. Located **by name**, never by position. |
+| **Amount** | `- $21.00` — the sign is a **separate token before the `$`**. `parseFloat` returns `NaN`; stripping non-numerics without reading the sign first turns a withdrawal into a payment. |
+| **Datetime** | `2026-07-27T21:49:00` — **no timezone offset at all.** |
+| **Non-transactions** | Balance rows and the trailing disclaimer arrive as rows with an **empty `ID`**. Skip on that, never on line position. |
+| **Footer** | A **quoted field spanning multiple lines**, so a `split("\n")` parser breaks on the last record of every file. |
+
+🪤 **The datetime is the dangerous one.** `new Date("2026-07-27T21:49:00")` is
+parsed as *local* time, which on the server is UTC — landing a 9pm Central
+payment five hours early. This is the codebase's existing
+`new Date("2026-09-01T18:00")` trap arriving through a new door.
+
+**Decided 2026-08-06: the stamp is Central wall time**, attached explicitly via
+`centralWallTimeToInstant`. Venmo renders statements in the account's own
+timezone and the org is in Texas. The cost of being wrong is bounded and
+already has a remedy: a payment near a term boundary lands one term out, which
+is exactly why `start_term` is a **default** rather than a generated column.
+
+🔒 The statement read was real financial data. **Nothing from it is in the
+repo** — the test fixture reproduces the shape with invented values.
+
+## 🐛 Corrections to this document, found while building phase 1
+
+- **`scoreMemberCandidates` (named below) does not exist.** The real exports in
+  `lib/attendance.ts` are `scoreMemberMatch` and `rankMemberSuggestions`. Phase
+  2 should reuse those.
+- 🪤 **"Tokenize the note on whitespace *and punctuation*" is wrong**, and a
+  test caught it. Splitting on punctuation breaks `rp-8571` into `rp` and
+  `8571` and matches neither — destroying the very thing
+  `members.normalized_eid` strips `-` for. The rule is: split on **whitespace
+  only**, then strip punctuation *within* each token. Accepted consequence,
+  and it is the right one: `rp 8571` with a real space does not match, because
+  two separate words are genuinely ambiguous and "don't auto-resolve
+  near-misses" says to queue that rather than guess.
+- **The term functions gained a shape the outline did not have.** `terms_from`
+  is implemented over an integer **term index** (`Spring 2026 → 4052`,
+  `Fall 2026 → 4053`) rather than by iterating `next_term`. It is immutable
+  with no recursion — which a generated column requires — and it gives the
+  schema a correct *total order* over terms, which is what the lexicographic
+  trap actually needs. `term_index` and `term_at_index` are exported for it.
 
 ## Context
 

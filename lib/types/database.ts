@@ -96,18 +96,24 @@ export type Database = {
       app_settings: {
         Row: {
           current_term: string | null
+          dues_one_term_cents: number
+          dues_two_term_cents: number
           id: boolean
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           current_term?: string | null
+          dues_one_term_cents?: number
+          dues_two_term_cents?: number
           id?: boolean
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           current_term?: string | null
+          dues_one_term_cents?: number
+          dues_two_term_cents?: number
           id?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -211,6 +217,97 @@ export type Database = {
           submitted_at?: string
         }
         Relationships: []
+      }
+      dues_payments: {
+        Row: {
+          amount_cents: number
+          covered_terms: string[] | null
+          id: string
+          import_batch_id: string
+          imported_at: string
+          imported_by: string
+          member_id: string | null
+          normalized_eid: string | null
+          note: string | null
+          paid_at: string
+          payer_handle: string | null
+          payer_name: string | null
+          start_term: string
+          submitted_eid: string | null
+          terms_covered: number | null
+          updated_at: string
+          venmo_txn_id: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          amount_cents: number
+          covered_terms?: string[] | null
+          id?: string
+          import_batch_id: string
+          imported_at?: string
+          imported_by: string
+          member_id?: string | null
+          normalized_eid?: string | null
+          note?: string | null
+          paid_at: string
+          payer_handle?: string | null
+          payer_name?: string | null
+          start_term?: string
+          submitted_eid?: string | null
+          terms_covered?: number | null
+          updated_at?: string
+          venmo_txn_id: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          amount_cents?: number
+          covered_terms?: string[] | null
+          id?: string
+          import_batch_id?: string
+          imported_at?: string
+          imported_by?: string
+          member_id?: string | null
+          normalized_eid?: string | null
+          note?: string | null
+          paid_at?: string
+          payer_handle?: string | null
+          payer_name?: string | null
+          start_term?: string
+          submitted_eid?: string | null
+          terms_covered?: number | null
+          updated_at?: string
+          venmo_txn_id?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dues_payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "leaderboard"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dues_payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_directory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dues_payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "members"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       events: {
         Row: {
@@ -447,6 +544,7 @@ export type Database = {
           attendance_rate: number | null
           bonus_points: number | null
           custom_fields: Json | null
+          dues_paid_current_term: boolean | null
           eid: string | null
           email: string | null
           events_attended: number | null
@@ -476,6 +574,7 @@ export type Database = {
           title: string
         }[]
       }
+      next_term: { Args: { t: string }; Returns: string }
       open_event_at: {
         Args: { ts?: string }
         Returns: {
@@ -503,7 +602,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      term_at_index: { Args: { i: number }; Returns: string }
+      term_index: { Args: { t: string }; Returns: number }
       term_of: { Args: { ts: string }; Returns: string }
+      terms_from: { Args: { n: number; start: string }; Returns: string[] }
       valid_field_options: { Args: { options: string[] }; Returns: boolean }
     }
     Enums: {

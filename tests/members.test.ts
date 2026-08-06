@@ -8,6 +8,7 @@ import {
   classifyTermEvents,
   customSortColumn,
   customSortKey,
+  FIELD_KEY_PATTERN,
   fieldOptions,
   fieldValue,
   formatAttendanceRate,
@@ -142,7 +143,7 @@ describe("formatAttendanceRate", () => {
 
 describe("isValidFieldKey", () => {
   it("accepts the documented shape", () => {
-    for (const key of ["dues_paid", "a", "tshirt_size", "x9", "a".repeat(40)]) {
+    for (const key of ["committee_paid", "a", "tshirt_size", "x9", "a".repeat(40)]) {
       expect(isValidFieldKey(key)).toBe(true);
     }
   });
@@ -154,22 +155,22 @@ describe("isValidFieldKey", () => {
   // pattern is enforced again by member_field_definitions_key_format.
   it("rejects everything that could break out of an order term", () => {
     for (const key of [
-      "dues,full_name",
-      "dues.paid",
-      "dues paid",
+      "committee,full_name",
+      "committee.paid",
+      "committee paid",
       'du"es',
-      "dues)paid",
-      "dues-paid",
-      "dues*",
-      "dues%",
-      "cf:dues",
+      "committee)paid",
+      "committee-paid",
+      "committee*",
+      "committee%",
+      "cf:committee",
       "",
-      "1dues",
-      "_dues",
+      "1committee",
+      "_committee",
       "DUES",
-      "duesPaid",
+      "committeePaid",
       "a".repeat(41),
-      "dues\nfull_name",
+      "committee\nfull_name",
     ]) {
       expect(isValidFieldKey(key), key).toBe(false);
     }
@@ -180,12 +181,27 @@ describe("isValidFieldKey", () => {
       expect(isValidFieldKey(key), key).toBe(false);
     }
   });
+
+  it("⚠️ rejects the dues keys, which are reserved for a different reason", () => {
+    // The built-in keys above are reserved so two columns cannot compete for one
+    // name in the export catalogue. These three forbid a duplicate ANSWER: dues
+    // status is calculated from dues_payments and surfaced as
+    // member_directory.dues_paid_current_term, so a hand-ticked dropdown beside
+    // it would leave the roster saying two different things at once.
+    //
+    // Well-formed keys, every one of them — which is the point. Only the
+    // reservation stops them, here and in migration 19's CHECK.
+    for (const key of ["dues", "dues_paid", "dues_paid_current_term"]) {
+      expect(FIELD_KEY_PATTERN.test(key), `${key} is well-formed`).toBe(true);
+      expect(isValidFieldKey(key), key).toBe(false);
+    }
+  });
 });
 
 describe("custom sort keys", () => {
   it("round-trips through the cf: namespace", () => {
-    expect(customSortKey("dues_paid")).toBe("cf:dues_paid");
-    expect(parseCustomSortKey("cf:dues_paid")).toBe("dues_paid");
+    expect(customSortKey("committee_paid")).toBe("cf:committee_paid");
+    expect(parseCustomSortKey("cf:committee_paid")).toBe("committee_paid");
   });
 
   it("reports a built-in sort key as not custom", () => {
@@ -207,8 +223,8 @@ describe("custom sort keys", () => {
   });
 
   it("refuses to build a column expression for an unsafe key", () => {
-    expect(customSortColumn("dues_paid")).toBe("custom_fields->>dues_paid");
-    for (const key of ["dues,full_name", "dues paid", 'du"es', "email"]) {
+    expect(customSortColumn("committee_paid")).toBe("custom_fields->>committee_paid");
+    for (const key of ["committee,full_name", "committee paid", 'du"es', "email"]) {
       expect(customSortColumn(key), key).toBeNull();
     }
   });
@@ -216,15 +232,15 @@ describe("custom sort keys", () => {
 
 describe("fieldValue", () => {
   it("reads a stored answer", () => {
-    expect(fieldValue({ dues_paid: "Paid" }, "dues_paid")).toBe("Paid");
+    expect(fieldValue({ committee_paid: "Paid" }, "committee_paid")).toBe("Paid");
   });
 
   // A missing key and an empty string are one state — "no answer" — because
   // clearing a dropdown deletes the key rather than storing "". Collapsing them
   // here is what stops two states rendering alike and sorting differently.
   it("reads a missing key and an empty string alike", () => {
-    expect(fieldValue({}, "dues_paid")).toBeNull();
-    expect(fieldValue({ dues_paid: "" }, "dues_paid")).toBeNull();
+    expect(fieldValue({}, "committee_paid")).toBeNull();
+    expect(fieldValue({ committee_paid: "" }, "committee_paid")).toBeNull();
   });
 
   it("survives anything that is not an object of strings", () => {
@@ -240,17 +256,17 @@ describe("fieldValue", () => {
 describe("setFieldValue", () => {
   it("sets a value without disturbing the others", () => {
     expect(
-      setFieldValue({ dues_paid: "Paid", size: "M" }, "size", "L")
-    ).toEqual({ dues_paid: "Paid", size: "L" });
+      setFieldValue({ committee_paid: "Paid", size: "M" }, "size", "L")
+    ).toEqual({ committee_paid: "Paid", size: "L" });
   });
 
   it("deletes the key rather than storing an empty string", () => {
-    expect(setFieldValue({ dues_paid: "Paid", size: "M" }, "size", "")).toEqual({
-      dues_paid: "Paid",
+    expect(setFieldValue({ committee_paid: "Paid", size: "M" }, "size", "")).toEqual({
+      committee_paid: "Paid",
     });
     expect(
-      setFieldValue({ dues_paid: "Paid", size: "M" }, "size", null)
-    ).toEqual({ dues_paid: "Paid" });
+      setFieldValue({ committee_paid: "Paid", size: "M" }, "size", null)
+    ).toEqual({ committee_paid: "Paid" });
   });
 
   it("returns a whole object, since PostgREST writes the column wholesale", () => {
@@ -266,9 +282,9 @@ describe("setFieldValue", () => {
   });
 
   it("does not mutate its input", () => {
-    const before = { dues_paid: "Paid" };
-    setFieldValue(before, "dues_paid", "Unpaid");
-    expect(before).toEqual({ dues_paid: "Paid" });
+    const before = { committee_paid: "Paid" };
+    setFieldValue(before, "committee_paid", "Unpaid");
+    expect(before).toEqual({ committee_paid: "Paid" });
   });
 });
 

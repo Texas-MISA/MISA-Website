@@ -149,6 +149,19 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   "attendance_rate",
   "pending_count",
   "last_seen_at",
+  // Stage 6.5 (migration 19). ⚠️ These three are reserved for a different
+  // reason from the rest: they name no column an officer could shadow, they
+  // forbid a *duplicate answer*. Dues status is calculated from `dues_payments`
+  // and surfaced as `member_directory.dues_paid_current_term`, so a hand-ticked
+  // "Paid Dues" dropdown beside it would leave the roster carrying two answers
+  // to one question with nothing to say which is right.
+  //
+  // Reserving `dues` alone is not enough — `dues_paid` is the name somebody
+  // reaches for first, and it is literally the key phase 4's own browser
+  // walkthrough created.
+  "dues",
+  "dues_paid",
+  "dues_paid_current_term",
 ]);
 
 /** Bounds on an option list, mirroring `valid_field_options()` in migration 18. */

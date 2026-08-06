@@ -1,8 +1,46 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.37
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — **phases 1 through 5 of 9 built and browser-verified**. **Stage 6.5 (dues & membership status) interrupts here, before phase 6** — planned and unbuilt, see the v1.34 note below.
+**Version:** 1.38
+**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) is now in progress — phase 1 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
 **Last updated:** August 2026
+
+> **v1.38: dues get a schema, and the parser meets a real file.** Stage 6.5
+> phase 1 — migration 19 and `lib/dues.ts`. No screens; the import is phase 2.
+>
+> - **Migration 19** matches §4.1's DDL, with two additions the outline did not
+>   have. `terms_from` is implemented over an integer **term index**
+>   (`Spring 2026 → 4052`, `Fall 2026 → 4053`) rather than by iterating
+>   `next_term`: it must be IMMUTABLE to back `covered_terms`' generated column,
+>   and an index gives a correct **total order** over terms, which is what §4.7's
+>   lexicographic trap actually needs — a successor function alone does not
+>   answer "which of these two is later". `term_index` and `term_at_index` ship
+>   alongside.
+> - 🪤 **The real Venmo export was read at last, and every part of its shape was
+>   a surprise.** The header is on **line 3** behind two preamble lines and a
+>   leading empty column; the amount is `- $21.00` with the **sign as a separate
+>   token before the `$`**, so `parseFloat` returns `NaN`; non-transaction rows
+>   are identified by an **empty `ID`**, not by position; and the trailing legal
+>   disclaimer is a **quoted field spanning multiple lines**, so a `split("\n")`
+>   parser breaks on the last record of every file. Recorded in full in
+>   `docs/dues-and-membership.md` — the parser is written against a real header
+>   rather than a remembered one, which was the point of insisting on it.
+> - ⚠️ **A Venmo timestamp carries no timezone** (`2026-07-27T21:49:00`), so
+>   `new Date(raw)` reads it as UTC and lands a 9pm Central payment five hours
+>   early. This is §4.7's `new Date("2026-09-01T18:00")` trap arriving through a
+>   new door. Decided: **Central wall time**, attached with the same helper every
+>   event uses. The cost of being wrong is bounded and already has a remedy —
+>   `start_term` is a default rather than a generated column precisely so an
+>   officer can override it.
+> - 🪤 **Reserving a key has a cost the suite finds and nothing else does.**
+>   Five test files used `dues_paid` as their sample custom-field key; the
+>   moment migration 19's CHECK landed they failed. Renamed in the same commit.
+>   The general form: forbidding a key breaks every fixture that borrowed it as
+>   a plausible example.
+> - 🐛 **Two corrections to the spec, both found by building it.**
+>   `scoreMemberCandidates` does not exist (`scoreMemberMatch` and
+>   `rankMemberSuggestions` do), and "tokenize on whitespace **and
+>   punctuation**" is wrong — it splits `rp-8571` into two tokens and matches
+>   neither, destroying the thing `normalized_eid` strips `-` for.
 
 > **v1.37: the roster exports as a real workbook, written by hand.** Stage 6
 > phase 5b. No migration, no new audit verb — `roster.exported` already carries
