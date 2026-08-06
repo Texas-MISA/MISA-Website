@@ -671,6 +671,13 @@ Also: `<autoFilter>` goes **after** `<sheetData>`, not with the other sheet-leve
 - [x] `total_points` is `<v>13</v>` — a **number**, not an inline string; `attendance_rate` `<v>50</v>`; `joined_at` `s="2"` with serial **46042**
 - [x] 🪤 Serial 46042 → 2026-01-20, checked against the database: Amara Osei's `joined_at` is `2026-01-20 12:00 Central`. **The Central conversion survives into the serial** — a UTC slice would have been a day out for anyone who joined at an evening event.
 - [x] `dimension`/`autoFilter` both `A1:G33` (32 rows + header), frozen pane present, seven `<col>` widths sized from content
+- [x] ✅ **Opened in real Excel by an officer — no repair prompt**, Total points sorts numerically with no conversion step, the date column is a genuine serial. This was the one check no test could make, and passing it is what confirms the four `styles.xml` traps above were all handled.
+
+📌 **Two things that look wrong in Excel's ribbon and are not**, both raised on that open and worth writing down so nobody "fixes" them:
+
+- **`Total points` reports its type as `General`, and that is what a plain number IS in Excel.** The cells carry no number format at all, deliberately — imposing one on a point total is not the export's business. The proof it is numeric rather than text is that it sorts without a conversion step and that Excel **right-aligns** it, which is its own tell.
+- **`Joined` reports `Custom` rather than `Date`, and it is still a real date.** The cell is `<c r="F2" s="2"><v>46042</v></c>` — no `t` attribute, so numeric, with `numFmtId="164"` applied. Excel says "Custom" only because `yyyy-mm-dd` is not one of its built-in *named* formats. Setting the column to General shows `46042`.
+  - **Decided 2026-08-06: the ISO format stays**, rather than switching to built-in `numFmtId` 14 (`mm-dd-yy`). ISO is unambiguous across locales — `2026-03-10` can only be March 10, where `03-10` is October 3 to half the world — it survives being pasted elsewhere, it still sorts chronologically if anyone re-exports the column as text, and it **matches what the CSV writer emits**, so the two formats do not disagree about what a date looks like. The cosmetic "Custom" label is the entire cost.
 
 🪤 **An environment trap that cost real time, and is not an application bug:**
 

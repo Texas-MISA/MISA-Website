@@ -39,6 +39,16 @@
 >   evening event.
 > - **XLSX is the primary download; CSV stays beside it, not behind a menu.** It
 >   is explicitly the format that keeps working if this writer is ever pulled.
+> - ✅ **Confirmed by opening the generated workbook in real Excel** — no repair
+>   prompt, numbers sort numerically, dates are genuine serials. That was the one
+>   check the test suite structurally cannot make, and it is what validates the
+>   four traps above. 📌 Two ribbon labels look wrong and are not: a number cell
+>   reports `General`, which is what a plain number *is* in Excel, and a date
+>   cell reports `Custom` because `yyyy-mm-dd` is not one of the built-in *named*
+>   formats. **The ISO format stays** rather than built-in `numFmtId` 14
+>   (`mm-dd-yy`) — ISO is unambiguous across locales, survives a paste elsewhere,
+>   sorts chronologically even as text, and agrees with what the CSV writer
+>   emits. The cosmetic label is the whole cost.
 
 > **v1.36: the roster leaves the building, and it is audited on the way out.**
 > Stage 6 phase 5 split into **5a** (selection, the field catalogue, the
