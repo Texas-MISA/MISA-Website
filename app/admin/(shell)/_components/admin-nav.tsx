@@ -17,6 +17,11 @@ const NAV = [
   { href: "/admin/attendance", label: "Attendance", ready: true },
   { href: "/admin/members", label: "Members", ready: true },
   { href: "/admin/points", label: "Points", ready: true },
+  // Points at the import until Stage 6.5 phase 3 builds the ledger at
+  // /admin/dues. The active check below is `startsWith`, so this stays
+  // underlined for every /admin/dues/* path — which is what we want here,
+  // unlike the members/fields case where a second entry would have lit two.
+  { href: "/admin/dues/import", label: "Dues", ready: true },
   { href: "/admin/audit", label: "Audit", ready: false },
 ] as const;
 

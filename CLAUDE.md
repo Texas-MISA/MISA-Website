@@ -12,7 +12,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 📦 **Phase 5 was split into 5a and 5b** (2026-08-06), mirroring the mid-stage 2a/2 split. **5a**: `lib/export.ts` (the pure core — the field catalogue, the typed `ExportCell` projection, the CSV/TSV/clipboard writers), row checkboxes with a real "select all N matching this filter", a field picker, and **`app/admin/(shell)/members/export/route.ts`, the codebase's first Route Handler**. **5b**: `lib/xlsx.ts`, a **hand-rolled, zero-dependency** workbook writer — SheetJS's npm package is four years stale (releases moved to its own CDN) and `exceljs` has been inactive since Oct 2023, so both were rejected rather than adopted; an xlsx is a zip of six XML parts and `node:zlib` is built in. DOWNLOAD XLSX is the primary button, CSV outlined beside it. Rejected candidates and the four repair-prompt traps are in `tasks.md` under Phase 5b.
 
-🚧 **Stage 6.5 (dues & membership status) — phase 1 of 4 built 2026-08-06** (migration 19 and `lib/dues.ts`; the import, the ledger screens and the directory UI are phases 2–4). Decided 2026-08-05, spec at [`docs/dues-and-membership.md`](docs/dues-and-membership.md).
+🚧 **Stage 6.5 (dues & membership status) — phases 1 and 2 of 4 built 2026-08-06** (migration 19 and `lib/dues.ts`; then `app/actions/dues.ts`, `lib/dues-roster.ts` and `/admin/dues/import`. The ledger screens and the directory UI are phases 3–4). Decided 2026-08-05, spec at [`docs/dues-and-membership.md`](docs/dues-and-membership.md).
+  - **The import is two steps over one CSV**, and the text lives **only in the officer's browser** between them — no staging table, no temp file. `commitImport` **re-parses** rather than accepting the preview's output; both actions share one `planImport`, so the commit runs the identical code path and cannot diverge from what was shown. Same posture as `/attend`'s `step=confirm`.
+  - 🔓 **`upsert` with `ignoreDuplicates` is the write**, and it is the first use of upsert in application code. It makes "re-importing is a no-op" a **database** guarantee rather than an app-level pre-check a concurrent import could race past, and the `.select()` then returns only the rows actually inserted — so **requested − returned is the duplicate count**, with no second query to disagree with it.
+  - ⚠️ **Next caps a Server Action request at 1MB by default.** `MAX_IMPORT_BYTES` (512 KB) and `MAX_IMPORT_ROWS` (2000) sit below it so the officer gets a sentence naming the limit rather than an opaque framework error. Both **refuse; neither truncates**.
+  - ⚠️ **`lib/dues-roster.ts` is uncapped and deliberately not `fetchMemberOptions`** — that caps at `MEMBER_SCAN_LIMIT`, filters to active members, and never selects `normalized_eid`. Matching against a truncated roster reports `unmatched` for someone who *is* on the roster: silent truncation landing on money. 🪤 But uncapped ≠ one unbounded request — it pages in 1000s, because the hosted project applies its own `max_rows`.
   - **Migration 19** carries `dues_payments`, the `app_settings` price columns (3000 / 5000 cents), `term_index` / `term_at_index` / `next_term` / `terms_from`, `'dues_payment'` in the audit entity types, `dues_paid_current_term` appended to `member_directory`, and the three reserved dues keys. Applied from scratch via `db reset`, so it rebuilds from the repo alone.
   - 🪤 **The real Venmo export format was recorded from an actual statement, and every part of it was a surprise**: the header is on **line 3** with a leading empty column, the amount is `- $18.50` with the sign as a separate token before the `$`, the footer is a **quoted field spanning multiple lines** (so a `split("\n")` parser breaks on the last record of every file), and non-transaction rows are identified by an **empty `ID`** rather than by position. Full table in the spec doc.
   - ⚠️ **A Venmo timestamp carries no timezone** (`2026-09-03T19:22:00`), so `new Date(raw)` reads it as UTC and lands a 9pm Central payment five hours early — the `new Date("2026-09-01T18:00")` trap in a new place. Decided: **Central wall time**, attached via `centralWallTimeToInstant`.
@@ -297,12 +301,24 @@ lib/dues.ts             the dues domain core (6.5 phase 1) — pure like
                         prices injected, and the nextTerm/termsFrom mirrors of
                         the SQL functions. The ONLY place term ordering is
                         expressed — see the lexicographic trap in Invariants
-app/actions/dues.ts     Stage 6.5, not built — previewImport (parses, writes
-                        nothing), commitImport (re-parses server-side rather
-                        than trusting the preview), and the corrections:
-                        assignPayment, setPaymentTerms, voidPayment. No role
-                        check, same as members.ts (§9 #6)
-app/admin/(shell)/dues/ Stage 6.5, not built — the ledger, /[id] payment detail,
+lib/dues-roster.ts      the uncapped {memberId, normalizedEid} roster the note
+                        matcher runs against (6.5 phase 2). Paged in 1000s —
+                        the hosted project applies its own max_rows. Returns a
+                        discriminated error rather than [], because an empty
+                        roster and a failed read are indistinguishable to the
+                        caller and the difference marks a whole statement
+                        unmatched
+app/actions/dues.ts     6.5 phase 2, built — previewImport (parses, probes for
+                        duplicates, writes NOTHING) and commitImport
+                        (re-parses server-side rather than trusting the
+                        preview). The corrections — assignPayment,
+                        setPaymentTerms, voidPayment — arrive in phase 3. No
+                        role check anywhere, and the header says so (§9 #6)
+app/admin/(shell)/dues/import/
+                        6.5 phase 2, built — the two-step upload. The client
+                        component holds the CSV text in memory between preview
+                        and commit; nothing is staged server-side
+app/admin/(shell)/dues/ phase 3, not built — the ledger, /[id] payment detail,
                         and /import. The import is a Server Action, not a route
                         handler; its client component holds the CSV text between
                         the preview and commit steps so nothing is staged

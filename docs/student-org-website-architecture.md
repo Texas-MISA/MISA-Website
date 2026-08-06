@@ -1,8 +1,45 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.38
-**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) is now in progress — phase 1 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
+**Version:** 1.39
+**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) — phases 1 and 2 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
 **Last updated:** August 2026
+
+> **v1.39: the import.** Stage 6.5 phase 2 — `app/actions/dues.ts`,
+> `lib/dues-roster.ts`, and `/admin/dues/import`. No migration.
+>
+> - **Two steps over one CSV, and the text never touches the server's disk.**
+>   The client reads the file with `FileReader` and holds it in component state;
+>   `commitImport` **re-parses** rather than accepting the preview's output.
+>   Both actions call one shared `planImport`, so the commit runs the identical
+>   code path the preview did and cannot drift from what the officer was shown —
+>   the only thing it adds is the write. Same posture as `/attend`'s
+>   `step=confirm`, for the same reason: a preview is a courtesy, never an input.
+> - 🔓 **The write is an upsert with `ignoreDuplicates`**, the first in
+>   application code here. Officers upload overlapping statements on purpose, so
+>   "re-importing is a no-op" has to be a **database** guarantee rather than an
+>   app-level pre-check a concurrent import could race past. The `.select()`
+>   then returns only the rows actually inserted, so *requested − returned* is
+>   the duplicate count with no second query able to disagree with it. The
+>   unique index spans voided rows, so a payment an officer already voided stays
+>   skipped rather than resurrected.
+> - ⚠️ **A Server Action request is capped at 1MB by default.** `MAX_IMPORT_BYTES`
+>   (512 KB) and `MAX_IMPORT_ROWS` (2000) sit below it deliberately, so the
+>   officer gets a sentence naming the limit instead of an opaque framework
+>   error. Both refuse; neither truncates.
+> - ⚠️ **The matching roster is uncapped, and is not `fetchMemberOptions`.**
+>   That one caps at `MEMBER_SCAN_LIMIT` (a picker's payload bound), filters to
+>   active members, and never selects `normalized_eid`. Matching a payment
+>   against a truncated roster reports `unmatched` for somebody who *is* on the
+>   roster — §2.2's silent-truncation failure landing on money. 🪤 But uncapped
+>   is not the same as one unbounded request: it pages in 1000s, because the
+>   hosted project applies a `max_rows` local does not.
+> - **Summer payments are warned about, not silently corrected.** §4.7 puts
+>   May–July in Spring, so a July payment buys a term with three weeks left. A
+>   per-row override in the preview was rejected — it would make the preview an
+>   input to the commit — so the preview warns and phase 3's detail page fixes.
+> - **One audit row per payment, not one receipt per import**, matching
+>   `points.granted`. `import_batch_id` on the row already answers "which upload
+>   was this".
 
 > **v1.38: dues get a schema, and the parser meets a real file.** Stage 6.5
 > phase 1 — migration 19 and `lib/dues.ts`. No screens; the import is phase 2.
@@ -2197,7 +2234,7 @@ The criterion previously read "attended fewer than three events this term". That
 | Phase | Scope | State |
 |---|---|---|
 | 1 | Migration 19, `term_index` / `term_at_index` / `next_term` / `terms_from`, `lib/dues.ts` (parse, term math, matching), the `member_directory` column, the reserved-key widening, tests | ✅ **built 2026-08-06** |
-| 2 | The import — `/admin/dues/import`, the two-step parse-preview-commit flow, `app/actions/dues.ts`, batch receipts, audit | |
+| 2 | The import — `/admin/dues/import`, the two-step parse-preview-commit flow, `app/actions/dues.ts`, batch receipts, audit | ✅ **built 2026-08-06** |
 | 3 | The ledger and the editor — `/admin/dues`, `/admin/dues/[id]`, reassign / correct / void, the needs-review queue | |
 | 4 | The directory column and filter, the detail page's payment history, and dues added to phase 5's export catalogue | **Stage 6 exit criteria met here** |
 

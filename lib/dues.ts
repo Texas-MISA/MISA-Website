@@ -78,6 +78,53 @@ export function isLaterTerm(a: string, b: string): boolean {
   return left > right;
 }
 
+/**
+ * 🪤 Does this payment land in the summer, where §4.7 puts May–July in Spring?
+ *
+ * Pay $30 in July intending to cover the coming Fall and it buys a term with
+ * three weeks left in it. The rule is NOT changed — changing it would make
+ * `term_of` disagree with itself between events and payments — so the import
+ * warns instead, and `start_term` is a default rather than a generated column
+ * precisely so an officer can correct it afterwards.
+ *
+ * Central months, because that is the zone `term_of` anchors to.
+ */
+export function isSummerTerm(paidAt: Date): boolean {
+  const month = Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/Chicago",
+      month: "numeric",
+    }).format(paidAt)
+  );
+  return month >= 5 && month <= 7;
+}
+
+// ---------------------------------------------------------------------------
+// Import bounds
+// ---------------------------------------------------------------------------
+
+/**
+ * How much CSV text one import may carry.
+ *
+ * ⚠️ Deliberately BELOW Next's own 1MB Server Action body cap, so an officer
+ * who overshoots gets a sentence naming the limit rather than an opaque
+ * framework error. A real monthly statement measured about 2 KB, so this is
+ * three orders of magnitude of headroom — a guard rail, not a constraint.
+ *
+ * Refuses; never truncates. Importing the first N bytes of a statement would
+ * cut a row in half and silently drop the rest of the month.
+ */
+export const MAX_IMPORT_BYTES = 512 * 1024;
+
+/**
+ * How many payments one import may carry.
+ *
+ * Sized well above §2.2's worst case (500 members paying twice a year through
+ * one account). Same rule as `MAX_EXPORT_ROWS`: it refuses loudly, because a
+ * partial import reported as success is somebody's dues going missing.
+ */
+export const MAX_IMPORT_ROWS = 2000;
+
 // ---------------------------------------------------------------------------
 // Prices
 // ---------------------------------------------------------------------------
