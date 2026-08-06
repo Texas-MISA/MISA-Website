@@ -1381,9 +1381,11 @@ create table dues_payments (
   voided_at      timestamptz,
   voided_by      uuid references auth.users(id),
   void_reason    text,
+  -- Written as an equality of null-ness, matching point_adjustments'
+  -- void_requires_reason, so it also rejects a voided_by left behind on a row
+  -- that is not voided.
   constraint dues_void_is_complete check (
-    (voided_at is null and voided_by is null) or
-    (voided_at is not null and voided_by is not null)
+    (voided_at is null) = (voided_by is null)
   ),
   constraint dues_void_requires_reason check (
     (voided_at is null) = (void_reason is null)
@@ -1394,12 +1396,12 @@ create table dues_payments (
 
 -- The dedupe. Spans voided rows on purpose: re-importing a statement whose
 -- payment an officer already voided must stay a no-op, not resurrect it.
-create unique index dues_payments_txn on dues_payments (venmo_txn_id);
-create index dues_payments_member  on dues_payments (member_id);
-create index dues_payments_covered on dues_payments using gin (covered_terms);
-create index dues_payments_batch   on dues_payments (import_batch_id);
+create unique index dues_payments_txn_idx     on dues_payments (venmo_txn_id);
+create index dues_payments_member_idx  on dues_payments (member_id);
+create index dues_payments_covered_idx on dues_payments using gin (covered_terms);
+create index dues_payments_batch_idx   on dues_payments (import_batch_id);
 -- The needs-review queue: unmatched, or matched but undecided.
-create index dues_payments_review on dues_payments (imported_at desc)
+create index dues_payments_review_idx on dues_payments (imported_at desc)
   where voided_at is null and (member_id is null or terms_covered is null);
 
 -- Single append-only audit log across every entity an officer can modify.
@@ -1773,43 +1775,56 @@ January 1 is Spring. August 1 is Fall. Summer events fall in Spring — a June m
 - It cannot be overridden. Moving an event across a boundary re-tags it automatically, which also means an event rescheduled from July to August moves between terms and changes both members' standings — the §4.6 edit-impact warning should say so.
 - `point_adjustments.term` is **defaulted, not generated**, precisely because it does need overriding: a bonus awarded in Spring for Fall work belongs to Fall. This is the independence §4.4 relies on.
 
-**Terms also have to advance, not just be named** (migration 19, v1.34). A dues payment buys one term or two, so "the term after this one" becomes a schema-level question for the first time. Two more immutable functions, beside `term_of` and derived from the same two-season rule:
+**Terms also have to advance, not just be named** (migration 19, built v1.38). A dues payment buys one term or two, so "the term after this one" becomes a schema-level question for the first time. **Four** immutable functions, beside `term_of` and derived from the same two-season rule — the count grew by two during the build, and the reason is the interesting part.
 
 ```sql
--- 'Fall 2026' → 'Spring 2027';  'Spring 2027' → 'Fall 2027'.
-create or replace function next_term(t text)
-returns text
-language sql
-immutable
+-- A term as a monotonically increasing integer. Spring sorts before Fall
+-- within a year:  Spring 2026 → 4052,  Fall 2026 → 4053,  Spring 2027 → 4054.
+create or replace function public.term_index(t text)
+returns integer language sql immutable
 as $$
   select case
-    when t like 'Fall %'
-      then 'Spring ' || (split_part(t, ' ', 2)::int + 1)
-      else 'Fall '   ||  split_part(t, ' ', 2)::int
+    when t is null then null
+    else split_part(t, ' ', 2)::int * 2
+       + case when split_part(t, ' ', 1) = 'Fall' then 1 else 0 end
   end
 $$;
+
+-- The inverse.
+create or replace function public.term_at_index(i integer)
+returns text language sql immutable
+as $$
+  select case
+    when i is null then null
+    else case when i % 2 = 1 then 'Fall ' else 'Spring ' end || (i / 2)::text
+  end
+$$;
+
+-- 'Fall 2026' → 'Spring 2027';  'Spring 2027' → 'Fall 2027'.
+create or replace function public.next_term(t text)
+returns text language sql immutable
+as $$ select public.term_at_index(public.term_index(t) + 1) $$;
 
 -- The n consecutive terms starting at `start`. Null n yields null, which is
 -- what makes dues_payments.covered_terms cover nothing until an officer
 -- decides how many terms a payment bought.
-create or replace function terms_from(start text, n int)
-returns text[]
-language sql
-immutable
+create or replace function public.terms_from(start text, n int)
+returns text[] language sql immutable
 as $$
-  select case when n is null then null else
-    (select array_agg(t order by i)
-     from generate_series(1, n) as i,
-     lateral (select case when i = 1 then start
-                          else (select …)  -- iterated next_term, i-1 times
-                     end as t) s)
+  select case
+    when start is null or n is null or n < 1 then null
+    else (
+      select array_agg(public.term_at_index(public.term_index(start) + step)
+                       order by step)
+      from generate_series(0, n - 1) as step
+    )
   end
 $$;
 ```
 
-*(`terms_from` is shown in outline — the migration is the authority, as everywhere in §4.1. The contract is what matters: `terms_from('Fall 2026', 2)` is `{'Fall 2026','Spring 2027'}`, and `terms_from(anything, null)` is null.)*
+**Why an index rather than iterating `next_term`, which is what this section used to show.** Two reasons, and the second is the one that matters. `covered_terms` is a **generated column**, so its expression must be `IMMUTABLE` — an index makes stepping plain addition with no recursion. And a successor function alone cannot answer *"which of these two terms is later"*, which is the question the trap below is actually about. An index gives a **total order** for free, and `isLaterTerm` in `lib/dues.ts` is that order made available to application code.
 
-🪤 **Terms do not sort lexicographically, and this is the trap the two functions exist to avoid.** `'Fall 2026' < 'Spring 2026'` is true as a string compare and false as a calendar fact. Any "which term is later" question — the latest term a member is paid through, the ordering of a payment history — must go through `terms_from` ordering or the array's own position, never `max()` or `order by term`. It is the same class of error as `new Date("2026-09-01T18:00")`: plausible output, wrong answer, no error anywhere.
+🪤 **Terms do not sort lexicographically, and this is the trap these functions exist to avoid.** `'Fall 2026' < 'Spring 2026'` is true as a string compare and false as a calendar fact. Any "which term is later" question — the latest term a member is paid through, the ordering of a payment history — must go through `term_index`, never `max()` or `order by term`. It is the same class of error as `new Date("2026-09-01T18:00")`: plausible output, wrong answer, no error anywhere.
 
 **A payment's covered terms are derived, never typed** — the same rule this section opens with, applied to money. `dues_payments.start_term` defaults from `term_of(paid_at)` and `covered_terms` is generated from it, so no officer types a term string into a payment. `start_term` is nonetheless **overridable**, like `point_adjustments.term` and for a related reason: summer falls in Spring under the boundaries above, so a July payment for the coming academic year would otherwise buy a term with three weeks left in it. The import preview flags May–July payments for exactly this.
 
@@ -2073,9 +2088,11 @@ contact form's backend — it renders disabled, with email as the working path.
 | 2a | Migration 15 — close the anon read of `member_directory`; `tests/security.test.ts` | ✅ built & deployed |
 | 2 | The EID switch — migrations 16 and 17, the ranker retune, seed and fixture regeneration | ✅ built & deployed |
 | 3 | The reshaped four-column directory **and** `/admin/members/[id]` | ✅ built — no migration needed |
-| 4 | Custom fields — definitions, dropdown values, inline editing, sorting | ✅ built & browser-verified — **migration 18 unpushed, unmerged** |
-| 5 | Selection and extraction — copy emails / names / TSV, CSV **and `.xlsx`** download with a field picker, export auditing | |
-| — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | |
+| 4 | Custom fields — definitions, dropdown values, inline editing, sorting | ✅ built, browser-verified & deployed (migration 18) |
+| 5a | Selection — row checkboxes, "select all N matching", the field picker, clipboard, CSV, and the codebase's first Route Handler | ✅ built, browser-verified & deployed |
+| 5b | The `.xlsx` workbook — hand-rolled and dependency-free | ✅ built & deployed; confirmed by opening it in real Excel |
+| — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | 🚧 phase 1 of 4 built |
+| 5c | Filter by categorical fields — custom fields, dues status, `source`. **After 6.5**, because it filters on the dues column | |
 | 6 | Relational filters (attended or missed a given event, has pending, not seen since) | |
 | 7 | Saved filter presets and CSV roster import | |
 | 8 | The merge tool — its own estimate, see below | |
@@ -2179,7 +2196,7 @@ The criterion previously read "attended fewer than three events this term". That
 
 | Phase | Scope | State |
 |---|---|---|
-| 1 | Migration 19, `next_term` / `terms_from`, `lib/dues.ts` (parse, term math, matching), the `member_directory` column, the reserved-key widening, tests | |
+| 1 | Migration 19, `term_index` / `term_at_index` / `next_term` / `terms_from`, `lib/dues.ts` (parse, term math, matching), the `member_directory` column, the reserved-key widening, tests | ✅ **built 2026-08-06** |
 | 2 | The import — `/admin/dues/import`, the two-step parse-preview-commit flow, `app/actions/dues.ts`, batch receipts, audit | |
 | 3 | The ledger and the editor — `/admin/dues`, `/admin/dues/[id]`, reassign / correct / void, the needs-review queue | |
 | 4 | The directory column and filter, the detail page's payment history, and dues added to phase 5's export catalogue | **Stage 6 exit criteria met here** |
@@ -2434,12 +2451,21 @@ One decision, and it earns a place here rather than in Stage 10 because it const
   filters.ts                 directory filter → SQL translation. One filter
                              object, one translation; pagination stays outside
                              it so the export is the same query (§4.5)
-  export.ts                  CSV / TSV / clipboard formatting, the exportable
-                             field catalogue, and the xlsx workbook builder
-                             (Stage 6 phase 5). Pure — takes rows and a field
-                             list, returns a string or a byte array; the audit
-                             write and the response headers belong to the
-                             Route Handler
+  export.ts                  CSV / TSV / clipboard formatting and the exportable
+                             field catalogue (phase 5a). Pure — rows and a field
+                             list in, a string out; the audit write and the
+                             response headers belong to the Route Handler. The
+                             typed ExportCell union is what lets the CSV formula
+                             guard fire on text and never on numbers
+  xlsx.ts                    the workbook writer (phase 5b) — a ZIP container
+                             over node:zlib plus the six OOXML parts. Split from
+                             export.ts rather than folded into it, and
+                             hand-rolled rather than a dependency: SheetJS's npm
+                             package is four years stale and exceljs inactive
+                             since Oct 2023. Consumes the SAME projectRow output
+                             as the CSV writer; only the formatting differs, and
+                             the two must never share a "join with commas"
+                             shortcut
   members.ts                 member domain core: classifyTermEvents (the detail
                              page's three-state grid), formatAttendanceRate,
                              and the custom-field core — FIELD_KEY_PATTERN (a
@@ -2453,14 +2479,20 @@ One decision, and it earns a place here rather than in Stage 10 because it const
                              screen, and phase 5's field catalogue. Deliberately
                              uncapped: nobody hand-creates 500 dropdowns, and
                              show_in_directory is the bound that matters
-  dues.ts                    Stage 6.5 — the dues domain core, and pure like the
-                             rest of this list: Venmo CSV parsing, the note →
-                             EID token match, the amount → terms_covered rule
-                             (prices injected, never read from here), and the
-                             term arithmetic mirroring next_term / terms_from.
-                             🪤 Terms do not sort lexicographically — any
-                             "which term is later" comparison lives here, and
-                             never as a string compare at a call site
+  dues.ts                    Stage 6.5 phase 1, built — the dues domain core,
+                             pure like the rest of this list. parseCsv (a real
+                             tokenizer: the Venmo footer is a quoted field
+                             spanning newlines, so split("\n") breaks on the
+                             last record of every file), parseVenmoStatement,
+                             parseAmountCents (the sign is a separate token
+                             before the $), parseVenmoDatetime (⚠️ the stamp
+                             carries NO timezone — treated as Central wall
+                             time), matchNote, termsForAmount, planPayment —
+                             the decision table in one place — and the term
+                             arithmetic. 🪤 Terms do not sort
+                             lexicographically: every "which term is later"
+                             question goes through termIndex / isLaterTerm
+                             here, never a string compare at a call site
 /supabase
   /migrations                versioned SQL
   seed.sql
