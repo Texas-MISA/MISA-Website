@@ -9,6 +9,7 @@ import {
 import { customSortKey, type FieldDefinition } from "@/lib/members";
 
 import { DirectoryRow } from "./directory-row";
+import { SelectAllHeader } from "./selection";
 
 // A Server Component, and it stays one. Phase 4 added the inline <select> cells
 // for custom fields, and — as the phase-3 note here predicted — the row markup
@@ -78,6 +79,9 @@ export function MemberTable({
       <table className="w-full min-w-[40rem] border-collapse text-sm">
         <thead className="bg-misa-panel">
           <tr className="border-b-2 border-black">
+            {/* One Client Component cell in an otherwise server-rendered head —
+                the other headers are navigation links, this is a control. */}
+            <SelectAllHeader />
             <SortHeader filter={filter} column="name" align="left">
               Member
             </SortHeader>

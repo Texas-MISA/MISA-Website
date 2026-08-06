@@ -5,18 +5,22 @@ import { requireOfficer } from "@/lib/auth";
 import {
   applyMemberFilter,
   isDefaultFilter,
+  memberFilterToParams,
   pageCount,
   pageRange,
   parseMemberFilter,
   PAGE_SIZE,
 } from "@/lib/filters";
+import { exportCatalogue } from "@/lib/export";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
 import type { FieldDefinition } from "@/lib/members";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { ExportToolbar } from "./_components/export-toolbar";
 import { MemberFilters } from "./_components/member-filters";
 import { MemberTable, type MemberRow } from "./_components/member-table";
 import { Pagination } from "./_components/pagination";
+import { SelectionProvider } from "./_components/selection";
 
 // The member directory (§5, §7 Stage 6). Reads member_directory, which is
 // current-term scoped and keeps the attendance/bonus split the public
@@ -120,6 +124,18 @@ export default async function AdminMembersPage({
 
   const pages = result.kind === "ok" ? pageCount(result.total) : 1;
 
+  // The filter as the export sees it — deliberately WITHOUT `page`.
+  //
+  // Two jobs, and both want the page number gone. It is the export's query
+  // string, and an export is never page-scoped (that separation is the whole
+  // reason applyMemberFilter does not paginate). It is also the key that resets
+  // the selection, and paging is not a filter change: an officer who checks
+  // three rows on page 1, looks at page 2 and comes back should still have
+  // three rows checked.
+  const filterScope = memberFilterToParams(filter);
+  filterScope.delete("page");
+  const filterKey = filterScope.toString();
+
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-4">
@@ -165,9 +181,27 @@ export default async function AdminMembersPage({
                   : `${result.total} matching member${result.total === 1 ? "" : "s"}.`}
             </p>
 
-            <MemberTable rows={result.rows} filter={filter} fields={fields} />
+            {/* The provider wraps the toolbar, the table AND the pagination:
+                the toolbar reads the selection, the table writes it, and the
+                pagination sits inside so a page change cannot remount the
+                provider and silently drop what was checked. The filter key is
+                what resets it — see selection.tsx. */}
+            <SelectionProvider
+              filterKey={filterKey}
+              total={result.total}
+              pageIds={result.rows.map((row) => row.id)}
+            >
+              {result.total > 0 && (
+                <ExportToolbar
+                  filterParams={filterKey}
+                  catalogue={exportCatalogue(fields)}
+                />
+              )}
 
-            <Pagination filter={filter} pages={pages} total={result.total} />
+              <MemberTable rows={result.rows} filter={filter} fields={fields} />
+
+              <Pagination filter={filter} pages={pages} total={result.total} />
+            </SelectionProvider>
           </>
         )}
       </div>

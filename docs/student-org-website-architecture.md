@@ -1,8 +1,55 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.35
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2, 3 and 4 of 9 built, merged and deployed; **phase 5 (selection and extraction) is next**. **Stage 6.5 (dues & membership status) is planned and unbuilt** — see the v1.34 note below.
+**Version:** 1.36
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2, 3 and 4 of 9 built, merged and deployed, and **phase 5a (selection and extraction over CSV) built and browser-verified**; phase 5b (the xlsx workbook) is next. **Stage 6.5 (dues & membership status) is planned and unbuilt** — see the v1.34 note below.
 **Last updated:** August 2026
+
+> **v1.36: the roster leaves the building, and it is audited on the way out.**
+> Stage 6 phase 5 split into **5a** (selection, the field catalogue, the
+> clipboard, CSV) and **5b** (the xlsx workbook, unbuilt), mirroring the
+> mid-stage 2a/2 split — CSV is the format that survives if the xlsx writer is
+> ever pulled, so it ships first and stands alone. No migration.
+>
+> - **The codebase's first Route Handler**,
+>   `app/admin/(shell)/members/export/route.ts`, because a download needs
+>   `Content-Disposition` and a Server Action cannot set response headers.
+>   ⚠️ Route Handlers **do not participate in layouts**, so the `(shell)`
+>   layout's `requireOfficer()` never runs for it — the group is colocation and
+>   grants nothing. `proxy.ts` still 307s an unauthenticated request to login
+>   before the handler runs, but that is a convenience; the `getOfficer()` 403
+>   is what catches a signed-in user with no `admin_profiles` row.
+> - **Selection is two modes, not one set that happens to be full.** In `filter`
+>   mode the request carries **no ids at all** and the route re-runs the same
+>   filtered query, which is what makes "all N matching" provably all N rather
+>   than the 25 that happened to be rendered. Explicit ids *narrow* that query
+>   instead of replacing it, so a stale checkbox cannot pull back a row the
+>   filter excludes. §4.5's one-translation rule is what makes this cheap:
+>   `applyMemberFilter` is shared and only `pageRange()` differs.
+> - 🔓 **The CSV formula guard fires on text and must never fire on numbers.**
+>   A member named `=HYPERLINK(...)` is reachable by design (§6 self-registration),
+>   but `bonus_points` of `-5` is legitimately negative and `'-5` stops being a
+>   number the moment it lands in the sheet. Hence a typed `ExportCell` union
+>   rather than stringified rows: an "escape everything" pass would be right for
+>   names and wrong for every negative number. Confirmed end to end against a
+>   real row, not only in unit tests.
+> - **The receipt records what actually left, not what was ticked.** The
+>   clipboard's email and name formats emit one column regardless of the field
+>   picker, and the first cut logged the picker's four for an email copy.
+>   Over-reporting is still misreporting: a receipt that answers §6's question
+>   with a superset is one nobody can reason from later. Found in the
+>   walkthrough. The clipboard is audited exactly like the download — same
+>   egress, and only `Content-Disposition` differs.
+> - **Export is open to any officer, and that is now settled** (§6's "consider
+>   restricting it", resolved). §9 answered four adjacent questions the same way
+>   on one premise — the audit log is the control, not a gate — and nothing in
+>   this codebase branches on `admin_profiles.role`. The one argument that
+>   genuinely does not apply to approving was weighed and lost: a downloaded
+>   file outlives the session. Both `lib/export.ts` and the route say so in
+>   their headers so nobody re-adds a gate as an oversight.
+> - **The xlsx writer will be hand-rolled, zero-dependency** (5b). Checked
+>   rather than remembered: SheetJS's npm package is stuck four years back
+>   because releases moved to its own CDN, and `exceljs` has been inactive since
+>   Oct 2023. An xlsx is a zip of ~6 XML parts and `node:zlib` is built in.
 
 > **v1.35: Stage 6 phase 4 shipped** (2026-08-05, merge `3931d99`). Migration 18
 > was pushed to the remote, so **local and remote are level again at 19

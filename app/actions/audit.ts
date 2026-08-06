@@ -94,7 +94,13 @@ export type AuditAction =
   | "member_field.updated"
   // Archived, never deleted: stored values stay keyed to the definition, and a
   // hard delete would rewrite what the roster said at the time.
-  | "member_field.archived";
+  | "member_field.archived"
+  // Stage 6 phase 5. The only verb here that is not a mutation: §6 requires
+  // every export logged because it is the largest PII egress point in the
+  // system, and reading is exactly what makes it one. Filed under entity type
+  // 'roster' against a receipt uuid nothing else references, since an export
+  // spans N members rather than naming one.
+  | "roster.exported";
 
 export type AuditEntry = {
   entityType: AuditEntityType;

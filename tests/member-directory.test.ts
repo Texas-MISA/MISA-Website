@@ -494,3 +494,131 @@ describe("custom-field sorting through the view", () => {
     expect(data).toHaveProperty("notes");
   });
 });
+
+// ---------------------------------------------------------------------------
+// The export query (§7 Stage 6 phase 5)
+// ---------------------------------------------------------------------------
+//
+// 🪤 This is the block the whole phase exists for, and it can only live here.
+// "Select all N matching this filter" versus "the 25 rows on this page" is a
+// distinction no pure test can settle — it depends on PostgREST actually
+// returning what the unpaginated filter claims. It is also invisible against the
+// seed: 32 members at a page size of 25 means a broken export looks correct on
+// every screen an officer would think to check.
+//
+// ⚠️ Its own marker, for the reason recorded above CF_MARKER: `t3q` matches
+// every fixture the earlier describes created, and several of them add members
+// as they run — asserting a count against `t3q` here counts somebody else's
+// rows. `t3qex` is a strict narrowing, so the earlier blocks still see
+// everything they expect and this one sees only what it made. Getting this wrong
+// is not subtle when it fails (31 expected, 67 received) but it would be
+// invisible if the assertion were an inequality.
+//
+// The export mirrors the route handler rather than importing it, because a Route
+// Handler needs a request context this suite cannot build. What is pinned is the
+// query shape: the same applyMemberFilter, with pageRange() replaced by explicit
+// chunked paging.
+const EX_MARKER = "t3qex";
+const EX_COUNT = PAGE_SIZE + 6;
+const EX_INACTIVE_EVERY = 5;
+
+describe("the export query returns every matching member", () => {
+  // Deliberately far below EX_COUNT, so the loop genuinely goes round four
+  // times. A chunk larger than the fixture set would pass while testing nothing.
+  const CHUNK = 8;
+
+  const exIds: string[] = [];
+
+  beforeAll(async () => {
+    for (let i = 0; i < EX_COUNT; i++) {
+      const base = testIdentity();
+      const id = await createTestMember(
+        db,
+        track,
+        { ...base, eid: base.eid.replace("t3q", EX_MARKER) },
+        { active: i % EX_INACTIVE_EVERY !== 0 }
+      );
+      exIds.push(id);
+    }
+  }, 60_000);
+
+  const everyone = () => parseMemberFilter({ q: EX_MARKER, state: "all" });
+
+  async function exportAll(
+    filter: ReturnType<typeof parseMemberFilter>,
+    ids: string[] = []
+  ) {
+    const base = applyMemberFilter(
+      db.from("member_directory").select(ROW_COLUMNS, { count: "exact" }),
+      filter,
+      []
+    );
+    const query = ids.length > 0 ? base.in("id", ids) : base;
+
+    const rows: { id: string | null }[] = [];
+    let total = 0;
+
+    for (let offset = 0; ; offset += CHUNK) {
+      const { data, error, count } = await query.range(
+        offset,
+        offset + CHUNK - 1
+      );
+      if (error) throw new Error(`export query failed: ${error.message}`);
+      if (offset === 0) total = count ?? data.length;
+      rows.push(...data);
+      if (data.length < CHUNK || rows.length >= total) break;
+    }
+
+    return { rows, total };
+  }
+
+  it("returns all N, not the page size", async () => {
+    const { rows, total } = await exportAll(everyone());
+
+    expect(total).toBe(EX_COUNT);
+    expect(rows).toHaveLength(EX_COUNT);
+    // The assertion that would have caught the classic bug: the export is
+    // strictly larger than one page.
+    expect(rows.length).toBeGreaterThan(PAGE_SIZE);
+  });
+
+  it("agrees exactly with the count the directory renders beside it", async () => {
+    const { count, rows: pageRows } = await page(everyone());
+    const { rows } = await exportAll(everyone());
+
+    // §4.5's one-translation rule asserted end to end: the file and the number
+    // printed above it come from the same filter, so they cannot drift.
+    expect(rows).toHaveLength(count);
+    expect(pageRows.length).toBeLessThan(rows.length);
+  });
+
+  it("returns every fixture exactly once, with no duplicates across chunks", async () => {
+    const { rows } = await exportAll(everyone());
+    const seen = rows.map((row) => row.id ?? "");
+
+    expect(new Set(seen).size).toBe(EX_COUNT);
+    expect([...seen].sort()).toEqual([...exIds].sort());
+  });
+
+  it("narrows to explicitly selected ids", async () => {
+    const chosen = exIds.slice(0, 3);
+    const { rows } = await exportAll(everyone(), chosen);
+
+    expect(rows.map((row) => row.id ?? "").sort()).toEqual([...chosen].sort());
+  });
+
+  it("⚠️ an id outside the filter cannot be pulled back in by selecting it", async () => {
+    // The ids narrow the filtered query rather than replacing it, so a stale
+    // checkbox left over from a wider filter contributes nothing instead of
+    // smuggling a row the officer can no longer see into the file.
+    const active = parseMemberFilter({ q: EX_MARKER, state: "active" });
+    const { rows: activeRows } = await exportAll(active);
+    const activeIds = new Set(activeRows.map((row) => row.id ?? ""));
+
+    const excluded = exIds.filter((id) => !activeIds.has(id));
+    expect(excluded.length).toBeGreaterThan(0);
+
+    const { rows } = await exportAll(active, [excluded[0]]);
+    expect(rows).toHaveLength(0);
+  });
+});
