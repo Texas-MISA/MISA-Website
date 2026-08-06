@@ -6,6 +6,7 @@ import Link from "next/link";
 import { fieldValue, type FieldDefinition } from "@/lib/members";
 
 import { MemberFieldCell } from "./member-field-cell";
+import { SelectRowCell } from "./selection";
 import type { MemberRow } from "./member-table";
 
 // One directory row (§7 Stage 6 phase 4).
@@ -61,6 +62,10 @@ export function DirectoryRow({
         row.active ? "" : "bg-black/[0.03] text-foreground/60"
       }`}
     >
+      {/* Outside the per-cell <form> elements below, deliberately: those each
+          carry exactly one field name, and a checkbox inside one would ride
+          along on a custom-field save. */}
+      <SelectRowCell id={row.id} label={row.fullName} />
       <td className={text}>
         <Link
           href={detailHref}

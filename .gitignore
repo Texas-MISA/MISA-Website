@@ -44,3 +44,9 @@ yarn-error.log*
 
 .vercel
 .env*
+
+# The dev server's log. `npm run dev` must be started detached with its output
+# redirected to a file — an attached stdout that stops being read kills Next on
+# an uncaught EPIPE, and the process then spins instead of exiting while every
+# request hangs. See CLAUDE.md.
+dev.log

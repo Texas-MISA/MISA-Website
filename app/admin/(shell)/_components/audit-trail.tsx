@@ -56,6 +56,11 @@ function formatAuditAction(action: string): string {
     "member_field.created": "Field created",
     "member_field.updated": "Field updated",
     "member_field.archived": "Field archived",
+    // Stage 6 phase 5. Appears in no entity's trail today — a roster receipt
+    // names a uuid nothing else references, so it is reachable only from an
+    // audit browser (phase 9's /admin/audit). The label lands with the verb
+    // regardless, because a row written now is uncorrectable later.
+    "roster.exported": "Exported",
   };
   return LABELS[action] ?? action;
 }
