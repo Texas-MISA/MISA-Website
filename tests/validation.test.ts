@@ -231,10 +231,10 @@ describe("fieldDefinitionSchema", () => {
   it("accepts a well-formed definition and splits the options", () => {
     const parsed = fieldDefinitionSchema.parse({
       ...FIELD_BASE,
-      key: "dues_paid",
+      key: "committee_paid",
     });
     expect(parsed.options).toEqual(["Paid", "Unpaid", "Waived"]);
-    expect(parsed.key).toBe("dues_paid");
+    expect(parsed.key).toBe("committee_paid");
   });
 
   it("tolerates what a textarea actually submits", () => {
@@ -242,7 +242,7 @@ describe("fieldDefinitionSchema", () => {
     // pasting from a spreadsheet brings blank lines and stray indentation.
     const parsed = fieldDefinitionSchema.parse({
       ...FIELD_BASE,
-      key: "dues_paid",
+      key: "committee_paid",
       options: "  Paid  \n\n\tUnpaid\n\n",
     });
     expect(parsed.options).toEqual(["Paid", "Unpaid"]);
@@ -253,12 +253,12 @@ describe("fieldDefinitionSchema", () => {
   // second order column and a space is accepted silently.
   it("refuses a key that could break out of an order term", () => {
     for (const key of [
-      "dues,full_name",
-      "dues paid",
+      "committee,full_name",
+      "committee paid",
       'du"es',
-      "dues-paid",
+      "committee-paid",
       "Dues",
-      "1dues",
+      "1committee",
       "",
     ]) {
       const result = fieldDefinitionSchema.safeParse({ ...FIELD_BASE, key });
@@ -281,7 +281,7 @@ describe("fieldDefinitionSchema", () => {
     // exactly what valid_field_options() enforces on the other side.
     const result = fieldDefinitionSchema.safeParse({
       ...FIELD_BASE,
-      key: "dues_paid",
+      key: "committee_paid",
       options: "Paid\npaid",
     });
     expect(result.success).toBe(false);
@@ -298,7 +298,7 @@ describe("fieldDefinitionSchema", () => {
     for (const options of cases) {
       const result = fieldDefinitionSchema.safeParse({
         ...FIELD_BASE,
-        key: "dues_paid",
+        key: "committee_paid",
         options,
       });
       expect(result.success, options.slice(0, 20)).toBe(false);
@@ -311,7 +311,7 @@ describe("fieldDefinitionSchema", () => {
       (_, i) => `o${i}`
     ).join("\n");
     expect(
-      fieldDefinitionSchema.parse({ ...FIELD_BASE, key: "dues_paid", options })
+      fieldDefinitionSchema.parse({ ...FIELD_BASE, key: "committee_paid", options })
         .options
     ).toHaveLength(MAX_FIELD_OPTIONS);
   });
@@ -319,7 +319,7 @@ describe("fieldDefinitionSchema", () => {
   it("requires a label", () => {
     const result = fieldDefinitionSchema.safeParse({
       ...FIELD_BASE,
-      key: "dues_paid",
+      key: "committee_paid",
       label: "   ",
     });
     expect(result.success).toBe(false);
@@ -348,7 +348,7 @@ describe("fieldDefinitionEditSchema", () => {
 describe("memberFieldValueSchema", () => {
   const VALUE_BASE = {
     memberId: UUID_A,
-    key: "dues_paid",
+    key: "committee_paid",
     value: "Paid",
     expectedUpdatedAt: "2026-08-02T22:34:16.934133+00:00",
   };
@@ -362,7 +362,7 @@ describe("memberFieldValueSchema", () => {
   });
 
   it("refuses a key that did not come from a definition", () => {
-    for (const key of ["cf:dues_paid", "dues,full_name", "email", ""]) {
+    for (const key of ["cf:committee_paid", "committee,full_name", "email", ""]) {
       expect(
         memberFieldValueSchema.safeParse({ ...VALUE_BASE, key }).success,
         key
