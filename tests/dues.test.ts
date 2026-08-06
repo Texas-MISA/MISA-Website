@@ -9,6 +9,7 @@ import {
   parseCsv,
   parseVenmoDatetime,
   parseVenmoStatement,
+  termOf,
   planPayment,
   termAtIndex,
   termIndex,
@@ -86,6 +87,36 @@ describe("term arithmetic", () => {
     for (const bad of ["Summer 2026", "Fall", "2026", "fall 2026", ""]) {
       expect(termIndex(bad), bad).toBeNull();
     }
+  });
+});
+
+describe("termOf", () => {
+  it("mirrors the SQL term_of: August starts Fall, January is Spring", () => {
+    // §4.7's half-open boundaries. Aug 1 is Fall, Jan 1 is Spring.
+    expect(termOf(new Date("2026-08-01T12:00:00Z"))).toBe("Fall 2026");
+    expect(termOf(new Date("2026-07-31T12:00:00Z"))).toBe("Spring 2026");
+    expect(termOf(new Date("2026-01-01T12:00:00Z"))).toBe("Spring 2026");
+    expect(termOf(new Date("2026-12-31T12:00:00Z"))).toBe("Fall 2026");
+  });
+
+  it("🪤 anchors on Central, so a late-evening payment does not roll a term", () => {
+    // 2026-07-31 20:00 Central is 2026-08-01 01:00Z. Anchoring on UTC would
+    // call it Fall; it is Spring.
+    expect(termOf(new Date("2026-08-01T01:00:00Z"))).toBe("Spring 2026");
+  });
+
+  it("⚠️ is why the import sets start_term rather than letting SQL default it", () => {
+    // The column defaults to term_of(now()) — the IMPORT time — because a
+    // Postgres default cannot reference another column. Those differ for every
+    // statement uploaded after a term boundary, which is the ordinary case.
+    // Found in the phase-2 walkthrough: the preview said a June payment counted
+    // as Spring while the stored row said Fall.
+    const paidInJune = new Date("2026-06-14T15:00:00Z");
+    const importedInSeptember = new Date("2026-09-20T15:00:00Z");
+
+    expect(termOf(paidInJune)).toBe("Spring 2026");
+    expect(termOf(importedInSeptember)).toBe("Fall 2026");
+    expect(termOf(paidInJune)).not.toBe(termOf(importedInSeptember));
   });
 });
 

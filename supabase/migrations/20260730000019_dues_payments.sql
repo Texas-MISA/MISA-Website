@@ -179,10 +179,23 @@ create table public.dues_payments (
                  (lower(regexp_replace(coalesce(submitted_eid, ''),
                                        '\s|-', '', 'g'))) stored,
 
-  -- Which term the payment starts covering. Defaulted from term_of(now()) and
-  -- NOT generated, because an officer must be able to override it: §4.7 puts
-  -- May–July in Spring, so a July payment intended for the coming year would
-  -- otherwise buy a term with three weeks left in it.
+  -- Which term the payment starts covering. NOT generated, because an officer
+  -- must be able to override it: §4.7 puts May–July in Spring, so a July
+  -- payment intended for the coming year would otherwise buy a term with three
+  -- weeks left in it.
+  --
+  -- ⚠️ **THE DEFAULT IS A FALLBACK, NOT THE ANSWER. The application must set
+  -- this column explicitly.** The default asks term_of(NOW()) — the import time
+  -- — and the right question is term_of(PAID_AT). A Postgres column default
+  -- cannot reference another column, so this default is incapable of expressing
+  -- what the column means, and the two answers differ for every statement
+  -- uploaded after a term boundary, which is the ordinary case rather than an
+  -- edge one. `termOf()` in lib/dues.ts is the mirror the import uses.
+  --
+  -- (Comment added 2026-08-06 after the phase-2 walkthrough found the preview
+  -- saying a June payment counted as Spring while the stored row said Fall.
+  -- Comment-only: SQL comments are not schema, so a db reset still produces a
+  -- byte-identical database and this applied migration has not drifted.)
   start_term     text not null default public.term_of(now()),
 
   -- NULLABLE, and that nullability is the entire review mechanism. Null means

@@ -40,6 +40,19 @@
 > - **One audit row per payment, not one receipt per import**, matching
 >   `points.granted`. `import_batch_id` on the row already answers "which upload
 >   was this".
+> - 🐛 **The walkthrough found two defects, both of a shape no unit test
+>   reaches.** First, `start_term` was coming from the import time rather than
+>   the payment date — the preview told the officer a June payment counted as
+>   Spring while the row stored Fall. The cause is in §4.1 itself: the default is
+>   `term_of(now())` and the column comment claims `term_of(paid_at)`, which **a
+>   Postgres column default cannot express**, because a default may not reference
+>   another column. The application must set it, and `termOf()` in `lib/dues.ts`
+>   is the mirror that keeps it derived rather than typed. Second, "Import
+>   another statement" did nothing, because `useActionState` has no reset and the
+>   success status is sticky. **A default that cannot express what it means, and
+>   a state machine with no reset** — the first needs the clock and the database
+>   to disagree before it shows, the second needs a second interaction after a
+>   success.
 
 > **v1.38: dues get a schema, and the parser meets a real file.** Stage 6.5
 > phase 1 — migration 19 and `lib/dues.ts`. No screens; the import is phase 2.

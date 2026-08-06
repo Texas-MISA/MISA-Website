@@ -10,6 +10,7 @@ import {
   isSummerTerm,
   parseVenmoStatement,
   planPayment,
+  termOf,
   type DuesPrices,
   type PlannedPayment,
 } from "@/lib/dues";
@@ -345,11 +346,19 @@ export async function commitImport(
           payer_handle: payment.payerHandle,
           submitted_eid: payment.submittedEid,
           terms_covered: payment.termsCovered,
+          // ⚠️ Set EXPLICITLY, and it has to be. The column defaults to
+          // `term_of(now())` — the import time — because a Postgres column
+          // default cannot reference another column, so the default can never
+          // ask "what term was this payment made in". Those differ for every
+          // statement uploaded after a term boundary, which is the ordinary
+          // case: import July's statement in August and the default files a
+          // Spring payment under Fall.
+          //
+          // Not a term string typed in application code (§4.7) — it is derived
+          // from paid_at by termOf(), the mirror of the SQL function.
+          start_term: termOf(payment.paidAt),
           import_batch_id: batchId,
           imported_by: officer.userId,
-          // No start_term key, deliberately: it defaults to term_of(now()) in
-          // SQL and a term string typed in application code is a bug (§4.7).
-          // Read back in the .select() below instead.
         })),
         { onConflict: "venmo_txn_id", ignoreDuplicates: true }
       )

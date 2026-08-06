@@ -47,7 +47,22 @@ export function ImportForm({ maxRows }: { maxRows: number }) {
     COMMIT_INITIAL
   );
 
-  const done = commit.status === "done";
+  // ⚠️ useActionState has no reset, so `commit.status` stays "done" forever
+  // once an import succeeds — which left "Import another statement" clearing the
+  // text while the Done panel kept rendering and the file chooser stayed hidden.
+  // The button did nothing visible. Found in the phase-2 walkthrough.
+  //
+  // `dismissed` is the missing half, un-set whenever the action speaks again —
+  // the render-phase derived-state idiom this codebase uses in grant-form.tsx
+  // and directory-row.tsx rather than an effect, so no stale frame paints.
+  const [dismissed, setDismissed] = useState(false);
+  const [seenCommit, setSeenCommit] = useState(commit);
+  if (commit !== seenCommit) {
+    setSeenCommit(commit);
+    setDismissed(false);
+  }
+
+  const done = commit.status === "done" && !dismissed;
 
   function onFile(file: File | undefined) {
     if (!file) return;
@@ -68,10 +83,11 @@ export function ImportForm({ maxRows }: { maxRows: number }) {
   function reset() {
     setCsv("");
     setFileName("");
+    setDismissed(true);
+    // Clearing the DOM input too: it is uncontrolled, so React does not reset
+    // it, and the officer would otherwise still see the old file name beside a
+    // chooser that had forgotten the text.
     if (fileInput.current) fileInput.current.value = "";
-    // The action states are left alone deliberately — useActionState has no
-    // reset, and the panels below key off `csv` being empty, so clearing the
-    // text is enough to return to the chooser.
   }
 
   return (
