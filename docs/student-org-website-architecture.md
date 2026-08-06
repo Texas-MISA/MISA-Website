@@ -1,8 +1,44 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.36
-**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — phases 1, 2a, 2, 3 and 4 of 9 built, merged and deployed, and **phase 5a (selection and extraction over CSV) built and browser-verified**; phase 5b (the xlsx workbook) is next. **Stage 6.5 (dues & membership status) is planned and unbuilt** — see the v1.34 note below.
+**Version:** 1.37
+**Status:** Stages 0–5 complete; Stage 6 (member directory) in progress — **phases 1 through 5 of 9 built and browser-verified**. **Stage 6.5 (dues & membership status) interrupts here, before phase 6** — planned and unbuilt, see the v1.34 note below.
 **Last updated:** August 2026
+
+> **v1.37: the roster exports as a real workbook, written by hand.** Stage 6
+> phase 5b. No migration, no new audit verb — `roster.exported` already carries
+> a format.
+>
+> - **`lib/xlsx.ts` is dependency-free, and that was a decision rather than a
+>   flourish.** The candidates were checked rather than remembered: SheetJS's
+>   npm `xlsx` is stuck at 0.18.5 from roughly four years ago because releases
+>   moved to the vendor's own CDN, so adopting it means either a stale build or
+>   a CDN tarball URL that `npm ci` depends on; `exceljs` has had no meaningful
+>   release since October 2023 and the community has forked it. This project's
+>   officers turn over annually and inherit whatever lands here. An xlsx is a
+>   zip of six XML parts and `node:zlib` is built in. If the shape ever grows
+>   past a flat table, that is the moment to revisit `@office-kit/xlsx` — not to
+>   grow the file.
+> - **The typed `ExportCell` union from 5a is what makes this worth shipping.**
+>   CSV is a text file: every number and date arrives as text, so the officer's
+>   first act is a "convert to number" pass and sorting by points sorts
+>   lexicographically until they do. The workbook writes numbers as numbers and
+>   dates as date serials, and a null `attendance_rate` omits the cell entirely
+>   rather than writing `0` — §4.5 does not stop at the screen.
+> - 🪤 **A hand-rolled workbook has exactly one failure symptom**: Excel's "we
+>   found a problem with some content" repair prompt, which names no cause. Four
+>   things produce it — the reserved `none`/`gray125` fills, the child order
+>   under `<styleSheet>`, every `count` attribute matching its real child count,
+>   and a custom `numFmtId` at or above 164 — and all four are pinned by tests
+>   that unzip the package and read it back. The suite grows its own ~40-line
+>   ZIP reader rather than a dependency, so the zero-dependency property covers
+>   the tests too.
+> - ⚠️ **The Excel epoch is 1899-12-30**, absorbing the February 29, 1900 that
+>   never existed. The serial is taken from the **Central** civil date, not a
+>   UTC slice — the `new Date("2026-09-01T18:00")` class of bug arriving in a
+>   new place, and it would be wrong for exactly the members who joined at an
+>   evening event.
+> - **XLSX is the primary download; CSV stays beside it, not behind a menu.** It
+>   is explicitly the format that keeps working if this writer is ever pulled.
 
 > **v1.36: the roster leaves the building, and it is audited on the way out.**
 > Stage 6 phase 5 split into **5a** (selection, the field catalogue, the

@@ -60,6 +60,9 @@ export function ExportToolbar({
   }, [filterParams, catalogue, chosen, mode, ids]);
 
   const nothingSelected = count === 0;
+  // A file needs both rows and at least one column; the clipboard actions only
+  // need rows, because their column is fixed.
+  const noFile = nothingSelected || chosen.size === 0;
 
   async function copy(format: "emails" | "names" | "tsv", noun: string) {
     setStatus({ kind: "working" });
@@ -163,20 +166,21 @@ export function ExportToolbar({
           Copy table
         </Action>
 
-        {/* A plain navigation, not fetch: Content-Disposition is what turns the
+        {/* Plain navigations, not fetch: Content-Disposition is what turns the
             response into a saved file, and an <a> is the only thing that lets
-            the browser handle it. */}
-        <a
-          href={nothingSelected || chosen.size === 0 ? undefined : url("csv")}
-          className={`border-2 border-black px-2 py-1 text-xs font-semibold uppercase tracking-wider ${
-            nothingSelected || chosen.size === 0
-              ? "pointer-events-none opacity-40"
-              : "bg-black text-white"
-          }`}
-          aria-disabled={nothingSelected || chosen.size === 0}
-        >
+            the browser handle it.
+
+            xlsx is the primary because it is what officers asked for — it opens
+            ready to sort, where a CSV needs a "convert to number" pass on every
+            column first. CSV stays beside it rather than behind a menu: it is
+            explicitly the format that keeps working if the xlsx writer is ever
+            pulled, so it must not be buried. */}
+        <Download href={url("xlsx")} disabled={noFile} primary>
+          Download XLSX
+        </Download>
+        <Download href={url("csv")} disabled={noFile}>
           Download CSV
-        </a>
+        </Download>
 
         {status.kind === "working" && (
           <span className="text-sm text-foreground/70">Working…</span>
@@ -252,6 +256,30 @@ function FieldPicker({
         </button>
       </div>
     </div>
+  );
+}
+
+function Download({
+  href,
+  disabled,
+  primary = false,
+  children,
+}: {
+  href: string;
+  disabled: boolean;
+  primary?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <a
+      href={disabled ? undefined : href}
+      className={`border-2 border-black px-2 py-1 text-xs font-semibold uppercase tracking-wider ${
+        disabled ? "pointer-events-none opacity-40" : ""
+      } ${primary && !disabled ? "bg-black text-white" : ""}`}
+      aria-disabled={disabled}
+    >
+      {children}
+    </a>
   );
 }
 
