@@ -24,12 +24,24 @@ looked right and was wrong.
 |---|---|
 | **Header row** | **Line 3**, not line 1. Lines 1–2 are `Account Statement - (@handle)` and `Account Activity`. |
 | **Columns** | A **leading empty column**, then 22 fields: `ID, Datetime, Type, Status, Note, From, To, Amount (total), Amount (tip), Amount (tax), Amount (fee), Tax Rate, Tax Exempt, Funding Source, Destination, Beginning Balance, Ending Balance, Statement Period Venmo Fees, Terminal Location, Year to Date Venmo Fees, Disclaimer`. Located **by name**, never by position. |
-| **Amount** | `- $21.00` — the sign is a **separate token before the `$`**. `parseFloat` returns `NaN`; stripping non-numerics without reading the sign first turns a withdrawal into a payment. |
-| **Datetime** | `2026-07-27T21:49:00` — **no timezone offset at all.** |
+| **Amount** | `+ $30.00` / `- $18.50` — the sign is a **separate token before the `$`**. `parseFloat` returns `NaN`; stripping non-numerics without reading the sign first turns a withdrawal into a payment. |
+
+⚠️ **On the MISA account, dues arrive POSITIVE** (`+ $30.00`), because the org is
+*receiving*. Only positive completed `Payment` rows are dues; a negative amount
+is money leaving — a `Standard Transfer` to the bank, or a refund — and the
+parser skips it as `not_incoming`. The schema agrees: `amount_cents` is
+positive-only, and a refund is a **void with a reason**, never a negative
+payment row.
+
+Worth stating explicitly because the statement the format was read from was a
+*personal* account, where the sample transaction was outgoing. The format lesson
+(the sign is a separate token) is identical either way, but nobody should infer
+from that sample that dues look negative.
+| **Datetime** | `2026-09-03T19:22:00` — **no timezone offset at all.** |
 | **Non-transactions** | Balance rows and the trailing disclaimer arrive as rows with an **empty `ID`**. Skip on that, never on line position. |
 | **Footer** | A **quoted field spanning multiple lines**, so a `split("\n")` parser breaks on the last record of every file. |
 
-🪤 **The datetime is the dangerous one.** `new Date("2026-07-27T21:49:00")` is
+🪤 **The datetime is the dangerous one.** `new Date("2026-09-03T19:22:00")` is
 parsed as *local* time, which on the server is UTC — landing a 9pm Central
 payment five hours early. This is the codebase's existing
 `new Date("2026-09-01T18:00")` trap arriving through a new door.

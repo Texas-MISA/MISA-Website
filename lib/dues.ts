@@ -299,10 +299,14 @@ export type SkipReason =
   | "unparseable_datetime";
 
 /**
- * ⚠️ A Venmo amount is `- $21.00` or `+ $30.00` — the sign is a **separate
+ * ⚠️ A Venmo amount is `+ $30.00` or `- $18.50` — the sign is a **separate
  * token** before the currency symbol, so `parseFloat` on the raw string returns
  * `NaN`, and stripping non-numerics without reading the sign first silently
  * turns a withdrawal into a payment.
+ *
+ * On the MISA account **dues are POSITIVE**, because the org is receiving. A
+ * negative amount is money leaving — a bank transfer or a refund — and is never
+ * a due.
  *
  * Cents, never floats: `parseFloat("30.10") * 100` is `3009.9999...`.
  */
@@ -319,7 +323,7 @@ export function parseAmountCents(raw: string): number | null {
 }
 
 /**
- * ⚠️ Venmo stamps a transaction `2026-07-27T21:49:00` — with **no timezone
+ * ⚠️ Venmo stamps a transaction `2026-09-03T19:22:00` — with **no timezone
  * offset at all**.
  *
  * That string is parsed as *local* time by JS, which on this server is UTC, so

@@ -95,10 +95,10 @@ describe("term arithmetic", () => {
 
 describe("parseAmountCents", () => {
   it("🪤 reads the sign, which sits before the currency symbol", () => {
-    // `- $21.00` — parseFloat on that is NaN, and stripping non-numerics
+    // `- $18.50` — parseFloat on that is NaN, and stripping non-numerics
     // without reading the sign first turns a withdrawal into a payment.
     expect(parseAmountCents("+ $30.00")).toBe(3000);
-    expect(parseAmountCents("- $21.00")).toBe(-2100);
+    expect(parseAmountCents("- $18.50")).toBe(-1850);
     expect(parseAmountCents("$50.00")).toBe(5000);
   });
 
@@ -239,7 +239,7 @@ const STATEMENT = [
   ",1002,2026-09-04T09:12:00,Payment,Complete,dues,Anon Person,MISA,+ $30.00,",
   ",1003,2026-09-05T18:30:00,Standard Transfer,Complete,,MISA,Bank,- $80.00,",
   ",1004,2026-09-06T11:00:00,Payment,Pending,ao4471,Amara Osei,MISA,+ $30.00,",
-  ',1005,2026-09-07T21:49:00,Payment,Complete,"bk2856, thanks!",Bela Kovacs,MISA,+ $42.00,',
+  ',1005,2026-09-07T20:15:00,Payment,Complete,"bk2856, thanks!",Bela Kovacs,MISA,+ $42.00,',
   ',,,,,,,,,"Legal disclaimer',
   'spanning two lines."',
 ].join("\n");
@@ -290,20 +290,20 @@ describe("parseVenmoStatement", () => {
 
 describe("parseVenmoDatetime", () => {
   it("🪤 treats the offset-less stamp as CENTRAL, not UTC", () => {
-    // Venmo writes `2026-07-27T21:49:00` with no zone. `new Date(raw)` reads
-    // that as local — UTC on this server — landing a 9pm Central payment five
-    // hours early. Same class as new Date("2026-09-01T18:00").
-    const parsed = parseVenmoDatetime("2026-07-27T21:49:00");
-    // 21:49 CDT is 02:49Z the following day.
-    expect(parsed?.toISOString()).toBe("2026-07-28T02:49:00.000Z");
-    expect(parsed?.toISOString()).not.toBe("2026-07-27T21:49:00.000Z");
+    // Venmo writes `2026-09-03T19:22:00` with no zone. `new Date(raw)` reads
+    // that as local — UTC on this server — landing an evening Central payment
+    // five hours early. Same class as new Date("2026-09-01T18:00").
+    const parsed = parseVenmoDatetime("2026-09-03T19:22:00");
+    // 19:22 CDT is 00:22Z the following day.
+    expect(parsed?.toISOString()).toBe("2026-09-04T00:22:00.000Z");
+    expect(parsed?.toISOString()).not.toBe("2026-09-03T19:22:00.000Z");
   });
 
   it("handles the winter offset too", () => {
-    // 21:49 CST is 03:49Z — an hour later than the summer case, which is what
+    // 19:22 CST is 01:22Z — an hour later than the summer case, which is what
     // makes attaching the zone (rather than a fixed offset) load-bearing.
-    expect(parseVenmoDatetime("2026-01-27T21:49:00")?.toISOString()).toBe(
-      "2026-01-28T03:49:00.000Z"
+    expect(parseVenmoDatetime("2026-01-27T19:22:00")?.toISOString()).toBe(
+      "2026-01-28T01:22:00.000Z"
     );
   });
 

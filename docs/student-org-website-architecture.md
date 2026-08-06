@@ -17,14 +17,14 @@
 >   alongside.
 > - 🪤 **The real Venmo export was read at last, and every part of its shape was
 >   a surprise.** The header is on **line 3** behind two preamble lines and a
->   leading empty column; the amount is `- $21.00` with the **sign as a separate
+>   leading empty column; the amount is `- $18.50` with the **sign as a separate
 >   token before the `$`**, so `parseFloat` returns `NaN`; non-transaction rows
 >   are identified by an **empty `ID`**, not by position; and the trailing legal
 >   disclaimer is a **quoted field spanning multiple lines**, so a `split("\n")`
 >   parser breaks on the last record of every file. Recorded in full in
 >   `docs/dues-and-membership.md` — the parser is written against a real header
 >   rather than a remembered one, which was the point of insisting on it.
-> - ⚠️ **A Venmo timestamp carries no timezone** (`2026-07-27T21:49:00`), so
+> - ⚠️ **A Venmo timestamp carries no timezone** (`2026-09-03T19:22:00`), so
 >   `new Date(raw)` reads it as UTC and lands a 9pm Central payment five hours
 >   early. This is §4.7's `new Date("2026-09-01T18:00")` trap arriving through a
 >   new door. Decided: **Central wall time**, attached with the same helper every
