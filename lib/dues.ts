@@ -78,6 +78,84 @@ export function isLaterTerm(a: string, b: string): boolean {
   return left > right;
 }
 
+/**
+ * 🪤 Does this payment land in the summer, where §4.7 puts May–July in Spring?
+ *
+ * Pay $30 in July intending to cover the coming Fall and it buys a term with
+ * three weeks left in it. The rule is NOT changed — changing it would make
+ * `term_of` disagree with itself between events and payments — so the import
+ * warns instead, and `start_term` is a default rather than a generated column
+ * precisely so an officer can correct it afterwards.
+ *
+ * Central months, because that is the zone `term_of` anchors to.
+ */
+export function isSummerTerm(paidAt: Date): boolean {
+  const { month } = centralMonthYear(paidAt);
+  return month >= 5 && month <= 7;
+}
+
+/** The Central month and year of an instant — the anchor `term_of` uses. */
+function centralMonthYear(at: Date): { month: number; year: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Chicago",
+    month: "numeric",
+    year: "numeric",
+  }).formatToParts(at);
+  const field = (type: string) =>
+    Number(parts.find((p) => p.type === type)?.value ?? "0");
+  return { month: field("month"), year: field("year") };
+}
+
+/**
+ * The term an instant falls in — the TypeScript mirror of SQL `term_of()`.
+ *
+ * ⚠️ **The application must set `start_term` explicitly; the column default
+ * cannot.** `dues_payments.start_term` defaults to `term_of(now())`, and a
+ * Postgres column default is not allowed to reference another column — so the
+ * default can only ever ask "what term is it *now*", never "what term was this
+ * payment made in". Those differ for every statement uploaded after a term
+ * boundary, which is the normal case: import July's statement in August and the
+ * default files a Spring payment under Fall.
+ *
+ * Found in the phase-2 browser walkthrough, where the preview said a June
+ * payment counted as Spring and the stored row said Fall — the UI and the
+ * database disagreeing about the same payment.
+ *
+ * This is not "typing a term string" (§4.7): the term is *derived* from the
+ * payment date by the same rule the database uses, which is exactly what this
+ * module exists to hold.
+ */
+export function termOf(at: Date): string {
+  const { month, year } = centralMonthYear(at);
+  return month >= 8 ? `Fall ${year}` : `Spring ${year}`;
+}
+
+// ---------------------------------------------------------------------------
+// Import bounds
+// ---------------------------------------------------------------------------
+
+/**
+ * How much CSV text one import may carry.
+ *
+ * ⚠️ Deliberately BELOW Next's own 1MB Server Action body cap, so an officer
+ * who overshoots gets a sentence naming the limit rather than an opaque
+ * framework error. A real monthly statement measured about 2 KB, so this is
+ * three orders of magnitude of headroom — a guard rail, not a constraint.
+ *
+ * Refuses; never truncates. Importing the first N bytes of a statement would
+ * cut a row in half and silently drop the rest of the month.
+ */
+export const MAX_IMPORT_BYTES = 512 * 1024;
+
+/**
+ * How many payments one import may carry.
+ *
+ * Sized well above §2.2's worst case (500 members paying twice a year through
+ * one account). Same rule as `MAX_EXPORT_ROWS`: it refuses loudly, because a
+ * partial import reported as success is somebody's dues going missing.
+ */
+export const MAX_IMPORT_ROWS = 2000;
+
 // ---------------------------------------------------------------------------
 // Prices
 // ---------------------------------------------------------------------------

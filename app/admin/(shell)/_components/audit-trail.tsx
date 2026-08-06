@@ -61,6 +61,12 @@ function formatAuditAction(action: string): string {
     // audit browser (phase 9's /admin/audit). The label lands with the verb
     // regardless, because a row written now is uncorrectable later.
     "roster.exported": "Exported",
+    // Stage 6.5. "Imported" rather than "Created": a payment row is a record of
+    // money that already arrived, not something an officer brought into being.
+    "dues.imported": "Imported",
+    "dues.assigned": "Assigned to a member",
+    "dues.updated": "Updated",
+    "dues.voided": "Voided",
   };
   return LABELS[action] ?? action;
 }

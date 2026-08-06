@@ -35,9 +35,15 @@ type Client = SupabaseClient<Database>;
  * `member_field` is a custom-field definition (migration 18) — its own type
  * rather than `member`, because "someone renamed the dues column" is not an
  * event in any individual member's history.
+ *
+ * 🐛 It drifted a SECOND time, exactly as the warning above predicted:
+ * migration 19 added `'dues_payment'` to the constraint and phase 1 did not add
+ * it here. Caught at the start of phase 2, before any row was written. Two for
+ * two — treat widening the SQL check and widening this union as one edit.
  */
 export type AuditEntityType =
   | "attendance"
+  | "dues_payment"
   | "event"
   | "member"
   | "member_field"
@@ -100,7 +106,18 @@ export type AuditAction =
   // system, and reading is exactly what makes it one. Filed under entity type
   // 'roster' against a receipt uuid nothing else references, since an export
   // spans N members rather than naming one.
-  | "roster.exported";
+  | "roster.exported"
+  // Stage 6.5. One row per PAYMENT, not one per import — the entity is the
+  // payment, the same reason points.granted is one row per adjustment. Batch
+  // context travels in `note`, and `dues_payments.import_batch_id` already
+  // answers "which upload did this arrive in" without a second row.
+  | "dues.imported"
+  // The corrections, phase 3. A payment is editable (the parser can attribute
+  // one wrongly) AND voidable (money arriving is a fact) — the union of the
+  // attendance and point_adjustment patterns, deliberately both.
+  | "dues.assigned"
+  | "dues.updated"
+  | "dues.voided";
 
 export type AuditEntry = {
   entityType: AuditEntityType;

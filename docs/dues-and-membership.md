@@ -1,8 +1,10 @@
 # Dues & membership status — Venmo reconciliation
 
-**Status:** **phase 1 of 4 built, 2026-08-06** — migration 19 and `lib/dues.ts`
-exist. Phases 2–4 (the import, the ledger screens, the directory column's UI)
-are unbuilt. Decided 2026-08-05. This document is the reference for *why*
+**Status:** **phases 1 and 2 of 4 built, 2026-08-06** — migration 19,
+`lib/dues.ts`, `lib/dues-roster.ts`, `app/actions/dues.ts` and
+`/admin/dues/import` exist. Phases 3–4 (the ledger and editor screens, the
+directory column's UI) are unbuilt. Decided 2026-08-05. This document is the
+reference for *why*
 Stage 6.5 is shaped the way it is; the normative summary lives in the
 architecture doc (§4.1, §4.5, §4.7, §5, §6, §7 Stage 6.5, §9 #12).
 
@@ -54,6 +56,33 @@ is exactly why `start_term` is a **default** rather than a generated column.
 
 🔒 The statement read was real financial data. **Nothing from it is in the
 repo** — the test fixture reproduces the shape with invented values.
+
+## 🐛 Corrections to this document, found while building phase 2
+
+- **The audit shape is one row per PAYMENT, not one receipt per import.** This
+  document asked for a single receipt carrying the batch id, file name and the
+  four counts. The house invariant is *"one audit row per adjustment — the
+  entity is the adjustment, not the grant"*; per-payment rows are what make
+  phase 3's payment-detail `AuditTrail` work at all, and
+  `dues_payments.import_batch_id` already answers "which upload did this arrive
+  in" without a second row. Batch context travels in `note`
+  (`imported from "july.csv" — 12 of 14 new`).
+- **Summer payments are warned about, not corrected at import.** This document
+  says *"the import preview flags May–July payments and the officer overrides
+  `start_term`"*, which reads as a per-row edit during the preview. That would
+  make the preview an **input** to the commit — precisely what the re-parse rule
+  exists to prevent. Settled 2026-08-06: the preview **warns**, the rows import
+  with `start_term = term_of(paid_at)`, and phase 3's detail page is where an
+  officer corrects them.
+- ⚠️ **Next caps a Server Action request at 1MB by default**, which this
+  document did not account for. `MAX_IMPORT_BYTES` is 512 KB and
+  `MAX_IMPORT_ROWS` is 2000, both **refusing rather than truncating**, so an
+  officer who overshoots gets a sentence naming the limit instead of an opaque
+  framework error.
+- 🐛 **`AuditEntityType` was missing `'dues_payment'`** after phase 1 — migration
+  19 widened the SQL check and the TypeScript union was not widened with it.
+  Second occurrence of that exact drift (the first was `'roster'`). Widening the
+  check and widening the union is **one edit**, not two.
 
 ## 🐛 Corrections to this document, found while building phase 1
 
