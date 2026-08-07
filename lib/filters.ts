@@ -24,8 +24,9 @@
 // translation and still read the whole result.
 //
 // ⚠️ Phase 3 REMOVED six fields — `source`, `minEvents`, `maxEvents`, `minRate`,
-// `joinedFrom`, `joinedTo` — rather than merely hiding their controls. The
-// directory now shows four columns and filtering narrows to what is displayed,
+// `joinedFrom`, `joinedTo` — rather than merely hiding their controls. Filtering
+// narrows to what is displayed (four columns then, five since Stage 6.5 phase 4
+// added the calculated dues column),
 // and a filter with no control on screen is the phase-1 defect arriving from
 // the other direction: a count the officer cannot account for. parseMemberFilter
 // reads by key and is total, so an old bookmark carrying `minRate=50` is simply
@@ -45,12 +46,24 @@ import { customSortColumn, parseCustomSortKey } from "@/lib/members";
  * SORT_COLUMNS below; the two are separate so a URL cannot name a column that
  * is not meant to be sortable.
  *
- * Exactly the four columns the table displays (phase 3). Phase 1 allowed ten,
- * which was right when the table had ten — a sort on a column nobody can see
- * rearranges the list for no visible reason. `email` is newly sortable here: it
- * was displayed from phase 1 but had no header of its own until now.
+ * Exactly the columns the table displays. Phase 1 allowed ten, which was right
+ * when the table had ten — a sort on a column nobody can see rearranges the list
+ * for no visible reason. Phase 3 cut it to four; `email` became sortable there,
+ * having been displayed since phase 1 with no header of its own.
+ *
+ * `dues` (Stage 6.5 phase 4) is the fifth, and it obeys the same rule from the
+ * other side: it is sortable *because* it is displayed. It maps to
+ * `dues_paid_current_term`, a boolean the view calculates — nothing about this
+ * key is officer-defined, so it belongs here rather than behind the `cf:`
+ * namespace.
  */
-export const MEMBER_SORTS = ["name", "email", "eid", "total_points"] as const;
+export const MEMBER_SORTS = [
+  "name",
+  "email",
+  "eid",
+  "total_points",
+  "dues",
+] as const;
 
 export type MemberBuiltinSort = (typeof MEMBER_SORTS)[number];
 
@@ -71,6 +84,7 @@ const SORT_COLUMNS: Record<MemberBuiltinSort, string> = {
   email: "email",
   eid: "eid",
   total_points: "total_points",
+  dues: "dues_paid_current_term",
 };
 
 /**
@@ -112,6 +126,18 @@ export function sortColumn(
 export const MEMBER_STATES = ["active", "inactive", "all"] as const;
 export type MemberState = (typeof MEMBER_STATES)[number];
 
+/**
+ * Dues status, as a three-way selector shaped like MEMBER_STATES.
+ *
+ * ⚠️ `all` is FIRST because it is the default, and that is the difference from
+ * `state`, which defaults to the narrowing `active`. Dues status must not narrow
+ * the roster until an officer asks it to: a directory that silently hid unpaid
+ * members would be the phase-1 defect (a count nobody can account for) applied
+ * to the one column with money behind it.
+ */
+export const MEMBER_DUES = ["all", "paid", "unpaid"] as const;
+export type MemberDues = (typeof MEMBER_DUES)[number];
+
 /** How much free text the search box will carry. Long enough for a full name or
  * an email, short enough that a pasted essay cannot become the query. */
 export const MAX_SEARCH_LENGTH = 64;
@@ -138,14 +164,30 @@ export type MemberFilter = {
   q: string;
   minPoints: number | null;
   maxPoints: number | null;
+  /**
+   * Paid / not paid / any, against `member_directory.dues_paid_current_term`
+   * (Stage 6.5 phase 4).
+   *
+   * Dues status is CALCULATED — a live `dues_payments` row whose `covered_terms`
+   * includes `current_term()` — so this filter reads a boolean the view derives
+   * and never a field anybody ticked. That is the whole reason `dues`,
+   * `dues_paid` and `dues_paid_current_term` are reserved custom-field keys:
+   * without them the roster could carry a hand-ticked second answer to the same
+   * question, and this filter would have no way to say which one it meant.
+   */
+  dues: MemberDues;
   sort: MemberSort;
   dir: "asc" | "desc";
 };
 
 /** Sorts that read better largest-first when the officer has not said. A custom
- * field is never in here: its values are option text, which sorts A–Z. */
+ * field is never in here: its values are option text, which sorts A–Z.
+ *
+ * `dues` is a boolean, where descending means true first — so picking the column
+ * opens on the members who have paid. */
 const DESC_BY_DEFAULT: ReadonlySet<MemberSort> = new Set<MemberSort>([
   "total_points",
+  "dues",
 ]);
 
 /** "No custom fields are defined" — the pre-phase-4 world, and what the pure
@@ -236,6 +278,11 @@ export function parseMemberFilter(
     ? (rawState as MemberState)
     : "active";
 
+  const rawDues = one(params, "dues");
+  const dues: MemberDues = (MEMBER_DUES as readonly string[]).includes(rawDues)
+    ? (rawDues as MemberDues)
+    : "all";
+
   // A sort key is either one of the four built-ins or `cf:<key>` naming a
   // definition that exists and is shown in the directory. Anything else — a
   // retired phase-1 key, a field archived since the officer bookmarked the URL,
@@ -261,6 +308,7 @@ export function parseMemberFilter(
     q: searchTerm(one(params, "q")),
     minPoints: intOrNull(one(params, "minPoints"), 1_000_000),
     maxPoints: intOrNull(one(params, "maxPoints"), 1_000_000),
+    dues,
     sort,
     dir,
   };
@@ -291,6 +339,7 @@ export function memberFilterToParams(
   const params = new URLSearchParams();
 
   if (merged.state !== "active") params.set("state", merged.state);
+  if (merged.dues !== "all") params.set("dues", merged.dues);
   if (merged.q) params.set("q", merged.q);
 
   const numbers: [keyof MemberFilter, string][] = [
@@ -466,6 +515,18 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
 
   if (filter.minPoints !== null) q = q.gte("total_points", filter.minPoints);
   if (filter.maxPoints !== null) q = q.lte("total_points", filter.maxPoints);
+
+  // Dues status. The view computes this as an `exists (…)` over dues_payments,
+  // so it is a real boolean and never null — no third state to think about, and
+  // no nulls-last question the way a custom field has.
+  //
+  // ⚠️ This clause exists HERE and nowhere else, which is the property the whole
+  // module is built on: "copy the emails of all N unpaid members" has to be
+  // provably the same query as the count rendered beside the button. A dues
+  // predicate hand-written into the page or the export route is exactly how that
+  // pair starts disagreeing.
+  if (filter.dues === "paid") q = q.eq("dues_paid_current_term", true);
+  else if (filter.dues === "unpaid") q = q.eq("dues_paid_current_term", false);
 
   // Nulls last in both directions. None of the four BUILT-IN sortable columns is
   // nullable — that went with attendance_rate and last_seen_at in the phase-3

@@ -79,6 +79,7 @@ export type ExportSourceRow = {
   attendance_rate: number | null;
   pending_count: number | null;
   last_seen_at: string | null;
+  dues_paid_current_term: boolean | null;
   custom_fields: unknown;
 };
 
@@ -131,6 +132,13 @@ const BUILTIN_FIELDS: readonly ExportField[] = [
   { key: "joined_at", label: "Joined", kind: "date", source: "builtin" },
   { key: "active", label: "Active", kind: "text", source: "builtin" },
   { key: "source", label: "Source", kind: "text", source: "builtin" },
+  // Stage 6.5 phase 4 — ONE catalogue entry, not a new mechanism. `dues` is
+  // already reserved (RESERVED_FIELD_KEYS, and migration 19's
+  // member_field_definitions_key_not_builtin CHECK), so a custom field
+  // structurally cannot claim the name and the catalogue stays one namespace.
+  // It is also how the filter param and the sort key spell it, so all three
+  // agree.
+  { key: "dues", label: "Dues", kind: "text", source: "builtin" },
   { key: "notes", label: "Officer notes", kind: "text", source: "builtin" },
 ];
 
@@ -291,6 +299,17 @@ function builtinCell(row: ExportSourceRow, key: string): ExportCell {
         : { kind: "text", value: row.active ? "Yes" : "No" };
     case "source":
       return textCell(row.source);
+    case "dues":
+      // ⚠️ Text, and the same two words the directory prints — so a spreadsheet
+      // and the screen cannot be read as saying different things. Not a number
+      // and not a bare boolean: the CSV formula guard fires on text and must
+      // never fire on numbers, and "Paid" / "Not Paid" trip none of `= + - @`.
+      return row.dues_paid_current_term === null
+        ? { kind: "empty" }
+        : {
+            kind: "text",
+            value: row.dues_paid_current_term ? "Paid" : "Not Paid",
+          };
     case "notes":
       return textCell(row.notes);
     default:

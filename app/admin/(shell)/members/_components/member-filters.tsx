@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import {
   MAX_SEARCH_LENGTH,
+  MEMBER_DUES,
   MEMBER_STATES,
   memberFilterFields,
   memberFilterUrl,
@@ -85,7 +86,8 @@ export function MemberFilters({
     filter.state !== "active" ||
     filter.q !== "" ||
     filter.minPoints !== null ||
-    filter.maxPoints !== null;
+    filter.maxPoints !== null ||
+    filter.dues !== "all";
 
   return (
     <div className="flex flex-wrap items-end gap-4">
@@ -126,6 +128,28 @@ export function MemberFilters({
                 : state === "active"
                   ? "Active only"
                   : "Inactive only"}
+            </option>
+          ))}
+        </select>
+      </Labelled>
+
+      {/* 📌 Ships in the same commit as the filter field it drives. A filter
+          with no control on screen is the phase-1 defect from the other side —
+          a count the officer cannot account for — and it is why phase 3 deleted
+          its six retired fields outright rather than hiding them. */}
+      <Labelled label="Dues">
+        <select
+          className={controlClass}
+          value={filter.dues}
+          onChange={(e) => update({ dues: e.target.value })}
+        >
+          {MEMBER_DUES.map((dues) => (
+            <option key={dues} value={dues}>
+              {dues === "all"
+                ? "Paid and not paid"
+                : dues === "paid"
+                  ? "Paid only"
+                  : "Not paid only"}
             </option>
           ))}
         </select>

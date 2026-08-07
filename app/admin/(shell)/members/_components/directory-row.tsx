@@ -91,6 +91,27 @@ export function DirectoryRow({
       <td className={text}>{row.eid}</td>
       <td className={`${numeric} font-medium`}>{row.totalPoints}</td>
 
+      {/* ⚠️ Text, never a <select>. Dues status is calculated from
+          dues_payments and the only way to change it is to record, correct or
+          void a payment — an editable cell here would be the hand-ticked "Paid
+          Dues" dropdown that migration 19 reserves three keys to forbid, and the
+          roster would carry two answers to one question.
+
+          One word each, and no coverage detail: what a payment bought and what
+          the member is paid through belong on /admin/members/[id], which has
+          room to show the payments themselves. */}
+      <td className={text}>
+        {row.duesPaid ? (
+          <span className="border border-black/30 bg-misa-panel px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+            paid
+          </span>
+        ) : (
+          <span className="border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider text-foreground/60 uppercase">
+            not paid
+          </span>
+        )}
+      </td>
+
       {fields.map((definition) => (
         <td key={definition.key} className={text}>
           {definition.editableInline ? (

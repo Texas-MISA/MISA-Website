@@ -42,6 +42,15 @@ export type MemberRow = {
    * §4.2's roster-cleanup signal. */
   source: string;
   totalPoints: number;
+  /**
+   * Calculated dues status for the current term (Stage 6.5 phase 4).
+   *
+   * A column, not a badge like `active` and `source`: officers filter and sort
+   * on it, which is the line between the two. Read-only everywhere — it is
+   * derived from `dues_payments` and the only way to change it is to record,
+   * correct or void a payment.
+   */
+  duesPaid: boolean;
   /** The member's answers, keyed by definition key. Raw jsonb from the view —
    * read it with fieldValue(), which collapses a missing key and an empty
    * string to the one "no answer" state. */
@@ -106,6 +115,11 @@ export function MemberTable({
             </SortHeader>
             <SortHeader filter={filter} column="total_points">
               Total points
+            </SortHeader>
+            {/* Last of the built-ins, so the officer-defined columns stay a
+                contiguous block after them. */}
+            <SortHeader filter={filter} column="dues" align="left">
+              Dues
             </SortHeader>
             {columns.map((field) => (
               <SortHeader

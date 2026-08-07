@@ -48,7 +48,7 @@ export const metadata: Metadata = { title: "Members" };
 // SELF badges beside the name. The view keeps every other column for the detail
 // page; nothing was dropped from the schema by this trim.
 const COLUMNS =
-  "id, eid, full_name, email, active, source, total_points, custom_fields, updated_at" as const;
+  "id, eid, full_name, email, active, source, total_points, dues_paid_current_term, custom_fields, updated_at" as const;
 
 type DirectoryQueryResult =
   | { kind: "ok"; rows: MemberRow[]; total: number }
@@ -117,6 +117,11 @@ async function fetchDirectory(
     active: row.active ?? true,
     source: row.source ?? "admin",
     totalPoints: row.total_points ?? 0,
+    // The view computes this as an `exists (…)`, so it is never really null —
+    // but every column of a view is nullable in the generated types, and false
+    // is the honest default: "we have no record of a payment covering this
+    // term" is exactly what Not Paid means.
+    duesPaid: row.dues_paid_current_term ?? false,
     customFields: row.custom_fields ?? {},
     // The compare-and-set anchor every inline cell posts back. Carried as the
     // raw PostgREST string all the way to the hidden input — a Date round trip

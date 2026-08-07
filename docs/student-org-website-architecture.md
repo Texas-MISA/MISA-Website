@@ -1,9 +1,46 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.43
-**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) — phases 1, 2 and 3 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
+**Version:** 1.44
+**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt, and is what Stage 6 resumes with.
 **Last updated:** August 2026
 
+> **v1.44: dues reach the roster, and Stage 6's exit criteria are met.** Stage
+> 6.5 phase 4 — the last of the stage. **No migration**: migration 19 appended
+> `member_directory.dues_paid_current_term` back in phase 1 and nothing had read
+> it until now.
+>
+> - **`MemberFilter` gains `dues: "all" | "paid" | "unpaid"`**, translated in
+>   `applyMemberFilter` and nowhere else, so the page, the CSV, the xlsx and the
+>   clipboard all inherit it with no second code path. ⚠️ It defaults to `all`,
+>   unlike `state`, which defaults to the narrowing `active` — a roster silently
+>   hiding its unpaid members is a count nobody can account for, on the one
+>   column with money behind it.
+> - **`dues` joins `MEMBER_SORTS`** as the fifth built-in, mapping to the
+>   calculated boolean. It is a built-in rather than a `cf:` key because the
+>   *view* computes it; the three reserved keys are what stop an officer-defined
+>   field turning up beside it claiming to answer the same question. Descending
+>   by default, so picking the column opens on who has paid.
+> - **The column renders Paid / Not Paid and is READ-ONLY.** An editable cell
+>   here would be exactly the hand-ticked "Paid Dues" dropdown migration 19
+>   exists to forbid.
+> - **The member detail page grows a Dues section** — every payment credited to
+>   the member, voided ones included, plus "paid through". 🪤 That last is
+>   `paidThroughTerm` in `lib/dues.ts` and goes through the **term index**, never
+>   `max(term)` and never `order by term`: `'Fall 2026' < 'Spring 2026'` is true
+>   as a string compare and false as a calendar fact. It is why the view
+>   deliberately carries no "paid through" column to lean on.
+> - **The export gains one catalogue entry**, keyed `dues` — already reserved, so
+>   the catalogue stays one namespace. Emitted as *text* ("Paid" / "Not Paid"),
+>   because the CSV formula guard fires on text and must never fire on numbers.
+>   **Deliberately not in `DEFAULT_EXPORT_FIELDS`**: payment status leaves the
+>   building only when asked for (§6).
+> - ✅ **Stage 6's exit criterion demonstrated end to end** in the walkthrough:
+>   filtered to Not Paid (26 of 29), header checkbox → **`filter` mode with zero
+>   `ids` params in a 101-character URL** → COPY EMAILS → "Copied 26 addresses",
+>   with a `roster.exported` receipt recording `scope: filter`, `filter:
+>   dues=unpaid`, `rowCount: 26` and — correctly — **one** field rather than the
+>   four ticked in the picker.
+>
 > **v1.43: the directory shows every matching member.** `/admin/members`
 > stopped paginating (requested directly). No migration and no schema change.
 >
@@ -2334,8 +2371,8 @@ contact form's backend — it renders disabled, with email as the working path.
 | 4 | Custom fields — definitions, dropdown values, inline editing, sorting | ✅ built, browser-verified & deployed (migration 18) |
 | 5a | Selection — row checkboxes, "select all N matching", the field picker, clipboard, CSV, and the codebase's first Route Handler | ✅ built, browser-verified & deployed |
 | 5b | The `.xlsx` workbook — hand-rolled and dependency-free | ✅ built & deployed; confirmed by opening it in real Excel |
-| — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | 🚧 phases 1–3 of 4 built |
-| 5c | Filter by categorical fields — custom fields, dues status, `source`. **After 6.5**, because it filters on the dues column | |
+| — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | ✅ complete, all 4 phases; **Stage 6's exit criteria were met in its phase 4** |
+| 5c | Filter by categorical fields — custom fields, dues status, `source`. **After 6.5**, because it filters on the dues column | ← **next** |
 | 6 | Relational filters (attended or missed a given event, has pending, not seen since) | |
 | 7 | Saved filter presets and CSV roster import | |
 | 8 | The merge tool — its own estimate, see below | |
@@ -2432,7 +2469,7 @@ The criterion previously read "attended fewer than three events this term". That
 
 ---
 
-### Stage 6.5 — Dues & Membership Status 🚧 phases 1–3 of 4 built (v1.40)
+### Stage 6.5 — Dues & Membership Status ✅ complete, all 4 phases (v1.44)
 **Goal:** Officers can answer "is this an official member?" from the directory, and the answer comes from money that actually arrived rather than from a box somebody remembered to tick.
 
 **Numbered 6.5 rather than 7 on purpose.** It is stage-sized — a migration, a ledger, an import flow, an editor, a derived column — but renumbering Stages 7 through 10 would touch every stage reference in this document, `tasks.md`, `CLAUDE.md`, and the changelog above, for no gain. It **interrupts Stage 6 between phases 5 and 6**: phase 5 ships the export machinery, 6.5 makes dues real, and Stage 6's exit criterion is then demonstrated against the real column.

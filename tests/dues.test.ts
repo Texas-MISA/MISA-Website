@@ -10,6 +10,7 @@ import {
   matchNote,
   nextTerm,
   noteTokens,
+  paidThroughTerm,
   parseAmountCents,
   parseCsv,
   parseVenmoDatetime,
@@ -95,6 +96,75 @@ describe("term arithmetic", () => {
     for (const bad of ["Summer 2026", "Fall", "2026", "fall 2026", ""]) {
       expect(termIndex(bad), bad).toBeNull();
     }
+  });
+});
+
+// Stage 6.5 phase 4. The member detail page's "paid through", which is the one
+// place in the app that asks "which of these terms is latest" over a real
+// member's payments — and therefore the likeliest place for the lexicographic
+// trap to be re-introduced.
+describe("paidThroughTerm", () => {
+  const live = (...coveredTerms: string[]) => ({
+    coveredTerms,
+    voided: false,
+  });
+
+  it("🪤 answers where max() over the strings would not", () => {
+    // The whole trap in one assertion. Sorted as text, "Spring 2027" beats
+    // "Fall 2027" and the member appears paid through a term that has not
+    // arrived — plausible output, wrong answer, no error anywhere.
+    const payments = [live("Spring 2027"), live("Fall 2027")];
+    const lexicographic = payments
+      .flatMap((p) => p.coveredTerms)
+      .sort()
+      .at(-1);
+
+    expect(lexicographic).toBe("Spring 2027");
+    expect(paidThroughTerm(payments)).toBe("Fall 2027");
+  });
+
+  it("takes the latest term across every live payment", () => {
+    expect(
+      paidThroughTerm([
+        live("Fall 2026", "Spring 2027"),
+        live("Spring 2026"),
+      ])
+    ).toBe("Spring 2027");
+  });
+
+  it("counts a voided payment for nothing", () => {
+    // A void takes coverage away — that is what makes it the reversible record
+    // it is, rather than a delete.
+    expect(
+      paidThroughTerm([
+        { coveredTerms: ["Fall 2027"], voided: true },
+        live("Fall 2026"),
+      ])
+    ).toBe("Fall 2026");
+
+    expect(
+      paidThroughTerm([{ coveredTerms: ["Fall 2027"], voided: true }])
+    ).toBeNull();
+  });
+
+  it("counts an undecided amount for nothing", () => {
+    // covered_terms is generated from a nullable terms_covered, so a payment
+    // nobody has ruled on arrives here as null and buys no term. Under-reporting
+    // is the intended direction: the review queue makes it visible.
+    expect(paidThroughTerm([{ coveredTerms: null, voided: false }])).toBeNull();
+    expect(paidThroughTerm([{ coveredTerms: [], voided: false }])).toBeNull();
+  });
+
+  it("returns null for a member with no payments at all", () => {
+    expect(paidThroughTerm([])).toBeNull();
+  });
+
+  it("skips an unparseable term instead of treating it as zero", () => {
+    // Index 0 is a real index and would win a max against nothing, which would
+    // print "Spring 0" on an officer's screen.
+    expect(paidThroughTerm([{ coveredTerms: ["Summer 2026"], voided: false }]))
+      .toBeNull();
+    expect(paidThroughTerm([live("Summer 2026", "Fall 2026")])).toBe("Fall 2026");
   });
 });
 

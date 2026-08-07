@@ -5,6 +5,7 @@ import {
   parseMemberFilter,
   type SortableField,
 } from "@/lib/filters";
+import { termAtIndex, termIndex } from "@/lib/dues";
 import { classifyTermEvents, customSortKey } from "@/lib/members";
 
 import {
@@ -12,6 +13,7 @@ import {
   createCurrentTermEvent,
   createTestAttendance,
   createTestMember,
+  getTestOfficer,
   newTracker,
   testClient,
   testIdentity,
@@ -654,5 +656,159 @@ describe("the export query returns every matching member", () => {
 
     const { rows } = await exportAll(active, [excluded[0]]);
     expect(rows).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 6.5 phase 4 — the dues filter against the real view.
+//
+// The pure translation is pinned in filters.test.ts; what only real PostgREST
+// can answer is whether `dues_paid_current_term` actually flips when a payment
+// is recorded, voided, or left undecided — because that column is an
+// `exists (…)` over a generated array, scoped to current_term(), and every one
+// of those three parts is somewhere the filter could silently agree with itself
+// while disagreeing with the money.
+//
+// `t3qd` is a strict narrowing of `t3q`, so the blocks above still see
+// everything they created and this one sees only its own rows.
+// ---------------------------------------------------------------------------
+const DUES_MARKER = "t3qd";
+
+describe("the dues filter against real payments", () => {
+  const paidIds: string[] = [];
+  const unpaidIds: string[] = [];
+  const duesTxnIds: string[] = [];
+  const duesBatch = crypto.randomUUID();
+
+  let officerId = "";
+  let term = "";
+
+  async function pay(
+    memberId: string,
+    overrides: Record<string, unknown> = {}
+  ): Promise<string> {
+    const txn = `${DUES_MARKER}-${duesBatch.slice(0, 8)}-${duesTxnIds.length}`;
+    duesTxnIds.push(txn);
+
+    const { error } = await db.from("dues_payments").insert({
+      venmo_txn_id: txn,
+      member_id: memberId,
+      paid_at: new Date().toISOString(),
+      amount_cents: 3000,
+      // Never a literal term string (§4.7) — the database is asked.
+      start_term: term,
+      terms_covered: 1,
+      import_batch_id: duesBatch,
+      imported_by: officerId,
+      ...overrides,
+    });
+    if (error) throw new Error(`payment insert failed: ${error.message}`);
+    return txn;
+  }
+
+  beforeAll(async () => {
+    officerId = await getTestOfficer(db);
+    const { data, error } = await db.rpc("current_term");
+    if (error) throw new Error(error.message);
+    term = data as unknown as string;
+
+    for (let i = 0; i < 6; i++) {
+      const base = testIdentity();
+      const id = await createTestMember(db, track, {
+        ...base,
+        eid: base.eid.replace("t3q", DUES_MARKER),
+      });
+      if (i % 2 === 0) paidIds.push(id);
+      else unpaidIds.push(id);
+    }
+
+    for (const id of paidIds) await pay(id);
+  }, 60_000);
+
+  afterAll(async () => {
+    // ON DELETE RESTRICT, so the payments go before the members cleanup() will
+    // remove — which is the FK doing exactly what it was chosen to do.
+    if (duesTxnIds.length > 0) {
+      await db.from("dues_payments").delete().in("venmo_txn_id", duesTxnIds);
+    }
+  });
+
+  const mine = (dues: string) =>
+    parseMemberFilter({ q: DUES_MARKER, state: "all", dues });
+
+  async function idsFor(dues: string) {
+    const { data, error, count } = await applyMemberFilter(
+      db.from("member_directory").select("id", { count: "exact" }),
+      mine(dues),
+      []
+    );
+    if (error) throw new Error(`dues query failed: ${error.message}`);
+    return { ids: (data ?? []).map((row) => row.id ?? ""), count: count ?? 0 };
+  }
+
+  it("splits the roster into exactly the two halves", async () => {
+    const paid = await idsFor("paid");
+    const unpaid = await idsFor("unpaid");
+    const all = await idsFor("all");
+
+    expect(paid.ids.sort()).toEqual([...paidIds].sort());
+    expect(unpaid.ids.sort()).toEqual([...unpaidIds].sort());
+    expect(all.ids).toHaveLength(paidIds.length + unpaidIds.length);
+  });
+
+  it("returns a count that matches the rows it returned", async () => {
+    // §4.5's one-translation rule on the new predicate: the number printed above
+    // the table and the rows in it come from one query, so "copy all N unpaid"
+    // cannot quietly mean something else.
+    for (const dues of ["paid", "unpaid", "all"]) {
+      const { ids, count } = await idsFor(dues);
+      expect(count, dues).toBe(ids.length);
+    }
+  });
+
+  it("⚠️ counts an undecided amount as NOT paid", async () => {
+    // terms_covered null → covered_terms null → covers nothing. The failure
+    // direction is under-reporting membership, which the review queue makes
+    // visible, rather than over-reporting it, which nothing would.
+    const [member] = unpaidIds;
+    const txn = await pay(member, { terms_covered: null, amount_cents: 4200 });
+
+    const unpaid = await idsFor("unpaid");
+    expect(unpaid.ids).toContain(member);
+    expect((await idsFor("paid")).ids).not.toContain(member);
+
+    await db.from("dues_payments").delete().eq("venmo_txn_id", txn);
+  });
+
+  it("takes membership away again when a payment is voided", async () => {
+    const [member] = paidIds;
+    expect((await idsFor("paid")).ids).toContain(member);
+
+    await db
+      .from("dues_payments")
+      .update({
+        voided_at: new Date().toISOString(),
+        voided_by: officerId,
+        void_reason: "Refunded at the member's request",
+      })
+      .eq("member_id", member);
+
+    expect((await idsFor("paid")).ids).not.toContain(member);
+    expect((await idsFor("unpaid")).ids).toContain(member);
+  });
+
+  it("🪤 ignores a payment covering only a term that is not the current one", async () => {
+    // member_directory is scoped to current_term() like every other aggregate
+    // here, so a live payment for a past term counts for nothing. Stepped off
+    // the index rather than typed, because 'Fall 2026' < 'Spring 2026' is true
+    // as a string and false as a calendar fact.
+    const [member] = unpaidIds;
+    const previous = termAtIndex(termIndex(term)! - 1);
+    const txn = await pay(member, { start_term: previous, terms_covered: 1 });
+
+    expect((await idsFor("paid")).ids).not.toContain(member);
+    expect((await idsFor("unpaid")).ids).toContain(member);
+
+    await db.from("dues_payments").delete().eq("venmo_txn_id", txn);
   });
 });

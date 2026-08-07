@@ -58,6 +58,7 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     attendance_rate: 0.75,
     pending_count: 0,
     last_seen_at: "2026-03-01T02:00:00.000Z",
+    dues_paid_current_term: false,
     custom_fields: {},
     ...over,
   };
@@ -232,6 +233,26 @@ describe("projectRow", () => {
   it("keeps numbers as numbers", () => {
     const cells = projectRow(row({ bonus_points: -5 }), pick("bonus_points"));
     expect(cells[0]).toEqual({ kind: "number", value: -5 });
+  });
+
+  // Stage 6.5 phase 4 — ONE catalogue entry, not a new mechanism.
+  it("renders dues as the same two words the directory prints", () => {
+    expect(
+      projectRow(row({ dues_paid_current_term: true }), pick("dues"))[0]
+    ).toEqual({ kind: "text", value: "Paid" });
+    expect(
+      projectRow(row({ dues_paid_current_term: false }), pick("dues"))[0]
+    ).toEqual({ kind: "text", value: "Not Paid" });
+    expect(
+      projectRow(row({ dues_paid_current_term: null }), pick("dues"))[0]
+    ).toEqual({ kind: "empty" });
+  });
+
+  it("keeps dues OUT of the default field list", () => {
+    // 🔓 Opt-in through the picker. Defaulting narrow is a §6 PII mitigation
+    // rather than a convenience, and "has this person paid" is exactly the kind
+    // of thing that should leave the building only when someone asked for it.
+    expect(DEFAULT_EXPORT_FIELDS).not.toContain("dues");
   });
 });
 

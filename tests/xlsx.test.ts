@@ -101,6 +101,7 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     attendance_rate: 0.75,
     pending_count: 0,
     last_seen_at: "2026-03-01T02:00:00.000Z",
+    dues_paid_current_term: true,
     custom_fields: {},
     ...over,
   };

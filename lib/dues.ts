@@ -728,6 +728,48 @@ export function paymentReviewState(row: {
 }
 
 /**
+ * The last term this member's payments cover, or null if none of them cover
+ * anything (Stage 6.5 phase 4).
+ *
+ * 🪤 **This is the lexicographic trap's home ground, and the reason it is a
+ * function rather than three lines on the detail page.** `'Fall 2026' <
+ * 'Spring 2026'` is true as a string compare and false as a calendar fact, so
+ * `max(term)` and `order by term` are both wrong here and neither raises
+ * anything — they return a real term string that happens to be the wrong one.
+ * The comparison goes through `termIndex` and nothing else, which is also why
+ * `member_directory` deliberately carries no "paid through" column for a caller
+ * to lean on: the answer cannot be expressed as an ordering over the text.
+ *
+ * Voided payments contribute nothing — a void takes coverage away, which is the
+ * whole point of it being reversible-by-record rather than a delete. An
+ * undecided amount contributes nothing either, and gets that for free:
+ * `covered_terms` is generated from a nullable `terms_covered`, so such a row
+ * arrives here as null or empty. Under-reporting is the intended failure
+ * direction; the review queue is where it becomes visible.
+ */
+export function paidThroughTerm(
+  payments: readonly {
+    coveredTerms: readonly string[] | null;
+    voided: boolean;
+  }[]
+): string | null {
+  let best: number | null = null;
+
+  for (const payment of payments) {
+    if (payment.voided || !payment.coveredTerms) continue;
+    for (const term of payment.coveredTerms) {
+      const index = termIndex(term);
+      // An unparseable term is skipped rather than treated as zero: zero would
+      // be a real index and could win a max against nothing.
+      if (index === null) continue;
+      if (best === null || index > best) best = index;
+    }
+  }
+
+  return best === null ? null : termAtIndex(best);
+}
+
+/**
  * Rank roster candidates for a payment whose note named nobody.
  *
  * 🪤 **This is a new *caller* of the Stage 5 ranker, not a second ranker.** The

@@ -99,7 +99,7 @@ describe("parseMemberFilter", () => {
     );
   });
 
-  it("sorts on the four displayed columns and nothing else", () => {
+  it("sorts on the displayed columns and nothing else", () => {
     // Email is newly sortable in phase 3 — displayed since phase 1, but with no
     // header of its own until the table shrank to four columns.
     expect(parseMemberFilter({ sort: "email" }).sort).toBe("email");
@@ -485,6 +485,96 @@ describe("applyMemberFilter", () => {
     // matching" would return one chunk and report success.
     const calls = callsFor({});
     expect(calls.some(([m]) => m === "range" || m === "limit")).toBe(false);
+  });
+});
+
+// Stage 6.5 phase 4. Dues status is the fifth displayed column and the first
+// filter added since phase 3 removed six — so these assertions are as much about
+// the rules that removal established as about the column itself.
+describe("dues status (Stage 6.5 phase 4)", () => {
+  it("defaults to 'all', which narrows nothing", () => {
+    // ⚠️ The asymmetry with `state` is the point. `state` defaults to the
+    // narrowing "active"; dues must not hide anyone until asked, because a
+    // roster silently missing its unpaid members is a count nobody can account
+    // for — on the one column with money behind it.
+    const filter = parseMemberFilter({});
+    expect(filter.dues).toBe("all");
+    expect(isDefaultFilter(filter)).toBe(true);
+    expect(callsFor({ dues: "all" }).some(([, column]) =>
+      column === "dues_paid_current_term"
+    )).toBe(false);
+  });
+
+  it("parses both narrowing values and falls back on anything else", () => {
+    expect(parseMemberFilter({ dues: "paid" }).dues).toBe("paid");
+    expect(parseMemberFilter({ dues: "unpaid" }).dues).toBe("unpaid");
+    for (const junk of ["yes", "true", "1", "PAID", ""]) {
+      expect(parseMemberFilter({ dues: junk }).dues).toBe("all");
+    }
+  });
+
+  it("translates to one equality on the view's calculated boolean", () => {
+    expect(callsFor({ dues: "paid" })).toContainEqual([
+      "eq",
+      "dues_paid_current_term",
+      true,
+    ]);
+    // Not `.not("eq", true)` and not a null branch: the view computes this as an
+    // `exists (…)`, so it is a real boolean in every row.
+    expect(callsFor({ dues: "unpaid" })).toContainEqual([
+      "eq",
+      "dues_paid_current_term",
+      false,
+    ]);
+  });
+
+  it("composes with the other clauses rather than replacing them", () => {
+    // The exit-criterion query: every unpaid active member matching a search.
+    const calls = callsFor({ dues: "unpaid", state: "active", q: "sharma" });
+    expect(calls).toContainEqual(["eq", "active", true]);
+    expect(calls).toContainEqual(["eq", "dues_paid_current_term", false]);
+    expect(calls.some(([method]) => method === "or")).toBe(true);
+    expect(calls.some(([method]) => method === "range")).toBe(false);
+  });
+
+  it("is sortable, and opens on the members who have paid", () => {
+    expect(parseMemberFilter({ sort: "dues" }).sort).toBe("dues");
+    // Descending on a boolean is true-first. The officer picking this column is
+    // looking at dues; who has paid is the answer it should open on.
+    expect(parseMemberFilter({ sort: "dues" }).dir).toBe("desc");
+    expect(defaultDirection("dues")).toBe("desc");
+    expect(sortColumn("dues", NO_FIELDS)).toBe("dues_paid_current_term");
+  });
+
+  it("is a built-in sort key, not a custom one", () => {
+    // 📌 `dues` names a column the VIEW calculates, so it belongs in
+    // MEMBER_SORTS rather than behind the `cf:` namespace — and the three
+    // reserved keys are what stop an officer-defined field from turning up
+    // beside it claiming to answer the same question.
+    expect(sortColumn("cf:dues", [{ key: "dues", showInDirectory: true }])).toBe(
+      null
+    );
+  });
+
+  it("round-trips through the URL, omitting only the default", () => {
+    const unpaid = parseMemberFilter({ dues: "unpaid" });
+    const params = memberFilterToParams(unpaid);
+    expect(params.get("dues")).toBe("unpaid");
+    expect(parseMemberFilter(Object.fromEntries(params)).dues).toBe("unpaid");
+
+    expect(memberFilterToParams(parseMemberFilter({})).has("dues")).toBe(false);
+  });
+
+  it("survives a filter change, the way a cf: sort had to be taught to", () => {
+    // 🪤 The memberFilterUrl trap: it re-parses what it builds, so a field the
+    // round trip drops is silently reset by any OTHER control. That killed a
+    // `cf:` sort on every keystroke in the search box once already.
+    const filter = parseMemberFilter({ dues: "unpaid", sort: "total_points" });
+    const next = memberFilterUrl(filter, { q: "sharma" }, NO_FIELDS);
+    const params = new URLSearchParams(next);
+    expect(params.get("dues")).toBe("unpaid");
+    expect(params.get("sort")).toBe("total_points");
+    expect(params.get("q")).toBe("sharma");
   });
 });
 

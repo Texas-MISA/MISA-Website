@@ -63,7 +63,7 @@ export const dynamic = "force-dynamic";
 // catalogue can reach, so the picker is limited by the catalogue rather than by
 // what happened to be selected here.
 const EXPORT_COLUMNS =
-  "id, eid, full_name, email, active, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, custom_fields" as const;
+  "id, eid, full_name, email, active, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_current_term, custom_fields" as const;
 
 /**
  * Rows per PostgREST request while paging through the result.

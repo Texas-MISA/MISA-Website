@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { AuditTrail } from "@/app/admin/(shell)/_components/audit-trail";
 import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
 import { requireOfficer } from "@/lib/auth";
+import { formatCents, paidThroughTerm } from "@/lib/dues";
 import { formatCategory, formatDay, formatInstant } from "@/lib/events";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
 import {
@@ -39,7 +40,7 @@ export const metadata: Metadata = { title: "Member" };
 // lib/points.ts. Every column of the view, because this page is where the ones
 // the directory no longer shows have to land.
 const DIRECTORY_COLUMNS =
-  "id, eid, full_name, email, active, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate, notes, custom_fields, updated_at" as const;
+  "id, eid, full_name, email, active, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate, notes, custom_fields, dues_paid_current_term, updated_at" as const;
 
 const ATTENDANCE_COLUMNS =
   "id, event_id, status, submitted_at, submitted_name, submitted_eid, source" as const;
@@ -49,6 +50,9 @@ const ADJUSTMENT_COLUMNS =
 
 const TERM_EVENT_COLUMNS =
   "id, title, starts_at, ends_at, points, category" as const;
+
+const DUES_COLUMNS =
+  "id, paid_at, amount_cents, note, payer_name, start_term, terms_covered, covered_terms, voided_at" as const;
 
 export default async function MemberDetailPage({
   params,
@@ -65,7 +69,7 @@ export default async function MemberDetailPage({
   // The separate `members.select("notes")` read that used to sit here is gone:
   // migration 18 appended notes, custom_fields and updated_at to the view, which
   // is exactly what that read's own comment anticipated.
-  const [directory, definitions, currentTerm, attendance, adjustments] =
+  const [directory, definitions, currentTerm, attendance, adjustments, payments] =
     await Promise.all([
       db
         .from("member_directory")
@@ -84,6 +88,19 @@ export default async function MemberDetailPage({
         .select(ADJUSTMENT_COLUMNS)
         .eq("member_id", id)
         .order("awarded_at", { ascending: false }),
+      // Every payment credited to this member, voided ones included — a void is
+      // a recorded action rather than a deletion (§4.2), and money having
+      // arrived stays a fact whatever an officer later decided about it.
+      //
+      // Ordered by paid_at, NOT by term: `order by term` is the lexicographic
+      // trap, and this is a list of payments in the order they were made rather
+      // than a claim about which term is latest. That question is
+      // paidThroughTerm's, and it goes through the term index.
+      db
+        .from("dues_payments")
+        .select(DUES_COLUMNS)
+        .eq("member_id", id)
+        .order("paid_at", { ascending: false }),
     ]);
 
   if (directory.error) {
@@ -107,6 +124,17 @@ export default async function MemberDetailPage({
 
   const attendanceRows = attendance.error ? [] : (attendance.data ?? []);
   const adjustmentRows = adjustments.error ? [] : (adjustments.data ?? []);
+  const paymentRows = payments.error ? [] : (payments.data ?? []);
+
+  // 🪤 Through the term index, never `max(term)` — see paidThroughTerm. Null
+  // means no live payment covers anything, which is a different statement from
+  // "not paid this term" and is rendered as one.
+  const paidThrough = paidThroughTerm(
+    paymentRows.map((row) => ({
+      coveredTerms: row.covered_terms,
+      voided: row.voided_at !== null,
+    }))
+  );
 
   const officerNames = await fetchOfficerNames(
     db,
@@ -413,6 +441,110 @@ export default async function MemberDetailPage({
                       </td>
                       <td className="py-2">
                         {describeOfficer(officerNames, row.awarded_by)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="mt-12">
+        <h2 className="font-display text-xl font-bold">Dues</h2>
+
+        {/* The status comes from the view's own boolean rather than being
+            re-derived from the payments below, so this page and the directory
+            cannot end up saying different things about the same member. What is
+            derived here is "paid through", which the view deliberately does not
+            carry — see paidThroughTerm. */}
+        <p className="mt-3 max-w-3xl text-sm text-foreground/70">
+          Calculated from payments, never ticked by hand.{" "}
+          {member.dues_paid_current_term ? (
+            <span className="font-medium">
+              Official for {term ?? "the current term"}.
+            </span>
+          ) : (
+            <span className="font-medium">
+              Not paid for {term ?? "the current term"}.
+            </span>
+          )}{" "}
+          {paidThrough === null ? (
+            <>No payment covers a term yet.</>
+          ) : (
+            <>
+              Paid through <span className="font-medium">{paidThrough}</span>.
+            </>
+          )}
+        </p>
+
+        {paymentRows.length === 0 ? (
+          <p className="mt-4 max-w-3xl border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+            No payments have been credited to this member.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[48rem] border-collapse text-sm">
+              <thead>
+                <tr className="border-b-2 border-black text-left">
+                  <th className="py-2 pr-4 font-medium">Paid</th>
+                  <th className="py-2 pr-4 font-medium">Amount</th>
+                  <th className="py-2 pr-4 font-medium">Covers</th>
+                  <th className="py-2 pr-4 font-medium">Payer</th>
+                  <th className="py-2 font-medium">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paymentRows.map((row) => {
+                  const voided = row.voided_at !== null;
+                  return (
+                    <tr
+                      key={row.id}
+                      className={`border-b border-black/15 align-top ${
+                        voided ? "text-foreground/50" : ""
+                      }`}
+                    >
+                      <td className="py-2 pr-4 whitespace-nowrap">
+                        <Link
+                          href={`/admin/dues/${row.id}`}
+                          className="underline underline-offset-2"
+                        >
+                          {formatInstant(row.paid_at)} CT
+                        </Link>
+                      </td>
+                      <td className="py-2 pr-4 font-mono whitespace-nowrap">
+                        <span className={voided ? "line-through" : ""}>
+                          {formatCents(row.amount_cents)}
+                        </span>
+                        {voided && (
+                          <span className="ml-2 border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+                            voided
+                          </span>
+                        )}
+                      </td>
+                      {/* Same wording as the ledger's Covers column, on purpose:
+                          an undecided amount covers NOTHING until an officer
+                          says what it bought, and a row that reads blank here
+                          would look like a bug rather than a job. */}
+                      <td className="py-2 pr-4 whitespace-nowrap">
+                        {row.covered_terms && row.covered_terms.length > 0 ? (
+                          row.covered_terms.join(", ")
+                        ) : (
+                          <span className="text-foreground/50">
+                            nothing yet — from {row.start_term}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {row.payer_name ?? (
+                          <span className="text-foreground/50">—</span>
+                        )}
+                      </td>
+                      <td className="py-2 max-w-[18rem] break-words">
+                        {row.note ?? (
+                          <span className="text-foreground/50">—</span>
+                        )}
                       </td>
                     </tr>
                   );
