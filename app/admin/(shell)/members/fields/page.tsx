@@ -48,9 +48,9 @@ export default async function MemberFieldsPage() {
       </p>
 
       <p className="mt-6 max-w-2xl text-sm text-foreground/70">
-        Dropdowns officers can set on any member — dues status, t-shirt size,
-        committee. Fields marked as directory columns appear in the roster table
-        and can be sorted on; the rest live on each member&apos;s own page.
+        Dropdowns officers can set on any member — t-shirt size, committee,
+        major. Fields marked as directory columns appear in the roster table and
+        can be sorted on; the rest live on each member&apos;s own page.
       </p>
 
       <section className="mt-10">
