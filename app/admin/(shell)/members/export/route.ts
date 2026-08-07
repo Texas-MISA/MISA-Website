@@ -136,11 +136,16 @@ export async function GET(request: Request): Promise<Response> {
       fields
     );
 
-    // ⚠️ pageRange() is NOT called here, and that is the whole design. It is a
-    // separate function the page applies precisely so the export can apply the
-    // identical filter without it — which is what makes the file provably the
-    // same query as the count rendered beside the button, rather than a second
-    // query someone has to keep in step (§4.5).
+    // ⚠️ applyMemberFilter applies no window at all, and that is the whole
+    // design: the range below belongs to this caller, so the file is provably
+    // the same query as the count rendered beside the button rather than a
+    // second one someone has to keep in step (§4.5).
+    //
+    // 📌 The directory used to paginate at 25 and this comment used to say
+    // "pageRange() is NOT called here". Since 2026-08-07 it renders every
+    // matching member and reads in chunks exactly as this loop does — the
+    // separation still matters, but it now buys completeness on both sides
+    // rather than distinguishing a page from an export.
     const query = scoped ? base.in("id", ids) : base;
 
     const rows: ExportSourceRow[] = [];

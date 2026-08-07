@@ -5,12 +5,23 @@
 // ⚠️ This module is the stage's load-bearing piece, and the reason is worth
 // stating before the code: §7's exit criterion is that an officer filters the
 // roster and copies a *complete* email list, and the classic way that screen
-// breaks is the page query and the export query drifting apart, so "copy all
-// 60 matching" quietly returns the 25 rows that happened to be rendered. The
+// breaks is the rendered query and the export query drifting apart, so "copy all
+// 60 matching" quietly returns whatever subset happened to be on screen. The
 // defence is structural rather than careful: there is one filter object, parsed
-// in one place, and one function that turns it into a query. Phase 5's export
-// re-derives the filter from the same URL and applies the same function, with
-// only the pagination differing.
+// in one place, and one function that turns it into a query. The export
+// re-derives the filter from the same URL and applies the same function.
+//
+// ⚠️ **The directory stopped paginating on 2026-08-07** and `page` left
+// `MemberFilter` with it, the same way phase 3's six retired filters left rather
+// than merely losing their controls — an old bookmark carrying `?page=3` must
+// narrow nothing, not silently offset a list whose control no longer exists.
+//
+// That does NOT mean the row window stopped mattering. Both callers now read in
+// CHUNKS: the directory page and the export route each loop `.range()` in
+// thousands, because one unbounded request is subject to the hosted project's
+// `max_rows` and comes back short with no error. applyMemberFilter still never
+// ranges — keeping the window out of it is what lets two callers share one
+// translation and still read the whole result.
 //
 // ⚠️ Phase 3 REMOVED six fields — `source`, `minEvents`, `maxEvents`, `minRate`,
 // `joinedFrom`, `joinedTo` — rather than merely hiding their controls. The
@@ -28,11 +39,6 @@
 // key format and the `cf:` namespace, so both modules cannot drift on what a
 // custom sort key looks like. Still no next/* and no supabase-js.
 import { customSortColumn, parseCustomSortKey } from "@/lib/members";
-
-/** Rows per page in the directory. Small enough that the seeded roster of 32
- * actually paginates — a page size that fits the whole fixture set hides every
- * bug this screen is prone to. */
-export const PAGE_SIZE = 25;
 
 /**
  * Sortable columns, as the URL spells them. Mapped to real column names by
@@ -134,8 +140,6 @@ export type MemberFilter = {
   maxPoints: number | null;
   sort: MemberSort;
   dir: "asc" | "desc";
-  /** 1-based, as it appears in the URL. */
-  page: number;
 };
 
 /** Sorts that read better largest-first when the officer has not said. A custom
@@ -248,11 +252,10 @@ export function parseMemberFilter(
         ? "desc"
         : "asc";
 
-  const page = Math.max(1, intOrNull(one(params, "page"), 100_000) ?? 1);
-
   // Any other key in `params` — `minRate`, `source`, `joinedFrom` from a phase-1
-  // bookmark, or anything a human typed — is ignored by construction: this reads
-  // the keys it knows and never enumerates the input.
+  // bookmark, `page` from a pre-2026-08-07 one, or anything a human typed — is
+  // ignored by construction: this reads the keys it knows and never enumerates
+  // the input.
   return {
     state,
     q: searchTerm(one(params, "q")),
@@ -260,7 +263,6 @@ export function parseMemberFilter(
     maxPoints: intOrNull(one(params, "maxPoints"), 1_000_000),
     sort,
     dir,
-    page,
   };
 }
 
@@ -307,8 +309,6 @@ export function memberFilterToParams(
     params.set("dir", merged.dir);
   }
 
-  if (merged.page > 1) params.set("page", String(merged.page));
-
   return params;
 }
 
@@ -316,7 +316,7 @@ export function memberFilterToParams(
  * choose the empty-state wording, and by phase 5 to warn before an export of
  * everything. */
 export function isDefaultFilter(filter: MemberFilter): boolean {
-  return memberFilterToParams({ ...filter, page: 1 }).toString() === "";
+  return memberFilterToParams(filter).toString() === "";
 }
 
 /** The free-text and numeric filter boxes, as the strings they display. */
@@ -397,7 +397,6 @@ export function memberFilterUrl(
     if (value) params.set(key, value);
     else params.delete(key);
   }
-  params.delete("page");
 
   const raw: RawParams = {};
   for (const [key, value] of params.entries()) raw[key] = value;
@@ -497,21 +496,31 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
 }
 
 /**
- * The row window for a page, as PostgREST's inclusive .range() bounds.
+ * How many rows to ask PostgREST for at a time.
  *
- * Kept apart from applyMemberFilter on purpose: the export in phase 5 applies
- * the identical filter and must NOT apply this. Making pagination the separate
- * step is what makes "the same query, unpaginated" expressible without copying
- * the filter logic.
+ * 🪤 **Neither caller may ask for everything in one request.** `config.toml`
+ * sets no `max_rows` locally, but the hosted project applies its own — so an
+ * unbounded request comes back complete in development and silently short in
+ * production, with no error anywhere. That is the partial-list failure this
+ * whole module exists to prevent, wearing a different hat.
+ *
+ * Deliberately NOT applied inside `applyMemberFilter`. Keeping the window out
+ * of the translation is what lets the directory and the export share one
+ * filter-to-query function and each still read the complete result — the same
+ * separation `pageRange()` used to provide when the directory paginated, for the
+ * same reason.
+ *
+ * ⚠️ Reading in chunks re-introduces the tie-break hazard that paging had: rows
+ * equal on the sort column can come back ordered differently per request, so a
+ * chunk boundary drops one row and repeats another. `applyMemberFilter` ends
+ * every query `.order("id")` for exactly this, and it is load-bearing rather
+ * than tidy — see the note there.
  */
-export function pageRange(page: number): { from: number; to: number } {
-  const safe = Math.max(1, Math.floor(page));
-  const from = (safe - 1) * PAGE_SIZE;
-  return { from, to: from + PAGE_SIZE - 1 };
-}
+export const READ_CHUNK = 1000;
 
-/** Total pages for a row count — at least 1, so an empty result still renders
- * as "page 1 of 1" rather than "page 1 of 0". */
-export function pageCount(total: number): number {
-  return Math.max(1, Math.ceil(total / PAGE_SIZE));
+/** The inclusive `.range()` bounds for the nth chunk, zero-based. */
+export function chunkRange(index: number): { from: number; to: number } {
+  const safe = Math.max(0, Math.floor(index));
+  const from = safe * READ_CHUNK;
+  return { from, to: from + READ_CHUNK - 1 };
 }

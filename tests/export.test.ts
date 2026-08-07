@@ -400,11 +400,19 @@ describe("the export route's boundaries", () => {
     expect(code).not.toContain("requireOfficer");
   });
 
-  it("⚠️ never calls pageRange — that separation is the design", () => {
-    // pageRange() is the directory's 25-row window. An export that applied it
-    // would return one page while claiming to be the whole filter. Not imported
-    // is the structural version of not called.
-    expect(code).not.toContain("pageRange");
+  it("⚠️ reads to the end rather than taking one window", () => {
+    // The export must never stop at a single bounded read — that would return
+    // part of the filter while claiming to be all of it, which is the failure
+    // this entire screen is built around.
+    //
+    // 📌 This used to assert `pageRange` was absent, back when the directory
+    // paginated at 25 and the risk was the export borrowing its window. Both
+    // now read in chunks, so absence of that name proves nothing (it no longer
+    // exists) — the property worth pinning is that the read LOOPS and bounds
+    // itself with a range rather than a limit.
+    expect(code).toMatch(/for \(let offset = 0/);
+    expect(code).toContain(".range(");
+    expect(code).not.toContain(".limit(");
   });
 
   it("writes the audit receipt before the body is built", () => {

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyMemberFilter,
+  chunkRange,
   defaultDirection,
   isDefaultFilter,
   memberFilterFields,
@@ -12,10 +13,8 @@ import {
   MAX_SEARCH_LENGTH,
   MEMBER_SORTS,
   NO_CUSTOM_FIELDS,
-  pageCount,
-  pageRange,
   parseMemberFilter,
-  PAGE_SIZE,
+  READ_CHUNK,
   sortColumn,
   type FilterableQuery,
   type MemberFilter,
@@ -86,7 +85,6 @@ describe("parseMemberFilter", () => {
     expect(filter.state).toBe("active");
     expect(filter.sort).toBe("name");
     expect(filter.dir).toBe("asc");
-    expect(filter.page).toBe(1);
     expect(filter.minPoints).toBeNull();
     expect(isDefaultFilter(filter)).toBe(true);
   });
@@ -171,12 +169,10 @@ describe("parseMemberFilter", () => {
       state: "banana",
       sort: "'; drop table members; --",
       dir: "sideways",
-      page: "-4",
     });
     expect(filter.state).toBe("active");
     expect(filter.sort).toBe("name");
     expect(filter.dir).toBe("asc");
-    expect(filter.page).toBe(1);
   });
 
   it("tolerates a phase-1 bookmark without letting it narrow anything", () => {
@@ -278,7 +274,6 @@ describe("memberFilterToParams", () => {
       maxPoints: "40",
       sort: "total_points",
       dir: "asc",
-      page: "3",
     });
 
     const roundTripped = parseMemberFilter(
@@ -305,9 +300,8 @@ describe("memberFilterToParams", () => {
     // A caller writing `{ dir: someCondition ? "asc" : undefined }` must not end
     // up with `dir=undefined` in the URL.
     const filter = parseMemberFilter({ sort: "total_points", dir: "asc" });
-    const params = memberFilterToParams(filter, { dir: undefined, page: 2 });
+    const params = memberFilterToParams(filter, { dir: undefined });
     expect(params.get("dir")).toBe("asc");
-    expect(params.get("page")).toBe("2");
   });
 
   it("defaultDirection agrees with what the parser would have chosen", () => {
@@ -484,28 +478,28 @@ describe("applyMemberFilter", () => {
     }
   });
 
-  it("never paginates — that is the caller's job", () => {
-    // The export in phase 5 applies this same function and simply does not call
-    // pageRange(). If a .range() ever appears in here, "copy all N matching"
-    // starts returning one page and reporting success.
-    const calls = callsFor({ page: 4 });
+  it("never windows the result — that is the caller's job", () => {
+    // ⚠️ MORE load-bearing since the directory stopped paginating, not less.
+    // Both callers now read in chunks and each applies its own .range(); if one
+    // ever appeared in here, every caller would inherit it and "copy all N
+    // matching" would return one chunk and report success.
+    const calls = callsFor({});
     expect(calls.some(([m]) => m === "range" || m === "limit")).toBe(false);
   });
 });
 
-describe("pagination arithmetic", () => {
-  it("produces inclusive PostgREST bounds", () => {
-    expect(pageRange(1)).toEqual({ from: 0, to: PAGE_SIZE - 1 });
-    expect(pageRange(2)).toEqual({ from: PAGE_SIZE, to: 2 * PAGE_SIZE - 1 });
-    // Page 0 and negatives are clamped rather than producing a negative offset.
-    expect(pageRange(0)).toEqual({ from: 0, to: PAGE_SIZE - 1 });
+describe("chunk arithmetic", () => {
+  it("produces inclusive PostgREST bounds, zero-based", () => {
+    expect(chunkRange(0)).toEqual({ from: 0, to: READ_CHUNK - 1 });
+    expect(chunkRange(1)).toEqual({ from: READ_CHUNK, to: 2 * READ_CHUNK - 1 });
+    expect(chunkRange(2)).toEqual({
+      from: 2 * READ_CHUNK,
+      to: 3 * READ_CHUNK - 1,
+    });
   });
 
-  it("reports at least one page, so an empty result is 'page 1 of 1'", () => {
-    expect(pageCount(0)).toBe(1);
-    expect(pageCount(1)).toBe(1);
-    expect(pageCount(PAGE_SIZE)).toBe(1);
-    expect(pageCount(PAGE_SIZE + 1)).toBe(2);
+  it("clamps a negative index rather than producing a negative offset", () => {
+    expect(chunkRange(-1)).toEqual({ from: 0, to: READ_CHUNK - 1 });
   });
 });
 
@@ -576,9 +570,17 @@ describe("filter control state", () => {
     );
   });
 
-  it("always drops page, because a narrower filter invalidates the offset", () => {
-    const onPage3: MemberFilter = { ...base, page: 3, minPoints: 15 };
-    expect(memberFilterUrl(onPage3, { minPoints: "20" }, NO_CUSTOM_FIELDS)).toBe("minPoints=20");
+  it("ignores a stale page param from a pre-2026-08-07 bookmark", () => {
+    // The directory stopped paginating and `page` left MemberFilter with it, so
+    // there is nothing to drop any more — an old URL simply parses without it.
+    const stale = parseMemberFilter(
+      { minPoints: "15", page: "3" },
+      NO_CUSTOM_FIELDS
+    );
+    expect(memberFilterToParams(stale).toString()).toBe("minPoints=15");
+    expect(memberFilterUrl(stale, { minPoints: "20" }, NO_CUSTOM_FIELDS)).toBe(
+      "minPoints=20"
+    );
   });
 
   it("preserves sort and direction across a filter change", () => {

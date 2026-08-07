@@ -32,7 +32,7 @@ export function ExportToolbar({
   filterParams: string;
   catalogue: ExportField[];
 }) {
-  const { mode, ids, total, count, selectAllMatching, clear, pageIds } =
+  const { mode, ids, total, count, selectAllMatching, clear } =
     useSelection();
 
   const [chosen, setChosen] = useState<ReadonlySet<string>>(
@@ -86,7 +86,9 @@ export function ExportToolbar({
     }
   }
 
-  const pageCount = pageIds.length;
+  // Reachable only from a partial hand-picked selection now that the header
+  // checkbox goes straight to `filter` mode. Still worth keeping: an officer who
+  // ticked eleven rows and then wants everyone has a one-click way there.
   const canPromote = mode === "ids" && count > 0 && count < total;
 
   return (
@@ -98,11 +100,11 @@ export function ExportToolbar({
             : `${count} selected`}
         </span>
 
-        {/* ⚠️ The promotion is a separate, explicitly worded control rather than
-            a bigger checkbox. "Select all N matching this filter" and "select
-            the rows on this page" have to be visibly different actions, because
-            the officer who thinks they did the first and actually did the
-            second gets a partial list with no signal. */}
+        {/* ⚠️ Still an explicitly worded control rather than a bigger checkbox.
+            The wording carries the distinction the modes encode — this exports
+            everything the filter matches, not the rows that happen to be
+            ticked — and an officer who thinks they did the first while actually
+            doing the second gets a partial list with no signal. */}
         {canPromote && (
           <button
             type="button"
@@ -111,12 +113,6 @@ export function ExportToolbar({
           >
             Select all {total} matching this filter
           </button>
-        )}
-
-        {mode === "filter" && pageCount < total && (
-          <span className="text-sm text-foreground/70">
-            (not just the {pageCount} on this page)
-          </span>
         )}
 
         {count > 0 && (

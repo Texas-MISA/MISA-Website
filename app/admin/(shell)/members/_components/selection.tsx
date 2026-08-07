@@ -11,13 +11,28 @@ import {
 
 // Row selection for the directory (§7 Stage 6 phase 5).
 //
-// ⚠️ The two modes are the whole point of this file. "The 25 rows on this page"
+// ⚠️ The two modes are the whole point of this file. A hand-picked set of rows
 // and "all N matching this filter" are different answers, and conflating them is
 // the classic bug on this kind of screen — it silently produces a partial email
 // list that looks complete. They are therefore separate states rather than one
 // set of ids that happens to be full, so nothing downstream has to infer which
 // the officer meant: in `filter` mode the export sends no ids at all and the
 // route re-runs the same filtered query.
+//
+// 📌 **The directory stopped paginating on 2026-08-07, and both modes survived
+// that on purpose.** Every matching row is now on screen, so "select everything
+// visible" and "all N matching" pick the same people — but they are still not
+// the same instruction. `ids` mode exports exactly what was ticked; `filter`
+// mode re-runs the query at export time, so it carries whatever matches *then*.
+// Collapsing them would throw away the only mode that can prove a list is
+// complete rather than merely long.
+//
+// 🔓 It also fixed a failure the change would otherwise have introduced. The
+// header checkbox used to select 25 ids; unpaginated it would select every one,
+// and `ids` mode appends one `ids=` query param per member — a few hundred
+// uuids at ~40 characters each overruns request-header limits and the download
+// simply fails. So the header checkbox sets `filter` mode, which sends none.
+// That is not a workaround: with no pages, ticking "all" IS the filter.
 //
 // ⚠️ Selection resets whenever the filter changes. The count beside the button
 // and the rows behind it have to agree, and an officer who narrows the filter
@@ -35,15 +50,16 @@ type SelectionValue = {
   mode: Mode;
   /** Explicitly checked ids. Empty and meaningless while mode is `filter`. */
   ids: ReadonlySet<string>;
-  /** Rows matching the current filter, across every page. */
+  /** Rows matching the current filter. */
   total: number;
-  /** Ids rendered on this page, in render order. */
-  pageIds: readonly string[];
+  /** Every id on screen, in render order — which is every matching id. */
+  visibleIds: readonly string[];
   /** How many members an export would actually carry. */
   count: number;
   isSelected: (id: string) => boolean;
   toggle: (id: string) => void;
-  togglePage: (on: boolean) => void;
+  /** The header checkbox. `on` means "all matching", not "all rendered". */
+  toggleAll: (on: boolean) => void;
   selectAllMatching: () => void;
   clear: () => void;
 };
@@ -61,7 +77,7 @@ export function useSelection(): SelectionValue {
 export function SelectionProvider({
   filterKey,
   total,
-  pageIds,
+  visibleIds,
   children,
 }: {
   /**
@@ -72,7 +88,7 @@ export function SelectionProvider({
    */
   filterKey: string;
   total: number;
-  pageIds: readonly string[];
+  visibleIds: readonly string[];
   children: ReactNode;
 }) {
   const [mode, setMode] = useState<Mode>("ids");
@@ -96,28 +112,34 @@ export function SelectionProvider({
   const toggle = useCallback(
     (id: string) => {
       setIds((current) => {
-        // Leaving `filter` mode by unchecking a row drops back to this page's
+        // Leaving `filter` mode by unchecking a row drops back to the visible
         // rows, minus the one just unchecked. The alternative — keeping "all N"
         // minus one — would need a not-in list the export has no way to express,
         // and would read as "all N" in the banner while quietly meaning
         // something else.
-        const base = mode === "filter" ? new Set(pageIds) : new Set(current);
+        const base = mode === "filter" ? new Set(visibleIds) : new Set(current);
         if (base.has(id)) base.delete(id);
         else base.add(id);
         return base;
       });
       setMode("ids");
     },
-    [mode, pageIds]
+    [mode, visibleIds]
   );
 
-  const togglePage = useCallback(
-    (on: boolean) => {
+  // ⚠️ Ticking the header goes to `filter` mode rather than enumerating every
+  // visible id. With no pagination those pick the same people, but only this
+  // way does the export send zero ids — see the note at the top for why a URL
+  // full of uuids is a real failure and not a tidiness point.
+  const toggleAll = useCallback((on: boolean) => {
+    if (on) {
+      setMode("filter");
+      setIds(new Set());
+    } else {
       setMode("ids");
-      setIds(() => (on ? new Set(pageIds) : new Set()));
-    },
-    [pageIds]
-  );
+      setIds(new Set());
+    }
+  }, []);
 
   const selectAllMatching = useCallback(() => {
     setMode("filter");
@@ -134,11 +156,11 @@ export function SelectionProvider({
       mode,
       ids,
       total,
-      pageIds,
+      visibleIds,
       count: mode === "filter" ? total : ids.size,
       isSelected,
       toggle,
-      togglePage,
+      toggleAll,
       selectAllMatching,
       clear,
     }),
@@ -146,10 +168,10 @@ export function SelectionProvider({
       mode,
       ids,
       total,
-      pageIds,
+      visibleIds,
       isSelected,
       toggle,
-      togglePage,
+      toggleAll,
       selectAllMatching,
       clear,
     ]
@@ -163,33 +185,39 @@ export function SelectionProvider({
 }
 
 /**
- * The header checkbox — selects or clears this page.
+ * The header checkbox — selects everything matching the filter, or clears.
  *
  * A separate Client Component so member-table.tsx can stay a Server Component;
  * it is one cell of an otherwise server-rendered `<thead>`. Deliberately NOT a
  * SortHeader: the other headers are links, and this is a control.
  */
 export function SelectAllHeader() {
-  const { pageIds, ids, mode, togglePage } = useSelection();
+  const { visibleIds, ids, mode, toggleAll } = useSelection();
 
-  const allOnPage =
+  // Hand-checking every row lands on the same set as ticking this box, so it
+  // shows checked either way — but the mode underneath still differs, and that
+  // difference is what the export reads.
+  const all =
     mode === "filter" ||
-    (pageIds.length > 0 && pageIds.every((id) => ids.has(id)));
-  const someOnPage = mode === "filter" || pageIds.some((id) => ids.has(id));
+    (visibleIds.length > 0 && visibleIds.every((id) => ids.has(id)));
+  const some = mode === "filter" || visibleIds.some((id) => ids.has(id));
 
   return (
-    <th scope="col" className="w-10 px-3 py-2">
+    <th
+      scope="col"
+      className="sticky top-0 z-10 w-10 border-b-2 border-black bg-misa-panel px-3 py-2"
+    >
       <input
         type="checkbox"
         className="size-4 accent-black"
-        checked={allOnPage}
+        checked={all}
         // Indeterminate is a property, not an attribute, so React cannot set it
         // declaratively — a ref callback is the only way to reach it.
         ref={(node) => {
-          if (node) node.indeterminate = someOnPage && !allOnPage;
+          if (node) node.indeterminate = some && !all;
         }}
-        onChange={(event) => togglePage(event.currentTarget.checked)}
-        aria-label={allOnPage ? "Clear selection" : "Select all on this page"}
+        onChange={(event) => toggleAll(event.currentTarget.checked)}
+        aria-label={all ? "Clear selection" : "Select all matching this filter"}
       />
     </th>
   );

@@ -2,10 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   applyMemberFilter,
-  pageCount,
-  pageRange,
   parseMemberFilter,
-  PAGE_SIZE,
   type SortableField,
 } from "@/lib/filters";
 import { classifyTermEvents, customSortKey } from "@/lib/members";
@@ -63,25 +60,59 @@ const isolated = () =>
 const ROW_COLUMNS =
   "id, full_name, email, eid, active, source, events_attended, events_possible, attendance_rate, total_points, notes, custom_fields" as const;
 
-async function page(
+/**
+ * A deliberately tiny chunk, so a fixture set of thirty-odd rows spans several
+ * reads.
+ *
+ * ⚠️ NOT lib/filters.ts's READ_CHUNK, which is 1000 — proving the tie-break
+ * against that would need a thousand fixtures. The property under test is a
+ * property of chunked reading itself and does not care about the size, so the
+ * tests use a size that exposes it cheaply. It is the same reason the directory's
+ * old PAGE_SIZE was 25: a read window that fits the whole fixture set hides every
+ * bug this screen is prone to.
+ */
+const CHUNK = 7;
+
+/** One chunk of the directory query, zero-based. */
+async function chunk(
   filter: ReturnType<typeof parseMemberFilter>,
+  index = 0,
   fields: SortableField[] = []
 ) {
-  const { from, to } = pageRange(filter.page);
+  const from = index * CHUNK;
   const { data, error, count } = await applyMemberFilter(
     db.from("member_directory").select(ROW_COLUMNS, { count: "exact" }),
     filter,
     fields
-  ).range(from, to);
+  ).range(from, from + CHUNK - 1);
   if (error) throw new Error(`directory query failed: ${error.message}`);
   return { rows: data, count: count ?? 0 };
 }
 
-// One more than a page, so the fixture set genuinely spans two pages. The
-// seeded roster is 32 members and could never do this on its own — with a page
-// size of 25 the select-all bug is invisible against the seed, which is exactly
-// why these rows exist.
-const FIXTURE_COUNT = PAGE_SIZE + 6;
+/**
+ * Every matching row, read the way the directory page and the export route
+ * both read: loop `.range()` until a short chunk comes back.
+ */
+async function readAll(
+  filter: ReturnType<typeof parseMemberFilter>,
+  fields: SortableField[] = []
+) {
+  const rows: Awaited<ReturnType<typeof chunk>>["rows"] = [];
+  let count = 0;
+  for (let index = 0; ; index++) {
+    const page = await chunk(filter, index, fields);
+    if (index === 0) count = page.count;
+    rows.push(...page.rows);
+    if (page.rows.length < CHUNK || rows.length >= count) break;
+  }
+  return { rows, count };
+}
+
+// Several chunks' worth, so the fixture set genuinely spans chunk boundaries.
+// The seeded roster of 32 could never prove this on its own — a read window that
+// swallows the whole fixture set hides every bug this screen is prone to, which
+// is exactly why these rows exist.
+const FIXTURE_COUNT = CHUNK * 4 + 3;
 const INACTIVE_EVERY = 13;
 const SELF_CHECKIN_EVERY = 11;
 
@@ -109,51 +140,47 @@ afterAll(async () => {
 });
 
 describe("the directory query on live data", () => {
-  it("counts every matching member, not the ones on the page", async () => {
-    const { rows, count } = await page(isolated());
+  it("reports the full count from the very first chunk", async () => {
+    // The directory renders every matching member, so the count and the rows
+    // agree once the loop finishes — but the count has to be right from chunk
+    // ZERO, because that is where the loop decides how much more to read. A
+    // count that only became correct later would end the read early.
+    const { rows, count } = await chunk(isolated());
 
     expect(count).toBe(FIXTURE_COUNT);
-    expect(rows).toHaveLength(PAGE_SIZE);
-    // The gap between these two numbers is the stage's headline bug: the
-    // officer is told 31 and shown 25, and phase 2's "copy all matching" must
-    // return 31.
+    expect(rows).toHaveLength(CHUNK);
     expect(count).toBeGreaterThan(rows.length);
   });
 
-  it("pages cover every matching member exactly once", async () => {
-    const filter = isolated();
-    const pages = pageCount(FIXTURE_COUNT);
-    expect(pages).toBe(2);
-
-    const seen: string[] = [];
-    for (let p = 1; p <= pages; p++) {
-      const { rows } = await page({ ...filter, page: p });
-      seen.push(...rows.map((r) => r.id!));
-    }
+  it("chunks cover every matching member exactly once", async () => {
+    const { rows, count } = await readAll(isolated());
+    expect(count).toBe(FIXTURE_COUNT);
 
     // No duplicates and no gaps. Both failure modes come from a non-total sort
     // order, and both look like missing or doubled data rather than like an
-    // ordering fault.
+    // ordering fault. This is what the directory and the export both depend on
+    // now that neither paginates and both read in chunks.
+    const seen = rows.map((r) => r.id!);
     expect(seen).toHaveLength(FIXTURE_COUNT);
     expect(new Set(seen).size).toBe(FIXTURE_COUNT);
     expect([...seen].sort()).toEqual([...createdIds].sort());
   });
 
-  it("keeps the page split stable across repeated reads", async () => {
-    // Every fixture member has zero points, so the
-    // sort column is tied across the whole set. Without the id tie-break in
-    // applyMemberFilter the same request can return a different split each
-    // time — which is how a member silently vanishes between page 1 and page 2.
+  it("keeps the chunk split stable across repeated reads", async () => {
+    // Every fixture member has zero points, so the sort column is tied across
+    // the whole set. Without the id tie-break in applyMemberFilter the same
+    // request can return a different split each time — which is how a member
+    // silently vanishes between one chunk and the next.
     const filter = { ...isolated(), sort: "total_points" as const };
-    const first = await page({ ...filter, page: 1 });
-    const again = await page({ ...filter, page: 1 });
+    const first = await chunk(filter);
+    const again = await chunk(filter);
     expect(again.rows.map((r) => r.id)).toEqual(first.rows.map((r) => r.id));
   });
 
   it("splits the roster on state, with the two halves accounting for everyone", async () => {
-    const all = await page(isolated());
-    const active = await page({ ...isolated(), state: "active" });
-    const inactive = await page({ ...isolated(), state: "inactive" });
+    const all = await readAll(isolated());
+    const active = await readAll({ ...isolated(), state: "active" });
+    const inactive = await readAll({ ...isolated(), state: "inactive" });
 
     expect(inactive.count).toBe(Math.ceil(FIXTURE_COUNT / INACTIVE_EVERY));
     expect(inactive.rows.every((r) => r.active === false)).toBe(true);
@@ -173,7 +200,7 @@ describe("free-text search against real PostgREST", () => {
     const id = await createTestMember(db, track, identity);
 
     for (const term of [identity.fullName, identity.email, identity.eid]) {
-      const { rows } = await page(parseMemberFilter({ q: term, state: "all" }));
+      const { rows } = await readAll(parseMemberFilter({ q: term, state: "all" }));
       expect(rows.map((r) => r.id)).toContain(id);
     }
   });
@@ -190,7 +217,7 @@ describe("free-text search against real PostgREST", () => {
     const local = identity.email.split("@")[0];
     expect(local).toContain(".");
 
-    const { rows } = await page(parseMemberFilter({ q: local, state: "all" }));
+    const { rows } = await readAll(parseMemberFilter({ q: local, state: "all" }));
     expect(rows.map((r) => r.id)).toContain(id);
   });
 
@@ -198,7 +225,7 @@ describe("free-text search against real PostgREST", () => {
     // A comma separates conditions inside an or-group. Unquoted, a searched
     // comma would split one predicate into two and silently widen the result —
     // the partial/over-broad list failure this screen is prone to.
-    const { count } = await page(
+    const { count } = await readAll(
       parseMemberFilter({ q: `${FIXTURE_MARKER}, nobody`, state: "all" })
     );
     expect(count).toBe(0);
@@ -209,8 +236,8 @@ describe("free-text search against real PostgREST", () => {
     // earlier tests in this file add members carrying the same marker, so the
     // absolute number is not stable across the file. The property under test is
     // that case makes no difference, and that is what this asserts.
-    const lower = await page(isolated());
-    const upper = await page(
+    const lower = await readAll(isolated());
+    const upper = await readAll(
       parseMemberFilter({ q: FIXTURE_MARKER.toUpperCase(), state: "all" })
     );
     expect(upper.count).toBe(lower.count);
@@ -220,7 +247,7 @@ describe("free-text search against real PostgREST", () => {
   it("composes with the roster scope rather than replacing it", async () => {
     // An `or` group and an `eq` are ANDed. If the search ever escaped its group,
     // "inactive only" plus a search would return active members too.
-    const inactive = await page(
+    const inactive = await readAll(
       parseMemberFilter({ q: FIXTURE_MARKER, state: "inactive" })
     );
     expect(inactive.count).toBe(Math.ceil(FIXTURE_COUNT / INACTIVE_EVERY));
@@ -366,7 +393,7 @@ const FIELD_OPTIONS = ["Paid", "Unpaid", "Waived"];
  * seeing everything they expect and this one sees only what it made.
  */
 const CF_MARKER = "t3qcf";
-const CF_COUNT = PAGE_SIZE + 6;
+const CF_COUNT = CHUNK * 4 + 3;
 
 describe("custom-field sorting through the view", () => {
   const fields: SortableField[] = [
@@ -431,13 +458,11 @@ describe("custom-field sorting through the view", () => {
 
   it("orders by the JSON path, with unanswered members last either way", async () => {
     for (const dir of ["asc", "desc"] as const) {
+      const { rows } = await readAll(sorted(dir), fields);
       const seen: (string | null)[] = [];
-      for (let p = 1; p <= pageCount(CF_COUNT); p++) {
-        const { rows } = await page({ ...sorted(dir), page: p }, fields);
-        for (const row of rows) {
-          const cf = row.custom_fields as Record<string, string> | null;
-          seen.push(cf?.[FIELD_KEY] ?? null);
-        }
+      for (const row of rows) {
+        const cf = row.custom_fields as Record<string, string> | null;
+        seen.push(cf?.[FIELD_KEY] ?? null);
       }
 
       expect(seen).toHaveLength(CF_COUNT);
@@ -449,8 +474,8 @@ describe("custom-field sorting through the view", () => {
       expect(firstNull).toBeGreaterThan(-1);
       expect(seen.slice(firstNull).every((v) => v === null)).toBe(true);
 
-      // And the answered run is genuinely ordered — across page boundaries,
-      // which is the half a single-page assertion would miss.
+      // And the answered run is genuinely ordered — across chunk boundaries,
+      // which is the half a single-chunk assertion would miss.
       const answered = seen.slice(0, firstNull) as string[];
       const expected = [...answered].sort();
       if (dir === "desc") expected.reverse();
@@ -460,13 +485,11 @@ describe("custom-field sorting through the view", () => {
 
   it("covers every member exactly once when the sort column is mostly ties", async () => {
     // Three options over 31 members: ties are the rule here, not the exception.
-    // Without the id tie-break applyMemberFilter appends, pages drop and repeat
-    // rows — the spike reproduced precisely this, losing one row in thirty.
-    const seen: string[] = [];
-    for (let p = 1; p <= pageCount(CF_COUNT); p++) {
-      const { rows } = await page({ ...sorted("asc"), page: p }, fields);
-      seen.push(...rows.map((r) => r.id!));
-    }
+    // Without the id tie-break applyMemberFilter appends, chunked reads drop and
+    // repeat rows — the spike reproduced precisely this, losing one row in
+    // thirty.
+    const { rows } = await readAll(sorted("asc"), fields);
+    const seen = rows.map((r) => r.id!);
 
     expect(seen).toHaveLength(CF_COUNT);
     expect(new Set(seen).size).toBe(CF_COUNT);
@@ -474,9 +497,11 @@ describe("custom-field sorting through the view", () => {
   });
 
   it("counts the same rows the sort returns", async () => {
-    const { rows, count } = await page(sorted("asc"), fields);
+    const { rows, count } = await readAll(sorted("asc"), fields);
     expect(count).toBe(CF_COUNT);
-    expect(rows).toHaveLength(PAGE_SIZE);
+    // Reading to the end returns exactly the count — which is the property the
+    // directory now renders directly, since it shows every matching member.
+    expect(rows).toHaveLength(CF_COUNT);
   });
 
   it("surfaces the stored value on the view", async () => {
@@ -516,10 +541,10 @@ describe("custom-field sorting through the view", () => {
 //
 // The export mirrors the route handler rather than importing it, because a Route
 // Handler needs a request context this suite cannot build. What is pinned is the
-// query shape: the same applyMemberFilter, with pageRange() replaced by explicit
-// chunked paging.
+// query shape: the same applyMemberFilter, read through explicit chunked
+// ranges — which is now how the directory reads too.
 const EX_MARKER = "t3qex";
-const EX_COUNT = PAGE_SIZE + 6;
+const EX_COUNT = CHUNK * 4 + 3;
 const EX_INACTIVE_EVERY = 5;
 
 describe("the export query returns every matching member", () => {
@@ -578,18 +603,27 @@ describe("the export query returns every matching member", () => {
     expect(total).toBe(EX_COUNT);
     expect(rows).toHaveLength(EX_COUNT);
     // The assertion that would have caught the classic bug: the export is
-    // strictly larger than one page.
-    expect(rows.length).toBeGreaterThan(PAGE_SIZE);
+    // strictly larger than a single read window.
+    expect(rows.length).toBeGreaterThan(CHUNK);
   });
 
-  it("agrees exactly with the count the directory renders beside it", async () => {
-    const { count, rows: pageRows } = await page(everyone());
+  it("agrees exactly with what the directory renders beside it", async () => {
+    const { count, rows: shown } = await readAll(everyone());
     const { rows } = await exportAll(everyone());
 
     // §4.5's one-translation rule asserted end to end: the file and the number
     // printed above it come from the same filter, so they cannot drift.
     expect(rows).toHaveLength(count);
-    expect(pageRows.length).toBeLessThan(rows.length);
+
+    // 📌 This used to assert the directory showed strictly FEWER rows than the
+    // export — the gap between "25 on this page" and "all 31 matching" was the
+    // bug the whole screen was built to survive. Since the directory stopped
+    // paginating on 2026-08-07 the two are the same set, so the assertion
+    // inverts: same length, same ids, same order. That is a stronger property
+    // than the old one, not a weaker one — it now catches the export and the
+    // screen disagreeing about *which* members, not merely how many.
+    expect(shown).toHaveLength(rows.length);
+    expect(shown.map((r) => r.id)).toEqual(rows.map((r) => r.id));
   });
 
   it("returns every fixture exactly once, with no duplicates across chunks", async () => {

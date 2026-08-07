@@ -4,12 +4,11 @@ import Link from "next/link";
 import { requireOfficer } from "@/lib/auth";
 import {
   applyMemberFilter,
+  chunkRange,
   isDefaultFilter,
   memberFilterToParams,
-  pageCount,
-  pageRange,
   parseMemberFilter,
-  PAGE_SIZE,
+  READ_CHUNK,
 } from "@/lib/filters";
 import { exportCatalogue } from "@/lib/export";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
@@ -19,7 +18,6 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ExportToolbar } from "./_components/export-toolbar";
 import { MemberFilters } from "./_components/member-filters";
 import { MemberTable, type MemberRow } from "./_components/member-table";
-import { Pagination } from "./_components/pagination";
 import { SelectionProvider } from "./_components/selection";
 
 // The member directory (§5, §7 Stage 6). Reads member_directory, which is
@@ -61,31 +59,57 @@ async function fetchDirectory(
   filter: ReturnType<typeof parseMemberFilter>,
   fields: readonly FieldDefinition[]
 ): Promise<DirectoryQueryResult> {
-  const { from, to } = pageRange(filter.page);
-
   // applyMemberFilter is the only thing that translates a filter into a query.
-  // Phase 5's export will call it on the same filter and skip the .range()
-  // below — that separation is what keeps "copy all N matching" honest.
+  // The export calls it on the same filter and reads the same way — that
+  // sharing is what keeps "copy all N matching" honest.
   //
   // The definitions go in because a `cf:` sort key resolves against them.
   // applyMemberFilter takes them as a required argument on purpose: forgetting
   // to load them is then a compile error rather than a directory that silently
   // falls back to sorting by name.
-  const { data, error, count } = await applyMemberFilter(
+  const query = applyMemberFilter(
     db.from("member_directory").select(COLUMNS, { count: "exact" }),
     filter,
     fields
-  ).range(from, to);
+  );
 
-  if (error) {
-    console.error("member directory query failed:", error.message);
-    return { kind: "error" };
+  // ⚠️ Read in chunks rather than asking for the whole result at once. The
+  // directory stopped paginating on 2026-08-07 and shows every matching member,
+  // which is NOT the same as issuing one unbounded request: the hosted project
+  // applies its own PostgREST `max_rows`, so that request comes back complete
+  // locally and silently short in production. Same loop and same reasoning as
+  // the export route — it is the identical trap, not a coincidence.
+  //
+  // There is deliberately no ceiling. The count below is always the true total,
+  // so the rows on screen and the number above them cannot disagree; a cap
+  // would re-introduce a partial list that looks complete. §2.2's worst case is
+  // 500 members, one chunk. If the roster ever grows enough for this to feel
+  // slow, virtualize the table — do not start trimming the result.
+  // Rows typed off the builder rather than restated, so the COLUMNS literal
+  // stays the single source of the row shape (PostgREST types the result from
+  // that literal — see the note on COLUMNS).
+  const raw: NonNullable<Awaited<typeof query>["data"]> = [];
+  let total = 0;
+
+  for (let index = 0; ; index++) {
+    const { from, to } = chunkRange(index);
+    const { data, error, count } = await query.range(from, to);
+
+    if (error) {
+      console.error("member directory query failed:", error.message);
+      return { kind: "error" };
+    }
+
+    if (index === 0) total = count ?? data.length;
+    raw.push(...data);
+
+    if (data.length < READ_CHUNK || raw.length >= total) break;
   }
 
   // No timestamp reaches the table any more, so there is nothing to pre-format
   // here — the columns that needed it moved to the detail page, which formats
   // them on the server for the same reason.
-  const rows: MemberRow[] = data.map((row) => ({
+  const rows: MemberRow[] = raw.map((row) => ({
     id: row.id ?? "",
     eid: row.eid ?? "",
     fullName: row.full_name ?? "",
@@ -100,7 +124,7 @@ async function fetchDirectory(
     updatedAt: row.updated_at ?? "",
   }));
 
-  return { kind: "ok", rows, total: count ?? rows.length };
+  return { kind: "ok", rows, total };
 }
 
 export default async function AdminMembersPage({
@@ -122,19 +146,14 @@ export default async function AdminMembersPage({
   const filter = parseMemberFilter(params, fields);
   const result = await fetchDirectory(db, filter, fields);
 
-  const pages = result.kind === "ok" ? pageCount(result.total) : 1;
-
-  // The filter as the export sees it — deliberately WITHOUT `page`.
+  // The filter, serving two jobs at once: it is the export's query string, and
+  // it is the key that resets the selection when the officer narrows the view.
   //
-  // Two jobs, and both want the page number gone. It is the export's query
-  // string, and an export is never page-scoped (that separation is the whole
-  // reason applyMemberFilter does not paginate). It is also the key that resets
-  // the selection, and paging is not a filter change: an officer who checks
-  // three rows on page 1, looks at page 2 and comes back should still have
-  // three rows checked.
-  const filterScope = memberFilterToParams(filter);
-  filterScope.delete("page");
-  const filterKey = filterScope.toString();
+  // 📌 It used to need `page` stripped for both — an export is never
+  // page-scoped, and paging is not a filter change so it must not clear what
+  // was checked. With pagination gone the filter simply *is* the scope, which
+  // is the simplification that workaround was standing in for.
+  const filterKey = memberFilterToParams(filter).toString();
 
   return (
     <div>
@@ -171,25 +190,26 @@ export default async function AdminMembersPage({
           </p>
         ) : (
           <>
+            {/* Every matching member is on screen, so this is a count rather
+                than a window — and it is the SAME number the export carries,
+                which is the property the whole screen is built around. */}
             <p className="mb-3 text-xs text-foreground/60">
               {result.total === 0
                 ? isDefaultFilter(filter)
                   ? "No active members yet."
                   : "No members match these filters."
-                : result.total > PAGE_SIZE
-                  ? `${result.total} matching members — showing ${result.rows.length} on page ${filter.page} of ${pages}.`
+                : isDefaultFilter(filter)
+                  ? `${result.total} member${result.total === 1 ? "" : "s"}.`
                   : `${result.total} matching member${result.total === 1 ? "" : "s"}.`}
             </p>
 
-            {/* The provider wraps the toolbar, the table AND the pagination:
-                the toolbar reads the selection, the table writes it, and the
-                pagination sits inside so a page change cannot remount the
-                provider and silently drop what was checked. The filter key is
-                what resets it — see selection.tsx. */}
+            {/* The provider wraps the toolbar and the table: the toolbar reads
+                the selection and the table writes it. The filter key is what
+                resets it — see selection.tsx. */}
             <SelectionProvider
               filterKey={filterKey}
               total={result.total}
-              pageIds={result.rows.map((row) => row.id)}
+              visibleIds={result.rows.map((row) => row.id)}
             >
               {result.total > 0 && (
                 <ExportToolbar
@@ -199,8 +219,6 @@ export default async function AdminMembersPage({
               )}
 
               <MemberTable rows={result.rows} filter={filter} fields={fields} />
-
-              <Pagination filter={filter} pages={pages} total={result.total} />
             </SelectionProvider>
           </>
         )}

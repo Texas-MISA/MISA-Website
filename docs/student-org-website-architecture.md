@@ -1,9 +1,50 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.42
+**Version:** 1.43
 **Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) — phases 1, 2 and 3 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
 **Last updated:** August 2026
 
+> **v1.43: the directory shows every matching member.** `/admin/members`
+> stopped paginating (requested directly). No migration and no schema change.
+>
+> - **`page` left `MemberFilter`**, the way phase 3's six retired filters did
+>   and for the same reason: a bookmarked `?page=3` must narrow nothing rather
+>   than silently offset a list whose control no longer exists.
+>   `PAGE_SIZE`/`pageRange`/`pageCount` are gone and `pagination.tsx` with them.
+> - ⚠️ **Rendering everything is not asking for everything in one request.**
+>   The page loops `.range()` in chunks of `READ_CHUNK` (1000), exactly as the
+>   export route already did, because the hosted project applies its own
+>   PostgREST `max_rows` — an unbounded request returns complete in development
+>   and silently short in production. `applyMemberFilter` still never windows;
+>   that separation is what lets both callers share one translation and each
+>   read the whole result, and it is now more load-bearing than when it existed
+>   to keep `pageRange()` out of the export.
+> - **No ceiling, deliberately.** The count and the rows are the same set, so
+>   they cannot disagree; a cap would re-introduce a partial list that looks
+>   complete. §2.2's worst case is 500 members — one chunk. Virtualize before
+>   trimming.
+> - 🔓 **The header checkbox became "select all matching", and that is a fix
+>   rather than a rename.** It used to enumerate 25 ids into the export URL;
+>   unpaginated it would enumerate every one, and the export appends one `ids=`
+>   param each. Measured: **28 members already produces a 1,257-character URL**,
+>   so a real roster would overrun request-header limits and the download would
+>   fail outright. It now switches to `filter` mode, which sends none —
+>   confirmed live at 29 members, 0 `ids` params, 109 characters. **The two
+>   selection modes still exist and must not be merged**: they now pick the same
+>   people on screen, but only `filter` mode re-runs the query and can prove a
+>   list complete rather than merely long.
+> - **The total-order invariant survived unchanged.** Chunked reading has the
+>   same skip/repeat hazard as paging — it is the same `.range()` boundary under
+>   a different name — so `.order("id")` stays load-bearing and the tie-break
+>   tests simply moved from `pageRange()` to a local `CHUNK = 7`.
+> - 🪤 **The sticky header needed a bounded scrollport.** `overflow-x-auto`
+>   alone makes the wrapper a scroll container in *both* axes, so with no height
+>   limit the page scrolls instead of it and `sticky top-0` has no scrollport to
+>   stick within.
+> - ✅ Walked through a browser: `?page=3` renders the full roster, count ==
+>   rows == CSV rows under a filter (15/15/15), both selection modes behave, and
+>   the header stays put while scrolling. 545 tests, lint, build and tsc clean.
+>
 > **v1.42: production is the seed again, and the seeder learned two lessons.**
 > No schema change and no application change — `supabase/seed.sql`,
 > `scripts/seed-remote.sh`, and a data reset of the linked project.
@@ -1215,7 +1256,7 @@ Run against a deliberately pessimistic year: **500 registered members, 3 events 
 |---|---|
 | Supabase database — 500 MB | ~13,500 attendance rows/year at roughly half a KB with indexes is **~7 MB/year**; add members, events, adjustments and audit and call it 10–15 MB. Decades of headroom. |
 | Supabase MAU — 50k | **~13, and it does not grow with the roster.** MAU counts Supabase *Auth* users, and members have no accounts (§3) — only officers sign in. This is the limit people assume they will hit and the one the design has already removed. |
-| Supabase egress — 5 GB/mo | Small payloads throughout; the directory is paginated at 25 and the largest single response in the system is a full-roster export measured in tens of KB. |
+| Supabase egress — 5 GB/mo | Small payloads throughout. The directory renders the whole matching roster since 2026-08-07, which at 500 members is still tens of KB — the same order as the full-roster export, which remains the largest single response in the system. |
 | Vercel bandwidth / invocations | ~2,000 check-ins a month plus casual browsing — single-digit GB, tens of thousands of invocations. **Verify against the dashboard's usage page rather than a remembered number:** Vercel restructured Hobby around Fast Data Transfer, edge requests, and Fluid Active CPU, and the allowances have moved. |
 | Peak load | 150 submissions inside ten minutes is ~0.25 req/s average and maybe 5–10/s at the door, each a small indexed lookup. Not a concern on the free instance. |
 
@@ -2313,7 +2354,7 @@ That is now four consecutive phases where a browser pass found something the sui
 **The directory — what is displayed**
 - **Name, Email, EID, Total Points**, plus officer-defined custom-field columns
 - Name links to `/admin/members/[id]`
-- Sortable: exactly the displayed columns, custom fields included. Server-side against `member_directory`, never client-side — required for correct behaviour with pagination, and the reason a custom field's value has to be a *column* the database can order by rather than something assembled in the app.
+- Sortable: exactly the displayed columns, custom fields included. Server-side against `member_directory`, never client-side — required for correct behaviour once the result is read in more than one request, and the reason a custom field's value has to be a *column* the database can order by rather than something assembled in the app.
 - Filterable: the displayed columns, plus two deliberate exceptions — **active/inactive**, kept as a scope selector rather than a column filter (dropping it would strand inactive members, who are excluded from `leaderboard` too), and **free-text search across name / email / EID**, which touches only displayed columns.
 - Phase 6 adds the relational filters — attended or missed a given event, has pending submissions, not seen since a date. These narrow on data the table does not show, so they get their own labelled panel rather than sitting among the column filters.
 
@@ -2651,8 +2692,9 @@ One decision, and it earns a place here rather than in Stage 10 because it const
                              which has no PostgREST path to admin_profiles
   site.ts / officers.ts      org copy and the officer roster
   filters.ts                 directory filter → SQL translation. One filter
-                             object, one translation; pagination stays outside
-                             it so the export is the same query (§4.5)
+                             object, one translation; the row window stays
+                             outside it, so the directory and the export are the
+                             same query read in chunks (§4.5)
   export.ts                  CSV / TSV / clipboard formatting and the exportable
                              field catalogue (phase 5a). Pure — rows and a field
                              list in, a string out; the audit write and the

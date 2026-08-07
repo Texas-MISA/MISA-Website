@@ -75,10 +75,23 @@ export function MemberTable({
     `${DIRECTORY}/${id}${context ? `?${context}` : ""}`;
 
   return (
-    <div className="overflow-x-auto border-2 border-black">
+    /* 🪤 The bounded height is what makes the sticky header work, and it is not
+       a styling preference. `overflow-x-auto` alone computes `overflow-y` to
+       `auto` as well, so this div is already a scroll container — but with no
+       height limit its content never overflows, the PAGE scrolls instead, and a
+       `sticky` header inside has no scrollport to stick within. Giving it a real
+       max height makes it scroll in both axes, which is what the header sticks
+       to. Since the directory stopped paginating this list runs to the whole
+       roster, and losing the column headers (and the sort controls with them)
+       partway down is exactly what showing everything at once would otherwise
+       cost. */
+    <div className="max-h-[70vh] overflow-auto border-2 border-black">
       <table className="w-full min-w-[40rem] border-collapse text-sm">
         <thead className="bg-misa-panel">
-          <tr className="border-b-2 border-black">
+          {/* The border sits on the cells rather than the row: a sticky element
+              carries its own borders, and a border on the <tr> scrolls away
+              from the cells that stuck. */}
+          <tr>
             {/* One Client Component cell in an otherwise server-rendered head —
                 the other headers are navigation links, this is a control. */}
             <SelectAllHeader />
@@ -126,9 +139,7 @@ export function MemberTable({
  *
  * Clicking the active column flips the direction; clicking any other starts at
  * that column's own default, which is descending only for total points — nobody
- * opens a leaderboard-shaped screen wanting the lowest total first. Always
- * resets to page 1: keeping the offset across a re-sort lands the officer in
- * the middle of a list they have not seen the top of.
+ * opens a leaderboard-shaped screen wanting the lowest total first.
  */
 function SortHeader({
   filter,
@@ -150,7 +161,6 @@ function SortHeader({
   const params = memberFilterToParams(filter, {
     sort: column,
     dir: nextDir,
-    page: 1,
   });
   const query = params.toString();
 
@@ -160,7 +170,9 @@ function SortHeader({
       aria-sort={
         isActive ? (filter.dir === "asc" ? "ascending" : "descending") : "none"
       }
-      className={`px-3 py-2 text-xs font-semibold uppercase tracking-wider ${
+      // sticky + a solid background, and the bottom border on the cell rather
+      // than the row — see the note on the wrapper.
+      className={`sticky top-0 z-10 border-b-2 border-black bg-misa-panel px-3 py-2 text-xs font-semibold uppercase tracking-wider ${
         align === "right" ? "text-right" : "text-left"
       }`}
     >
