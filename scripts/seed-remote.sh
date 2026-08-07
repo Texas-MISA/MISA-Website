@@ -89,7 +89,17 @@ for f in "$TMP"/*.sql; do
     printf '%-26s %s\n' "$name" "guard skipped (--force) — wipe retained"
   fi
   # Drop full-line comments and blank lines, then collapse to a single line.
-  sql=$(sed -e 's/^[[:space:]]*--.*$//' -e '/^[[:space:]]*$/d' "$f" | tr '\n' ' ')
+  #
+  # 🪤 grep -v, NOT `sed 's/^[[:space:]]*--.*$//'`, and the difference is not
+  # style. In a UTF-8 locale GNU sed's `.*` fails to match a line containing a
+  # multibyte character, so a comment carrying an emoji — which this repo's
+  # comments do constantly — SURVIVES the strip, gets flattened into the SQL,
+  # and is then read by the CLI as a command-line flag. It half-seeded the
+  # production project on 2026-08-07: the wipe and the members chunk applied,
+  # the events chunk was rejected as "Unrecognized flag: -- 🪤 …", and the
+  # database was left with 32 members and no events. The pattern below anchors
+  # on the comment marker alone and never has to match the rest of the line.
+  sql=$(grep -v -E '^[[:space:]]*--' "$f" | grep -v -E '^[[:space:]]*$' | tr '\n' ' ')
   printf '%-26s %5d chars  ' "$name" "${#sql}"
   if [ "${#sql}" -gt 7500 ]; then
     echo "TOO LONG — split this chunk further"
