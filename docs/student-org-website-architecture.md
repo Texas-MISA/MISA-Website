@@ -1,9 +1,54 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.40
+**Version:** 1.41
 **Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) — phases 1, 2 and 3 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
 **Last updated:** August 2026
 
+> **v1.41: the seed moves to Fall 2026 and drops its term pin.** No schema
+> change and no application change — `supabase/seed.sql` only.
+>
+> - **Every seeded date is now inside Fall 2026**, so the data sits in the term
+>   the clock is actually in. `app_settings.current_term` is **no longer
+>   pinned**: the pin existed to stop the leaderboard emptying at a term
+>   boundary, and with the seed in the live term it only added a second source
+>   of truth — one that `tests/global-setup.ts` un-pins for the suite anyway, so
+>   the local database and the test run genuinely disagreed about
+>   `current_term()`. They now agree.
+> - ⚠️ **The completed events are compressed into 1–5 August**, which is not a
+>   plausible schedule and is the price of the move. `term_of` opens Fall 2026 on
+>   1 August; attendance can only hang off events with `starts_at < now()`
+>   (otherwise `events_attended` exceeds `events_possible`); and the real date is
+>   the 6th. The alternative was a seed with no attendance, an empty leaderboard
+>   and every rate showing "—". Spread them out again once more of the term has
+>   elapsed — nothing depends on the dates being adjacent, only on their order
+>   and on their being past.
+> - 🪤 **Visible consequence:** twelve events inside five days puts every orphan
+>   within the 48-hour grace window of several of them, so `nearby_events()`
+>   returns a ranked list where the old spread-out schedule returned one
+>   confident answer. Realistic, and it exercises the ranking harder, but it is a
+>   change in what the review screen looks like rather than a coincidence.
+> - 🪤 **The cost of dropping the pin has a date: 1 January 2027.**
+>   `current_term()` becomes Spring 2027, every seeded row falls out of scope,
+>   and both aggregate views go empty with nothing on screen to explain it. That
+>   is the seed needing its dates moved forward a term.
+> - **`point_adjustments.term` stopped being a typed string.** It was the literal
+>   `'Spring 2026'` — §4.7's rule broken in the one file nobody thinks of as
+>   application code, and it stopped matching the instant the dates moved. Now
+>   `term_of(<the award date>)`. Omitting the column is not the fix: the default
+>   is `current_term()`, the term the seed is *run* in rather than the term the
+>   grant belongs to.
+> - ✅ **Every documented count survived** — 32 members, 15 events, 202 present /
+>   5 pending / 1 rejected, 6 adjustments, 2 audit rows, 29 leaderboard rows. The
+>   seeded `random()` draw has the same eligible-pair structure because
+>   `joined_at` moved with the calendar, so the three self-registered members
+>   still qualify for exactly 5 of the 12 completed events. The `@chunk assert`
+>   block needed no edit.
+> - 🎯 **A case that used to need a fixture is now native**: `Fall Kickoff` on
+>   1 September is published, in the current term, and has not ended, so the
+>   member detail page's third grid state renders for real — `8 attended,
+>   4 missed, 1 still to come`. The `—` attendance-rate case still needs a
+>   temporary pin, now to `'Spring 2027'`.
+>
 > **v1.40: the ledger and the editor.** Stage 6.5 phase 3 — `/admin/dues`,
 > `/admin/dues/[id]`, and the two corrections behind them. No migration:
 > migration 19 already carries `dues_payments_review_idx`, a partial index on

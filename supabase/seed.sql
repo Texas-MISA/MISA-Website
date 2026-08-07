@@ -52,10 +52,22 @@ values ('00000000-0000-4000-8000-5eed00000001',
 insert into admin_profiles (user_id, display_name, role)
 values ('00000000-0000-4000-8000-5eed00000001', 'Seed Officer', 'admin');
 
--- Pin the board to the seeded semester. Without this the leaderboard empties
--- the moment the real date crosses into the next term, and the seed data
--- looks broken when it is only out of scope.
-update app_settings set current_term = 'Spring 2026';
+-- ⚠️ NO TERM PIN, deliberately, and this changed on 2026-08-06 when the seed
+-- moved from Spring 2026 to Fall 2026.
+--
+-- `app_settings.current_term` used to be pinned to the seeded semester so the
+-- leaderboard would not empty when real time crossed a term boundary. The seed
+-- now lives in the term the clock is actually in, so the pin would only add a
+-- second source of truth — and `tests/global-setup.ts` un-pins it for the suite
+-- anyway, which meant the local database and the test run genuinely disagreed
+-- about what `current_term()` was. Leaving it null makes them agree.
+--
+-- 🪤 The cost, stated plainly because it will arrive on a specific date: on
+-- **1 January 2027** `current_term()` becomes Spring 2027, every seeded event
+-- falls out of scope, and the leaderboard and directory go empty with nothing
+-- on screen to explain why. That is not a bug — it is this file needing its
+-- dates moved forward a term. The pin is the workaround if you need the old
+-- behaviour for an afternoon: `update app_settings set current_term = 'Fall 2026';`
 
 -- @chunk members
 -- 32 members with UT-EID-shaped identifiers: initials plus four digits.
@@ -106,9 +118,16 @@ select
   active,
   source,
   -- Self-registered members joined mid-semester, at their first check-in.
+  --
+  -- Load-bearing rather than flavour: the bulk attendance below only draws for
+  -- events at or after a member's joined_at, so these three attend 5 of the 12
+  -- completed events rather than all 12. That is what gives the leaderboard a
+  -- real spread and what makes events_attended differ from events_possible for
+  -- somebody. The 18:05 is five minutes AFTER the Welcome Social starts, so
+  -- that event is excluded too — they joined at it, they did not attend it.
   case when source = 'self_checkin'
-       then timestamptz '2026-03-10 18:05-06'
-       else timestamptz '2026-01-20 12:00-06'
+       then timestamptz '2026-08-03 18:05-05'
+       else timestamptz '2026-07-25 12:00-05'
   end
 from raw
 -- Load-bearing, not tidiness. The bulk attendance below draws with a seeded
@@ -120,25 +139,64 @@ from raw
 order by last_name;
 
 -- @chunk events
--- A Spring 2026 semester that has already happened, plus Fall 2026 events that
--- have not. term is generated from starts_at, so it is never set here.
+-- A Fall 2026 semester: twelve completed events plus one cancelled, then two
+-- that have not happened yet. term is generated from starts_at, never set here.
+--
+-- ⚠️ **Why the completed events are packed into 1–5 August, which is not a
+-- plausible meeting schedule.** Two hard constraints collide:
+--
+--   * `term_of` puts Fall 2026 at 1 Aug – 31 Dec, half-open at both ends.
+--   * Attendance can only hang off events that have already happened. The bulk
+--     insert below filters on `starts_at < now()`, and member_directory counts
+--     `events_possible` as published events with `ends_at < now()` — so an
+--     event in the future with attendance on it would make somebody's
+--     attendance_rate exceed 1, or divide by zero.
+--
+-- This file was written when the seeded semester (Spring 2026, Jan–Apr) had
+-- fully elapsed, which is what made a twelve-week schedule possible. Moving to
+-- Fall 2026 while the real date is early August leaves only the first days of
+-- the term in the past, so the alternative to compressing was a seed with no
+-- attendance, an empty leaderboard, and every rate showing "—". Read this block
+-- as "an intensive kickoff week", and **spread the dates back out the moment
+-- there is more elapsed term to spread them across** — nothing depends on them
+-- being adjacent, only on their order and on their being in the past.
+--
+-- 🪤 One consequence worth knowing before it surprises you: with twelve events
+-- inside five days, every orphaned check-in now falls within the 48-hour grace
+-- window of SEVERAL events, so `nearby_events()` offers a list rather than the
+-- single confident suggestion the old spread-out schedule produced. That is
+-- realistic and it exercises the ranking harder, but it is a change in what the
+-- review screen looks like, not a coincidence.
+--
+-- 🪤 `events_no_overlapping_checkin` is an exclusion constraint over published
+-- rows only, on half-open [starts_at, ends_at). Packed this tightly, two
+-- published events sharing an instant is an easy accident and it fails the
+-- whole seed with a 23P01. The cancelled row is exempt, which is why it can sit
+-- inside the same afternoon as another event.
 insert into events (title, description, location, starts_at, ends_at, points, category, status, created_by)
 values
-  ('Spring Kickoff',        'First general meeting of the semester', 'UTC 3.102', '2026-01-27 18:00-06','2026-01-27 19:00-06', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #2',    null, 'UTC 3.102', '2026-02-03 18:00-06','2026-02-03 19:00-06', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Resume Workshop',       'Bring a printed copy', 'GDC 2.216', '2026-02-10 18:00-06','2026-02-10 19:30-06', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #3',    null, 'UTC 3.102', '2026-02-17 18:00-06','2026-02-17 19:00-06', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Case Competition',      'Flagship event', 'RLP 1.106', '2026-02-24 17:00-06','2026-02-24 21:00-06', 5, 'flagship','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #4',    null, 'UTC 3.102', '2026-03-03 18:00-06','2026-03-03 19:00-06', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Spring Social',         'Food provided', 'Gregory Plaza', '2026-03-10 18:00-06','2026-03-10 20:00-06', 1, 'social','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #5',    null, 'UTC 3.102', '2026-03-24 18:00-05','2026-03-24 19:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Alumni Panel',          null, 'UTC 4.132', '2026-03-31 18:00-05','2026-03-31 19:30-05', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #6',    null, 'UTC 3.102', '2026-04-07 18:00-05','2026-04-07 19:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Interview Prep',        null, 'GDC 2.216', '2026-04-14 18:00-05','2026-04-14 19:30-05', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
-  ('End of Year Banquet',   'Awards and closing', 'AT&T Center', '2026-04-21 18:00-05','2026-04-21 21:00-05', 3, 'flagship','published','00000000-0000-4000-8000-5eed00000001'),
+  -- Saturday 1 August — the term opens.
+  ('Semester Kickoff',      'First general meeting of the semester', 'UTC 3.102', '2026-08-01 10:00-05','2026-08-01 11:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #2',    null, 'UTC 3.102', '2026-08-01 13:00-05','2026-08-01 14:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  -- Sunday 2 August.
+  ('Resume Workshop',       'Bring a printed copy', 'GDC 2.216', '2026-08-02 10:00-05','2026-08-02 11:30-05', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #3',    null, 'UTC 3.102', '2026-08-02 13:00-05','2026-08-02 14:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  -- Monday 3 August.
+  ('Case Competition',      'Flagship event', 'RLP 1.106', '2026-08-03 09:00-05','2026-08-03 13:00-05', 5, 'flagship','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #4',    null, 'UTC 3.102', '2026-08-03 14:00-05','2026-08-03 15:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Welcome Social',        'Food provided', 'Gregory Plaza', '2026-08-03 18:00-05','2026-08-03 20:00-05', 1, 'social','published','00000000-0000-4000-8000-5eed00000001'),
+  -- Tuesday 4 August.
+  ('General Meeting #5',    null, 'UTC 3.102', '2026-08-04 09:00-05','2026-08-04 10:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Alumni Panel',          null, 'UTC 4.132', '2026-08-04 11:00-05','2026-08-04 12:30-05', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #6',    null, 'UTC 3.102', '2026-08-04 18:00-05','2026-08-04 19:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  -- Wednesday 5 August — the last elapsed day.
+  ('Interview Prep',        null, 'GDC 2.216', '2026-08-05 10:00-05','2026-08-05 11:30-05', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Awards Banquet',        'Awards and closing', 'AT&T Center', '2026-08-05 18:00-05','2026-08-05 21:00-05', 3, 'flagship','published','00000000-0000-4000-8000-5eed00000001'),
   -- Cancelled: keeps its attendance history but is excluded from totals (§4.6).
-  ('Rained Out Tabling',    'Cancelled due to weather', 'Speedway', '2026-04-02 11:00-05','2026-04-02 14:00-05', 1, 'social','cancelled','00000000-0000-4000-8000-5eed00000001'),
-  -- Fall 2026: one published, one still draft, so the schedule UI has both.
+  -- Exempt from the overlap constraint, so it may share an afternoon.
+  ('Rained Out Tabling',    'Cancelled due to weather', 'Speedway', '2026-08-02 15:00-05','2026-08-02 18:00-05', 1, 'social','cancelled','00000000-0000-4000-8000-5eed00000001'),
+  -- Still to come, so the schedule UI has both and the member detail page has
+  -- an *upcoming* event to paint (attended / missed / upcoming, §4.5).
   ('Fall Kickoff',          'First meeting of the fall', 'UTC 3.102', '2026-09-01 18:00-05','2026-09-01 19:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
   ('Fall Info Session',     'Not announced yet', 'TBD', '2026-09-08 18:00-05','2026-09-08 19:00-05', 1, 'general_meeting','draft','00000000-0000-4000-8000-5eed00000001');
 
@@ -146,8 +204,8 @@ values
 -- Deterministic pseudo-randomness so the seed is reproducible.
 select setseed(0.42);
 
--- Bulk attendance across the completed Spring events. Participation varies by
--- member so the leaderboard has a real distribution rather than a flat line.
+-- Bulk attendance across the completed events. Participation varies by member
+-- so the leaderboard has a real distribution rather than a flat line.
 insert into attendance (event_id, member_id, submitted_name, submitted_eid, submitted_email, submitted_at, status, source)
 select
   e.id, m.id, m.full_name, m.eid, m.email,
@@ -174,8 +232,13 @@ where e.title = 'Rained Out Tabling';
 -- The cases the review queue exists for.
 
 -- Orphans: checked in after the window closed, so no event link yet.
+-- 1h15m after General Meeting #6 (4 Aug, 18:00–19:00) closed, which is the gap
+-- the review screen describes. ⚠️ Unlike the old spread-out schedule, several
+-- other events also sit within the 48-hour grace window of this instant, so
+-- nearby_events() returns a ranked list rather than one obvious answer — see
+-- the note on the events block.
 insert into attendance (member_id, submitted_name, submitted_eid, submitted_email, submitted_at, status)
-select m.id, m.full_name, m.eid, m.email, timestamptz '2026-04-07 20:15-05', 'pending'
+select m.id, m.full_name, m.eid, m.email, timestamptz '2026-08-04 20:15-05', 'pending'
 from members m where m.full_name in ('Hana Sato','Luca Moretti');
 
 -- Unknown EIDs: event is clear, the person is not on the roster.
@@ -205,8 +268,12 @@ where e.title = 'Interview Prep';
 
 -- Neither link resolved: late submission from someone not on the roster.
 -- tv7140 is distance 2 from tn7146 and distance 1 from nobody.
+--
+-- 21:30 on the last elapsed day: half an hour after the Awards Banquet closed
+-- and ten hours after Interview Prep did, so it sits outside every check-in
+-- window while staying inside the 48-hour grace period.
 insert into attendance (submitted_name, submitted_eid, submitted_email, submitted_at, status)
-values ('Toby Vance','tv7140','toby.vance@example.edu', timestamptz '2026-04-15 09:30-05','pending');
+values ('Toby Vance','tv7140','toby.vance@example.edu', timestamptz '2026-08-05 21:30-05','pending');
 
 -- Rejected: a duplicate someone submitted twice. The partial unique index
 -- excludes rejected rows, so the corrected entry can coexist.
@@ -229,15 +296,23 @@ select e.id, m.id, m.full_name, m.eid, m.email, e.starts_at + interval '30 minut
        '00000000-0000-4000-8000-5eed00000001', e.ends_at
 from events e
 join members m on m.full_name = 'Zane Okonkwo'
-where e.title = 'End of Year Banquet'
+where e.title = 'Awards Banquet'
   and not exists (
     select 1 from attendance a where a.event_id = e.id and a.member_id = m.id
   );
 
 -- @chunk point-adjustments
 -- Discretionary grants, including one voided and one negative.
+-- 🪤 `term` is DERIVED from the award date rather than typed (§4.7): a literal
+-- term string in the seed is the same bug it would be in application code, and
+-- it silently stopped matching the moment these dates moved. Not omitted
+-- either — the column defaults to current_term(), which is the term the seed is
+-- RUN in rather than the term the grant belongs to, and those diverge the day
+-- the calendar leaves Fall 2026.
 insert into point_adjustments (member_id, points, reason, category, term, awarded_by, awarded_at)
-select m.id, v.pts, v.rsn, v.cat, 'Spring 2026', '00000000-0000-4000-8000-5eed00000001', timestamptz '2026-03-15 12:00-05'
+select m.id, v.pts, v.rsn, v.cat,
+       public.term_of(timestamptz '2026-08-03 12:00-05'),
+       '00000000-0000-4000-8000-5eed00000001', timestamptz '2026-08-03 12:00-05'
 from (values
   ('Amara Osei',      5, 'Staffed the info booth all day at the org fair', 'recruitment'),
   ('Chen Wu',         3, 'Volunteered at the food drive',                  'volunteer'),
@@ -249,9 +324,10 @@ join members m on m.full_name = v.nm;
 
 -- Voided grant: still visible, struck through in the UI, counts for nothing.
 insert into point_adjustments (member_id, points, reason, category, term, awarded_by, awarded_at, voided_at, voided_by, void_reason)
-select m.id, 8, 'Bonus for tabling', 'recruitment', 'Spring 2026',
-       '00000000-0000-4000-8000-5eed00000001', timestamptz '2026-03-16 12:00-05',
-       timestamptz '2026-03-18 09:00-05', '00000000-0000-4000-8000-5eed00000001',
+select m.id, 8, 'Bonus for tabling', 'recruitment',
+       public.term_of(timestamptz '2026-08-04 12:00-05'),
+       '00000000-0000-4000-8000-5eed00000001', timestamptz '2026-08-04 12:00-05',
+       timestamptz '2026-08-05 09:00-05', '00000000-0000-4000-8000-5eed00000001',
        'Awarded to the wrong member'
 from members m where m.full_name = 'Wren Abbott';
 
