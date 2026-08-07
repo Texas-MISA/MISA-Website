@@ -1,7 +1,7 @@
 import {
   describeGap,
+  describeMatchReason,
   diffEid,
-  type MatchReason,
   type MemberSuggestion,
 } from "@/lib/attendance";
 import { formatEventRange } from "@/lib/events";
@@ -156,7 +156,10 @@ export function MemberSuggestions({
               {suggestion.member.email}
             </p>
             <p className="mt-1 text-xs text-foreground/60">
-              {suggestion.reasons.map(describeReason).filter(Boolean).join(" · ")}
+              {suggestion.reasons
+                .map(describeMatchReason)
+                .filter(Boolean)
+                .join(" · ")}
             </p>
           </li>
         );
@@ -176,25 +179,4 @@ function NearMiss({ value, at }: { value: string; at: number | null }) {
       {value.slice(at + 1)}
     </>
   );
-}
-
-function describeReason(reason: MatchReason): string {
-  switch (reason.kind) {
-    case "email_exact":
-      return "same email";
-    case "email_local":
-      return "same email name, different domain";
-    case "id_exact":
-      return "same EID";
-    case "id_near_miss":
-      return `EID off by ${reason.distance}`;
-    case "name_exact":
-      return "same name";
-    case "name_tokens":
-      return `shares ${reason.shared.join(", ")}`;
-    case "name_near":
-      return "near-identical name";
-    case "inactive":
-      return "";
-  }
 }

@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_BULK_ASSIGN } from "@/lib/attendance";
+import { MAX_TERMS_COVERED } from "@/lib/dues";
 import { MAX_FIELD_OPTIONS, MAX_OPTION_LENGTH } from "@/lib/members";
 import { MAX_GRANT_MEMBERS, MAX_POINTS_PER_GRANT } from "@/lib/points";
 import {
   attendanceEditSchema,
   bulkAssignSchema,
   checkinSchema,
+  duesPaymentSaveSchema,
+  duesVoidSchema,
   fieldDefinitionEditSchema,
   fieldDefinitionSchema,
   memberFieldValueSchema,
@@ -416,5 +419,80 @@ describe("memberNotesSchema", () => {
       memberNotesSchema.safeParse({ ...NOTES_BASE, notes: "x".repeat(2001) })
         .success
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Dues corrections (§7 Stage 6.5 phase 3)
+// ---------------------------------------------------------------------------
+
+describe("duesPaymentSaveSchema", () => {
+  const BASE = {
+    id: "0f8fad5b-d9cb-469f-a165-70867728950e",
+    memberId: "",
+    startTerm: "Fall 2026",
+    termsCovered: "",
+    expectedUpdatedAt: "2026-09-04T01:22:13.123456+00:00",
+  };
+
+  it("accepts an unlinked, undecided payment", () => {
+    // Both of these are the review axis rather than missing input: a payment
+    // credited to nobody, covering nothing, is a legitimate stored state and
+    // has to be reachable from the form as well as from the importer.
+    const parsed = duesPaymentSaveSchema.parse(BASE);
+    expect(parsed.memberId).toBeNull();
+    expect(parsed.termsCovered).toBeNull();
+  });
+
+  it("coerces the terms count and enforces the column's bounds", () => {
+    expect(
+      duesPaymentSaveSchema.parse({ ...BASE, termsCovered: "2" }).termsCovered
+    ).toBe(2);
+    expect(
+      duesPaymentSaveSchema.safeParse({ ...BASE, termsCovered: "0" }).success
+    ).toBe(false);
+    expect(
+      duesPaymentSaveSchema.safeParse({
+        ...BASE,
+        termsCovered: String(MAX_TERMS_COVERED + 1),
+      }).success
+    ).toBe(false);
+  });
+
+  it("refuses a term that is not a term", () => {
+    for (const startTerm of ["", "Fall", "Summer 2026", "2026", "Fall 26"]) {
+      expect(
+        duesPaymentSaveSchema.safeParse({ ...BASE, startTerm }).success
+      ).toBe(false);
+    }
+  });
+
+  it("requires the compare-and-set token", () => {
+    expect(
+      duesPaymentSaveSchema.safeParse({ ...BASE, expectedUpdatedAt: "" }).success
+    ).toBe(false);
+  });
+
+  it("⚠️ keeps the token as the raw string it was given", () => {
+    // A JS Date round trip truncates the microseconds and the CAS then never
+    // matches, reporting a phantom conflict on every save.
+    expect(duesPaymentSaveSchema.parse(BASE).expectedUpdatedAt).toBe(
+      BASE.expectedUpdatedAt
+    );
+  });
+});
+
+describe("duesVoidSchema", () => {
+  const id = "0f8fad5b-d9cb-469f-a165-70867728950e";
+
+  it("requires a reason, mirroring dues_void_requires_reason", () => {
+    expect(duesVoidSchema.safeParse({ id, voidReason: "" }).success).toBe(false);
+    expect(duesVoidSchema.safeParse({ id, voidReason: "   " }).success).toBe(
+      false
+    );
+    expect(
+      duesVoidSchema.parse({ id, voidReason: "  Refunded by request  " })
+        .voidReason
+    ).toBe("Refunded by request");
   });
 });

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   parseVenmoStatement,
   planPayment,
+  termOf,
   type DuesPrices,
   type PlannedPayment,
   type RosterEntry,
@@ -114,6 +115,12 @@ async function commit(csv: string, roster: RosterEntry[]) {
         payer_handle: payment.payerHandle,
         submitted_eid: payment.submittedEid,
         terms_covered: payment.termsCovered,
+        // ⚠️ Set explicitly, as commitImport does. The column default asks
+        // term_of(now()) — the import time — because a Postgres default cannot
+        // reference another column, so it can never ask what term the PAYMENT
+        // was made in. Those differ for every statement uploaded after a term
+        // boundary, which is the ordinary case.
+        start_term: termOf(payment.paidAt),
         import_batch_id: batchId,
         imported_by: officerId,
       })),
@@ -372,5 +379,271 @@ describe("previewing", () => {
 
     expect(error).toBeNull();
     expect(await countPayments()).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The corrections (phase 3)
+// ---------------------------------------------------------------------------
+//
+// Same convention as the block above: savePayment and voidPayment are
+// "use server" exports and need a request context, so what runs here is the
+// exact statement sequence they perform. A change that breaks the contract
+// fails here rather than in a browser.
+
+/** The columns savePayment reads on both sides of its audit entry. */
+const SAVE_COLUMNS =
+  "id, member_id, paid_at, start_term, terms_covered, covered_terms, voided_at, updated_at";
+
+async function readPayment(id: string) {
+  const { data, error } = await db
+    .from("dues_payments")
+    .select(SAVE_COLUMNS)
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) throw new Error("payment not found");
+  return data;
+}
+
+/** savePayment's write, reproduced. Returns the row, or null when the CAS lost. */
+async function save(
+  id: string,
+  expectedUpdatedAt: string,
+  patch: {
+    member_id: string | null;
+    start_term: string;
+    terms_covered: number | null;
+  }
+) {
+  const { data, error } = await db
+    .from("dues_payments")
+    .update(patch)
+    .eq("id", id)
+    // The raw PostgREST string, never a Date round trip — microsecond precision
+    // is what makes this match at all.
+    .eq("updated_at", expectedUpdatedAt)
+    .select(SAVE_COLUMNS)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+/** voidPayment's write, reproduced. All three columns in one statement. */
+async function voidIt(id: string, reason: string) {
+  const { data, error } = await db
+    .from("dues_payments")
+    .update({
+      voided_at: new Date().toISOString(),
+      voided_by: officerId,
+      void_reason: reason,
+    })
+    .eq("id", id)
+    .is("voided_at", null)
+    .select(SAVE_COLUMNS)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+async function duesPaid(memberId: string): Promise<boolean | null> {
+  const { data, error } = await db
+    .from("member_directory")
+    .select("dues_paid_current_term")
+    .eq("id", memberId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.dues_paid_current_term ?? null;
+}
+
+async function currentTerm(): Promise<string> {
+  const { data, error } = await db.rpc("current_term");
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+describe("assigning and voiding a payment", () => {
+  it("âš ï¸ flips dues_paid_current_term on, and back off when voided", async () => {
+    // The stage's exit criterion, end to end. Nothing application-side
+    // maintains this boolean — member_directory derives it from covered_terms —
+    // so it is the one assertion that proves the whole chain agrees.
+    const term = await currentTerm();
+    const id = txn("assign-flip");
+    const { created } = await commit(
+      statement([row({ id, note: "dues", amount: "+ $30.00" })]),
+      // Empty roster, so the note resolves to nobody: the queued row an officer
+      // is about to resolve by hand.
+      []
+    );
+    const paymentId = created[0].id;
+    expect(created[0].member_id).toBeNull();
+    expect(await duesPaid(amara)).toBe(false);
+
+    const before = await readPayment(paymentId);
+    const after = await save(paymentId, before.updated_at, {
+      member_id: amara,
+      // Derived from the term under test, never typed: global-setup.ts unpins
+      // app_settings.current_term, so current_term() here is whatever today
+      // derives rather than the seed's pinned Spring 2026.
+      start_term: term,
+      terms_covered: 1,
+    });
+
+    expect(after).not.toBeNull();
+    expect(after?.covered_terms).toEqual([term]);
+    expect(await duesPaid(amara)).toBe(true);
+
+    // Voiding is retroactive by construction: the status is a live derivation
+    // from covered_terms, not a stored flag. It will surprise someone, which is
+    // why the reason is required and an audit row is written.
+    const voided = await voidIt(paymentId, "Refunded - paid twice");
+    expect(voided).not.toBeNull();
+    expect(await duesPaid(amara)).toBe(false);
+
+    // Still holds its coverage; it simply stops counting.
+    expect(voided?.covered_terms).toEqual([term]);
+  });
+
+  it("âš ï¸ a stale updated_at updates nothing", async () => {
+    // The compare-and-set, from the losing side. Without it, two officers with
+    // the page open would silently overwrite each other's attribution.
+    const id = txn("cas-conflict");
+    const { created } = await commit(
+      statement([row({ id, note: "dues", amount: "+ $30.00" })]),
+      []
+    );
+    const paymentId = created[0].id;
+
+    const before = await readPayment(paymentId);
+    const won = await save(paymentId, before.updated_at, {
+      member_id: rowan,
+      start_term: before.start_term,
+      terms_covered: 1,
+    });
+    expect(won).not.toBeNull();
+
+    // The second officer still holds the token they rendered with.
+    const lost = await save(paymentId, before.updated_at, {
+      member_id: amara,
+      start_term: before.start_term,
+      terms_covered: 2,
+    });
+    expect(lost).toBeNull();
+
+    // And the first officer's write stands, unclobbered.
+    const now = await readPayment(paymentId);
+    expect(now.member_id).toBe(rowan);
+    expect(now.terms_covered).toBe(1);
+  });
+
+  it("regenerates covered_terms when an officer decides an amount", async () => {
+    // The $42 case: an amount matching neither price parses, links, and waits.
+    // An undecided row covers NOTHING, which is what makes the failure
+    // direction under-reporting membership rather than over-reporting it.
+    const roster: RosterEntry[] = [
+      { memberId: rowan, normalizedEid: rowanEid.toLowerCase() },
+    ];
+    const id = txn("undecided");
+    const { created } = await commit(
+      statement([row({ id, note: `dues ${rowanEid}`, amount: "+ $42.00" })]),
+      roster
+    );
+    expect(created[0].member_id).toBe(rowan);
+    expect(created[0].terms_covered).toBeNull();
+    expect(created[0].covered_terms).toBeNull();
+
+    const before = await readPayment(created[0].id);
+    const after = await save(created[0].id, before.updated_at, {
+      member_id: rowan,
+      start_term: before.start_term,
+      terms_covered: 2,
+    });
+
+    // Generated from start_term and terms_covered by terms_from(), so the
+    // application never writes it and the two cannot disagree. Two terms, the
+    // first being where it starts — the second is whatever next_term() says,
+    // which is the point of not asserting it as a literal.
+    expect(after?.covered_terms).toHaveLength(2);
+    expect(after?.covered_terms?.[0]).toBe(before.start_term);
+  });
+
+  it("ðŸª¤ correcting start_term moves what the payment covers", async () => {
+    // The summer case. Â§4.7 puts May-July in Spring, so a July payment meant
+    // for the coming Fall buys a term with three weeks left in it. The rule is
+    // not changed — that would make term_of disagree with itself between events
+    // and payments — so start_term is a column an officer can correct.
+    const id = txn("summer");
+    const { created } = await commit(
+      statement([
+        row({
+          id,
+          note: "dues",
+          amount: "+ $30.00",
+          when: "2026-06-15T14:05:00",
+        }),
+      ]),
+      []
+    );
+    const paymentId = created[0].id;
+
+    const before = await readPayment(paymentId);
+    expect(before.start_term).toBe("Spring 2026");
+
+    const after = await save(paymentId, before.updated_at, {
+      member_id: null,
+      start_term: "Fall 2026",
+      terms_covered: 1,
+    });
+    expect(after?.covered_terms).toEqual(["Fall 2026"]);
+  });
+
+  it("never creates a member", async () => {
+    // Â§4.2's rule, extended to money and asserted from the other side: a status
+    // check alone would pass while the roster quietly grew.
+    const id = txn("no-member-created");
+    const { created } = await commit(
+      statement([row({ id, note: "no eid here", amount: "+ $30.00" })]),
+      []
+    );
+    const paymentId = created[0].id;
+
+    const membersBefore = await countMembers();
+    const before = await readPayment(paymentId);
+    await save(paymentId, before.updated_at, {
+      member_id: null,
+      start_term: before.start_term,
+      terms_covered: 1,
+    });
+    expect(await countMembers()).toBe(membersBefore);
+  });
+
+  it("voiding twice is refused rather than repeated", async () => {
+    // No compare-and-set here, and none is needed: voiding is one-way, so
+    // `.is("voided_at", null)` is a complete guard. Zero rows back means
+    // another officer got there first — the argument voidAdjustment makes.
+    const id = txn("double-void");
+    const { created } = await commit(
+      statement([row({ id, note: "dues", amount: "+ $30.00" })]),
+      []
+    );
+    expect(await voidIt(created[0].id, "First void")).not.toBeNull();
+    expect(await voidIt(created[0].id, "Second void")).toBeNull();
+  });
+
+  it("ðŸ”“ re-importing a statement whose payment was voided stays a no-op", async () => {
+    // The unique index spans voided rows for exactly this reason: a re-import
+    // must not resurrect a payment an officer deliberately voided. Phase 3 is
+    // the first time there is anything for that to protect.
+    const id = txn("void-then-reimport");
+    const csv = statement([row({ id, note: "dues", amount: "+ $30.00" })]);
+    const first = await commit(csv, []);
+    await voidIt(first.created[0].id, "Refunded");
+
+    const again = await commit(csv, []);
+    expect(again.created).toHaveLength(0);
+
+    // And it is still voided, not quietly revived.
+    const now = await readPayment(first.created[0].id);
+    expect(now.voided_at).not.toBeNull();
   });
 });

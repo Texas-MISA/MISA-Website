@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { MAX_BULK_ASSIGN } from "@/lib/attendance";
 import { normalizeEid } from "@/lib/checkin";
+import { MAX_TERMS_COVERED, termIndex } from "@/lib/dues";
 import {
   EVENT_CATEGORIES,
   EVENT_STATUSES,
@@ -269,6 +270,75 @@ export type PointGrantFields = z.infer<typeof pointGrantSchema>;
 
 /** Mirrors the void_requires_reason constraint added in migration 13. */
 export const pointVoidSchema = z.object({
+  id: z.uuid(),
+  voidReason: z
+    .string()
+    .trim()
+    .min(1, "A reason is required")
+    .max(500, "Reason is too long"),
+});
+
+// Dues corrections (§4.1, §7 Stage 6.5 phase 3).
+//
+// Two schemas for two actions, not the three the spec doc names. Reassigning a
+// payment and correcting what it bought are one officer intent over one row
+// holding one `updated_at`, so they save together — splitting them would give
+// each form its own copy of that token and strand the second one the moment the
+// first saved. Voiding stays separate because it is one-way.
+
+/**
+ * One correction to a payment: who it credits, and what it bought.
+ *
+ * `memberId` accepting "" is deliberate — an officer must be able to *unlink* a
+ * payment credited to the wrong person, and `dues_payments.member_id` is
+ * nullable precisely so an unresolved row can exist. Clearing it puts the
+ * payment back in the queue rather than deleting anything.
+ *
+ * `termsCovered` accepting "" is the same shape for a different reason: null
+ * means "no officer has decided", which is the review axis itself (migration
+ * 19), so it has to be reachable from the form and not only from the importer.
+ *
+ * ⚠️ `startTerm` is checked for *shape* here and for *membership of the offered
+ * list* in the action, which is the half that needs `paid_at`. Both matter: the
+ * shape check keeps a malformed string out of a column `term_index()` would
+ * silently return null for, and the membership check is what stops the form
+ * being a way to type an arbitrary term (§4.7 — a literal term string in
+ * application code is a bug, and that applies to one arriving in a POST too).
+ */
+export const duesPaymentSaveSchema = z.object({
+  id: z.uuid(),
+  memberId: optionalUuid("member"),
+  startTerm: z
+    .string()
+    .trim()
+    // Through termIndex() rather than a regex copied here, so the one place
+    // that knows what a term looks like stays the one place.
+    .refine((v) => termIndex(v) !== null, "Pick a term"),
+  termsCovered: z
+    .union([
+      z.literal(""),
+      z.coerce
+        .number()
+        .int()
+        .min(1, "A payment covers at least one term")
+        .max(
+          MAX_TERMS_COVERED,
+          `A payment covers at most ${MAX_TERMS_COVERED} terms`
+        ),
+    ])
+    .transform((v) => (v === "" ? null : v)),
+  // The compare-and-set anchor, carried as the raw PostgREST string. A JS Date
+  // round trip truncates the microseconds and the CAS then never matches,
+  // reporting a phantom conflict on every save.
+  expectedUpdatedAt: z.string().min(1),
+});
+
+export type DuesPaymentSaveFields = z.infer<typeof duesPaymentSaveSchema>;
+
+/** Mirrors dues_void_requires_reason. A void moves someone's membership status
+ * without their doing anything, so the reason is not optional — same argument
+ * as pointVoidSchema, and money makes it stronger rather than weaker. */
+export const duesVoidSchema = z.object({
   id: z.uuid(),
   voidReason: z
     .string()

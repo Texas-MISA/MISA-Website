@@ -392,6 +392,37 @@ export function rankMemberSuggestions(
 }
 
 /**
+ * A match reason as a phrase, so the UI can explain a ranking rather than
+ * assert it.
+ *
+ * Lives here rather than beside one screen because two now render suggestions —
+ * the attendance resolution form and the dues payment editor — and the same
+ * reason must read the same way in both. `inactive` returns "" on purpose: it
+ * is a score penalty, and the roster row is already labelled inactive where it
+ * is shown, so naming it again would read as a reason to pick the member.
+ */
+export function describeMatchReason(reason: MatchReason): string {
+  switch (reason.kind) {
+    case "email_exact":
+      return "same email";
+    case "email_local":
+      return "same email name, different domain";
+    case "id_exact":
+      return "same EID";
+    case "id_near_miss":
+      return `EID off by ${reason.distance}`;
+    case "name_exact":
+      return "same name";
+    case "name_tokens":
+      return `shares ${reason.shared.join(", ")}`;
+    case "name_near":
+      return "near-identical name";
+    case "inactive":
+      return "";
+  }
+}
+
+/**
  * Where two EIDs first diverge, so the UI can highlight the character
  * instead of leaving the officer to compare them by eye — the "near-miss ID
  * shown for comparison" the review screen calls for.

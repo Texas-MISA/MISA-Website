@@ -6,13 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–5 complete; Stage 6 (member directory) — phases 1, 2a, 2, 3, 4 and 5 of 9 built and browser-verified. Stage 6.5 (dues) interrupts here, before phase 6, and its phases 1 and 2 of 4 are built (2026-08-06, doc v1.39); phase 3 is next.** Stage 6 merges to `main` at the end of each phase rather than at the end of the stage, as Stage 5 did.
+**Stages 0–5 complete; Stage 6 (member directory) — phases 1, 2a, 2, 3, 4 and 5 of 9 built and browser-verified. Stage 6.5 (dues) interrupts here, before phase 6, and its phases 1, 2 and 3 of 4 are built (2026-08-06, doc v1.40); phase 4 is next.** Stage 6 merges to `main` at the end of each phase rather than at the end of the stage, as Stage 5 did.
 
 📋 **A new Stage 6 phase 5c is planned and unbuilt** — **filter the directory by categorical fields**: officer-defined custom fields, `dues_paid_current_term`, and `source` (which phase 3 removed as a *column* and which belongs back as a *filter*). Requested directly — *"filter the members to those with M size and export as an Excel file"* — and phase 5 built only the export half of that sentence. ⚠️ It is sequenced **after Stage 6.5**, not before, because the dues column has to exist before it can be filtered on. Every predicate goes in `applyMemberFilter` and nowhere else, so the CSV, xlsx and clipboard all inherit it with no second code path.
 
 📦 **Phase 5 was split into 5a and 5b** (2026-08-06), mirroring the mid-stage 2a/2 split. **5a**: `lib/export.ts` (the pure core — the field catalogue, the typed `ExportCell` projection, the CSV/TSV/clipboard writers), row checkboxes with a real "select all N matching this filter", a field picker, and **`app/admin/(shell)/members/export/route.ts`, the codebase's first Route Handler**. **5b**: `lib/xlsx.ts`, a **hand-rolled, zero-dependency** workbook writer — SheetJS's npm package is four years stale (releases moved to its own CDN) and `exceljs` has been inactive since Oct 2023, so both were rejected rather than adopted; an xlsx is a zip of six XML parts and `node:zlib` is built in. DOWNLOAD XLSX is the primary button, CSV outlined beside it. Rejected candidates and the four repair-prompt traps are in `tasks.md` under Phase 5b.
 
-🚧 **Stage 6.5 (dues & membership status) — phases 1 and 2 of 4 built 2026-08-06** (migration 19 and `lib/dues.ts`; then `app/actions/dues.ts`, `lib/dues-roster.ts` and `/admin/dues/import`. The ledger screens and the directory UI are phases 3–4). Decided 2026-08-05, spec at [`docs/dues-and-membership.md`](docs/dues-and-membership.md).
+🚧 **Stage 6.5 (dues & membership status) — phases 1, 2 and 3 of 4 built 2026-08-06** (migration 19 and `lib/dues.ts`; then `app/actions/dues.ts`, `lib/dues-roster.ts` and `/admin/dues/import`; then the ledger at `/admin/dues`, the editor at `/admin/dues/[id]`, and `savePayment` / `voidPayment`. The directory column's UI is phase 4). Decided 2026-08-05, spec at [`docs/dues-and-membership.md`](docs/dues-and-membership.md).
+  - **Phase 3 shipped TWO corrections where the spec named three.** `assignPayment` + `setPaymentTerms` became one **`savePayment`**, because `dues_payments.updated_at` is a **row**-level CAS token — two forms would each hold their own copy, the first save would move it, and the second would report a phantom conflict. That is the `directory-row.tsx` defect, built deliberately. Only the audit verb branches: `dues.assigned` when `member_id` moved, `dues.updated` otherwise. `voidPayment` stays separate and carries **no** CAS token (voiding is one-way, so `.is("voided_at", null)` is a complete guard) — the same asymmetry `voidAdjustment` argues for.
+  - 🐛 **The phase-3 walkthrough found a data-loss path, and it was a rule already written in this repo.** The editor's selects used `defaultValue`; React 19's post-action form reset beat the revalidated props, so after assigning a member the dropdown read "Nobody yet" while the database held the new value — and pressing SAVE again would post the empty option and genuinely **unassign** the member just credited. `member-field-cell.tsx` carries the identical warning in its header. **Controlled selects with the reset-during-render resync, every time**; `tests/dues.test.ts` pins it as a source assertion rather than prose.
+  - **The queue says "no member", never "unmatched" or "ambiguous".** Two *parse* outcomes, one *storage* outcome — nothing persists which happened, so distinguishing them on screen would invent information the row does not carry. `paymentReviewState` owns that restraint, and it also keeps voided rows out of the queue: they count for nothing and no officer action changes that.
+  - **`rankPaymentSuggestions` is a new CALLER of the Stage 5 ranker, not a second ranker.** It scores the payer's Venmo name and each note token as a candidate EID, keeping each member's **best** identity — never the sum, which would let a long note of near-misses accumulate past `MIN_SUGGESTION_SCORE`.
+  - **`start_term` is picked from a derived list, never typed** — `startTermOptions` steps off `termOf(paid_at)` by term index, and the action re-checks membership of that list rather than trusting the POST. It appends a stored value outside the window, because a `<select>` with no matching `<option>` renders blank and the next save would rewrite a real answer.
   - **The import is two steps over one CSV**, and the text lives **only in the officer's browser** between them — no staging table, no temp file. `commitImport` **re-parses** rather than accepting the preview's output; both actions share one `planImport`, so the commit runs the identical code path and cannot diverge from what was shown. Same posture as `/attend`'s `step=confirm`.
   - 🔓 **`upsert` with `ignoreDuplicates` is the write**, and it is the first use of upsert in application code. It makes "re-importing is a no-op" a **database** guarantee rather than an app-level pre-check a concurrent import could race past, and the `.select()` then returns only the rows actually inserted — so **requested − returned is the duplicate count**, with no second query to disagree with it.
   - ⚠️ **Next caps a Server Action request at 1MB by default.** `MAX_IMPORT_BYTES` (512 KB) and `MAX_IMPORT_ROWS` (2000) sit below it so the officer gets a sentence naming the limit rather than an opaque framework error. Both **refuse; neither truncates**.
@@ -229,6 +234,8 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **Change a view with `create or replace`, which can only *append* columns — never reorder, rename, retype, or drop one.** Dropping the view drops its grants with it, and `member_directory` is granted to `authenticated` as a §6 security boundary. This is why `attendance_rate` sits last in migration 14 rather than beside the counts it derives from.
   - **The one exception, added 2026-08-01: renaming an output column requires a drop.** `create or replace` cannot do it, and Stage 6 phase 2 renames `student_id` → `eid`. A drop is permitted *provided the same migration re-issues* `grant select on public.member_directory to authenticated`. DDL is transactional, so there is no window where the grant is missing — the real hazard is a migration that forgets the re-grant, which fails at the next read rather than at migration time, and only for non-service-role callers. Say why in the migration header whenever you take this path.
 - **Never type a term string.** `events.term` is generated from `starts_at` via `term_of()`, and `current_term()` derives from `now()` unless an officer has pinned `app_settings.current_term`. A literal `'Fall 2026'` anywhere in application code is a bug. (§4.7)
+  - **`seed.sql` is application code for this purpose**, and it broke the rule until 2026-08-06: `point_adjustments.term` was the literal `'Spring 2026'`, which silently stopped matching the moment the seeded dates moved. It is now `term_of(<the award date>)` — derived, and coherent whenever the seed is run. Omitting the column is *not* the fix: it defaults to `current_term()`, which is the term the seed is **run** in rather than the term the grant belongs to.
+  - 🪤 **The seed no longer pins `current_term` at all** (2026-08-06), because its data now lives in the term the clock is in. That closes a real divergence — `tests/global-setup.ts` un-pins for the suite, so the local database and the test run used to disagree about what `current_term()` was. **The cost lands on 1 January 2027**: the pin was what stopped seeded data falling out of scope at a term boundary, so on that date the leaderboard and directory go empty with nothing on screen to say why. That is `seed.sql` needing its dates moved forward, not a bug.
 - **No unauthenticated route returns an email or student ID** — including the `leaderboard` view, which deliberately omits both. (§4.4, §6)
 - **`/leaderboard` is public but must never be indexed.** It carries `robots: { index: false, follow: false }` (the pattern is already in `app/admin/(shell)/layout.tsx`). Names against point totals are the residual exposure once IDs and emails are gone, and a search cache outlives the deploy that filled it — this is the one privacy choice here that cannot be undone by shipping a fix. (§9 #1)
 - **Event edits are not retroactive.** Recorded attendance is a fact; the check-in window is consulted only at resolution time. Narrowing a window warns, it never revokes. Deleting an event that has attendance is blocked — offer `status = 'cancelled'` instead. Changing `points` is allowed but must warn with the count of members affected. (§4.6)
@@ -239,6 +246,7 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **Check-in window bounds are half-open (`>= opens`, `< closes`) in three places that must agree:** the `events_no_overlapping_checkin` exclusion constraint, `open_event_at()`, and any application-side window logic. Making one inclusive either blocks back-to-back events from being published or lets one instant match two events. (§4.3)
 - **RLS is enabled on every table, deny-all until Stage 8** — with one deliberate exception: `events_public_read` grants anon `select` on `status = 'published'` events (the §6 grant, pulled forward for the Stage 2 landing page). New tables must ship deny-all in their own migration. All other reads reach clients only through `leaderboard` and `member_directory`, which run as owner and are the security boundary; writes are deny-all everywhere. (§4.4, §6)
 - **`seed.sql` must not use trailing inline comments.** `scripts/seed-remote.sh` flattens each chunk onto one line, so a `--` after code would comment out everything following it. Full-line comments are stripped and safe.
+- **The seeded semester must sit in the term the clock is in, and its completed events must be in the past.** Two constraints decide every date in `seed.sql`: `term_of` bounds the term, and attendance can only hang off events with `starts_at < now()` — an event in the future carrying attendance would push somebody's `attendance_rate` above 1, or divide by zero. Moving the seed to Fall 2026 on 2026-08-06 therefore **compressed twelve completed events into 1–5 August**, the only elapsed days of the term. That is deliberate, documented at the events block, and should be spread back out once more of the term has elapsed. 🪤 Its visible side effect: with twelve events inside five days every orphan falls within the 48-hour grace window of *several*, so `nearby_events()` returns a ranked list where it used to return one obvious answer.
 
 ## Layout
 
@@ -302,13 +310,17 @@ lib/site.ts             org copy, socials, emails, partners
 lib/officers.ts         officer roster
 lib/validation.ts       zod schemas
 tests/                  Vitest suite — integration tests against the local stack
-lib/dues.ts             the dues domain core (6.5 phase 1) — pure like
+lib/dues.ts             the dues domain core (6.5 phases 1 and 3) — pure like
                         lib/events.ts and lib/attendance.ts: Venmo CSV parsing,
                         the note → EID token match (no EID regex; tokenize and
                         fold against the roster), the amount → terms rule with
                         prices injected, and the nextTerm/termsFrom mirrors of
                         the SQL functions. The ONLY place term ordering is
-                        expressed — see the lexicographic trap in Invariants
+                        expressed — see the lexicographic trap in Invariants.
+                        Phase 3 added formatCents, the shared noteTokens,
+                        paymentReviewState, startTermOptions, and
+                        rankPaymentSuggestions (a new CALLER of
+                        lib/attendance.ts's ranker, never a second one)
 lib/dues-roster.ts      the uncapped {memberId, normalizedEid} roster the note
                         matcher runs against (6.5 phase 2). Paged in 1000s —
                         the hosted project applies its own max_rows. Returns a
@@ -316,21 +328,29 @@ lib/dues-roster.ts      the uncapped {memberId, normalizedEid} roster the note
                         roster and a failed read are indistinguishable to the
                         caller and the difference marks a whole statement
                         unmatched
-app/actions/dues.ts     6.5 phase 2, built — previewImport (parses, probes for
-                        duplicates, writes NOTHING) and commitImport
+app/actions/dues.ts     6.5 phases 2–3, built — previewImport (parses, probes
+                        for duplicates, writes NOTHING), commitImport
                         (re-parses server-side rather than trusting the
-                        preview). The corrections — assignPayment,
-                        setPaymentTerms, voidPayment — arrive in phase 3. No
-                        role check anywhere, and the header says so (§9 #6)
+                        preview), and the corrections: savePayment (member +
+                        start_term + terms_covered in ONE write, CAS on
+                        updated_at) and voidPayment (one-way, needs a reason, no
+                        CAS). Two actions, not the spec's three — see the
+                        Stage 6.5 notes. No role check anywhere, and the header
+                        says so (§9 #6)
+app/admin/(shell)/dues/ 6.5 phase 3, built — the ledger. Filters by state
+                        (needs review / live / voided), term, member and a
+                        Central-anchored half-open date range; the needs-review
+                        count is its own head query in the header, because it
+                        must be true regardless of what is filtered
+app/admin/(shell)/dues/[id]/
+                        6.5 phase 3, built — the payment editor. payment-editor
+                        .tsx owns the row's CAS token and drives every select
+                        from STATE, never defaultValue (the walkthrough defect);
+                        payment-suggestions.tsx is inert and preselects nothing
 app/admin/(shell)/dues/import/
                         6.5 phase 2, built — the two-step upload. The client
                         component holds the CSV text in memory between preview
                         and commit; nothing is staged server-side
-app/admin/(shell)/dues/ phase 3, not built — the ledger, /[id] payment detail,
-                        and /import. The import is a Server Action, not a route
-                        handler; its client component holds the CSV text between
-                        the preview and commit steps so nothing is staged
-                        server-side
 lib/filters.ts          directory filter core: parse → MemberFilter → query.
                         Pure; the query builder is typed structurally, not
                         imported from supabase-js, so tests drive a fake.

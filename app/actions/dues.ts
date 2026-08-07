@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { writeAuditBatch } from "@/app/actions/audit";
+import { writeAudit, writeAuditBatch } from "@/app/actions/audit";
 import { getOfficer } from "@/lib/auth";
 import {
   MAX_IMPORT_BYTES,
@@ -10,12 +10,14 @@ import {
   isSummerTerm,
   parseVenmoStatement,
   planPayment,
+  startTermOptions,
   termOf,
   type DuesPrices,
   type PlannedPayment,
 } from "@/lib/dues";
 import { fetchDuesRoster } from "@/lib/dues-roster";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { duesPaymentSaveSchema, duesVoidSchema } from "@/lib/validation";
 
 // Dues import (§7 Stage 6.5 phase 2). Two actions over one CSV: previewImport
 // writes nothing, commitImport re-parses and writes.
@@ -39,12 +41,42 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // anything it was handed back.
 
 const IMPORT_PATH = "/admin/dues/import";
+const LEDGER = "/admin/dues";
+/** The directory reads member_directory, whose dues_paid_current_term moves on
+ * every assign, term change and void. Phase 4 renders that column; revalidating
+ * it now costs nothing and means the column is correct the day it appears. */
+const DIRECTORY = "/admin/members";
 
 /** One unbroken literal with `as const` — PostgREST types the returned row off
  * the string literal, and a concatenation widens it to plain `string`, which
  * collapses every field access at once. */
 const AUDITED_PAYMENT_COLUMNS =
-  "id, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, voided_at, void_reason" as const;
+  "id, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, voided_at, voided_by, void_reason" as const;
+
+/**
+ * The same columns plus `updated_at`, as its own unbroken literal rather than a
+ * concatenation — see the note above for why that is a build break and not a
+ * style preference.
+ *
+ * ⚠️ `updated_at` is read back so the client can adopt the fresh compare-and-set
+ * token, and it is stripped from **both** sides before the audit write. Both
+ * halves matter. Keeping it would print `updated_at: t1 → t2` on every single
+ * save, and stripping it from only one side would make AuditTrail render it as
+ * `→ —` and report a change that never happened — the AUDITED_ADJUSTMENT_COLUMNS
+ * lesson, where a narrower select on the update made voiding look like it had
+ * erased the reason.
+ */
+const PAYMENT_SAVE_COLUMNS =
+  "id, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, voided_at, voided_by, void_reason, updated_at" as const;
+
+/** Drop the CAS token before the row becomes an audit before/after. */
+function auditable<T extends { updated_at: string }>(
+  row: T
+): Omit<T, "updated_at"> {
+  const rest: Record<string, unknown> = { ...row };
+  delete rest.updated_at;
+  return rest as Omit<T, "updated_at">;
+}
 
 // ---------------------------------------------------------------------------
 // Shared shapes
@@ -402,6 +434,325 @@ export async function commitImport(
     );
     return { status: "error" };
   }
+}
+
+// ---------------------------------------------------------------------------
+// The corrections (§7 Stage 6.5 phase 3)
+// ---------------------------------------------------------------------------
+//
+// 📌 TWO actions, where docs/dues-and-membership.md names three
+// (assignPayment / setPaymentTerms / voidPayment). Recorded there as a
+// correction, alongside phase 2's two.
+//
+// Reassigning a payment and correcting what it bought are one officer intent
+// over one row, and — decisively — one row owns ONE `updated_at`. Two separate
+// actions means two forms on the same page each holding its own copy of that
+// token, so the first save moves it and strands the second on a stale one: the
+// officer's next edit reports a phantom conflict, and their third, until a
+// revalidation lands. That is the defect directory-row.tsx exists to avoid, and
+// building it deliberately would be a strange way to honour the lesson.
+//
+// So savePayment is shaped like saveSubmission — one save per officer intent —
+// and only the audit verb branches. voidPayment stays separate because voiding
+// is one-way and not an edit.
+
+/** Echoed back so React 19's post-action form reset doesn't discard what the
+ * officer was in the middle of correcting. */
+export type SubmittedPaymentValues = {
+  memberId: string;
+  startTerm: string;
+  termsCovered: string;
+};
+
+type PaymentField = "memberId" | "startTerm" | "termsCovered";
+
+export type PaymentSaveState =
+  | { status: "idle" }
+  | { status: "unauthorized" }
+  | { status: "error" }
+  | {
+      status: "invalid";
+      fieldErrors: Partial<Record<PaymentField, string[]>>;
+      values: SubmittedPaymentValues;
+    }
+  /** The payment was deleted between the render and the save. */
+  | { status: "not_found" }
+  /** Someone else edited or voided this row first — the CAS caught it. */
+  | { status: "conflict"; values: SubmittedPaymentValues }
+  /** It was voided while the form was open; a voided payment is settled. */
+  | { status: "voided" }
+  /** The picked member was deleted between the render and the save. */
+  | { status: "stale_member"; values: SubmittedPaymentValues }
+  /** Carries the fresh CAS token, which the client adopts for its next save. */
+  | { status: "done"; updatedAt: string };
+
+const PAYMENT_ECHO_LIMITS = {
+  memberId: 40,
+  startTerm: 40,
+  termsCovered: 4,
+  voidReason: 500,
+} as const;
+
+/**
+ * Correct who a payment credits and what it bought.
+ *
+ * The parser attributes payments from member-supplied free text, so getting one
+ * wrong is an ordinary outcome rather than an exception — which is why a payment
+ * is editable at all, unlike a point adjustment. What it is *not* is deletable:
+ * money arriving is a fact, and the way to undo one is a void with a reason.
+ */
+export async function savePayment(
+  _prev: PaymentSaveState,
+  formData: FormData
+): Promise<PaymentSaveState> {
+  const officer = await getOfficer();
+  if (!officer) return { status: "unauthorized" };
+
+  const values: SubmittedPaymentValues = {
+    memberId: echoField(formData.get("memberId"), PAYMENT_ECHO_LIMITS.memberId),
+    startTerm: echoField(formData.get("startTerm"), PAYMENT_ECHO_LIMITS.startTerm),
+    termsCovered: echoField(
+      formData.get("termsCovered"),
+      PAYMENT_ECHO_LIMITS.termsCovered
+    ),
+  };
+
+  const parsed = duesPaymentSaveSchema.safeParse({
+    id: formData.get("id"),
+    ...values,
+    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
+  });
+  if (!parsed.success) {
+    return {
+      status: "invalid",
+      fieldErrors: fieldErrorsOf<PaymentField>(parsed.error, "startTerm"),
+      values,
+    };
+  }
+  const fields = parsed.data;
+
+  try {
+    const db = createAdminClient();
+
+    const { data: before, error: beforeError } = await db
+      .from("dues_payments")
+      .select(PAYMENT_SAVE_COLUMNS)
+      .eq("id", fields.id)
+      .maybeSingle();
+
+    if (beforeError) {
+      console.error("savePayment read failed:", beforeError.message);
+      return { status: "error" };
+    }
+    if (!before) return { status: "not_found" };
+    if (before.voided_at !== null) return { status: "voided" };
+
+    // The other half of the startTerm check, and the half that needs paid_at.
+    // The schema proved the string is a well-formed term; this proves it is one
+    // of the terms the editor actually offered for THIS payment. Without it the
+    // form is a way to write an arbitrary term into the column, which is §4.7's
+    // rule arriving through a POST rather than through source code. The stored
+    // value is passed as `include` so a row already holding something outside
+    // the window can be saved without being silently changed.
+    const allowed = startTermOptions(new Date(before.paid_at), before.start_term);
+    if (!allowed.includes(fields.startTerm)) {
+      return {
+        status: "invalid",
+        fieldErrors: { startTerm: ["Pick one of the terms offered"] },
+        values,
+      };
+    }
+
+    const { data: after, error } = await db
+      .from("dues_payments")
+      .update({
+        member_id: fields.memberId,
+        start_term: fields.startTerm,
+        terms_covered: fields.termsCovered,
+        // covered_terms is NOT written: it is generated from start_term and
+        // terms_covered, which is what makes an undecided row cover nothing
+        // without anything application-side maintaining it.
+      })
+      .eq("id", fields.id)
+      // Carried as the raw PostgREST string — it has microsecond precision, and
+      // a JS Date round trip truncates to milliseconds so the CAS would never
+      // match. No separate `.is("voided_at", null)` guard: the update trigger
+      // moves updated_at, so a concurrent void already lands here as a conflict.
+      .eq("updated_at", fields.expectedUpdatedAt)
+      .select(PAYMENT_SAVE_COLUMNS)
+      .maybeSingle();
+
+    if (error) {
+      // The FK is `on delete restrict`, so a member holding payments cannot be
+      // deleted at all — but the check belongs at the write either way, and a
+      // member with no payments yet can be. Same shape as grantPoints.
+      if (error.code === "23503") return { status: "stale_member", values };
+      console.error("savePayment failed:", error.message);
+      return { status: "error" };
+    }
+    if (!after) return { status: "conflict", values };
+
+    await writeAudit(db, {
+      entityType: "dues_payment",
+      entityId: fields.id,
+      actorId: officer.userId,
+      // Two verbs for one write, chosen by what actually moved. "Who does this
+      // payment credit" is the question the review queue exists to answer, so
+      // an answer changing is worth its own verb in the log; everything else is
+      // an update, and before/after already says which columns moved.
+      action:
+        before.member_id !== after.member_id ? "dues.assigned" : "dues.updated",
+      before: auditable(before),
+      after: auditable(after),
+    });
+
+    revalidatePayment(fields.id);
+    return { status: "done", updatedAt: after.updated_at };
+  } catch (e) {
+    console.error(
+      "savePayment failed:",
+      e instanceof Error ? e.message : String(e)
+    );
+    return { status: "error" };
+  }
+}
+
+export type PaymentVoidState =
+  | { status: "idle" }
+  | { status: "unauthorized" }
+  | { status: "error" }
+  | {
+      status: "invalid";
+      fieldErrors: Partial<Record<"voidReason", string[]>>;
+      value: string;
+    }
+  /** Someone else voided it between the render and the save. */
+  | { status: "already_voided" }
+  | { status: "done" };
+
+/**
+ * Void a payment, with a reason.
+ *
+ * Not a delete: the row stays in the ledger, struck through, because money
+ * arriving is a fact and a receipt exists for it somewhere. A refund is recorded
+ * this way rather than as a negative payment — `amount_cents` is positive-only.
+ *
+ * ⚠️ It takes effect retroactively and will surprise someone: dues status is a
+ * live derivation from `covered_terms`, not a stored flag, so voiding makes a
+ * member unofficial the instant it lands. That is correct, and it is exactly why
+ * the reason is required and an audit row is written.
+ *
+ * No compare-and-set token, matching voidAdjustment and diverging from
+ * savePayment above: voiding is one-way, so `.is("voided_at", null)` is a
+ * complete guard rather than an approximation — the only thing another officer
+ * could have done to make this fail is the very thing being attempted, and zero
+ * rows back says they got there first.
+ */
+export async function voidPayment(
+  _prev: PaymentVoidState,
+  formData: FormData
+): Promise<PaymentVoidState> {
+  const officer = await getOfficer();
+  if (!officer) return { status: "unauthorized" };
+
+  const value = echoField(
+    formData.get("voidReason"),
+    PAYMENT_ECHO_LIMITS.voidReason
+  );
+
+  const parsed = duesVoidSchema.safeParse({
+    id: formData.get("id"),
+    voidReason: value,
+  });
+  if (!parsed.success) {
+    return {
+      status: "invalid",
+      fieldErrors: fieldErrorsOf<"voidReason">(parsed.error, "voidReason"),
+      value,
+    };
+  }
+  const fields = parsed.data;
+
+  try {
+    const db = createAdminClient();
+
+    const { data: before, error: beforeError } = await db
+      .from("dues_payments")
+      .select(PAYMENT_SAVE_COLUMNS)
+      .eq("id", fields.id)
+      .maybeSingle();
+
+    if (beforeError || !before) {
+      console.error(
+        "voidPayment failed:",
+        beforeError?.message ?? "payment not found"
+      );
+      return { status: "error" };
+    }
+
+    // All three void columns move in one statement, so dues_void_is_complete
+    // and dues_void_requires_reason can never observe a half-voided row.
+    const { data: after, error } = await db
+      .from("dues_payments")
+      .update({
+        voided_at: new Date().toISOString(),
+        voided_by: officer.userId,
+        void_reason: fields.voidReason,
+      })
+      .eq("id", fields.id)
+      .is("voided_at", null)
+      .select(PAYMENT_SAVE_COLUMNS)
+      .maybeSingle();
+
+    if (error) {
+      console.error("voidPayment failed:", error.message);
+      return { status: "error" };
+    }
+    if (!after) return { status: "already_voided" };
+
+    await writeAudit(db, {
+      entityType: "dues_payment",
+      entityId: fields.id,
+      actorId: officer.userId,
+      action: "dues.voided",
+      before: auditable(before),
+      after: auditable(after),
+    });
+
+    revalidatePayment(fields.id);
+    return { status: "done" };
+  } catch (e) {
+    console.error(
+      "voidPayment failed:",
+      e instanceof Error ? e.message : String(e)
+    );
+    return { status: "error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+
+function echoField(value: FormDataEntryValue | null, max: number): string {
+  // FormData.get can return a File; anything not a string echoes as empty.
+  return typeof value === "string" ? value.slice(0, max) : "";
+}
+
+function fieldErrorsOf<K extends string>(
+  error: { issues: { path: PropertyKey[]; message: string }[] },
+  fallback: K
+): Partial<Record<K, string[]>> {
+  const fieldErrors: Record<string, string[]> = {};
+  for (const issue of error.issues) {
+    const field = String(issue.path[0] ?? fallback);
+    (fieldErrors[field] ??= []).push(issue.message);
+  }
+  return fieldErrors as Partial<Record<K, string[]>>;
+}
+
+function revalidatePayment(id: string) {
+  revalidatePath(LEDGER);
+  revalidatePath(`${LEDGER}/${id}`);
+  revalidatePath(DIRECTORY);
 }
 
 /** `imported from "july.csv" — 12 of 14 new`. */
