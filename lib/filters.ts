@@ -39,7 +39,11 @@
 // The only import here, and deliberately a pure one: lib/members.ts owns the
 // key format and the `cf:` namespace, so both modules cannot drift on what a
 // custom sort key looks like. Still no next/* and no supabase-js.
-import { customSortColumn, parseCustomSortKey } from "@/lib/members";
+import {
+  customFieldColumn,
+  customFieldKey,
+  parseCustomFieldKey,
+} from "@/lib/members";
 
 /**
  * Sortable columns, as the URL spells them. Mapped to real column names by
@@ -100,7 +104,7 @@ export type SortableField = { key: string; showInDirectory: boolean };
  * Resolve a sort key to the column PostgREST should order by, or null if the
  * key names nothing sortable.
  *
- * 🔓 Custom keys go through customSortColumn(), which re-applies the key format
+ * 🔓 Custom keys go through customFieldColumn(), which re-applies the key format
  * check. That is the one place a definition key becomes part of a query string,
  * so it re-checks rather than trusting that the value came from the database —
  * see FIELD_KEY_PATTERN in lib/members.ts for what an unchecked key does to an
@@ -114,13 +118,13 @@ export function sortColumn(
   sort: MemberSort,
   fields: readonly SortableField[]
 ): string | null {
-  const custom = parseCustomSortKey(sort);
+  const custom = parseCustomFieldKey(sort);
   if (custom === null) {
     return SORT_COLUMNS[sort as MemberBuiltinSort] ?? null;
   }
   const field = fields.find((f) => f.key === custom);
   if (!field || !field.showInDirectory) return null;
-  return customSortColumn(custom);
+  return customFieldColumn(custom);
 }
 
 export const MEMBER_STATES = ["active", "inactive", "all"] as const;
@@ -137,6 +141,29 @@ export type MemberState = (typeof MEMBER_STATES)[number];
  */
 export const MEMBER_DUES = ["all", "paid", "unpaid"] as const;
 export type MemberDues = (typeof MEMBER_DUES)[number];
+
+/**
+ * How the member row got created (phase 5c), matching the `members_source_check`
+ * domain plus an `all` default.
+ *
+ * 📌 Phase 3 removed `source` as a *column* and that was right — it is an
+ * annotation on the name, not something to sort a table by. It comes back here
+ * as a *filter*, because §4.2's roster-cleanup query ("find the self-registered
+ * rows nobody has reconciled") has had nowhere to live since, and the SELF badge
+ * beside the name is the on-screen control this filter answers to.
+ */
+export const MEMBER_SOURCES = ["all", "admin", "self_checkin"] as const;
+export type MemberSource = (typeof MEMBER_SOURCES)[number];
+
+/**
+ * The most characters a custom-field filter value may carry.
+ *
+ * An option is capped at 80 by `saveFieldDefinition`, so this is that bound
+ * restated for a value arriving from a URL rather than from the definition — it
+ * bounds what a hand-edited link can put in front of PostgREST without needing
+ * the definition to hand.
+ */
+export const MAX_FIELD_VALUE_LENGTH = 80;
 
 /** How much free text the search box will carry. Long enough for a full name or
  * an email, short enough that a pasted essay cannot become the query. */
@@ -176,6 +203,29 @@ export type MemberFilter = {
    * question, and this filter would have no way to say which one it meant.
    */
   dues: MemberDues;
+  /**
+   * Admin-created / self-registered / either (phase 5c). See MEMBER_SOURCES for
+   * why this is a filter rather than the column phase 3 removed.
+   */
+  source: MemberSource;
+  /**
+   * Officer-defined field filters (phase 5c): definition key → the one value
+   * being matched. Absent key means "not filtered on"; the object is empty in
+   * the common case.
+   *
+   * ⚠️ Every key in here has already been checked against the live definitions
+   * — it names a field that exists, is not archived, and is shown in the
+   * directory — because `parseMemberFilter` is the only thing that writes it.
+   * 🔓 That is NOT what makes it safe to interpolate, though. `customFieldColumn`
+   * re-applies the key format check at the point the key becomes part of the
+   * query string, exactly as the sort does, because "it came out of the
+   * database" is not a property this module can verify.
+   *
+   * One value per field rather than a set: these are dropdowns, and "M or L"
+   * is a multi-select whose UI question (and `in.()` translation) belongs with
+   * phase 6's relational filters rather than smuggled in here.
+   */
+  custom: Record<string, string>;
   sort: MemberSort;
   dir: "asc" | "desc";
 };
@@ -249,6 +299,34 @@ function searchTerm(raw: string): string {
 }
 
 /**
+ * One custom-field filter value, or null for "not filtering on this field".
+ *
+ * 📌 Deliberately NOT checked against the definition's current option list, and
+ * that is a decision rather than an omission. Editing an option list orphans
+ * every member still holding the value that just left it (see `fieldOptions` in
+ * lib/members.ts — the coupling is intentionally absent from the database too),
+ * and "find everyone still on the retired size" is precisely the cleanup query
+ * an officer needs afterwards. Restricting this to live options would make the
+ * orphans the one thing the directory cannot show, which turns information into
+ * a dead end.
+ *
+ * ⚠️ The control has to cope, and does: it renders through `fieldOptions`, which
+ * appends an unmatched value as a trailing entry rather than letting the
+ * `<select>` go blank — the defect that has now bitten twice, in
+ * `member-field-cell.tsx` and again in the dues editor.
+ *
+ * No character stripping, unlike `searchTerm`. This value becomes a PostgREST
+ * `eq` operand rather than part of a quoted `or` group, so it is data and not
+ * syntax; stripping `.` or `,` here would make a legitimate option like `S/M`
+ * or `Yes, with notes` unfilterable. The length cap is the whole guard.
+ */
+function fieldFilterValue(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  return trimmed.slice(0, MAX_FIELD_VALUE_LENGTH);
+}
+
+/**
  * searchParams → a filter object. Total: every input yields a usable filter.
  *
  * Anything invalid falls back to the default rather than throwing, because
@@ -283,6 +361,29 @@ export function parseMemberFilter(
     ? (rawDues as MemberDues)
     : "all";
 
+  const rawSource = one(params, "source");
+  const source: MemberSource = (MEMBER_SOURCES as readonly string[]).includes(
+    rawSource
+  )
+    ? (rawSource as MemberSource)
+    : "all";
+
+  // Officer-defined field filters, read by walking the definitions rather than
+  // the params — so an unknown `cf:` param is ignored by construction and never
+  // reaches the query, the same way this function ignores every retired key.
+  //
+  // ⚠️ Only a field that is live AND shown in the directory can be filtered on,
+  // which is the same predicate `sortColumn` applies and is there for the same
+  // reason: a filter with no control on screen leaves the officer a count they
+  // cannot account for. A stale bookmark naming a since-archived field
+  // therefore narrows nothing rather than narrowing invisibly.
+  const custom: Record<string, string> = {};
+  for (const field of fields) {
+    if (!field.showInDirectory) continue;
+    const value = fieldFilterValue(one(params, customFieldKey(field.key)));
+    if (value !== null) custom[field.key] = value;
+  }
+
   // A sort key is either one of the four built-ins or `cf:<key>` naming a
   // definition that exists and is shown in the directory. Anything else — a
   // retired phase-1 key, a field archived since the officer bookmarked the URL,
@@ -309,6 +410,8 @@ export function parseMemberFilter(
     minPoints: intOrNull(one(params, "minPoints"), 1_000_000),
     maxPoints: intOrNull(one(params, "maxPoints"), 1_000_000),
     dues,
+    source,
+    custom,
     sort,
     dir,
   };
@@ -340,7 +443,17 @@ export function memberFilterToParams(
 
   if (merged.state !== "active") params.set("state", merged.state);
   if (merged.dues !== "all") params.set("dues", merged.dues);
+  if (merged.source !== "all") params.set("source", merged.source);
   if (merged.q) params.set("q", merged.q);
+
+  // Sorted by key so the query string is a function of the filter and not of
+  // object insertion order — two officers who picked the same filters in a
+  // different order must produce the same URL, or the selection reset key and
+  // the export's query string start differing for no visible reason.
+  for (const key of Object.keys(merged.custom).sort()) {
+    const value = merged.custom[key];
+    if (value) params.set(customFieldKey(key), value);
+  }
 
   const numbers: [keyof MemberFilter, string][] = [
     ["minPoints", "minPoints"],
@@ -527,6 +640,34 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
   // pair starts disagreeing.
   if (filter.dues === "paid") q = q.eq("dues_paid_current_term", true);
   else if (filter.dues === "unpaid") q = q.eq("dues_paid_current_term", false);
+
+  // §4.2's roster-cleanup query, back as a filter after phase 3 removed it as a
+  // column.
+  if (filter.source !== "all") q = q.eq("source", filter.source);
+
+  // Officer-defined fields. `custom_fields->>key = value` through the view —
+  // the same expression the sort orders by, which is why they share one
+  // builder.
+  //
+  // 🔓 customFieldColumn() re-applies the key format check HERE rather than
+  // trusting parseMemberFilter to have done it. This is the second position in
+  // which a definition key becomes part of a query string, and the phase-4
+  // spike's finding was that PostgREST accepts a space and a `"` silently, with
+  // no error at all — so "it would have failed if it were wrong" is not
+  // available as a defence. A key that does not survive the check is DROPPED,
+  // never interpolated: a filter that silently does not apply is bad, and a
+  // filter that applies something else is worse.
+  //
+  // Keys are sorted for the same reason memberFilterToParams sorts them —
+  // the emitted query must be a function of the filter, not of insertion order,
+  // or two identical filters produce two different recorded query shapes.
+  for (const key of Object.keys(filter.custom).sort()) {
+    const value = filter.custom[key];
+    if (!value) continue;
+    const column = customFieldColumn(key);
+    if (column === null) continue;
+    q = q.eq(column, value);
+  }
 
   // Nulls last in both directions. None of the four BUILT-IN sortable columns is
   // nullable — that went with attendance_rate and last_seen_at in the phase-3

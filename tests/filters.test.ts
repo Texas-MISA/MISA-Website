@@ -10,6 +10,7 @@ import {
   memberFilterFields,
   memberFilterToParams,
   memberFilterUrl,
+  MAX_FIELD_VALUE_LENGTH,
   MAX_SEARCH_LENGTH,
   MEMBER_SORTS,
   NO_CUSTOM_FIELDS,
@@ -20,7 +21,7 @@ import {
   type MemberFilter,
   type SortableField,
 } from "@/lib/filters";
-import { customSortKey } from "@/lib/members";
+import { customFieldKey } from "@/lib/members";
 
 // Pure tests for the directory's filter core (§7 Stage 6 phase 1). No database:
 // applyMemberFilter is handed a recording fake in place of a PostgREST builder,
@@ -176,12 +177,18 @@ describe("parseMemberFilter", () => {
   });
 
   it("tolerates a phase-1 bookmark without letting it narrow anything", () => {
-    // The six retired fields left MemberFilter entirely rather than merely
-    // losing their controls. An old URL must therefore parse to the default
-    // filter — not to an invisible narrowing the officer cannot account for,
-    // which is the phase-1 defect arriving from the other direction.
+    // The retired fields left MemberFilter entirely rather than merely losing
+    // their controls. An old URL must therefore parse to the default filter —
+    // not to an invisible narrowing the officer cannot account for, which is
+    // the phase-1 defect arriving from the other direction.
+    //
+    // 📌 `source` was one of the six and is deliberately NOT in this list any
+    // more: phase 5c brought it back as a filter, so a phase-1 bookmark
+    // carrying `source=self_checkin` now narrows again — correctly, because it
+    // narrows *with a control on screen showing it*. The invariant was never
+    // "an old bookmark can't narrow"; it is "nothing narrows without a
+    // control." The five below still have no control and still narrow nothing.
     const filter = parseMemberFilter({
-      source: "self_checkin",
       minEvents: "2",
       maxEvents: "9",
       minRate: "50",
@@ -325,7 +332,7 @@ describe("sortColumn", () => {
   });
 
   it("maps a live directory field to its JSON path", () => {
-    expect(sortColumn(customSortKey("committee_paid"), fields)).toBe(
+    expect(sortColumn(customFieldKey("committee_paid"), fields)).toBe(
       "custom_fields->>committee_paid"
     );
   });
@@ -334,7 +341,7 @@ describe("sortColumn", () => {
   // column nobody can see rearranges the list for no visible reason, which is
   // the argument that cut phase 1's ten sort keys down to four.
   it("refuses a field that is not a directory column", () => {
-    expect(sortColumn(customSortKey("shirt_size"), fields)).toBeNull();
+    expect(sortColumn(customFieldKey("shirt_size"), fields)).toBeNull();
   });
 
   it("returns null rather than guessing for anything unrecognized", () => {
@@ -371,7 +378,7 @@ describe("applyMemberFilter", () => {
     const orders = (calls: Call[]) => calls.filter(([m]) => m === "order");
 
     it("orders by the JSON path for a live directory field", () => {
-      const calls = callsFor({ sort: customSortKey("committee_paid") }, fields);
+      const calls = callsFor({ sort: customFieldKey("committee_paid") }, fields);
       expect(orders(calls)[0]).toEqual([
         "order",
         "custom_fields->>committee_paid",
@@ -385,7 +392,7 @@ describe("applyMemberFilter", () => {
     it("keeps members with no answer last in both directions", () => {
       for (const dir of ["asc", "desc"] as const) {
         const calls = callsFor(
-          { sort: customSortKey("committee_paid"), dir },
+          { sort: customFieldKey("committee_paid"), dir },
           fields
         );
         expect(orders(calls)[0][2]).toEqual({
@@ -396,7 +403,7 @@ describe("applyMemberFilter", () => {
     });
 
     it("still ends on a total order, so pages cannot skip or repeat", () => {
-      const calls = orders(callsFor({ sort: customSortKey("committee_paid") }, fields));
+      const calls = orders(callsFor({ sort: customFieldKey("committee_paid") }, fields));
       // A dropdown has a handful of options over the whole roster, so ties are
       // the rule rather than the exception here — the spike reproduced exactly
       // this, losing a row across a page boundary without the id tie-break.
@@ -578,6 +585,203 @@ describe("dues status (Stage 6.5 phase 4)", () => {
   });
 });
 
+// Stage 6 phase 5c. The categorical filters — `source`, and one predicate per
+// officer-defined directory field. The dues third of this phase shipped early
+// with Stage 6.5 phase 4 and has its own block above.
+describe("categorical filters (phase 5c)", () => {
+  const shirt: SortableField = { key: "shirt_size", showInDirectory: true };
+  const hidden: SortableField = { key: "committee", showInDirectory: false };
+
+  describe("source", () => {
+    it("defaults to 'all' and narrows nothing", () => {
+      const filter = parseMemberFilter({});
+      expect(filter.source).toBe("all");
+      expect(isDefaultFilter(filter)).toBe(true);
+      expect(
+        callsFor({ source: "all" }).some(([, column]) => column === "source")
+      ).toBe(false);
+    });
+
+    it("translates to one equality", () => {
+      expect(callsFor({ source: "self_checkin" })).toContainEqual([
+        "eq",
+        "source",
+        "self_checkin",
+      ]);
+      expect(callsFor({ source: "admin" })).toContainEqual([
+        "eq",
+        "source",
+        "admin",
+      ]);
+    });
+
+    it("falls back for anything outside the column's own domain", () => {
+      // members_source_check allows exactly two values; the parser must not be
+      // the thing that discovers a third.
+      for (const junk of ["officer", "SELF_CHECKIN", "1", ""]) {
+        expect(parseMemberFilter({ source: junk }).source).toBe("all");
+      }
+    });
+
+    it("round-trips through the URL", () => {
+      const params = memberFilterToParams(
+        parseMemberFilter({ source: "self_checkin" })
+      );
+      expect(params.get("source")).toBe("self_checkin");
+      expect(parseMemberFilter(Object.fromEntries(params)).source).toBe(
+        "self_checkin"
+      );
+    });
+  });
+
+  describe("custom fields", () => {
+    it("is empty by default and adds no clause", () => {
+      const filter = parseMemberFilter({}, [shirt]);
+      expect(filter.custom).toEqual({});
+      expect(isDefaultFilter(filter)).toBe(true);
+    });
+
+    it("reads a cf: param naming a live directory field", () => {
+      const filter = parseMemberFilter({ "cf:shirt_size": "M" }, [shirt]);
+      expect(filter.custom).toEqual({ shirt_size: "M" });
+      expect(callsFor(filter, [shirt])).toContainEqual([
+        "eq",
+        "custom_fields->>shirt_size",
+        "M",
+      ]);
+    });
+
+    it("⚠️ ignores a field that is not a directory column", () => {
+      // The same predicate sortColumn applies, for the same reason: a filter
+      // with no control on screen leaves a count the officer cannot account
+      // for. A stale bookmark must narrow nothing, not narrow invisibly.
+      const filter = parseMemberFilter({ "cf:committee": "Socials" }, [hidden]);
+      expect(filter.custom).toEqual({});
+      expect(
+        callsFor(filter, [hidden]).some(([method, column]) =>
+          method === "eq" && String(column).startsWith("custom_fields")
+        )
+      ).toBe(false);
+    });
+
+    it("ignores a cf: param naming no definition at all", () => {
+      // Built by walking the definitions rather than the params, so an unknown
+      // key is ignored by construction — the same way every retired phase-1
+      // key is.
+      expect(
+        parseMemberFilter({ "cf:nonexistent": "x" }, [shirt]).custom
+      ).toEqual({});
+    });
+
+    it("knows no custom fields when none are passed", () => {
+      expect(parseMemberFilter({ "cf:shirt_size": "M" }).custom).toEqual({});
+    });
+
+    it("🔓 drops a key the format check rejects rather than interpolating it", () => {
+      // The definitions come from the database and the key is CHECK-constrained
+      // there, so this cannot happen through the UI — which is exactly why it is
+      // asserted. customFieldColumn re-checks at the point the key becomes part
+      // of a query string, because the phase-4 spike showed PostgREST accepts a
+      // space and a `"` silently, with no error at all. Dropping is the right
+      // failure: a filter that does not apply beats one that applies something
+      // else.
+      const evil: SortableField = {
+        key: "shirt,size",
+        showInDirectory: true,
+      };
+      const filter = { ...parseMemberFilter({}), custom: { "shirt,size": "M" } };
+      const calls = callsFor(filter, [evil]);
+      expect(
+        calls.some(([, column]) => String(column).includes("shirt,size"))
+      ).toBe(false);
+    });
+
+    it("applies several fields as a conjunction", () => {
+      const other: SortableField = { key: "committee", showInDirectory: true };
+      const filter = parseMemberFilter(
+        { "cf:shirt_size": "M", "cf:committee": "Socials" },
+        [shirt, other]
+      );
+      const calls = callsFor(filter, [shirt, other]);
+      expect(calls).toContainEqual(["eq", "custom_fields->>shirt_size", "M"]);
+      expect(calls).toContainEqual(["eq", "custom_fields->>committee", "Socials"]);
+    });
+
+    it("emits clauses in key order, not insertion order", () => {
+      // The query has to be a function of the filter rather than of how the
+      // object was built, or two identical filters produce two different
+      // recorded shapes — and the URL is the export's query string.
+      const b: SortableField = { key: "b_field", showInDirectory: true };
+      const a: SortableField = { key: "a_field", showInDirectory: true };
+      const filter = { ...parseMemberFilter({}), custom: { b_field: "2", a_field: "1" } };
+
+      const columns = callsFor(filter, [b, a])
+        .filter(([method]) => method === "eq")
+        .map(([, column]) => column)
+        .filter((column) => String(column).startsWith("custom_fields"));
+
+      expect(columns).toEqual([
+        "custom_fields->>a_field",
+        "custom_fields->>b_field",
+      ]);
+
+      const params = memberFilterToParams(filter).toString();
+      expect(params.indexOf("a_field")).toBeLessThan(params.indexOf("b_field"));
+    });
+
+    it("📌 keeps a value the definition no longer offers", () => {
+      // Orphans are information (see fieldFilterValue). "Find everyone still on
+      // the retired size" is the cleanup query an officer needs after editing an
+      // option list, and restricting the filter to live options would make the
+      // orphans the one thing the directory cannot show.
+      const filter = parseMemberFilter({ "cf:shirt_size": "XXL" }, [shirt]);
+      expect(filter.custom).toEqual({ shirt_size: "XXL" });
+    });
+
+    it("caps a hand-edited value rather than passing it through", () => {
+      const long = "x".repeat(500);
+      const filter = parseMemberFilter({ "cf:shirt_size": long }, [shirt]);
+      expect(filter.custom.shirt_size).toHaveLength(MAX_FIELD_VALUE_LENGTH);
+    });
+
+    it("treats a blank value as no filter", () => {
+      expect(parseMemberFilter({ "cf:shirt_size": "   " }, [shirt]).custom).toEqual(
+        {}
+      );
+    });
+
+    it("🪤 survives a change to any other control", () => {
+      // The memberFilterUrl re-parse trap, which phase 5c gives a second mouth:
+      // the round trip reads the cf: FILTER params as well as the sort, so
+      // without the definitions every custom filter would be dropped on the next
+      // keystroke — not merely the sort.
+      const filter = parseMemberFilter(
+        { "cf:shirt_size": "M", sort: "cf:shirt_size" },
+        [shirt]
+      );
+      const next = new URLSearchParams(
+        memberFilterUrl(filter, { q: "sharma" }, [shirt])
+      );
+      expect(next.get("cf:shirt_size")).toBe("M");
+      expect(next.get("sort")).toBe("cf:shirt_size");
+      expect(next.get("q")).toBe("sharma");
+    });
+
+    it("never windows the result, however many predicates are applied", () => {
+      const calls = callsFor(
+        {
+          ...parseMemberFilter({ "cf:shirt_size": "M" }, [shirt]),
+          source: "self_checkin",
+          dues: "unpaid",
+          q: "a",
+        },
+        [shirt]
+      );
+      expect(calls.some(([m]) => m === "range" || m === "limit")).toBe(false);
+    });
+  });
+});
+
 describe("chunk arithmetic", () => {
   it("produces inclusive PostgREST bounds, zero-based", () => {
     expect(chunkRange(0)).toEqual({ from: 0, to: READ_CHUNK - 1 });
@@ -714,7 +918,7 @@ describe("filter control state", () => {
       { key: "shirt_size", showInDirectory: false },
     ];
     const sorted = parseMemberFilter(
-      { sort: customSortKey("committee_paid") },
+      { sort: customFieldKey("committee_paid") },
       fields
     );
 

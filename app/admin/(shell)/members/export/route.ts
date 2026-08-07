@@ -106,6 +106,12 @@ export async function GET(request: Request): Promise<Response> {
     // Definitions first, exactly as the directory page does: parseMemberFilter
     // needs them to tell a live `cf:` sort key from one naming an archived
     // field, and the catalogue needs them for the custom columns.
+    //
+    // ⚠️ Since phase 5c it also needs them to read the `cf:` FILTER params at
+    // all — parseMemberFilter builds `custom` by walking the definitions, so a
+    // route that forgot this argument would export the whole roster while the
+    // screen showed twelve members, with nothing on either side to say why.
+    // That is the "select all N matching" failure through a new door.
     const fields = await fetchFieldDefinitions(db);
 
     const filter = parseMemberFilter(

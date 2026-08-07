@@ -6,7 +6,7 @@ import {
   type SortableField,
 } from "@/lib/filters";
 import { termAtIndex, termIndex } from "@/lib/dues";
-import { classifyTermEvents, customSortKey } from "@/lib/members";
+import { classifyTermEvents, customFieldKey } from "@/lib/members";
 
 import {
   cleanup,
@@ -454,7 +454,7 @@ describe("custom-field sorting through the view", () => {
 
   const sorted = (dir: "asc" | "desc") =>
     parseMemberFilter(
-      { q: CF_MARKER, state: "all", sort: customSortKey(FIELD_KEY), dir },
+      { q: CF_MARKER, state: "all", sort: customFieldKey(FIELD_KEY), dir },
       fields
     );
 
@@ -810,5 +810,190 @@ describe("the dues filter against real payments", () => {
     expect((await idsFor("unpaid")).ids).toContain(member);
 
     await db.from("dues_payments").delete().eq("venmo_txn_id", txn);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stage 6 phase 5c — the categorical filters against real PostgREST.
+//
+// The pure translation is pinned in filters.test.ts. What only a real database
+// can answer is whether `.eq("custom_fields->>key", value)` actually filters
+// through the view — the sort proved the JSON path ORDERS, which is a different
+// clause — and whether a value carrying PostgREST's own punctuation survives
+// the trip. `.` and `,` are filter syntax inside an `or` group and are what
+// forced the search term to be double-quoted; an `eq` operand is a different
+// position and the difference is exactly the kind of thing a pure test cannot
+// see.
+//
+// `t3qcat` is a strict narrowing of `t3q`, like every other block's marker.
+// ---------------------------------------------------------------------------
+const CAT_KEY = "t3q_shirt";
+/** ⚠️ Two of these carry punctuation on purpose — a comma and a slash — because
+ * a real option list is written by an officer, not by a test. */
+const CAT_OPTIONS = ["M", "S/M", "Yes, with notes"];
+const CAT_MARKER = "t3qcat";
+
+describe("categorical filters against the view", () => {
+  const fields: SortableField[] = [{ key: CAT_KEY, showInDirectory: true }];
+  let fieldId = "";
+  const answered = new Map<string, string>();
+  const selfIds: string[] = [];
+  let unansweredId = "";
+
+  beforeAll(async () => {
+    const { data, error } = await db
+      .from("member_field_definitions")
+      .insert({
+        key: CAT_KEY,
+        label: "Shirt (test fixture)",
+        kind: "select",
+        options: CAT_OPTIONS,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(`definition insert failed: ${error.message}`);
+    fieldId = data.id;
+
+    // One member per option, plus two self-registered, plus one holding no
+    // answer at all — the sparse case a dropdown always produces.
+    for (const value of CAT_OPTIONS) {
+      const base = testIdentity();
+      const id = await createTestMember(db, track, {
+        ...base,
+        eid: base.eid.replace("t3q", CAT_MARKER),
+      });
+      answered.set(id, value);
+      const { error: writeError } = await db
+        .from("members")
+        .update({ custom_fields: { [CAT_KEY]: value } })
+        .eq("id", id);
+      if (writeError) throw new Error(`value write failed: ${writeError.message}`);
+    }
+
+    for (let i = 0; i < 2; i++) {
+      const base = testIdentity();
+      const id = await createTestMember(
+        db,
+        track,
+        { ...base, eid: base.eid.replace("t3q", CAT_MARKER) },
+        { source: "self_checkin" }
+      );
+      selfIds.push(id);
+    }
+
+    const base = testIdentity();
+    unansweredId = await createTestMember(db, track, {
+      ...base,
+      eid: base.eid.replace("t3q", CAT_MARKER),
+    });
+  }, 60_000);
+
+  afterAll(async () => {
+    if (fieldId) {
+      await db.from("member_field_definitions").delete().eq("id", fieldId);
+    }
+  });
+
+  const mine = (params: Record<string, string>) =>
+    parseMemberFilter({ q: CAT_MARKER, state: "all", ...params }, fields);
+
+  it("filters on the JSON path, not just orders by it", async () => {
+    const { rows, count } = await readAll(mine({ [`cf:${CAT_KEY}`]: "M" }), fields);
+
+    const expected = [...answered.entries()]
+      .filter(([, value]) => value === "M")
+      .map(([id]) => id);
+
+    expect(rows.map((r) => r.id)).toEqual(expected);
+    expect(count).toBe(expected.length);
+  });
+
+  it("🪤 survives a value carrying PostgREST's own punctuation", async () => {
+    // A comma and a slash. Inside an `or` group a bare comma ends the operand,
+    // which is why searchTerm's value has to be double-quoted; an `eq` operand
+    // is a different position and this asserts it, rather than assuming the two
+    // behave alike.
+    for (const value of ["S/M", "Yes, with notes"]) {
+      const { rows, count } = await readAll(
+        mine({ [`cf:${CAT_KEY}`]: value }),
+        fields
+      );
+      const expected = [...answered.entries()]
+        .filter(([, v]) => v === value)
+        .map(([id]) => id);
+
+      expect(rows.map((r) => r.id), value).toEqual(expected);
+      expect(count, value).toBe(1);
+    }
+  });
+
+  it("excludes a member holding no answer", async () => {
+    // A missing key is SQL NULL through `->>`, and NULL = 'M' is not true. The
+    // member must simply not match, rather than matching everything or
+    // erroring.
+    for (const value of CAT_OPTIONS) {
+      const { rows } = await readAll(mine({ [`cf:${CAT_KEY}`]: value }), fields);
+      expect(rows.map((r) => r.id)).not.toContain(unansweredId);
+    }
+  });
+
+  it("returns nothing, and no error, for an option no member holds", async () => {
+    const { rows, count } = await readAll(
+      mine({ [`cf:${CAT_KEY}`]: "XXL" }),
+      fields
+    );
+    expect(rows).toHaveLength(0);
+    expect(count).toBe(0);
+  });
+
+  it("narrows on source — §4.2's roster-cleanup query", async () => {
+    const self = await readAll(mine({ source: "self_checkin" }), fields);
+    expect(self.rows.map((r) => r.id).sort()).toEqual([...selfIds].sort());
+    expect(self.rows.every((r) => r.source === "self_checkin")).toBe(true);
+
+    const admin = await readAll(mine({ source: "admin" }), fields);
+    expect(admin.rows.every((r) => r.source === "admin")).toBe(true);
+    expect(self.count + admin.count).toBe(await readAll(mine({}), fields).then((r) => r.count));
+  });
+
+  it("composes source with a custom field as a conjunction", async () => {
+    // An admin-created member holding "M" exists; a self-registered one does
+    // not. Two predicates that each match something, together matching nothing,
+    // is the property that proves they AND rather than OR.
+    const both = await readAll(
+      mine({ source: "self_checkin", [`cf:${CAT_KEY}`]: "M" }),
+      fields
+    );
+    expect(both.rows).toHaveLength(0);
+    expect(both.count).toBe(0);
+  });
+
+  it("✅ the filtered count is what an export of the same filter returns", async () => {
+    // §4.5's one-translation rule on the new predicates, end to end: "filter to
+    // M, then export" has to be provably the same query as the number rendered
+    // beside the button. The export mirrors the route handler's chunked read
+    // rather than importing it, since a Route Handler needs a request context
+    // this suite cannot build.
+    const filter = mine({ [`cf:${CAT_KEY}`]: "M" });
+    const { count } = await readAll(filter, fields);
+
+    const query = applyMemberFilter(
+      db.from("member_directory").select(ROW_COLUMNS, { count: "exact" }),
+      filter,
+      fields
+    );
+
+    const exported: { id: string | null }[] = [];
+    let total = 0;
+    for (let offset = 0; ; offset += CHUNK) {
+      const { data, error, count: c } = await query.range(offset, offset + CHUNK - 1);
+      if (error) throw new Error(`export query failed: ${error.message}`);
+      if (offset === 0) total = c ?? data.length;
+      exported.push(...data);
+      if (data.length < CHUNK || exported.length >= total) break;
+    }
+
+    expect(total).toBe(count);
+    expect(exported).toHaveLength(count);
   });
 });

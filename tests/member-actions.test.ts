@@ -6,7 +6,7 @@ import { fetchFieldDefinitions } from "@/lib/member-fields";
 import {
   AUDITED_FIELD_COLUMNS,
   AUDITED_MEMBER_COLUMNS,
-  customSortKey,
+  customFieldKey,
   fieldValue,
   setFieldValue,
   withoutToken,
@@ -362,7 +362,7 @@ describe("field definitions", () => {
       showInDirectory: d.showInDirectory,
     }));
     expect(
-      parseMemberFilter({ sort: customSortKey(archivedKey) }, fields).sort
+      parseMemberFilter({ sort: customFieldKey(archivedKey) }, fields).sort
     ).toBe("name");
   });
 

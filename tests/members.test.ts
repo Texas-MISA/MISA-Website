@@ -6,15 +6,15 @@ import {
   AUDITED_FIELD_COLUMNS,
   AUDITED_MEMBER_COLUMNS,
   classifyTermEvents,
-  customSortColumn,
-  customSortKey,
+  customFieldColumn,
+  customFieldKey,
   FIELD_KEY_PATTERN,
   fieldOptions,
   fieldValue,
   formatAttendanceRate,
   isAllowedFieldValue,
   isValidFieldKey,
-  parseCustomSortKey,
+  parseCustomFieldKey,
   setFieldValue,
   withoutToken,
   type TermEventInput,
@@ -200,32 +200,32 @@ describe("isValidFieldKey", () => {
 
 describe("custom sort keys", () => {
   it("round-trips through the cf: namespace", () => {
-    expect(customSortKey("committee_paid")).toBe("cf:committee_paid");
-    expect(parseCustomSortKey("cf:committee_paid")).toBe("committee_paid");
+    expect(customFieldKey("committee_paid")).toBe("cf:committee_paid");
+    expect(parseCustomFieldKey("cf:committee_paid")).toBe("committee_paid");
   });
 
   it("reports a built-in sort key as not custom", () => {
     for (const sort of ["name", "email", "eid", "total_points"]) {
-      expect(parseCustomSortKey(sort)).toBeNull();
+      expect(parseCustomFieldKey(sort)).toBeNull();
     }
   });
 
   it("treats a bare prefix as naming nothing", () => {
-    expect(parseCustomSortKey("cf:")).toBeNull();
+    expect(parseCustomFieldKey("cf:")).toBeNull();
   });
 
   // The namespace is what makes a field keyed `email` unable to shadow the
   // column — and `:` cannot appear in a key at all, so the split is unambiguous
   // in both directions.
   it("cannot collide with a built-in even for a reserved-looking key", () => {
-    expect(customSortKey("email")).toBe("cf:email");
-    expect(parseCustomSortKey("email")).toBeNull();
+    expect(customFieldKey("email")).toBe("cf:email");
+    expect(parseCustomFieldKey("email")).toBeNull();
   });
 
   it("refuses to build a column expression for an unsafe key", () => {
-    expect(customSortColumn("committee_paid")).toBe("custom_fields->>committee_paid");
+    expect(customFieldColumn("committee_paid")).toBe("custom_fields->>committee_paid");
     for (const key of ["committee,full_name", "committee paid", 'du"es', "email"]) {
-      expect(customSortColumn(key), key).toBeNull();
+      expect(customFieldColumn(key), key).toBeNull();
     }
   });
 });

@@ -113,7 +113,7 @@ export type FieldDefinition = {
  * This regex IS the escape. `member_field_definitions_key_format` in migration
  * 18 is the same pattern, enforced a second time in the database so a key that
  * skipped the zod schema still cannot be stored. Nothing may reach
- * customSortColumn() without having been through one of them.
+ * customFieldColumn() without having been through one of them.
  *
  * Anchored, lowercase, leading letter, 1–40 characters — deliberately narrower
  * than "characters that happen to be safe", because a key is written once by an
@@ -176,38 +176,49 @@ export function isValidFieldKey(key: string): boolean {
 }
 
 /**
- * The prefix that keeps a custom sort key out of the built-in namespace.
+ * The prefix that keeps an officer-defined key out of the built-in namespace.
  *
- * `MEMBER_SORTS` is a closed list of four and a custom field is officer-defined
- * at runtime, so without a namespace a field keyed `email` would shadow the
- * real column — and `:` cannot appear in a key at all, which makes the split
+ * `MEMBER_SORTS` is a closed list and a custom field is officer-defined at
+ * runtime, so without a namespace a field keyed `email` would shadow the real
+ * column — and `:` cannot appear in a key at all, which makes the split
  * unambiguous in both directions.
+ *
+ * 📌 Used in two positions as of Stage 6 phase 5c, and it means the same thing
+ * in both: as a sort *value* (`sort=cf:shirt_size`) and as a filter *parameter
+ * name* (`cf:shirt_size=M`). One namespace, one spelling — which is why these
+ * helpers stopped being named after sorting.
  */
-export const CUSTOM_SORT_PREFIX = "cf:";
+export const CUSTOM_FIELD_PREFIX = "cf:";
 
-/** A definition key → the sort key that names it in a URL. */
-export function customSortKey(key: string): string {
-  return `${CUSTOM_SORT_PREFIX}${key}`;
+/** A definition key → the namespaced spelling a URL uses for it. */
+export function customFieldKey(key: string): string {
+  return `${CUSTOM_FIELD_PREFIX}${key}`;
 }
 
-/** The inverse: a sort key → the definition key, or null if it names a
+/** The inverse: a namespaced key → the definition key, or null if it names a
  * built-in. Total, so a caller never has to test the prefix itself. */
-export function parseCustomSortKey(sort: string): string | null {
-  if (!sort.startsWith(CUSTOM_SORT_PREFIX)) return null;
-  return sort.slice(CUSTOM_SORT_PREFIX.length) || null;
+export function parseCustomFieldKey(namespaced: string): string | null {
+  if (!namespaced.startsWith(CUSTOM_FIELD_PREFIX)) return null;
+  return namespaced.slice(CUSTOM_FIELD_PREFIX.length) || null;
 }
 
 /**
- * The PostgREST column expression a custom sort orders by.
+ * The PostgREST column expression for one custom field.
  *
  * 🔓 The one place a definition key becomes part of a query string, and
  * therefore the one place the key format has to be re-checked rather than
- * assumed. Returns null for anything that would not survive
- * `isValidFieldKey`, and callers must fall back to a built-in sort rather than
- * interpolating the key anyway — see the note on FIELD_KEY_PATTERN for what an
- * unchecked key does to an `order=` term.
+ * assumed. Returns null for anything that would not survive `isValidFieldKey`,
+ * and callers must fall back rather than interpolating the key anyway — see the
+ * note on FIELD_KEY_PATTERN for what an unchecked key does to an `order=` term.
+ *
+ * ⚠️ It serves **both** the `order=` term and, since phase 5c, the `cf:` filter
+ * predicates — which is exactly why it is one function and not two. The spike's
+ * finding was about what PostgREST *accepts silently* (a space and a `"` both
+ * passed with no error at all), and that is a property of the key reaching the
+ * query string, not of which clause it lands in. A second copy of this check
+ * written for filters would be a second thing to get wrong.
  */
-export function customSortColumn(key: string): string | null {
+export function customFieldColumn(key: string): string | null {
   if (!isValidFieldKey(key)) return null;
   return `custom_fields->>${key}`;
 }

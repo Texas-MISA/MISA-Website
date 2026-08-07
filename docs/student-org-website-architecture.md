@@ -1,9 +1,46 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.44
-**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt, and is what Stage 6 resumes with.
+**Version:** 1.45
+**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5c of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. **Phase 6 (relational filters) is next.**
 **Last updated:** August 2026
 
+> **v1.45: the directory filters on categorical fields.** Stage 6 phase 5c, and
+> the other half of *"filter the members to those with M size and export as an
+> Excel file"* — phase 5 built only the export. **No migration.** Custom-field
+> dropdowns and `source` (labelled **Added by**) join the dues filter that
+> shipped early with 6.5 phase 4.
+>
+> - 📌 **`customSortColumn` is now `customFieldColumn`** (with `customFieldKey`,
+>   `parseCustomFieldKey`, `CUSTOM_FIELD_PREFIX`). The guard escapes **two**
+>   positions now — the `order=` term and the `cf:` filter predicates — and a
+>   security control named after one of its call sites invites a second copy for
+>   the other. The spike's finding (a space and a `"` accepted **silently, with
+>   no error at all**) is a property of a key reaching the query string, not of
+>   which clause it lands in.
+> - 📌 **`cf:` is a parameter NAME as well as a sort VALUE**, same spelling in
+>   both: `?sort=cf:shirt_size` and `?cf:shirt_size=M`.
+> - ⚠️ **`parseMemberFilter` builds the custom filters by walking the
+>   DEFINITIONS, not the params**, so an unknown, archived or non-directory key
+>   is ignored by construction — the same way every retired phase-1 key is, and
+>   with no bad-key list to maintain. The corollary is sharp: a caller that
+>   forgets the definitions reads *no* custom filter at all, so an export would
+>   return the whole roster while the screen showed twelve members.
+> - 📌 **A filter value is deliberately not restricted to the definition's live
+>   options.** Editing an option list orphans stored values by design, and
+>   "find everyone still on the retired size" is the cleanup query that follows;
+>   restricting the filter would make orphans the one thing the directory cannot
+>   show. `fieldOptions` keeps the `<select>` from going blank on one.
+> - ⚠️ **Nor is the value character-stripped**, unlike a search term: it is an
+>   `eq` operand (data) rather than part of a quoted `or` group (syntax), so
+>   stripping `.` or `,` would make `S/M` or `Yes, with notes` unfilterable.
+>   A length cap is the whole guard, and both punctuated values are asserted
+>   against real PostgREST.
+> - 🪤 **Un-retiring a filter breaks the "an old bookmark narrows nothing" test,
+>   and correctly.** `source` was one of phase 3's six removed fields, so a
+>   phase-1 bookmark carrying it narrows again — *with a control on screen*. The
+>   invariant is "nothing narrows without a control", not "an old bookmark
+>   cannot narrow."
+>
 > **v1.44: dues reach the roster, and Stage 6's exit criteria are met.** Stage
 > 6.5 phase 4 — the last of the stage. **No migration**: migration 19 appended
 > `member_directory.dues_paid_current_term` back in phase 1 and nothing had read
@@ -2372,8 +2409,8 @@ contact form's backend — it renders disabled, with email as the working path.
 | 5a | Selection — row checkboxes, "select all N matching", the field picker, clipboard, CSV, and the codebase's first Route Handler | ✅ built, browser-verified & deployed |
 | 5b | The `.xlsx` workbook — hand-rolled and dependency-free | ✅ built & deployed; confirmed by opening it in real Excel |
 | — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | ✅ complete, all 4 phases; **Stage 6's exit criteria were met in its phase 4** |
-| 5c | Filter by categorical fields — custom fields, dues status, `source`. **After 6.5**, because it filters on the dues column | ← **next** |
-| 6 | Relational filters (attended or missed a given event, has pending, not seen since) | |
+| 5c | Filter by categorical fields — custom fields, dues status, `source`. **After 6.5**, because it filters on the dues column | ✅ built & browser-verified — no migration |
+| 6 | Relational filters (attended or missed a given event, has pending, not seen since) | ← **next** |
 | 7 | Saved filter presets and CSV roster import | |
 | 8 | The merge tool — its own estimate, see below | |
 | 9 | Docs and a closing read-through | |

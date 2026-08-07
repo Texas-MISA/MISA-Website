@@ -6,7 +6,7 @@ import {
   type MemberFilter,
   type MemberSort,
 } from "@/lib/filters";
-import { customSortKey, type FieldDefinition } from "@/lib/members";
+import { customFieldKey, type FieldDefinition } from "@/lib/members";
 
 import { DirectoryRow } from "./directory-row";
 import { SelectAllHeader } from "./selection";
@@ -125,7 +125,7 @@ export function MemberTable({
               <SortHeader
                 key={field.key}
                 filter={filter}
-                column={customSortKey(field.key)}
+                column={customFieldKey(field.key)}
                 align="left"
               >
                 {field.label}

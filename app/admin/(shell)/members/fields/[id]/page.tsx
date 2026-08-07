@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { AuditTrail } from "@/app/admin/(shell)/_components/audit-trail";
 import { requireOfficer } from "@/lib/auth";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
-import { customSortColumn } from "@/lib/members";
+import { customFieldColumn } from "@/lib/members";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { FieldArchive } from "./_components/field-archive";
@@ -90,7 +90,7 @@ export default async function MemberFieldPage({
 /**
  * How many members currently hold a value for this field.
  *
- * 🔓 `customSortColumn` is doing double duty as the key check here. The key came
+ * 🔓 `customFieldColumn` is doing double duty as the key check here. The key came
  * out of the database and is therefore already well-formed, but it is about to
  * be interpolated into a PostgREST filter string — the same surface as an
  * `order=` term — and the rule for a key in a query string is that it is
@@ -101,7 +101,7 @@ async function countHolders(
   db: ReturnType<typeof createAdminClient>,
   key: string
 ): Promise<number> {
-  const column = customSortColumn(key);
+  const column = customFieldColumn(key);
   if (!column) return 0;
 
   const { count, error } = await db
