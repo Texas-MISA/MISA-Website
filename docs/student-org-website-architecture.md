@@ -1,9 +1,59 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.41
+**Version:** 1.42
 **Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) — phases 1, 2 and 3 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
 **Last updated:** August 2026
 
+> **v1.42: production is the seed again, and the seeder learned two lessons.**
+> No schema change and no application change — `supabase/seed.sql`,
+> `scripts/seed-remote.sh`, and a data reset of the linked project.
+>
+> - **The linked project was reset to the seed** with the officer's explicit
+>   authorisation. The "real member" v1.28 built its argument on
+>   (`Christian A Gonzales / cag7284`) was their own test check-in; the database
+>   is due another reset when the term begins. Production now matches the seed
+>   exactly — 32 members / 15 events / 202 present / 29 leaderboard rows — with
+>   `current_term` unpinned and `current_term()` answering Fall 2026, the same as
+>   local. **v1.28's conclusion is superseded; its reasoning is not.** At the time
+>   nobody knew whose row it was, and an unexplained real person in the database
+>   is exactly when to stop and reach for a targeted migration.
+> - **`scripts/seed-remote.sh --force` is the sanctioned override**, replacing
+>   "never work around the guard". The guard refuses whenever `auth.users` holds
+>   a non-seed account — true of every project anybody has signed into, so it
+>   blocks the ordinary case forever after the first login, and the only way past
+>   it was hand-editing the guard out of a copy of `seed.sql`. That is both the
+>   shape of an accidental production wipe and something nobody should be
+>   practising. `--force` skips the guard chunk and nothing else: it still wipes
+>   what the seed wipes, names the project ref and prints current row counts
+>   **before** deleting, and requires the ref typed back. Officer logins survive —
+>   the wipe removes only the seed officer's `auth.users` row, and
+>   `admin_profiles` cascades from it.
+> - 🐛 **Two seed bugs, both found because the reset exercised a path a local
+>   `db reset` never does — running against a database that already exists.**
+>   `dues_payments` was missing from the wipe, and its `member_id` is
+>   `ON DELETE RESTRICT`, so `delete from members` fails once one payment exists;
+>   migration 19 added the table long after the wipe was written, so any dev
+>   project that had imported a statement could no longer be re-seeded at all.
+>   And the seed had stopped asserting `app_settings.current_term` when the pin
+>   was dropped in v1.41 — correct for a fresh reset, where the column starts
+>   null, and wrong for an existing database, where the old pin survives and Fall
+>   2026 data lands in a project scoped to Spring 2026. **The seed now asserts
+>   the state it wants rather than inheriting one.**
+> - 🪤 **An emoji in a seed comment half-seeded the production database.**
+>   `seed-remote.sh` stripped full-line comments with
+>   `sed 's/^[[:space:]]*--.*$//'`, and in a UTF-8 locale GNU sed's `.*` fails to
+>   match a line containing a multibyte character — so the comment survived, was
+>   flattened into the SQL, and reached the CLI as a command-line flag. The wipe
+>   and the members chunk had already applied; the remote sat at 32 members and
+>   no events until the re-run. Fixed with `grep -v -E '^[[:space:]]*--'`, which
+>   anchors on the marker and never has to match the rest of the line. The
+>   generalisable part: **a comment stripper that can silently fail to strip
+>   turns a comment into executable input**, and the error it raises names
+>   anything but the real cause.
+> - ✅ The re-run applied all eight chunks including `08-assert`, so the seed's
+>   own count assertions passed against the remote — the strongest available
+>   confirmation that the project holds what this document says it does.
+>
 > **v1.41: the seed moves to Fall 2026 and drops its term pin.** No schema
 > change and no application change — `supabase/seed.sql` only.
 >
@@ -522,6 +572,12 @@
 >   counts present rows against any non-cancelled current-term event, drafts
 >   included; the grid is published-only. The view is the authority on the
 >   numbers, the grid is the breakdown, and neither is derived from the other.
+>
+> **v1.28 was superseded on 2026-08-07 — see v1.42.** The remote *is* a scratch
+> database again: the real member it describes was the officer's own test row,
+> they authorised erasing it, and production was reset to the seed. The entry is
+> left exactly as written because its reasoning was correct and is the reason
+> the reset needed authorisation at all.
 >
 > **v1.28: the remote is not a scratch database.** Migration 17 backfills the
 > pre-rename EID values on the linked project, because the planned re-seed was
