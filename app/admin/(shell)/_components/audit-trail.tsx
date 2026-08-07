@@ -107,6 +107,7 @@ export async function AuditTrail({
   // receipt is not an entity anyone can open a page for.
   entityType:
     | "attendance"
+    | "dues_payment"
     | "event"
     | "member"
     | "member_field"

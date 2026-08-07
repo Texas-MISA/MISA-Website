@@ -1,9 +1,10 @@
 # Dues & membership status — Venmo reconciliation
 
-**Status:** **phases 1 and 2 of 4 built, 2026-08-06** — migration 19,
-`lib/dues.ts`, `lib/dues-roster.ts`, `app/actions/dues.ts` and
-`/admin/dues/import` exist. Phases 3–4 (the ledger and editor screens, the
-directory column's UI) are unbuilt. Decided 2026-08-05. This document is the
+**Status:** **phases 1, 2 and 3 of 4 built, 2026-08-06** — migration 19,
+`lib/dues.ts`, `lib/dues-roster.ts`, `app/actions/dues.ts`,
+`/admin/dues/import`, and now the ledger at `/admin/dues` with the editor at
+`/admin/dues/[id]`. Phase 4 (the directory column's UI and the `dues` filter)
+is unbuilt. Decided 2026-08-05. This document is the
 reference for *why*
 Stage 6.5 is shaped the way it is; the normative summary lives in the
 architecture doc (§4.1, §4.5, §4.7, §5, §6, §7 Stage 6.5, §9 #12).
@@ -56,6 +57,42 @@ is exactly why `start_term` is a **default** rather than a generated column.
 
 🔒 The statement read was real financial data. **Nothing from it is in the
 repo** — the test fixture reproduces the shape with invented values.
+
+## 🐛 Corrections to this document, found while building phase 3
+
+- **Two correction actions, not three.** This document names `assignPayment`,
+  `setPaymentTerms` and `voidPayment`. The first two shipped as one
+  **`savePayment`**, because `dues_payments.updated_at` is a **row**-level
+  compare-and-set token: two forms on the payment detail page would each hold
+  their own copy, so the first save would move it and strand the second, and the
+  officer's next edit would report a phantom conflict. That is precisely the
+  defect `directory-row.tsx` exists to prevent. Reassigning a payment and
+  correcting what it bought are also one officer intent, so this follows
+  `saveSubmission`'s "one save per intent" shape. Only the audit verb branches —
+  **`dues.assigned`** when `member_id` actually moved, **`dues.updated`**
+  otherwise. `voidPayment` stayed separate: voiding is one-way, so
+  `.is("voided_at", null)` is a complete guard and no CAS token is needed.
+- **The review queue reports "no member", not "unmatched" or "ambiguous".**
+  Those are two *parse* outcomes and one *storage* outcome — nothing persists
+  which of them happened, so `member_id is null` is all a stored row knows.
+  Claiming to distinguish them on the ledger would invent information. The note
+  is on screen beside it, and reading it is the officer's next move anyway.
+- **The suggestion ranker gained a caller, not a sibling.**
+  `rankPaymentSuggestions` in `lib/dues.ts` scores the payer name **and each
+  note token as a candidate EID**, taking each member's best identity rather
+  than the sum — summing would let a long note full of near-misses accumulate
+  past `MIN_SUGGESTION_SCORE`, which is the "confident-looking stranger" failure
+  the floor exists to stop. The weights and the floor stay in `lib/attendance.ts`.
+  This is what catches the typo'd-EID case in the stage's exit criterion: a note
+  reading `bk2857` against a roster holding `bk2856` is one edit, worth +45, and
+  stands alone.
+- **`start_term` is picked from a derived list, never typed.**
+  `startTermOptions(paidAt, current)` steps off `termOf(paid_at)` by term index —
+  one back, two forward — and the action re-checks membership of that list, so
+  the form is not a way to POST an arbitrary term (§4.7 through a new door). It
+  appends the row's stored value when that falls outside the window, because a
+  `<select>` whose value matches no `<option>` renders **blank** and the next
+  save would rewrite a real value — the orphaned-custom-field-option lesson.
 
 ## 🐛 Corrections to this document, found while building phase 2
 
@@ -263,10 +300,13 @@ re-added later as an oversight.
   `step=confirm`: a preview is a courtesy to the officer, never an input to the
   decision. Writes the rows under one `import_batch_id` plus one `admin_audit`
   receipt carrying the batch id, the file name, and the four counts.
-- `assignPayment`, `setPaymentTerms`, `voidPayment` — the corrections.
-  Compare-and-set on `updated_at`, carried as the **raw PostgREST string**
-  (a `Date` round trip truncates the microseconds and every save then reports a
-  phantom conflict). `voidPayment` is one-way and requires a reason.
+- ~~`assignPayment`, `setPaymentTerms`~~ → **`savePayment`** (built phase 3;
+  see the corrections at the top for why the two became one). Compare-and-set on
+  `updated_at`, carried as the **raw PostgREST string** — a `Date` round trip
+  truncates the microseconds and every save then reports a phantom conflict.
+- `voidPayment` — one-way, requires a reason, and deliberately carries no CAS
+  token: `.is("voided_at", null)` is a complete guard when the only competing
+  action is the same one.
 
 ### `/admin/dues/import`
 

@@ -16,6 +16,14 @@
 //     payment row — somebody sent real money and holds a receipt the system
 //     would otherwise not have.
 
+import {
+  MAX_SUGGESTED_MEMBERS,
+  MIN_SUGGESTION_SCORE,
+  scoreMemberMatch,
+  type MatchReason,
+  type MemberCandidate,
+  type MemberSuggestion,
+} from "@/lib/attendance";
 import { centralWallTimeToInstant } from "@/lib/events";
 
 // ---------------------------------------------------------------------------
@@ -76,6 +84,48 @@ export function isLaterTerm(a: string, b: string): boolean {
   const right = termIndex(b);
   if (left === null || right === null) return false;
   return left > right;
+}
+
+/**
+ * How many terms one payment may be recorded as covering.
+ *
+ * Mirrors `check (terms_covered between 1 and 4)` in migration 19. The database
+ * is the guarantee; this is what turns a violation into a `<select>` an officer
+ * cannot get wrong.
+ */
+export const MAX_TERMS_COVERED = 4;
+
+/**
+ * The terms the editor offers for `start_term`, derived rather than typed.
+ *
+ * §4.7 forbids a literal term string anywhere in application code, and that
+ * applies to a picker's options as much as to a query — so these are stepped off
+ * `termOf(paidAt)` by index. The window is one term back and two forward, which
+ * covers the two corrections that actually happen: the summer case (a July
+ * payment lands in Spring and the payer meant the coming Fall) and a payment
+ * made either side of midnight on a term boundary.
+ *
+ * ⚠️ `include` appends a value that falls outside the window, and it is not
+ * optional politeness. A `<select>` whose value matches no `<option>` renders
+ * **blank** in every browser, so a row whose `start_term` was written by the
+ * pre-fix column default would show as holding nothing and the officer's next
+ * save would silently rewrite it. Same defect, same remedy, as the orphaned
+ * custom-field option in `fieldOptions()`.
+ */
+export function startTermOptions(
+  paidAt: Date,
+  include: string | null = null
+): string[] {
+  const base = termIndex(termOf(paidAt));
+  if (base === null) return include ? [include] : [];
+
+  const indexes = new Set<number>();
+  for (let step = -1; step <= 2; step++) indexes.add(base + step);
+
+  const extra = include === null ? null : termIndex(include);
+  if (extra !== null) indexes.add(extra);
+
+  return [...indexes].sort((a, b) => a - b).map(termAtIndex);
 }
 
 /**
@@ -168,6 +218,29 @@ export type DuesPrices = {
 };
 
 /**
+ * Cents as money — `3000` → `"$30.00"`.
+ *
+ * Every amount on every dues screen goes through this rather than dividing by
+ * 100 at the call site. Amounts are stored in cents precisely because floats
+ * round differently in JS and Postgres, and a stray `/ 100` at a render site is
+ * how that discipline leaks back out.
+ *
+ * Not `Intl.NumberFormat`: this runs in Server Components today but the value
+ * ends up in Client Component props, and Node and Chrome ship different ICU
+ * data — the hydration trap that already cost this codebase a debugging
+ * session. Fixed-format arithmetic has no such split.
+ */
+export function formatCents(cents: number): string {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(Math.trunc(cents));
+  const whole = String(Math.floor(abs / 100)).replace(
+    /\B(?=(\d{3})+(?!\d))/g,
+    ","
+  );
+  return `${sign}$${whole}.${String(abs % 100).padStart(2, "0")}`;
+}
+
+/**
  * How many terms an amount buys.
  *
  * ⚠️ `null` is the "an officer decides" answer, not an error. Somebody tips,
@@ -214,6 +287,58 @@ function tokenCandidate(token: string): string {
   return token.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/**
+ * How many note tokens are considered.
+ *
+ * A note is member-supplied free text of arbitrary length, and
+ * `rankPaymentSuggestions` scores the whole roster once per token. This bounds
+ * that product. Unlike `MEMBER_SCAN_LIMIT` it truncates nothing an officer can
+ * miss: an EID people actually write sits in the first handful of words, and
+ * the exact-match path in `matchNote` is deliberately *not* bounded, so nothing
+ * that would have linked is affected.
+ */
+const MAX_NOTE_TOKENS = 12;
+
+/**
+ * The note reduced to EID candidates — the one tokenizer, shared by the exact
+ * matcher and the suggestion ranker so the two cannot disagree about what a
+ * token is.
+ *
+ * ⚠️ Split on **whitespace only**, then strip punctuation *within* each token,
+ * never the other way round. Splitting on punctuation too would break `rp-8571`
+ * into `rp` and `8571` and match neither — destroying the very thing
+ * `members.normalized_eid` strips `-` for. A test caught this in phase 1, and it
+ * is a quiet failure: the note looks matched to a human reader while the parser
+ * reports nothing.
+ *
+ * The consequence, and it is the right one: `rp 8571` with a real space does NOT
+ * match. Two separate words are genuinely ambiguous, and "don't auto-resolve
+ * near-misses" says to queue that rather than guess.
+ */
+export function noteTokens(note: string | null): string[] {
+  const seen = new Set<string>();
+  for (const { folded } of noteTokenPairs(note)) seen.add(folded);
+  return [...seen];
+}
+
+/**
+ * Each note token as the pair the two consumers need: the **raw** word, which is
+ * what gets stored in `submitted_eid` so the audit trail shows what the payer
+ * actually wrote, and its fold, which is what an equality against
+ * `members.normalized_eid` can be run on.
+ */
+function noteTokenPairs(
+  note: string | null
+): { raw: string; folded: string }[] {
+  if (!note) return [];
+  const pairs: { raw: string; folded: string }[] = [];
+  for (const raw of note.split(/\s+/)) {
+    const folded = tokenCandidate(raw);
+    if (folded) pairs.push({ raw, folded });
+  }
+  return pairs;
+}
+
 export type RosterEntry = { memberId: string; normalizedEid: string };
 
 export type NoteMatch =
@@ -251,22 +376,13 @@ export function matchNote(
     if (entry.normalizedEid) byEid.set(entry.normalizedEid, entry.memberId);
   }
 
-  // ⚠️ Split on WHITESPACE only, then strip punctuation inside each token —
-  // not the other way round. Splitting on punctuation too would break `rp-8571`
-  // into `rp` and `8571`, destroying the very thing the fold exists to repair:
-  // `members.normalized_eid` strips `-` precisely so a hyphenated EID still
-  // matches. Caught by a test, and it is a quiet failure — the note looks
-  // matched to a human reader while the parser reports nothing.
-  //
-  // The consequence, and it is the right one: `rp 8571` with a real space does
-  // NOT match. Two separate words are genuinely ambiguous, and "don't
-  // auto-resolve near-misses" says to queue that rather than guess.
-  const tokens = note.split(/\s+/).filter(Boolean);
-
+  // The shared tokenizer — see noteTokens for why the split is on whitespace
+  // only. The RAW word is what gets remembered, so `submitted_eid` records what
+  // the payer actually wrote rather than a normalized version of it.
   const hits = new Map<string, string>();
-  for (const token of tokens) {
-    const memberId = byEid.get(tokenCandidate(token));
-    if (memberId) hits.set(memberId, token);
+  for (const { raw, folded } of noteTokenPairs(note)) {
+    const memberId = byEid.get(folded);
+    if (memberId) hits.set(memberId, raw);
   }
 
   if (hits.size === 0) return { kind: "none" };
@@ -578,4 +694,97 @@ export function planPayment(
     termsCovered,
     review: match.kind === "ambiguous" ? "ambiguous" : "unmatched",
   };
+}
+
+// ---------------------------------------------------------------------------
+// The review queue (§7 Stage 6.5 phase 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why a stored payment still needs an officer.
+ *
+ * ⚠️ This is derived from the **stored row**, not from `PlannedPayment.review`,
+ * and it deliberately says less. `unmatched` and `ambiguous` are two different
+ * parse outcomes but only one storage outcome — `member_id` null — because
+ * nothing persists which of them happened. A ledger that claimed to distinguish
+ * them would be inventing information the row does not carry, so it reports
+ * "no member" for both. Recovering the distinction means re-reading the note,
+ * which is exactly what the officer is about to do anyway.
+ *
+ * The two flags are independent: a payment can be credited to the right member
+ * and still be waiting on what its amount bought.
+ */
+export function paymentReviewState(row: {
+  member_id: string | null;
+  terms_covered: number | null;
+  voided_at: string | null;
+}): { noMember: boolean; undecidedAmount: boolean; needsReview: boolean } {
+  // A voided payment is settled, whatever it is missing. It counts for nothing
+  // and no officer action will change that, so it must never sit in the queue.
+  const live = row.voided_at === null;
+  const noMember = live && row.member_id === null;
+  const undecidedAmount = live && row.terms_covered === null;
+  return { noMember, undecidedAmount, needsReview: noMember || undecidedAmount };
+}
+
+/**
+ * Rank roster candidates for a payment whose note named nobody.
+ *
+ * 🪤 **This is a new *caller* of the Stage 5 ranker, not a second ranker.** The
+ * scoring rules, the weights, and `MIN_SUGGESTION_SCORE` all stay in
+ * lib/attendance.ts, where the calibration argument lives; growing a parallel
+ * set here is how the two would drift into disagreeing about the same roster.
+ *
+ * A payment carries a weaker identity than a check-in — a Venmo display name
+ * and free-text note, no email, and no single field that *is* an EID. So the
+ * payment is scored as several identities and each candidate keeps its best:
+ * the payer name alone, and the payer name paired with each note token as a
+ * candidate EID. That is what catches the case this stage's exit criterion
+ * names — a note reading `rp8517` for a roster holding `rp8571` is one edit
+ * apart, which stands alone, while the payer's name is corroboration on top.
+ *
+ * Taking the best rather than the sum matters: summing across tokens would let
+ * a long note full of near-misses accumulate its way past the floor, which is
+ * precisely the "confident-looking stranger" failure the floor exists to stop.
+ *
+ * Returns `[]` freely. An empty list is a valid answer, not a gap.
+ */
+export function rankPaymentSuggestions(
+  payment: { payerName: string | null; note: string | null },
+  candidates: readonly MemberCandidate[],
+  limit = MAX_SUGGESTED_MEMBERS
+): MemberSuggestion[] {
+  const fullName = payment.payerName ?? "";
+  const tokens = noteTokens(payment.note).slice(0, MAX_NOTE_TOKENS);
+
+  const identities = [
+    { fullName, email: "", eid: "", normalizedEid: "" },
+    ...tokens.map((token) => ({
+      fullName,
+      email: "",
+      // Already folded by noteTokens, and `members.normalized_eid` uses the
+      // same fold — so raw and normalized are the same string here.
+      eid: token,
+      normalizedEid: token,
+    })),
+  ];
+
+  return candidates
+    .map((member) => {
+      let best: { score: number; reasons: MatchReason[] } = {
+        score: Number.NEGATIVE_INFINITY,
+        reasons: [],
+      };
+      for (const identity of identities) {
+        const scored = scoreMemberMatch(identity, member);
+        if (scored.score > best.score) best = scored;
+      }
+      return { member, ...best };
+    })
+    .filter((entry) => entry.score >= MIN_SUGGESTION_SCORE)
+    .sort(
+      (a, b) =>
+        b.score - a.score || a.member.fullName.localeCompare(b.member.fullName)
+    )
+    .slice(0, limit);
 }

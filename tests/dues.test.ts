@@ -1,14 +1,22 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
+import type { MemberCandidate } from "@/lib/attendance";
 import {
   foldEid,
+  formatCents,
   isLaterTerm,
   matchNote,
   nextTerm,
+  noteTokens,
   parseAmountCents,
   parseCsv,
   parseVenmoDatetime,
   parseVenmoStatement,
+  paymentReviewState,
+  rankPaymentSuggestions,
+  startTermOptions,
   termOf,
   planPayment,
   termAtIndex,
@@ -405,5 +413,331 @@ describe("planPayment — every row of the decision table", () => {
 
   it("records the token it matched on, for the audit trail", () => {
     expect(parse("Dues RP-8571", 3000).submittedEid).toBe("RP-8571");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The review queue (phase 3)
+// ---------------------------------------------------------------------------
+
+describe("formatCents", () => {
+  it("renders whole and part dollars", () => {
+    expect(formatCents(3000)).toBe("$30.00");
+    expect(formatCents(4250)).toBe("$42.50");
+    expect(formatCents(5)).toBe("$0.05");
+  });
+
+  it("groups thousands", () => {
+    expect(formatCents(123456789)).toBe("$1,234,567.89");
+  });
+
+  it("never loses a cent to float arithmetic", () => {
+    // 3010 / 100 * 100 is 3009.9999… in floating point, which is the whole
+    // reason amounts are stored in cents.
+    expect(formatCents(3010)).toBe("$30.10");
+  });
+});
+
+describe("noteTokens", () => {
+  it("is empty for no note", () => {
+    expect(noteTokens(null)).toEqual([]);
+    expect(noteTokens("   ")).toEqual([]);
+  });
+
+  it("🪤 keeps a hyphenated EID whole", () => {
+    // Splitting on punctuation as well as whitespace would yield ["rp","8571"]
+    // and match neither — destroying the very thing normalized_eid strips `-`
+    // for. This is the phase-1 trap, pinned from the tokenizer's side now that
+    // matchNote and the suggestion ranker share it.
+    expect(noteTokens("dues RP-8571")).toEqual(["dues", "rp8571"]);
+  });
+
+  it("strips trailing punctuation and folds case", () => {
+    expect(noteTokens("Spring dues, BK2856.")).toEqual([
+      "spring",
+      "dues",
+      "bk2856",
+    ]);
+  });
+
+  it("dedupes", () => {
+    expect(noteTokens("rp8571 rp8571")).toEqual(["rp8571"]);
+  });
+});
+
+describe("paymentReviewState", () => {
+  const live = { voided_at: null };
+
+  it("a linked row with a decided amount needs nothing", () => {
+    const state = paymentReviewState({
+      ...live,
+      member_id: "m-rowan",
+      terms_covered: 1,
+    });
+    expect(state).toEqual({
+      noMember: false,
+      undecidedAmount: false,
+      needsReview: false,
+    });
+  });
+
+  it("the two reasons are independent", () => {
+    expect(
+      paymentReviewState({ ...live, member_id: "m-rowan", terms_covered: null })
+    ).toMatchObject({ noMember: false, undecidedAmount: true });
+    expect(
+      paymentReviewState({ ...live, member_id: null, terms_covered: 2 })
+    ).toMatchObject({ noMember: true, undecidedAmount: false });
+  });
+
+  it("⚠️ a voided row never sits in the queue, however incomplete", () => {
+    // It counts for nothing and no officer action will change that, so leaving
+    // it in the queue would be work that can never be finished.
+    const state = paymentReviewState({
+      member_id: null,
+      terms_covered: null,
+      voided_at: "2026-09-04T00:00:00Z",
+    });
+    expect(state.needsReview).toBe(false);
+  });
+});
+
+describe("startTermOptions", () => {
+  // June 2026, Central — §4.7 puts May–July in Spring.
+  const june = new Date("2026-06-15T18:00:00Z");
+
+  it("offers the derived term with a term either side of it", () => {
+    expect(startTermOptions(june)).toEqual([
+      "Fall 2025",
+      "Spring 2026",
+      "Fall 2026",
+      "Spring 2027",
+    ]);
+  });
+
+  it("🪤 covers the summer override — the Fall the payer meant is offered", () => {
+    expect(startTermOptions(june)).toContain("Fall 2026");
+  });
+
+  it("is in calendar order across a year boundary, not alphabetical", () => {
+    // A string sort would put every Fall before every Spring.
+    const options = startTermOptions(new Date("2026-12-15T18:00:00Z"));
+    expect(options).toEqual([
+      "Spring 2026",
+      "Fall 2026",
+      "Spring 2027",
+      "Fall 2027",
+    ]);
+  });
+
+  it("⚠️ appends a stored value that falls outside the window", () => {
+    // A <select> whose value matches no <option> renders BLANK, so the row
+    // would appear to hold nothing and the next save would rewrite a real
+    // value. Same defect and same remedy as an orphaned custom-field option.
+    const options = startTermOptions(june, "Fall 2030");
+    expect(options).toContain("Fall 2030");
+    expect(options).toContain("Spring 2026");
+    // Still in calendar order once appended.
+    expect(options[options.length - 1]).toBe("Fall 2030");
+  });
+
+  it("does not duplicate a stored value already in the window", () => {
+    const options = startTermOptions(june, "Spring 2026");
+    expect(options.filter((t) => t === "Spring 2026")).toHaveLength(1);
+  });
+});
+
+describe("rankPaymentSuggestions", () => {
+  const candidates: MemberCandidate[] = [
+    {
+      id: "m-rowan",
+      fullName: "Rowan Pike",
+      email: "rowan.pike@example.edu",
+      eid: "rp8571",
+      normalizedEid: "rp8571",
+      active: true,
+    },
+    {
+      id: "m-amara",
+      fullName: "Amara Osei",
+      email: "amara.osei@example.edu",
+      eid: "ao4471",
+      normalizedEid: "ao4471",
+      active: true,
+    },
+    {
+      id: "m-mika",
+      fullName: "Mika Petrov",
+      email: "mika.petrov@example.edu",
+      eid: "mp8570",
+      normalizedEid: "mp8570",
+      active: true,
+    },
+  ];
+
+  it("finds the member behind a typo'd EID — the case the stage exists for", () => {
+    // rp8517 is a transposition of rp8571: one edit, which stands alone.
+    const ranked = rankPaymentSuggestions(
+      { payerName: "R Pike", note: "rp8517 dues" },
+      candidates
+    );
+    expect(ranked[0].member.id).toBe("m-rowan");
+  });
+
+  it("finds the member from the Venmo display name when the note is useless", () => {
+    const ranked = rankPaymentSuggestions(
+      { payerName: "Rowan Pike", note: "dues!!" },
+      candidates
+    );
+    expect(ranked[0].member.id).toBe("m-rowan");
+  });
+
+  it("⚠️ returns nothing rather than a weak guess", () => {
+    // An empty list is a valid answer, not a gap. A dues mis-credit shows the
+    // victim as unpaid and the beneficiary as paid, and neither has a reason
+    // to check — so the floor matters more here than it does for attendance.
+    expect(
+      rankPaymentSuggestions(
+        { payerName: "Someone Entirely Else", note: "thanks!" },
+        candidates
+      )
+    ).toEqual([]);
+  });
+
+  it("scores nothing at all when there is neither a name nor a note", () => {
+    expect(
+      rankPaymentSuggestions({ payerName: null, note: null }, candidates)
+    ).toEqual([]);
+  });
+
+  it("🪤 takes each candidate's BEST identity rather than summing them", () => {
+    // A long note full of near-misses must not accumulate its way past the
+    // floor — that is the "confident-looking stranger" failure the floor
+    // exists to stop. Every token below sits at distance 2 from Mika's mp8570,
+    // worth 15 each and well under the floor; four of them must still be no
+    // suggestion at all, while Rowan's exact rp8571 stands.
+    const ranked = rankPaymentSuggestions(
+      { payerName: null, note: "rp8571 rp8572 rp8573 rp8574" },
+      candidates
+    );
+    expect(ranked.map((r) => r.member.id)).toEqual(["m-rowan"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Source assertions — wiring invariants a node-environment suite cannot render
+// ---------------------------------------------------------------------------
+//
+// Same reasoning as the block at the end of tests/members.test.ts: these pin
+// decisions that live in JSX and in column-list literals, whose failure modes
+// are a client-side timing window and a silently widened type. If a file moves,
+// update the path rather than deleting the test.
+
+const read = (path: string) =>
+  readFileSync(new URL(path, import.meta.url), "utf8");
+
+describe("the payment editor owns the row's compare-and-set token", () => {
+  const editor = read(
+    "../app/admin/(shell)/dues/[id]/_components/payment-editor.tsx"
+  );
+
+  it("is a Client Component", () => {
+    expect(editor.split("\n").find((l) => l.trim() !== "")?.trim()).toBe(
+      '"use client";'
+    );
+  });
+
+  it("âš ï¸ holds the token in state and adopts the one each save returns", () => {
+    // dues_payments.updated_at is ROW-level. This is the reason phase 3 ships
+    // one savePayment rather than the spec's assignPayment + setPaymentTerms:
+    // two forms would each hold their own copy, so the first save would move it
+    // and strand the second, and the officer's next edit would report a phantom
+    // conflict. The failure is a client-side timing window that no behavioural
+    // test in this suite would catch.
+    expect(editor).toContain("useState(updatedAt)");
+    expect(editor).toContain("state.updatedAt");
+  });
+
+  it("has exactly one form posting the row", () => {
+    // If a second <form action={…}> appears here, the invariant above is gone.
+    expect(editor.match(/<form action=/g) ?? []).toHaveLength(1);
+  });
+
+  it("🐛 drives every select from state, never defaultValue", () => {
+    // Found in the phase-3 walkthrough, and it is a DATA-LOSS path rather than
+    // a cosmetic one. React 19 resets an uncontrolled `<form action>` once the
+    // action resolves, and the reset beat the revalidated props: after
+    // assigning a member the dropdown snapped back to "Nobody yet" while the
+    // database held the new value. The officer reads that as a failed save, and
+    // the obvious next move — press SAVE again — posts the empty option and
+    // genuinely unassigns the member they had just credited.
+    //
+    // member-field-cell.tsx already carried this rule in its own header; this
+    // component was written with defaultValue anyway, which is why it is pinned
+    // as an assertion here rather than left as prose.
+    //
+    // Matching the ATTRIBUTE form rather than the bare word, so the header can
+    // keep explaining the trap in prose — which is how this assertion failed
+    // the first time it was written, exactly as the equivalent one in
+    // tests/members.test.ts did.
+    expect(editor).not.toMatch(/defaultValue=\{/);
+    expect(editor.match(/value=\{values\./g) ?? []).toHaveLength(3);
+  });
+});
+
+describe("the phase-3 client components format no dates", () => {
+  // Intl inside a Client Component runs on both sides of hydration, and Node
+  // and Chrome ship different ICU data for the space before "PM" — the React
+  // diff then shows two strings that look character-for-character identical.
+  // None of these renders a date or an amount itself; both arrive as props.
+  const files = [
+    "../app/admin/(shell)/dues/[id]/_components/payment-editor.tsx",
+    "../app/admin/(shell)/dues/[id]/_components/void-payment-form.tsx",
+    "../app/admin/(shell)/dues/_components/dues-filters.tsx",
+  ];
+
+  for (const path of files) {
+    it(`${path.split("/").pop()} calls no locale formatter`, () => {
+      // Matching the CALL form, so the headers can keep warning about the trap
+      // in prose.
+      const source = read(path);
+      expect(source).not.toMatch(/Intl\.\w+\(/);
+      expect(source).not.toMatch(/toLocale\w*\(/);
+    });
+  }
+});
+
+describe("the audit before/after column lists are symmetric", () => {
+  const actions = read("../app/actions/dues.ts");
+
+  const literal = (name: string): string => {
+    const match = new RegExp(`const ${name} =\\s*"([^"]+)" as const`).exec(
+      actions
+    );
+    if (!match) throw new Error(`${name} not found as an unbroken literal`);
+    return match[1];
+  };
+
+  it("âš ï¸ differ by updated_at and nothing else", () => {
+    // AuditTrail diffs the union of both sides' keys and renders a key present
+    // on one side only as "—", so a narrower select on the update INVENTS
+    // changes that never happened: voiding a point adjustment once logged
+    // `reason: "Staffed the info booth" → —`, as though the void had erased it.
+    // Here the save list carries updated_at so the client can adopt the fresh
+    // token, and auditable() strips it from BOTH sides before the write.
+    const audited = literal("AUDITED_PAYMENT_COLUMNS").split(", ");
+    const saved = literal("PAYMENT_SAVE_COLUMNS").split(", ");
+    expect(saved.filter((c) => c !== "updated_at")).toEqual(audited);
+    expect(saved).toContain("updated_at");
+  });
+
+  it("ðŸª¤ are unbroken string literals, not concatenations", () => {
+    // PostgREST types the returned row off the string LITERAL, so "a, b" + "c"
+    // widens to plain `string` and collapses the result to GenericStringError —
+    // every field access failing at once, which reads as a schema problem. This
+    // has bitten twice in this codebase already. The regex above only matches
+    // an unbroken literal, so its absence is the failure.
+    expect(() => literal("AUDITED_PAYMENT_COLUMNS")).not.toThrow();
+    expect(() => literal("PAYMENT_SAVE_COLUMNS")).not.toThrow();
   });
 });

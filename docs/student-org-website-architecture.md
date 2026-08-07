@@ -1,9 +1,60 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.39
-**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) — phases 1 and 2 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
+**Version:** 1.40
+**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5 of 9 built**. **Stage 6.5 (dues & membership status) — phases 1, 2 and 3 of 4 built**; it interrupts Stage 6 before phase 6. A new **Stage 6 phase 5c** (filter by categorical fields) is planned and unbuilt.
 **Last updated:** August 2026
 
+> **v1.40: the ledger and the editor.** Stage 6.5 phase 3 — `/admin/dues`,
+> `/admin/dues/[id]`, and the two corrections behind them. No migration:
+> migration 19 already carries `dues_payments_review_idx`, a partial index on
+> exactly the queue's predicate, and the three `dues.*` audit verbs were added
+> with the import.
+>
+> - **Two correction actions, where the spec named three.** `assignPayment` and
+>   `setPaymentTerms` shipped as one **`savePayment`**, because
+>   `dues_payments.updated_at` is a **row**-level compare-and-set token: two
+>   forms would each hold their own copy, the first save would move it, and the
+>   second would report a phantom conflict — the defect `directory-row.tsx`
+>   exists to prevent. Reassigning a payment and correcting what it bought are
+>   also one officer intent, so this follows `saveSubmission`'s shape. Only the
+>   audit verb branches: `dues.assigned` when `member_id` actually moved,
+>   `dues.updated` otherwise. `voidPayment` stays separate and carries **no** CAS
+>   token, because voiding is one-way and `.is("voided_at", null)` is then a
+>   complete guard rather than an approximation — the same asymmetry
+>   `voidAdjustment` argues for.
+> - **The queue says "no member", not "unmatched" or "ambiguous".** Those are two
+>   *parse* outcomes and one *storage* outcome; nothing persists which happened,
+>   so a ledger claiming to distinguish them would be inventing information the
+>   row does not carry. `paymentReviewState` in `lib/dues.ts` is where that
+>   restraint lives, and it also keeps voided rows out of the queue entirely —
+>   they count for nothing and no officer action will change that.
+> - **The suggestion ranker gained a caller, not a sibling.**
+>   `rankPaymentSuggestions` scores the payer's Venmo name **and each note token
+>   as a candidate EID**, keeping each member's *best* identity rather than the
+>   sum — summing would let a long note full of near-misses accumulate past
+>   `MIN_SUGGESTION_SCORE`, which is the confident-looking-stranger failure the
+>   floor exists to stop. The weights and the floor stay in `lib/attendance.ts`.
+>   This is what catches the stage's exit-criterion case: a note reading `bk2857`
+>   against a roster holding `bk2856` is one edit, worth +45, and stands alone.
+> - **`start_term` is picked from a derived list, never typed** (§4.7 through a
+>   new door). `startTermOptions(paidAt, current)` steps off `termOf(paid_at)` by
+>   term index, and the action re-checks membership of that list rather than
+>   trusting the POST. It appends the row's stored value when that falls outside
+>   the window, because a `<select>` whose value matches no `<option>` renders
+>   **blank** and the officer's next save would rewrite a real value — the
+>   orphaned-custom-field-option lesson in a new place.
+> - 🐛 **The walkthrough found a data-loss path, and it was a rule this codebase
+>   had already written down.** The editor's selects were built with
+>   `defaultValue`; React 19 resets an uncontrolled `<form action>` once the
+>   action resolves, and the reset beat the revalidated props — after assigning a
+>   member the dropdown snapped back to "Nobody yet" while the database held the
+>   new value. The officer reads that as a failed save, and pressing SAVE again
+>   posts the empty option and genuinely unassigns the member they just
+>   credited. `member-field-cell.tsx` carries the identical warning in its
+>   header. Fixed by making all three selects controlled with the
+>   reset-during-render resync idiom, and pinned by a source assertion rather
+>   than left as prose.
+>
 > **v1.39: the import.** Stage 6.5 phase 2 — `app/actions/dues.ts`,
 > `lib/dues-roster.ts`, and `/admin/dues/import`. No migration.
 >
@@ -2141,7 +2192,7 @@ contact form's backend — it renders disabled, with email as the working path.
 | 4 | Custom fields — definitions, dropdown values, inline editing, sorting | ✅ built, browser-verified & deployed (migration 18) |
 | 5a | Selection — row checkboxes, "select all N matching", the field picker, clipboard, CSV, and the codebase's first Route Handler | ✅ built, browser-verified & deployed |
 | 5b | The `.xlsx` workbook — hand-rolled and dependency-free | ✅ built & deployed; confirmed by opening it in real Excel |
-| — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | 🚧 phase 1 of 4 built |
+| — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | 🚧 phases 1–3 of 4 built |
 | 5c | Filter by categorical fields — custom fields, dues status, `source`. **After 6.5**, because it filters on the dues column | |
 | 6 | Relational filters (attended or missed a given event, has pending, not seen since) | |
 | 7 | Saved filter presets and CSV roster import | |
@@ -2239,7 +2290,7 @@ The criterion previously read "attended fewer than three events this term". That
 
 ---
 
-### Stage 6.5 — Dues & Membership Status 📋 planned, unbuilt (v1.34)
+### Stage 6.5 — Dues & Membership Status 🚧 phases 1–3 of 4 built (v1.40)
 **Goal:** Officers can answer "is this an official member?" from the directory, and the answer comes from money that actually arrived rather than from a box somebody remembered to tick.
 
 **Numbered 6.5 rather than 7 on purpose.** It is stage-sized — a migration, a ledger, an import flow, an editor, a derived column — but renumbering Stages 7 through 10 would touch every stage reference in this document, `tasks.md`, `CLAUDE.md`, and the changelog above, for no gain. It **interrupts Stage 6 between phases 5 and 6**: phase 5 ships the export machinery, 6.5 makes dues real, and Stage 6's exit criterion is then demonstrated against the real column.
@@ -2248,7 +2299,7 @@ The criterion previously read "attended fewer than three events this term". That
 |---|---|---|
 | 1 | Migration 19, `term_index` / `term_at_index` / `next_term` / `terms_from`, `lib/dues.ts` (parse, term math, matching), the `member_directory` column, the reserved-key widening, tests | ✅ **built 2026-08-06** |
 | 2 | The import — `/admin/dues/import`, the two-step parse-preview-commit flow, `app/actions/dues.ts`, batch receipts, audit | ✅ **built 2026-08-06** |
-| 3 | The ledger and the editor — `/admin/dues`, `/admin/dues/[id]`, reassign / correct / void, the needs-review queue | |
+| 3 | The ledger and the editor — `/admin/dues`, `/admin/dues/[id]`, reassign / correct / void, the needs-review queue | ✅ **built 2026-08-06** |
 | 4 | The directory column and filter, the detail page's payment history, and dues added to phase 5's export catalogue | **Stage 6 exit criteria met here** |
 
 Full spec, including the parse decision table: [`docs/dues-and-membership.md`](dues-and-membership.md).
