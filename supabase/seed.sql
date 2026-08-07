@@ -24,6 +24,15 @@ end $$;
 
 delete from point_adjustments;
 delete from attendance;
+-- ⚠️ Before members, and not optional. dues_payments.member_id is ON DELETE
+-- RESTRICT — deliberately, because the row records that money arrived (§4.1) —
+-- so `delete from members` raises a foreign key violation the moment a single
+-- payment exists. It also references auth.users through imported_by, which
+-- would block the seed-officer delete below for the same reason. Added
+-- 2026-08-07: migration 19 introduced the table long after this wipe was
+-- written, so any dev project that had imported one statement could no longer
+-- be re-seeded at all.
+delete from dues_payments;
 delete from events;
 delete from members;
 alter table admin_audit disable trigger admin_audit_no_delete;
@@ -68,6 +77,15 @@ values ('00000000-0000-4000-8000-5eed00000001', 'Seed Officer', 'admin');
 -- on screen to explain why. That is not a bug — it is this file needing its
 -- dates moved forward a term. The pin is the workaround if you need the old
 -- behaviour for an afternoon: `update app_settings set current_term = 'Fall 2026';`
+--
+-- ⚠️ The clear below is NOT redundant, and leaving it out was a real bug for a
+-- day. A fresh `db reset` starts with app_settings.current_term already null,
+-- so removing the old `update ... = 'Spring 2026'` looked complete — but this
+-- file also runs against databases that already exist, where whatever pin is
+-- sitting there survives. Seeding a project pinned to Spring 2026 with Fall
+-- 2026 data gives an empty leaderboard and an empty directory and no hint as to
+-- why. **The seed asserts the state it wants; it never inherits one.**
+update app_settings set current_term = null;
 
 -- @chunk members
 -- 32 members with UT-EID-shaped identifiers: initials plus four digits.
