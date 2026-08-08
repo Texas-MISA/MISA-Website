@@ -78,6 +78,23 @@ export const MEMBER_SORTS = [
 export type MemberBuiltinSort = (typeof MEMBER_SORTS)[number];
 
 /**
+ * What each built-in sort is called on screen.
+ *
+ * Here rather than inline in the table headers because phase 7a's preset
+ * summaries name the sort too ("sorted by Dues ▾"), and two copies of this list
+ * is how a renamed column starts reading one way in the header and another in
+ * the saved filter beside it. A custom field's label comes from its definition,
+ * so only the built-ins need spelling out.
+ */
+export const MEMBER_SORT_LABELS: Record<MemberBuiltinSort, string> = {
+  name: "Member",
+  email: "Email",
+  eid: "EID",
+  total_points: "Total points",
+  dues: "Dues",
+};
+
+/**
  * A sort key, as the URL spells it: one of the four built-ins, or `cf:<key>`
  * naming a custom field.
  *

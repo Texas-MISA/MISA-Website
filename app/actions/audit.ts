@@ -40,6 +40,11 @@ type Client = SupabaseClient<Database>;
  * migration 19 added `'dues_payment'` to the constraint and phase 1 did not add
  * it here. Caught at the start of phase 2, before any row was written. Two for
  * two — treat widening the SQL check and widening this union as one edit.
+ *
+ * `member_preset` (migration 20, phase 7a) was added under that rule: the SQL
+ * check and this line moved in the same commit. Like `member_field` it is its
+ * own type rather than `member`, because "someone renamed a saved filter" is not
+ * an event in any individual member's history.
  */
 export type AuditEntityType =
   | "attendance"
@@ -47,6 +52,7 @@ export type AuditEntityType =
   | "event"
   | "member"
   | "member_field"
+  | "member_preset"
   | "point_adjustment"
   | "roster";
 
@@ -117,7 +123,15 @@ export type AuditAction =
   // attendance and point_adjustment patterns, deliberately both.
   | "dues.assigned"
   | "dues.updated"
-  | "dues.voided";
+  | "dues.voided"
+  // Stage 6 phase 7a. A saved directory filter, shared across officers.
+  // `preset.deleted` is a real hard delete rather than an archive — nothing is
+  // keyed to a preset the way custom-field values are keyed to a definition, so
+  // there is nothing to orphan. `event.deleted` is the existing precedent for an
+  // audit row naming a row that no longer exists.
+  | "preset.created"
+  | "preset.updated"
+  | "preset.deleted";
 
 export type AuditEntry = {
   entityType: AuditEntityType;

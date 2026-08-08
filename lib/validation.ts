@@ -20,6 +20,7 @@ import {
   MAX_POINTS_PER_GRANT,
   POINT_CATEGORIES,
 } from "@/lib/points";
+import { MAX_PRESET_NAME, MAX_PRESET_QUERY } from "@/lib/presets";
 
 // Zod schemas (§10). App-side validation is the only email-format check in
 // the system — the attendance table requires submitted_email to be non-null
@@ -472,3 +473,43 @@ export const memberNotesSchema = z.object({
 });
 
 export type MemberNotesFields = z.infer<typeof memberNotesSchema>;
+
+// ---------------------------------------------------------------------------
+// Saved filter presets (§7 Stage 6 phase 7a)
+// ---------------------------------------------------------------------------
+
+/**
+ * Saving a preset — creating one, renaming it, or re-pointing it at the current
+ * filter. One schema for all three, because `savePreset` is one action for the
+ * same reason `saveFieldDefinition` is: the form is the same and the only
+ * difference is whether an `id` is posted.
+ *
+ * ⚠️ `query` is `min(1)`, mirroring `member_filter_presets_query_bounded`, and
+ * that bound is a correctness rule rather than hygiene. An empty query is the
+ * default view, so a preset holding one is a chip an officer clicks expecting a
+ * narrowed roster and gets the whole thing — the phase-1 defect saved as an
+ * object and shared with the team. The UI disables Save when
+ * `isDefaultFilter(filter)`; this is the same rule where a hand-rolled POST
+ * cannot get past it, and the database CHECK is the third.
+ *
+ * The action canonicalises before parsing, so what reaches here is already what
+ * `memberFilterToParams` emits — see `canonicalPresetQuery` for why that happens
+ * on write and never on read.
+ */
+export const presetSaveSchema = z.object({
+  /** Absent when creating. */
+  id: z.uuid().optional(),
+  name: z
+    .string()
+    .trim()
+    .min(1, "A name is required")
+    .max(MAX_PRESET_NAME, "Name is too long"),
+  query: z
+    .string()
+    .min(1, "Narrow the list before saving it as a view")
+    .max(MAX_PRESET_QUERY, "That filter is too long to save"),
+});
+
+export type PresetSaveFields = z.infer<typeof presetSaveSchema>;
+
+export const presetDeleteSchema = z.object({ id: z.uuid() });

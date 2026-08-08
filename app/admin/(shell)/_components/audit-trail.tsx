@@ -67,6 +67,13 @@ function formatAuditAction(action: string): string {
     "dues.assigned": "Assigned to a member",
     "dues.updated": "Updated",
     "dues.voided": "Voided",
+    // Stage 6 phase 7a. Like roster.exported these appear in no entity's trail
+    // today — a preset has no detail page with an AuditTrail on it — and the
+    // labels land with the verbs regardless, because a row written now can never
+    // be corrected later.
+    "preset.created": "Saved",
+    "preset.updated": "Updated",
+    "preset.deleted": "Deleted",
   };
   return LABELS[action] ?? action;
 }

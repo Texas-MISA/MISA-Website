@@ -14,12 +14,15 @@ import {
 import { fetchEventOptions } from "@/lib/event-options";
 import { exportCatalogue } from "@/lib/export";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
+import { fetchPresets } from "@/lib/member-presets";
 import type { FieldDefinition } from "@/lib/members";
+import { presetSummary } from "@/lib/presets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { ExportToolbar } from "./_components/export-toolbar";
 import { MemberFilters } from "./_components/member-filters";
 import { MemberTable, type MemberRow } from "./_components/member-table";
+import { PresetBar, type PresetChip } from "./_components/preset-bar";
 import { SelectionProvider } from "./_components/selection";
 
 // The member directory (§5, §7 Stage 6). Reads member_directory, which is
@@ -204,9 +207,10 @@ export default async function AdminMembersPage({
   // together. fetchEventOptions is the same all-status list the attendance queue
   // and manual entry offer — an officer asking who missed a cancelled event is
   // asking a real question, and a published-only picker could not answer it.
-  const [result, events] = await Promise.all([
+  const [result, events, presets] = await Promise.all([
     fetchDirectory(db, filter, fields),
     fetchEventOptions(db),
+    fetchPresets(db),
   ]);
 
   // The filter, serving two jobs at once: it is the export's query string, and
@@ -217,6 +221,27 @@ export default async function AdminMembersPage({
   // was checked. With pagination gone the filter simply *is* the scope, which
   // is the simplification that workaround was standing in for.
   const filterKey = memberFilterToParams(filter).toString();
+
+  // Summaries are rendered here rather than in the chip row because
+  // presetSummary needs the field definitions and the event labels, and the bar
+  // is a Client Component that has neither. Each stored query is parsed the way
+  // the directory itself would parse it, so a preset naming a since-archived
+  // field describes what it will ACTUALLY narrow to rather than what it once did.
+  const eventLabels = new Map(events.map((event) => [event.id, event.label]));
+  const chips: PresetChip[] = presets.map((preset) => ({
+    id: preset.id,
+    name: preset.name,
+    query: preset.query,
+    summary:
+      presetSummary(
+        parseMemberFilter(
+          Object.fromEntries(new URLSearchParams(preset.query)),
+          fields
+        ),
+        fields,
+        eventLabels
+      ).join(" · ") || "Everyone",
+  }));
 
   return (
     <div>
@@ -244,6 +269,13 @@ export default async function AdminMembersPage({
 
       <div className="mt-6">
         <MemberFilters filter={filter} definitions={fields} events={events} />
+        <PresetBar
+          presets={chips}
+          filterKey={filterKey}
+          // The same predicate the schema and the CHECK apply, from the one
+          // module that owns it — a saved view has to narrow something.
+          canSave={!isDefaultFilter(filter)}
+        />
       </div>
 
       <div className="mt-8">
