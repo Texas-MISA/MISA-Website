@@ -108,6 +108,12 @@ export type AuditAction =
   // the entity is the member, not the upload, and the file name travels in
   // `note` exactly as the dues batch context does.
   | "member.imported"
+  // Stage 6 phase 8. ONE row, on the SURVIVOR — the losing member's row is
+  // deleted, and there is no page for a member that does not exist, so its own
+  // audit history becomes unreachable the moment the merge lands. This row is
+  // therefore the only surviving record of the merge and carries the loser's
+  // name, EID, id and the counts moved in `note`.
+  | "member.merged"
   | "member_field.created"
   | "member_field.updated"
   // Archived, never deleted: stored values stay keyed to the definition, and a

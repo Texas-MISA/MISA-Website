@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 
 import { AuditTrail } from "@/app/admin/(shell)/_components/audit-trail";
 import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
+import { describeMatchReason } from "@/lib/attendance";
+import { normalizeEid } from "@/lib/checkin";
 import { requireOfficer } from "@/lib/auth";
 import { formatCents, paidThroughTerm } from "@/lib/dues";
 import { formatCategory, formatDay, formatInstant } from "@/lib/events";
@@ -13,10 +15,13 @@ import {
   formatAttendanceRate,
   type TermEventState,
 } from "@/lib/members";
+import { fetchMergeCandidates } from "@/lib/member-options";
+import { rankDuplicateCandidates } from "@/lib/merge";
 import { formatPointCategory, signedPoints } from "@/lib/points";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { MemberEditor } from "./_components/member-editor";
+import { MergePanel, type DuplicateHint } from "./_components/merge-panel";
 
 // One member: everything the phase-1 directory used to show in columns, plus
 // the per-event breakdown that never fitted in a table (§7 Stage 6 phase 3).
@@ -171,6 +176,49 @@ export default async function MemberDetailPage({
   const backToDirectory = `/admin/members${
     query.toString() ? `?${query.toString()}` : ""
   }`;
+
+  // Phase 8's merge panel: the picker and the ranked suggestions, both derived
+  // from ONE read so they cannot disagree about who is offerable.
+  //
+  // ⚠️ fetchMergeCandidates includes INACTIVE members, unlike every other picker
+  // in the admin section. A duplicate is very often the deactivated half of a
+  // pair — switching a ghost off was the only thing an officer could do before
+  // this phase — so an active-only list would hide exactly the rows this tool
+  // exists to clean up. It is still bounded by MEMBER_SCAN_LIMIT; see the note
+  // on that function.
+  const mergeCandidates = await fetchMergeCandidates(db, { excludeId: id });
+
+  const memberOptions = mergeCandidates
+    .map((candidate) => ({
+      id: candidate.id,
+      label: `${candidate.fullName} (${candidate.eid})${candidate.active ? "" : " — inactive"}`,
+      active: candidate.active,
+    }))
+    .sort((a, b) => a.label.localeCompare(b.label));
+
+  const duplicateHints: DuplicateHint[] = rankDuplicateCandidates(
+    {
+      id,
+      fullName: member.full_name ?? "",
+      email: member.email ?? "",
+      eid: member.eid ?? "",
+      normalizedEid: normalizeEid(member.eid ?? ""),
+      active: member.active ?? true,
+      joinedAt: member.joined_at ?? "",
+      notes: member.notes,
+      customFields: member.custom_fields,
+    },
+    mergeCandidates
+  ).map((suggestion) => ({
+    id: suggestion.member.id,
+    label: `${suggestion.member.fullName} (${suggestion.member.eid})`,
+    // Formatted here, on the server, and through the shared describer so a
+    // reason reads the same on this screen as on the resolution form.
+    why: suggestion.reasons
+      .map(describeMatchReason)
+      .filter((phrase) => phrase !== "")
+      .join(" · "),
+  }));
 
   return (
     <div>
@@ -563,6 +611,17 @@ export default async function MemberDetailPage({
         customFields={member.custom_fields}
         notes={member.notes ?? ""}
         updatedAt={member.updated_at ?? ""}
+      />
+
+      {/* Phase 8. Below the editor because it is rare and destructive, and it
+          reads the same member the editor writes — the CAS token it posts comes
+          from the preview rather than from here, so the two cannot disagree
+          about which version of the row they are acting on. */}
+      <MergePanel
+        survivorId={id}
+        survivorLabel={`${member.full_name} (${member.eid})`}
+        suggestions={duplicateHints}
+        members={memberOptions}
       />
 
       <section className="mt-12 max-w-3xl">

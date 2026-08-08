@@ -1,9 +1,47 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.47
-**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 7 of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. **Phase 8 (the merge tool) is next.**
+**Version:** 1.48
+**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 8 of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. **Only phase 9, the closing read-through, remains.**
 **Last updated:** August 2026
 
+> **v1.48: the merge tool.** Stage 6 phase 8 — merging a duplicate member into
+> another, from `/admin/members/[id]`. **No migration.**
+>
+> 🔓 **The roadmap's central claim about this phase was WRONG, and correcting it
+> is the design.** Every earlier version of this document said a merge "can hit
+> `attendance_one_per_event` when both identities attended the same event — a
+> real conflict to decide, not to swallow." The index is keyed on
+> `(event_id, normalized_eid)` — the *submitted* EID — and **not on
+> `member_id`**. Two identities have different EIDs by construction, so
+> repointing `member_id` never touches an indexed column and the guard is
+> structurally unreachable from a merge. The failure is therefore **silent**: the
+> survivor keeps two `present` rows for one event, and both views aggregate per
+> row, so the event's points are counted twice and `events_attended` can exceed
+> `events_possible`. Asserted against real Postgres before the fix was written —
+> the test proves the hazard, then proves the tool prevents it.
+> - The resolution is the doc's own: keep one row and **reject** the other. A
+>   rejected row leaves the partial index and counts for nothing, so the double
+>   count is prevented rather than merely reported.
+> - ⚠️ **Only one of the three foreign keys fails loudly.** `attendance` is
+>   `on delete set null` (silently orphans), `point_adjustments` is
+>   **`on delete cascade`** (silently destroys grants), `dues_payments` is
+>   `on delete restrict`. The note that the restrict makes a forgetful merge fail
+>   loudly is true for dues and false for the other two. So `commitMerge`
+>   **re-counts all three and refuses to delete unless every count is zero.**
+> - **Not atomic, and it cannot be** — PostgREST has no cross-statement
+>   transaction. The order is chosen so every partial failure is *recoverable*:
+>   repointed-but-not-deleted is a visible duplicate holding no data, which the
+>   officer merges again. The one irreversible step is last and is guarded.
+> - **The survivor wins the identity fields; only custom fields are chosen.**
+>   Notes are concatenated, `joined_at` takes the earlier of the two.
+> - 🪤 **The suggestion ranker's calibration does not carry over.** Between two
+>   members `email_exact` and `id_exact` are impossible (unique indexes), so the
+>   two +100 signals the weights were built around can never fire. Measured
+>   against constructed shapes — the seed has **zero** member-vs-member pairs at
+>   any score — real duplicates land at 65+ on two axes and every different-person
+>   shape tops out at 50, so the floor is **60 plus at least two agreeing axes**.
+>   "Same name, nothing else" is deliberately not offered.
+>
 > **v1.47: saved filter presets and the CSV roster import.** Stage 6 phase 7,
 > split into **7a** (presets, **migration 20** — the stage's first since 19) and
 > **7b** (the import, no migration), mirroring the 2a/2 and 5a/5b splits.
@@ -2490,8 +2528,8 @@ contact form's backend — it renders disabled, with email as the working path.
 | 6 | Relational filters (attended or missed a given event, has pending, not seen since) | ✅ built & browser-verified — no migration |
 | 7a | Saved filter presets — shared, named directory filters (**migration 20**) | ✅ built, browser-verified & deployed |
 | 7b | CSV roster import — preview-then-commit, create-only, duplicate detection on **both** unique indexes | ✅ built & browser-verified — no migration |
-| 8 | The merge tool — its own estimate, see below | ← **next** |
-| 9 | Docs and a closing read-through | |
+| 8 | The merge tool — repoints, collision resolution, one audit row | ✅ built & browser-verified — no migration |
+| 9 | Docs and a closing read-through | ← **next** |
 
 ✅ **Phase 1 was walked through a browser (2026-08-01), and it earned its keep.** Sorting, the tie-break across a page boundary, pagination, and the rate-threshold arithmetic were all correct. The screen was not: the five numeric filter boxes were uncontrolled (`defaultValue`), which React reads only at mount, so CLEAR — a client-side push with no remount — left the officer's typed numbers on screen above a count that no longer applied them. Displayed filter and applied filter disagreed, which is the same partial-list failure phase 5's export exists to avoid, arriving through the filter instead of through pagination. Fixed by moving both translations into `lib/filters.ts` (`memberFilterFields`, `memberFilterUrl`).
 
@@ -2566,7 +2604,7 @@ Three paths out of the system, and they are not redundant: the clipboard is for 
 
 **Two consequences of §4.2's exact-match check-in land here** (recorded v1.21, while building Stage 5). Neither is a defect in the check-in path — both are the deliberate design's bill, and the directory is where it comes due.
 
-**1. Duplicate members still accumulate, and nothing merges them — but the main source is gone** (revised v1.22). Check-in used to match on `normalized_eid`, then `lower(email)`, then *create*, so a member who mistyped **both** was indistinguishable from a genuinely new person — the two were the same insert — and someone mistyping repeatedly could leave several ghosts. Under §4.2's confirmation flow that submission is refused and re-prompted, writing nothing. What remains is narrower: someone who ticks "this is my first MISA event" *and* types badly, which is a single row rather than a stream, plus the officer-queued collision noted below. Ghosts stay findable — `members.source = 'self_checkin'` marks every auto-created row. What is still missing is the merge itself, and it is not trivial: merging must repoint `attendance.member_id` and `point_adjustments.member_id`, and can hit `attendance_one_per_event` when both identities attended the same event, which is a real conflict needing a decision (keep one, reject the other) rather than a silent drop. Expect a preview-and-confirm flow like the CSV import, and one `admin_audit` row naming both sides. Smaller in expectation than it was, so it can follow the directory rather than gate it.
+**1. Duplicate members still accumulate, and nothing merges them — but the main source is gone** (revised v1.22). Check-in used to match on `normalized_eid`, then `lower(email)`, then *create*, so a member who mistyped **both** was indistinguishable from a genuinely new person — the two were the same insert — and someone mistyping repeatedly could leave several ghosts. Under §4.2's confirmation flow that submission is refused and re-prompted, writing nothing. What remains is narrower: someone who ticks "this is my first MISA event" *and* types badly, which is a single row rather than a stream, plus the officer-queued collision noted below. Ghosts stay findable — `members.source = 'self_checkin'` marks every auto-created row. ✅ **Built in phase 8**, and building it corrected this paragraph. It said a merge "can hit `attendance_one_per_event` when both identities attended the same event" — it **cannot**. That index is keyed on `(event_id, normalized_eid)`, the *submitted* EID, not on `member_id`, so repointing never touches an indexed column and the guard is structurally unreachable. The failure is silent instead: two `present` rows for one event, counted twice by both views. The resolution this paragraph proposed is still right — keep one, reject the other — but it is the application's job rather than the database's, and that is why the phase needed a pure planner rather than three UPDATEs. The merge repoints `attendance.member_id`, `point_adjustments.member_id`, **`dues_payments.member_id`** (added by Stage 6.5) and merges `members.custom_fields`; preview-and-confirm like the CSV import; one `admin_audit` row on the survivor naming the loser, because the loser's row — and therefore its own history — is deleted.
 
 **1a. A confirmed first-timer can leave a member row with no attendance.** If an officer has already queued a manual row carrying that EID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`, leaving a `self_checkin` row credited with nothing. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check, against §4.2's "three checks, not one". Another row for the directory to surface, and another reason merge tooling should assume the roster is untidy.
 

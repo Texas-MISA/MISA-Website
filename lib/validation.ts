@@ -513,3 +513,17 @@ export const presetSaveSchema = z.object({
 export type PresetSaveFields = z.infer<typeof presetSaveSchema>;
 
 export const presetDeleteSchema = z.object({ id: z.uuid() });
+
+/**
+ * Merging one member into another (§7 Stage 6 phase 8).
+ *
+ * Only the two ids: every other input is either derived server-side or a choice
+ * re-validated against the freshly derived plan. `survivorId === loserId` is
+ * refused by `planMerge` rather than here — the schema knows nothing about
+ * which member is which, and the check belongs with the rest of the merge's
+ * reasoning so every caller inherits it.
+ */
+export const mergeSchema = z.object({
+  survivorId: z.uuid(),
+  loserId: z.uuid(),
+});

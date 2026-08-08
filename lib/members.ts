@@ -352,9 +352,20 @@ export function isAllowedFieldValue(
  * as `—`, so a narrower select on the update invents changes that never
  * happened. Voiding a point adjustment logged two phantom erasures before
  * AUDITED_ADJUSTMENT_COLUMNS existed for this reason.
+ *
+ * 🐛 `joined_at` was added in phase 8, and its absence was a real gap rather
+ * than an omission nobody noticed: a merge takes the EARLIER of the two joined
+ * dates, so it writes that column — and the trail showed only notes and
+ * custom_fields changing. §4.2 asks every officer mutation to record what it
+ * changed, and one that quietly moves a date fails that. Found in the phase-8
+ * walkthrough by reading the rendered diff against the row.
+ *
+ * ⚠️ Adding it costs the other callers nothing, and that is a property of
+ * AuditTrail rather than luck: it renders only keys whose values DIFFER, so a
+ * column no other mutation touches never appears in their diffs.
  */
 export const AUDITED_MEMBER_COLUMNS =
-  "id, full_name, email, eid, active, notes, custom_fields, updated_at" as const;
+  "id, full_name, email, eid, active, joined_at, notes, custom_fields, updated_at" as const;
 
 /** The same contract for a field definition. Kept separate from
  * `FIELD_COLUMNS` in lib/member-fields.ts, which is the narrower read the UI

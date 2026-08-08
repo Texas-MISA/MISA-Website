@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { MEMBER_SCAN_LIMIT } from "@/lib/attendance";
+import { MEMBER_SCAN_LIMIT, type MemberCandidate } from "@/lib/attendance";
 import type { Database } from "@/lib/types/database";
 
 // Member choices for the admin pickers — the resolution form, manual entry, and
@@ -65,4 +65,57 @@ export async function fetchMemberOptions(
     label: `${member.full_name} (${member.eid})${member.active ? "" : " — inactive"}`,
     active: member.active,
   }));
+}
+
+/**
+ * The merge screen's candidates (§7 Stage 6 phase 8) — **including inactive
+ * members**, and in the ranker's own shape.
+ *
+ * ⚠️ Deliberately not `fetchMemberOptions`, and the difference is the whole
+ * point: that one is active-only, which is exactly wrong here. A duplicate is
+ * very often the deactivated half of a pair — an officer who noticed a ghost
+ * and switched it off rather than merging it, which is the only thing they
+ * could do before this phase existed. Filtering to active would hide precisely
+ * the rows the merge tool was built to clean up.
+ *
+ * `includeId` cannot cover that case either: it keeps the *currently linked*
+ * member, and a merge has no linked member — it is looking for one.
+ *
+ * Returns `MemberCandidate` rather than a label, so one read serves both the
+ * picker and `rankDuplicateCandidates`. Two reads could disagree about who is
+ * offerable, which would let the ranker suggest somebody the picker cannot
+ * select.
+ *
+ * ⚠️ Still bounded by MEMBER_SCAN_LIMIT, and here the truncation is sharper than
+ * usual: past the cap a duplicate is neither suggested nor pickable, with
+ * nothing on screen to say so. Unordered for the same reason the resolution
+ * form is — an order would make the truncation deterministic, not correct. The
+ * fix is pg_trgm and it is on the Capacity list in tasks.md.
+ */
+export async function fetchMergeCandidates(
+  db: Client,
+  opts: { excludeId?: string | null; limit?: number } = {}
+): Promise<MemberCandidate[]> {
+  const { excludeId = null, limit = MEMBER_SCAN_LIMIT } = opts;
+
+  const { data, error } = await db
+    .from("members")
+    .select("id, full_name, email, eid, normalized_eid, active")
+    .limit(limit);
+
+  if (error) {
+    console.error("merge candidate query failed:", error.message);
+    return [];
+  }
+
+  return data
+    .filter((row) => row.id !== excludeId)
+    .map((row) => ({
+      id: row.id,
+      fullName: row.full_name,
+      email: row.email,
+      eid: row.eid,
+      normalizedEid: row.normalized_eid ?? "",
+      active: row.active,
+    }));
 }

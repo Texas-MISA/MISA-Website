@@ -57,6 +57,9 @@ function formatAuditAction(action: string): string {
     // trail — it is filed against the member, so it is the first line of the
     // history on /admin/members/[id] for anyone who arrived by CSV.
     "member.imported": "Imported",
+    // Stage 6 phase 8. Reads on the SURVIVOR's trail, and the note beside it is
+    // the only remaining record of who was merged away.
+    "member.merged": "Merged",
     "member_field.created": "Field created",
     "member_field.updated": "Field updated",
     "member_field.archived": "Field archived",
