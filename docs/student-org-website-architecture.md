@@ -1,9 +1,51 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.46
-**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 6 of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. **Phase 7 (saved presets and CSV import) is next**, and needs the stage's first migration since 19.
+**Version:** 1.47
+**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 7 of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. **Phase 8 (the merge tool) is next.**
 **Last updated:** August 2026
 
+> **v1.47: saved filter presets and the CSV roster import.** Stage 6 phase 7,
+> split into **7a** (presets, **migration 20** — the stage's first since 19) and
+> **7b** (the import, no migration), mirroring the 2a/2 and 5a/5b splits.
+>
+> - **A preset stores the canonical query string, not a jsonb copy of
+>   `MemberFilter`.** `lib/filters.ts` already round-trips a filter through a URL
+>   and sorts its keys, so the string is a function of the filter rather than of
+>   the order the officer clicked — which is what lets the chip row mark the
+>   active preset by string equality. A structured copy would be a second
+>   representation of the type, and every field added to it would have to be
+>   added there too or silently drop out of every stored preset.
+> - 🪤 **"Canonicalise on write, never on read" is not sufficient, because a
+>   RENAME is a write.** Found in the 7a walkthrough. The manage screen posts the
+>   row's stored query back unchanged, so canonicalising it against the *live*
+>   field definitions re-derived a filter the officer never touched and dropped
+>   any `cf:` clause whose field was archived or hidden. **Storage is permissive,
+>   application stays strict**: `savePreset` canonicalises against every
+>   definition that exists, and the directory still parses with live,
+>   in-directory ones — so an archived field narrows nothing while archived and
+>   works again if restored. A preset whose only clause was archived failed
+>   loudly with a message about the *name*; one with a second live clause would
+>   have saved cleanly and lost the first.
+> - **The import CREATES ONLY.** A row matching an existing member — on
+>   `normalized_eid` **or** `lower(email)` — is counted, shown, and never
+>   written. A stale spreadsheet must not overwrite an officer's correction, and
+>   create-only is what makes re-importing a no-op.
+> - ⚠️ **Both unique indexes, and the file checked against itself.** `members`
+>   carries two, so an importer checking only the EID presents a clean preview
+>   and then takes a 23505. The within-file check is the "a pre-flight must
+>   dedupe within the selection too" invariant applied to a file naming the same
+>   person twice.
+> - **One atomic insert, not an upsert.** PostgREST's `onConflict` takes one
+>   target and there are two indexes, so an upsert cannot express the rule — and
+>   unlike dues, a roster is not *designed for* overlapping re-imports.
+>   All-or-nothing is safe because the preview recomputes: a retry reclassifies
+>   anything already written as `existing`.
+> - **`importColumns` is built from `exportCatalogue`**, so a downloaded CSV can
+>   be edited and imported straight back, and the header namespace cannot fork.
+>   Calculated columns in a round-tripped export are ignored *and named*.
+> - `lib/csv.ts` and `lib/roster-index.ts` were extracted so the tokenizer and
+>   the paged roster read have one implementation each rather than two.
+>
 > **v1.46: the relational filters.** Stage 6 phase 6 — attended or missed a
 > specific event, has-pending, not-seen-since, and events-attended bounds.
 > **No migration**: three of the four are plain columns on `member_directory`.
@@ -2446,8 +2488,9 @@ contact form's backend — it renders disabled, with email as the working path.
 | — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | ✅ complete, all 4 phases; **Stage 6's exit criteria were met in its phase 4** |
 | 5c | Filter by categorical fields — custom fields, dues status, `source`. **After 6.5**, because it filters on the dues column | ✅ built & browser-verified — no migration |
 | 6 | Relational filters (attended or missed a given event, has pending, not seen since) | ✅ built & browser-verified — no migration |
-| 7 | Saved filter presets and CSV roster import | ← **next** |
-| 8 | The merge tool — its own estimate, see below | |
+| 7a | Saved filter presets — shared, named directory filters (**migration 20**) | ✅ built, browser-verified & deployed |
+| 7b | CSV roster import — preview-then-commit, create-only, duplicate detection on **both** unique indexes | ✅ built & browser-verified — no migration |
+| 8 | The merge tool — its own estimate, see below | ← **next** |
 | 9 | Docs and a closing read-through | |
 
 ✅ **Phase 1 was walked through a browser (2026-08-01), and it earned its keep.** Sorting, the tie-break across a page boundary, pagination, and the rate-threshold arithmetic were all correct. The screen was not: the five numeric filter boxes were uncontrolled (`defaultValue`), which React reads only at mount, so CLEAR — a client-side push with no remount — left the officer's typed numbers on screen above a count that no longer applied them. Displayed filter and applied filter disagreed, which is the same partial-list failure phase 5's export exists to avoid, arriving through the filter instead of through pagination. Fixed by moving both translations into `lib/filters.ts` (`memberFilterFields`, `memberFilterUrl`).
@@ -2517,8 +2560,8 @@ Three paths out of the system, and they are not redundant: the clipboard is for 
 - Generation is buffered in memory (a workbook is a zip; there is no meaningful streaming path). Fine at club scale — a few hundred members — and the reason a hard row cap on the export is a sensible guard rather than a limitation.
 
 **Supporting work**
-- Saved filter presets, shared across officers — "award eligible", "missed last 3 meetings", "inactive since October" (phase 7)
-- CSV roster import with a preview-and-confirm step, duplicate detection on the normalized EID, and a dry-run row count before committing (phase 7)
+- ✅ **Saved filter presets, shared across officers** (phase 7a). A preset is a name over the canonical query string `memberFilterToParams` emits, stored in `member_filter_presets` (migration 20, RLS deny-all). Chips on the directory, a manage screen for renaming and deleting, and `preset.created` / `preset.updated` / `preset.deleted` under the new `member_preset` audit entity type. **Canonicalise on write only — and against every definition that exists**, archived included: a rename posts the stored query back, so canonicalising it against the live list drops a `cf:` clause whose field is currently archived. Storage permissive, application strict.
+- ✅ **CSV roster import** (phase 7b), preview-then-commit, no migration. **Create-only**: a row matching an existing member on the normalized EID *or* on `lower(email)` is counted, shown, and never written, so a stale spreadsheet cannot overwrite an officer's correction and re-importing is a no-op. Duplicate detection covers **both** unique indexes and the file against itself. Columns are matched **by header name** from `exportCatalogue`, so a downloaded CSV round-trips; calculated columns are ignored and named. One atomic insert (not an upsert — two indexes, one `onConflict` target), one `member.imported` audit row per member.
 - **Merging duplicate members** — see below; this is the piece with real domain logic in it (phase 8)
 
 **Two consequences of §4.2's exact-match check-in land here** (recorded v1.21, while building Stage 5). Neither is a defect in the check-in path — both are the deliberate design's bill, and the directory is where it comes due.

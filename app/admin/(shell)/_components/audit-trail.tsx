@@ -53,6 +53,10 @@ function formatAuditAction(action: string): string {
     "series.cancelled": "Cancelled with a series",
     // Stage 6 phase 4.
     "member.updated": "Updated",
+    // Stage 6 phase 7b. Unlike the preset verbs this one DOES appear in a
+    // trail — it is filed against the member, so it is the first line of the
+    // history on /admin/members/[id] for anyone who arrived by CSV.
+    "member.imported": "Imported",
     "member_field.created": "Field created",
     "member_field.updated": "Field updated",
     "member_field.archived": "Field archived",

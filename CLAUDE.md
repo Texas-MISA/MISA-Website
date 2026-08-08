@@ -6,7 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–5 complete; Stage 6 (member directory) — phases 1, 2a, 2, 3, 4, 5a, 5b, 5c and 6 of 9 built and browser-verified, and ✅ its exit criteria are MET. Stage 6.5 (dues) interrupted between 5b and 5c and is ✅ COMPLETE — all 4 phases (2026-08-07, doc v1.46). Phase 7 (saved presets and CSV import) is next and needs this stage's first migration since 19.** Stage 6 merges to `main` at the end of each phase rather than at the end of the stage, as Stage 5 did.
+**Stages 0–5 complete; Stage 6 (member directory) — phases 1, 2a, 2, 3, 4, 5a, 5b, 5c, 6, 7a and 7b of 9 built and browser-verified, and ✅ its exit criteria are MET. Stage 6.5 (dues) interrupted between 5b and 5c and is ✅ COMPLETE — all 4 phases. Phase 8 (the merge tool) is next; phase 9 is the closing read-through (2026-08-08, doc v1.47).** Stage 6 merges to `main` at the end of each phase rather than at the end of the stage, as Stage 5 did.
+
+✅ **Stage 6 phase 7 shipped 2026-08-08**, split into **7a** (saved filter presets, **migration 20** — the stage's first since 19) and **7b** (the CSV roster import, no migration), mirroring the 2a/2 and 5a/5b splits so the schema push stayed isolated from the wider work.
+  - **A preset stores the canonical query string, not a jsonb copy of `MemberFilter`.** `memberFilterToParams` sorts its keys and omits defaults, so the string is a function of the filter rather than of the order the officer clicked — which is what lets the chip row mark the active preset by **string equality**. A structured copy would be a second representation of the type, and every field added to it would have to be added there too or silently drop out of every stored preset. Verified live: reordered params carrying a redundant `state=active` still lit the chip.
+  - 🪤 **"Canonicalise on write, never on read" is NOT sufficient, because a RENAME is a write.** The manage screen posts the row's stored query straight back, so canonicalising it against the *live* definitions re-derived a filter the officer never touched and dropped any `cf:` clause whose field was archived or hidden. `storableFields` over `fetchFieldDefinitions(db, { includeArchived: true })` is the fix: **storage is permissive, application stays strict** — the directory still parses with live, in-directory definitions, so an archived field narrows nothing while archived and works again if restored. Found in the walkthrough; the single-clause case failed loudly with a message about the *name*, and a second live clause would have saved cleanly and lost the first.
+  - ⚠️ **A preset that narrows nothing is refused three times** — the disabled button, `presetSaveSchema`'s `min(1)`, and `member_filter_presets_query_bounded`. A chip promising a narrowed roster and showing the whole thing is the phase-1 defect saved as an object and shared with the team.
+  - **`deletePreset` is a real delete**, unlike archiving a field definition: nothing is keyed to a preset, so there is nothing to orphan. `event.deleted` is the precedent for an audit row naming a row that no longer exists.
+  - ⚠️ **The import CREATES ONLY, and checks BOTH unique indexes.** `members` carries `members_normalized_eid` *and* `members_email_lower`, so an importer checking only the EID shows a clean preview and then takes a 23505 — confirmed in the walkthrough by a row whose invented EID carried a real member's email. A matching row is counted, shown, and never written: a stale spreadsheet must not overwrite an officer's correction, and create-only is what makes re-importing a no-op. The file is checked against **itself** on both axes too.
+  - 🪤 **One atomic insert, NOT the upsert the dues import uses.** PostgREST's `onConflict` takes one target and there are two indexes, so an upsert cannot express the rule — and unlike dues, a roster is not *designed for* overlapping re-imports. All-or-nothing is safe because the preview recomputes: a retry reclassifies anything already written as `existing`. A 23505 is reported as a race, with nothing written.
+  - **`importColumns` is built from `exportCatalogue`**, so the export's labels are the import's headers and a downloaded CSV round-trips; calculated columns are ignored *and named*. Columns are located **by name, never by position** — the Venmo lesson restated.
+  - **`lib/csv.ts` and `lib/roster-index.ts` were extracted so there is one tokenizer and one paged roster read**, not two. `fetchDuesRoster` became `fetchRosterIndex` and gained `emailLower`.
+  - 🐛 **The second walkthrough defect was caught by a console warning, not by the screen**: the save form's two `<input name="name">` branches were reconciled as one input changing from uncontrolled to controlled, so React reused the DOM node and carried a half-typed name into the hidden field. Distinct `key`s. Both fixes are pinned by **source assertions**, since vitest runs `environment: "node"`.
 
 ✅ **Stage 6 phase 6 shipped 2026-08-07** — **the relational filters**: attended / missed a specific event, has-pending, not-seen-since, and events-attended bounds. **No migration** — three of the four are plain columns on `member_directory`.
   - 🪤 **The event filter is a PostgREST embed, not a uuid list, and the rejected option's numbers are worth keeping.** Resolving attendees to ids and narrowing with `.in()` **414s at ~220 ids** (Kong's 8KB header buffer; measured 150→200 OK, 220→414), and §2.2's worst case is 150 attendees an event — a 1.4× margin that shrinks further because the id list shares the URL with the search term and the `cf:` filters. An officer could 414 by *adding a search term to an event filter*. Instead: one `attendance!left(event_id)` embed, with `attendance=not.is.null` for attended and `is.null` for missed. Measured: 15 + 17 = 32, so the two modes **partition** the roster and `count=exact` is right in both.
@@ -246,6 +257,10 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
   - ⚠️ **A Route Handler does not participate in layouts**, confirmed against the shipped Next 16 docs — so `app/admin/(shell)/layout.tsx`'s `requireOfficer()` never runs for one. Living inside the `(shell)` group is colocation and grants **no** protection. `proxy.ts`'s `/admin/:path*` matcher does cover the path and 307s an unauthenticated request to login before the handler runs, but that is a convenience: the `getOfficer()` 403 is what catches a signed-in user with no `admin_profiles` row, and what survives a matcher change. Both are required; neither substitutes for the other.
   - **An export pages through explicitly and never calls `pageRange()`.** Chunks of 1000, because the hosted project applies its own `max_rows` that local does not — an export complete in development can come back short in production, which is the partial-list failure wearing a different hat. `MAX_EXPORT_ROWS` (5000) **refuses; it never truncates**, and it sits far under Vercel's 4.5 MB non-streaming response limit.
   - **An id that reaches a PostgREST `in.(…)` list is format-checked first**, the same discipline `FIELD_KEY_PATTERN` applies to a sort key. Anything not a uuid is dropped before the query is built.
+- **A saved view stores the canonical query string, and it is canonicalised on WRITE against every definition that exists.** Two halves, and the second is not obvious. The first: a preset is a name over what `memberFilterToParams` emits, never a jsonb copy of `MemberFilter` — one representation of that type, and a string that is a function of the filter rather than of click order, which is what makes "which preset is active?" a string comparison. The second: **a rename is a write**, and the manage form posts the row's stored query straight back, so canonicalising it against the *live* field definitions re-derives a filter the officer never touched and drops any `cf:` clause whose field is currently archived or hidden. `storableFields` over `includeArchived: true` closes it. **Storage is permissive; application stays strict** — the directory parses with live, in-directory definitions, so an archived field narrows nothing while archived and works again if restored. Never canonicalise on read.
+- **A roster import creates only, and duplicate detection covers BOTH unique indexes.** `members` carries `members_normalized_eid` *and* `members_email_lower`; an importer checking one shows a clean preview and then takes a 23505 on the other. A row matching an existing member is counted, shown and never written — a stale spreadsheet must not overwrite a correction an officer made, and create-only is what makes re-importing a no-op. The pre-flight also checks the file against **itself** on both axes, which is the "dedupe within the selection too" rule applied to a file naming one person twice.
+  - 🪤 **The write is one atomic insert, deliberately NOT the upsert the dues import uses.** PostgREST's `onConflict` takes a single target, so an upsert cannot express "skip if either index matches" — and unlike dues, a roster is not *designed for* overlapping re-imports. All-or-nothing is right for the `grantPoints` reason (a partial import reported as success has no backstop) and is safe to retry because the preview recomputes: anything already written comes back as `existing`.
+  - **An import's column list is `exportCatalogue`'s importable subset**, so the export's labels are the import's headers and a file can round-trip. Calculated columns are ignored *and named* in the preview. Columns are located **by name, never by position**.
 - **A wrapped PostgREST column list is a build break, not a style choice.** This has now bitten twice, in `lib/points.ts` and again in the directory page. PostgREST types the returned row off the string *literal*, so `"a, b" + "c"` widens to plain `string` and collapses the result to `GenericStringError` — the symptom is every field access failing at once, which reads as a schema problem. One unbroken literal with `as const`, every time. Assume it once per screen that selects more than a handful of columns.
 - **Both sides of an audit before/after must select the same columns.** `AuditTrail` diffs the union of their keys and renders a key present on one side only as `—`, so a narrower `.select()` on the update *invents changes that never happened*: voiding a point adjustment logged `reason: "Staffed the info booth" → —` and `awarded_by: <uuid> → —`, as though the void had erased both. `AUDITED_ADJUSTMENT_COLUMNS` in `lib/points.ts` is the shared list — one unbroken string literal with `as const`, because PostgREST types the returned row off the literal and a concatenation widens to `string`.
 - **`admin_audit.action` is a closed union in TypeScript and free text in SQL; readers must tolerate unknown values.** Two pre-Stage-5 rows on the production database carry the bare verbs `reject` and `void` and are permanently uncorrectable — the append-only trigger raises P0001 on `UPDATE` and `DELETE` alike. Format with a fallback to the raw string.
@@ -357,13 +372,23 @@ lib/dues.ts             the dues domain core (6.5 phases 1 and 3) — pure like
                         paymentReviewState, startTermOptions, and
                         rankPaymentSuggestions (a new CALLER of
                         lib/attendance.ts's ranker, never a second one)
-lib/dues-roster.ts      the uncapped {memberId, normalizedEid} roster the note
-                        matcher runs against (6.5 phase 2). Paged in 1000s —
-                        the hosted project applies its own max_rows. Returns a
-                        discriminated error rather than [], because an empty
-                        roster and a failed read are indistinguishable to the
-                        caller and the difference marks a whole statement
-                        unmatched
+lib/csv.ts              the CSV tokenizer, shared by the dues and roster
+                        imports (extracted in phase 7b). Handles quoted fields
+                        containing commas AND newlines — a real Venmo statement
+                        ends with a multi-line quoted disclaimer, so a
+                        split("\n") parser breaks on the last record of every
+                        file. ONE implementation: that hazard is exactly what a
+                        hand-rolled copy gets wrong
+lib/roster-index.ts     the uncapped {memberId, normalizedEid, emailLower}
+                        index every bulk operation matches against (6.5 phase 2
+                        as lib/dues-roster.ts; generalised in phase 7b). Paged
+                        in 1000s — the hosted project applies its own max_rows.
+                        Returns a discriminated error rather than [], because an
+                        empty roster and a failed read are indistinguishable to
+                        the caller and the difference marks a whole statement
+                        unmatched — or reports every import row as new.
+                        ⚠️ BOTH axes, because members carries two unique
+                        indexes and a row collides if it matches either
 app/actions/dues.ts     6.5 phases 2–3, built — previewImport (parses, probes
                         for duplicates, writes NOTHING), commitImport
                         (re-parses server-side rather than trusting the
@@ -440,6 +465,36 @@ app/actions/members.ts  setMemberFieldValue, saveMemberNotes,
                         saveFieldDefinition, setFieldArchived. No role check
                         anywhere in the file, and it says so: any officer may
                         define a field and edit a value (§9 #6)
+lib/presets.ts          the saved-filter core (phase 7a) — pure, built directly
+                        on lib/filters.ts. canonicalPresetQuery (call it on
+                        WRITE only), storableFields (the archived-field fix —
+                        storage permissive, application strict) and
+                        presetSummary. lib/member-presets.ts is the read
+app/actions/presets.ts  savePreset (create or update in one action, no CAS —
+                        one full-page form, same argument as
+                        saveFieldDefinition) and deletePreset (a real delete:
+                        nothing is keyed to a preset). No role check, and the
+                        header says so — presets are SHARED, so a gate would
+                        leave one person owning the team's saved views
+app/admin/(shell)/members/_components/preset-bar.tsx
+                        the chip row. The active chip is decided by STRING
+                        EQUALITY against the canonical filter key, which works
+                        only because memberFilterToParams sorts its keys and
+                        savePreset canonicalises through the same function.
+                        /admin/members/presets is rename and delete only —
+                        "update to the current filter" needs a current filter,
+                        so it lives here as the Replace option
+lib/member-import.ts    the roster-import core (phase 7b) — pure.
+                        importColumns (built FROM exportCatalogue, so a
+                        downloaded CSV round-trips), matchHeaders (by NAME,
+                        never by position), planRosterImport with four
+                        outcomes, parseActive, describeOutcome
+app/actions/member-import.ts
+                        previewRosterImport / commitRosterImport (phase 7b).
+                        One shared plan path, the commit re-parses, the CSV text
+                        never leaves the officer's browser. ONE atomic insert,
+                        not an upsert — two unique indexes, one onConflict
+                        target — and one member.imported audit row per member
 app/admin/(shell)/members/fields/
                         create / edit / archive field definitions, linked from
                         the directory header rather than the admin nav (that

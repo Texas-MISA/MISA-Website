@@ -102,6 +102,12 @@ export type AuditAction =
   // columns moved, and splitting by column adds rows without adding meaning.
   // A field DEFINITION is a different entity and gets its own three.
   | "member.updated"
+  // Stage 6 phase 7b. "Imported" rather than "created", the same distinction
+  // dues.imported draws: the officer is transcribing a roster that already
+  // exists rather than bringing these people into being. One row per member —
+  // the entity is the member, not the upload, and the file name travels in
+  // `note` exactly as the dues batch context does.
+  | "member.imported"
   | "member_field.created"
   | "member_field.updated"
   // Archived, never deleted: stored values stay keyed to the definition, and a

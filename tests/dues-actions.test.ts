@@ -8,7 +8,7 @@ import {
   type PlannedPayment,
   type RosterEntry,
 } from "@/lib/dues";
-import { fetchDuesRoster } from "@/lib/dues-roster";
+import { fetchRosterIndex } from "@/lib/roster-index";
 
 import {
   cleanup,
@@ -169,9 +169,9 @@ afterAll(async () => {
   await cleanup(db, track);
 });
 
-describe("fetchDuesRoster", () => {
+describe("fetchRosterIndex", () => {
   it("returns every member with a normalized EID, uncapped and unfiltered", async () => {
-    const result = await fetchDuesRoster(db);
+    const result = await fetchRosterIndex(db);
     expect(result.kind).toBe("ok");
     if (result.kind !== "ok") return;
 
@@ -190,7 +190,7 @@ describe("fetchDuesRoster", () => {
   });
 
   it("folds the EID the same way the note matcher does", async () => {
-    const result = await fetchDuesRoster(db);
+    const result = await fetchRosterIndex(db);
     if (result.kind !== "ok") throw new Error("roster read failed");
 
     const entry = result.roster.find((e) => e.memberId === rowan);

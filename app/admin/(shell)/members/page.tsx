@@ -249,16 +249,24 @@ export default async function AdminMembersPage({
         <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
           Members
         </h1>
-        {/* Not an admin-nav entry: admin-nav.tsx marks an item active with
-            pathname.startsWith, so a Fields link there would light "Members" up
-            alongside it. This is the same in-page idiom the events form uses
+        {/* Not admin-nav entries: admin-nav.tsx marks an item active with
+            pathname.startsWith, so links there would light "Members" up
+            alongside them. This is the same in-page idiom the events form uses
             for "Create a recurring series instead". */}
-        <Link
-          href="/admin/members/fields"
-          className="text-sm underline underline-offset-4"
-        >
-          Custom fields ({fields.length})
-        </Link>
+        <div className="flex flex-wrap items-baseline gap-4 text-sm">
+          <Link
+            href="/admin/members/import"
+            className="underline underline-offset-4"
+          >
+            Import CSV
+          </Link>
+          <Link
+            href="/admin/members/fields"
+            className="underline underline-offset-4"
+          >
+            Custom fields ({fields.length})
+          </Link>
+        </div>
       </div>
 
       <p className="mt-3 max-w-2xl text-sm text-foreground/70">

@@ -24,6 +24,7 @@ import {
   type MemberCandidate,
   type MemberSuggestion,
 } from "@/lib/attendance";
+import { parseCsv } from "@/lib/csv";
 import { centralWallTimeToInstant } from "@/lib/events";
 
 // ---------------------------------------------------------------------------
@@ -397,63 +398,14 @@ export function matchNote(
 // ---------------------------------------------------------------------------
 
 /**
- * A CSV tokenizer that handles quoted fields containing commas AND newlines.
+ * The CSV tokenizer moved to lib/csv.ts in phase 7b, when the roster import
+ * became its second caller — one implementation, because the multi-line quoted
+ * field it exists to handle is exactly the thing a hand-rolled copy gets wrong.
  *
- * ⚠️ A `split("\n")` parser is not sufficient here, and this is not a
- * hypothetical: a real Venmo export ends with a multi-line quoted legal
- * disclaimer, so a line-splitting parser breaks on the last record of every
- * file. Verified against a real statement on 2026-08-06.
+ * Re-exported here so `parseCsv` stays part of this module's surface for the
+ * statement parser below and for the tests that already import it from here.
  */
-export function parseCsv(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let quoted = false;
-
-  // Normalise line endings first so a CRLF file does not leave \r on every
-  // last field — which would silently defeat every === comparison downstream.
-  const input = text.replace(/\r\n?/g, "\n");
-
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i];
-
-    if (quoted) {
-      if (ch === '"') {
-        if (input[i + 1] === '"') {
-          field += '"';
-          i++;
-        } else {
-          quoted = false;
-        }
-      } else {
-        field += ch;
-      }
-      continue;
-    }
-
-    if (ch === '"') {
-      quoted = true;
-    } else if (ch === ",") {
-      row.push(field);
-      field = "";
-    } else if (ch === "\n") {
-      row.push(field);
-      rows.push(row);
-      row = [];
-      field = "";
-    } else {
-      field += ch;
-    }
-  }
-
-  // A file not ending in a newline still has a final record.
-  if (field !== "" || row.length > 0) {
-    row.push(field);
-    rows.push(row);
-  }
-
-  return rows;
-}
+export { parseCsv };
 
 /**
  * The header names a real Venmo export uses, recorded from an actual file on

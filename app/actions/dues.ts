@@ -15,7 +15,7 @@ import {
   type DuesPrices,
   type PlannedPayment,
 } from "@/lib/dues";
-import { fetchDuesRoster } from "@/lib/dues-roster";
+import { fetchRosterIndex } from "@/lib/roster-index";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { duesPaymentSaveSchema, duesVoidSchema } from "@/lib/validation";
 
@@ -169,7 +169,7 @@ async function planImport(
   const prices = await readPrices(db);
   if (!prices) return { kind: "error" };
 
-  const roster = await fetchDuesRoster(db);
+  const roster = await fetchRosterIndex(db);
   // ⚠️ A failed roster read must NOT fall through as an empty roster. Matching
   // against nothing would mark an entire statement unmatched and look like a
   // legitimate outcome — the same reason resolveCheckin distinguishes "missing"
