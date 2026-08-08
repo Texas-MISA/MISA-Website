@@ -1,9 +1,44 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.45
-**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 5c of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. **Phase 6 (relational filters) is next.**
+**Version:** 1.46
+**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 6 of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. **Phase 7 (saved presets and CSV import) is next**, and needs the stage's first migration since 19.
 **Last updated:** August 2026
 
+> **v1.46: the relational filters.** Stage 6 phase 6 — attended or missed a
+> specific event, has-pending, not-seen-since, and events-attended bounds.
+> **No migration**: three of the four are plain columns on `member_directory`.
+>
+> - 🪤 **The event filter is a PostgREST embed, and the rejected alternative's
+>   numbers are recorded because they are the reason.** Resolving attendees to a
+>   uuid list and narrowing with `.in()` **414s at ~220 ids** — Kong's 8 KB
+>   header buffer, measured at 150→200 OK, 210→200 OK, 220→414. §2.2's worst
+>   case is 150 attendees an event, a 1.4× margin that shrinks further because
+>   the list shares the URL with the search term and the `cf:` filters; an
+>   officer could 414 by adding a search term to an event filter. Instead
+>   PostgREST resolves the `member_directory` → `attendance` relationship and one
+>   `attendance!left(event_id)` embed expresses both halves:
+>   `attendance=not.is.null` is attended, `is.null` is missed. Measured
+>   15 + 17 = 32, so the two **partition** the roster and `count=exact` is right
+>   in both.
+> - 🪤 **The embed must be in the SELECT, and the select literal cannot be
+>   assembled dynamically** — PostgREST types the row off the literal, so
+>   concatenation collapses it to `GenericStringError`. Two `as const` literals
+>   and one branch per caller; `needsAttendanceEmbed` keeps the decision in
+>   `lib/filters.ts`. The page and the export route must branch identically.
+> - ⚠️ **`status = 'present'` on the embed is load-bearing** — a queued check-in
+>   is not attendance, and counting it as one would disagree with the leaderboard.
+> - ⚠️ **"Not seen since" includes members never seen at all.** A bare `.lt()`
+>   drops nulls, so the question "who has gone quiet?" would answer with the
+>   quietest members missing. It is the null-vs-zero rule in a new place, and it
+>   makes a **second** `or` group on the query — separate `or=` params AND
+>   together, which is not the failure the search's comment warns about.
+> - 📌 **`FilterableQuery` gained `is` and `not`, not the `in`/`not`/`lt` §7
+>   predicted** — that prediction assumed the uuid list.
+> - ⚠️ **These are the first filters that narrow on undisplayed data**, so they
+>   live in an Attendance-filters panel that says so, and the panel **opens
+>   whenever one is active**. A collapsed panel hiding an applied filter is the
+>   phase-1 defect with a lid on it.
+>
 > **v1.45: the directory filters on categorical fields.** Stage 6 phase 5c, and
 > the other half of *"filter the members to those with M size and export as an
 > Excel file"* — phase 5 built only the export. **No migration.** Custom-field
@@ -2410,8 +2445,8 @@ contact form's backend — it renders disabled, with email as the working path.
 | 5b | The `.xlsx` workbook — hand-rolled and dependency-free | ✅ built & deployed; confirmed by opening it in real Excel |
 | — | ⏸ **Stage 6.5 (dues) interrupts here** — see below | ✅ complete, all 4 phases; **Stage 6's exit criteria were met in its phase 4** |
 | 5c | Filter by categorical fields — custom fields, dues status, `source`. **After 6.5**, because it filters on the dues column | ✅ built & browser-verified — no migration |
-| 6 | Relational filters (attended or missed a given event, has pending, not seen since) | ← **next** |
-| 7 | Saved filter presets and CSV roster import | |
+| 6 | Relational filters (attended or missed a given event, has pending, not seen since) | ✅ built & browser-verified — no migration |
+| 7 | Saved filter presets and CSV roster import | ← **next** |
 | 8 | The merge tool — its own estimate, see below | |
 | 9 | Docs and a closing read-through | |
 

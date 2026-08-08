@@ -4,15 +4,20 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  EVENT_MODES,
+  hasRelationalFilter,
   MAX_SEARCH_LENGTH,
   MEMBER_DUES,
+  MEMBER_PENDING,
   MEMBER_SOURCES,
   MEMBER_STATES,
   memberFilterFields,
   memberFilterUrl,
+  relationalFilterCount,
   type MemberFilter,
   type MemberFilterFields,
 } from "@/lib/filters";
+import type { EventOption } from "@/lib/event-options";
 import {
   customFieldKey,
   fieldOptions,
@@ -35,9 +40,19 @@ import {
 // (an annotation on the name, not something to sort a table by) and comes back
 // as a *filter*, because §4.2's roster-cleanup query had nowhere to live.
 //
-// Every control here is a selector over a categorical value, and every one of
-// them defaults to the option that narrows NOTHING. Only the roster scope
+// Every control in the top row is a selector over a categorical value, and every
+// one of them defaults to the option that narrows NOTHING. Only the roster scope
 // defaults to narrowing, and it is the exception on purpose (see MemberFilter).
+//
+// ⚠️ **Phase 6's relational filters sit in their own panel below, and the split
+// is the point rather than a layout preference.** They narrow on data the
+// directory does not display — attendance against one event, pending
+// submissions, when someone was last seen — which cuts against the phase-3 trim
+// that cut the table to what it shows. The trim's actual argument was that a
+// filter the officer cannot see leaves a count they cannot account for, so the
+// answer is a panel that says plainly what it is, not a filter smuggled into the
+// row above. The panel OPENS whenever one of them is set: a collapsed panel
+// hiding an applied filter would be the phase-1 defect with a lid on it.
 
 const controlClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
 const smallNumber = `${controlClass} w-24`;
@@ -45,6 +60,7 @@ const smallNumber = `${controlClass} w-24`;
 export function MemberFilters({
   filter,
   definitions,
+  events,
 }: {
   filter: MemberFilter;
   /**
@@ -64,6 +80,19 @@ export function MemberFilters({
    * filter boxes' text.
    */
   definitions: readonly FieldDefinition[];
+  /**
+   * The events the relational panel can filter on, newest first.
+   *
+   * Shared with the attendance queue, the resolution form and manual entry via
+   * `fetchEventOptions` — all statuses, because an officer filtering "who missed
+   * the cancelled kickoff" is asking a real question and the ranker's
+   * published-only view cannot answer it.
+   *
+   * ⚠️ Capped at 100 by that helper. At three events a week that is under a
+   * year, so an old event eventually drops off the picker with no error — it is
+   * on the Capacity-ceilings list in tasks.md rather than raised blind here.
+   */
+  events: readonly EventOption[];
 }) {
   const router = useRouter();
 
@@ -82,13 +111,18 @@ export function MemberFilters({
   // rather than an effect, matching review-queue.tsx; comparing the derived
   // strings because `filter` is a fresh object on every render and would never
   // compare equal.
+  //
+  // 📌 Compared across EVERY key rather than three named ones. Phase 6 adds
+  // three more boxes, and a hand-written list of comparisons is precisely the
+  // kind of thing that gets a field added to one side and not the other — at
+  // which case the new box stops resyncing on CLEAR and quietly reproduces the
+  // phase-1 defect it was written to prevent.
   const incoming = memberFilterFields(filter);
   const [seen, setSeen] = useState(incoming);
-  if (
-    seen.q !== incoming.q ||
-    seen.minPoints !== incoming.minPoints ||
-    seen.maxPoints !== incoming.maxPoints
-  ) {
+  const changed = (Object.keys(incoming) as (keyof MemberFilterFields)[]).some(
+    (key) => seen[key] !== incoming[key]
+  );
+  if (changed) {
     setSeen(incoming);
     setFields(incoming);
   }
@@ -108,6 +142,8 @@ export function MemberFilters({
   // be applied, and no filter can be applied without a control.
   const filterable = definitions.filter((d) => d.showInDirectory);
 
+  const relationalCount = relationalFilterCount(filter);
+
   const anyNarrowing =
     filter.state !== "active" ||
     filter.q !== "" ||
@@ -115,9 +151,11 @@ export function MemberFilters({
     filter.maxPoints !== null ||
     filter.dues !== "all" ||
     filter.source !== "all" ||
-    Object.keys(filter.custom).length > 0;
+    Object.keys(filter.custom).length > 0 ||
+    relationalCount > 0;
 
   return (
+    <div>
     <div className="flex flex-wrap items-end gap-4">
       <Labelled label="Search">
         <input
@@ -263,6 +301,158 @@ export function MemberFilters({
         </button>
       )}
     </div>
+
+    <RelationalPanel
+      filter={filter}
+      fields={fields}
+      events={events}
+      activeCount={relationalCount}
+      set={set}
+      update={update}
+    />
+    </div>
+  );
+}
+
+/**
+ * Phase 6's relational filters, in a panel of their own.
+ *
+ * ⚠️ `<details open={…}>` with the open state derived from the filter, NOT
+ * component state. The panel must be open whenever one of its filters is
+ * applied — a collapsed panel hiding an active filter leaves the officer a count
+ * they cannot account for, which is the phase-1 defect this whole screen was
+ * rebuilt around. `hasRelationalFilter` in lib/filters.ts is the one definition
+ * of "active", so the panel and the query cannot disagree about it.
+ *
+ * The officer can still collapse it by hand; `open` on a `<details>` is the
+ * initial state per render, not a lock. What they cannot do is *land* on a page
+ * where a filter is applied and hidden.
+ */
+function RelationalPanel({
+  filter,
+  fields,
+  events,
+  activeCount,
+  set,
+  update,
+}: {
+  filter: MemberFilter;
+  fields: MemberFilterFields;
+  events: readonly EventOption[];
+  activeCount: number;
+  set: (key: keyof MemberFilterFields, value: string) => void;
+  update: (changes: Record<string, string>) => void;
+}) {
+  return (
+    <details
+      open={hasRelationalFilter(filter)}
+      className="mt-4 border border-black/30 bg-misa-panel/40"
+    >
+      <summary className="cursor-pointer px-4 py-2 text-sm font-medium">
+        Attendance filters
+        {activeCount > 0 && (
+          <span className="ml-2 border border-black/40 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+            {activeCount} active
+          </span>
+        )}
+      </summary>
+
+      <div className="border-t border-black/20 px-4 pt-3 pb-4">
+        {/* Says what the panel is, because these are the only filters on the
+            screen that narrow on something the table does not show. Without
+            this the count and the visible columns look unrelated. */}
+        <p className="mb-3 max-w-2xl text-xs text-foreground/60">
+          These narrow the list without being columns — the table still shows the
+          same fields either way. Open a member for the detail behind them.
+        </p>
+
+        <div className="flex flex-wrap items-end gap-4">
+          <Labelled label="Event">
+            <select
+              className={`${controlClass} max-w-[22rem]`}
+              value={filter.event ?? ""}
+              onChange={(e) => update({ event: e.target.value })}
+            >
+              <option value="">Any event</option>
+              {events.map((event) => (
+                <option key={event.id} value={event.id}>
+                  {event.label}
+                  {event.status !== "published" ? ` (${event.status})` : ""}
+                </option>
+              ))}
+            </select>
+          </Labelled>
+
+          {/* Only meaningful with an event chosen, and disabled rather than
+              hidden so the pairing is visible before the officer picks one. */}
+          <Labelled label="Who">
+            <select
+              className={controlClass}
+              value={filter.eventMode}
+              disabled={filter.event === null}
+              onChange={(e) => update({ eventMode: e.target.value })}
+            >
+              {EVENT_MODES.map((mode) => (
+                <option key={mode} value={mode}>
+                  {mode === "attended" ? "Attended it" : "Missed it"}
+                </option>
+              ))}
+            </select>
+          </Labelled>
+
+          <Labelled label="Pending check-ins">
+            <select
+              className={controlClass}
+              value={filter.pending}
+              onChange={(e) => update({ pending: e.target.value })}
+            >
+              {MEMBER_PENDING.map((value) => (
+                <option key={value} value={value}>
+                  {value === "all" ? "Any" : "Has some waiting"}
+                </option>
+              ))}
+            </select>
+          </Labelled>
+
+          {/* ⚠️ Labelled all-time on purpose. Every other number on this screen
+              is current-term scoped, and "when did we last see this person" is
+              not a term question — the member detail page says the same. */}
+          <Labelled label="Not seen since (all-time)">
+            <input
+              type="date"
+              className={controlClass}
+              value={fields.notSeenSince}
+              onChange={(e) => set("notSeenSince", e.target.value)}
+              onBlur={(e) => update({ notSeenSince: e.target.value })}
+            />
+          </Labelled>
+
+          <Labelled label="Events attended this term">
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="min"
+                className={smallNumber}
+                value={fields.minEvents}
+                onChange={(e) => set("minEvents", e.target.value)}
+                onBlur={(e) => update({ minEvents: e.target.value })}
+              />
+              <span className="text-foreground/50">–</span>
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="max"
+                className={smallNumber}
+                value={fields.maxEvents}
+                onChange={(e) => set("maxEvents", e.target.value)}
+                onBlur={(e) => update({ maxEvents: e.target.value })}
+              />
+            </div>
+          </Labelled>
+        </div>
+      </div>
+    </details>
   );
 }
 

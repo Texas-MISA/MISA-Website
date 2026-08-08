@@ -6,7 +6,10 @@ import {
   applyMemberFilter,
   chunkRange,
   defaultDirection,
+  hasRelationalFilter,
   isDefaultFilter,
+  needsAttendanceEmbed,
+  relationalFilterCount,
   memberFilterFields,
   memberFilterToParams,
   memberFilterUrl,
@@ -56,6 +59,17 @@ function recorder(): Recorder {
     },
     or(filters) {
       calls.push(["or", filters]);
+      return q;
+    },
+    // Phase 6. Adding a method to FilterableQuery without adding it here is a
+    // compile error in this file rather than a silent gap in coverage, which is
+    // the reason the structural type exists at all.
+    is(column, value) {
+      calls.push(["is", column, value]);
+      return q;
+    },
+    not(column, operator, value) {
+      calls.push(["not", column, operator, value]);
       return q;
     },
     order(column, options) {
@@ -182,15 +196,15 @@ describe("parseMemberFilter", () => {
     // not to an invisible narrowing the officer cannot account for, which is
     // the phase-1 defect arriving from the other direction.
     //
-    // 📌 `source` was one of the six and is deliberately NOT in this list any
-    // more: phase 5c brought it back as a filter, so a phase-1 bookmark
-    // carrying `source=self_checkin` now narrows again — correctly, because it
-    // narrows *with a control on screen showing it*. The invariant was never
-    // "an old bookmark can't narrow"; it is "nothing narrows without a
-    // control." The five below still have no control and still narrow nothing.
+    // 📌 The list keeps shrinking, and that is the honest record of what has
+    // been un-retired rather than a weakening of the test. `source` left it in
+    // phase 5c; `minEvents` and `maxEvents` leave it here, because phase 6
+    // brings the "attended fewer than N events" query back with a control in
+    // the Attendance panel. A phase-1 bookmark carrying any of the three now
+    // narrows again — correctly, because it narrows *with a control on screen*.
+    // The invariant was never "an old bookmark can't narrow"; it is "nothing
+    // narrows without a control." These three still have neither.
     const filter = parseMemberFilter({
-      minEvents: "2",
-      maxEvents: "9",
       minRate: "50",
       joinedFrom: "2026-01-01",
       joinedTo: "2026-06-30",
@@ -782,6 +796,221 @@ describe("categorical filters (phase 5c)", () => {
   });
 });
 
+// Stage 6 phase 6. The relational filters — the first that narrow on data the
+// directory does not display, and the first whose predicate is not a column.
+describe("relational filters (phase 6)", () => {
+  const EVENT = "11111111-2222-4333-8444-555555555555";
+
+  it("all five default to narrowing nothing", () => {
+    const filter = parseMemberFilter({});
+    expect(filter.event).toBeNull();
+    expect(filter.pending).toBe("all");
+    expect(filter.notSeenSince).toBeNull();
+    expect(filter.minEvents).toBeNull();
+    expect(filter.maxEvents).toBeNull();
+    expect(isDefaultFilter(filter)).toBe(true);
+    expect(hasRelationalFilter(filter)).toBe(false);
+    expect(relationalFilterCount(filter)).toBe(0);
+  });
+
+  describe("has pending", () => {
+    it("asks for at least one, not for a truthy count", () => {
+      expect(callsFor({ pending: "has" })).toContainEqual([
+        "gte",
+        "pending_count",
+        1,
+      ]);
+    });
+
+    it("adds no clause for 'all'", () => {
+      expect(
+        callsFor({ pending: "all" }).some(([, c]) => c === "pending_count")
+      ).toBe(false);
+    });
+  });
+
+  describe("events attended", () => {
+    it("bounds events_attended, not total_points", () => {
+      const calls = callsFor({ minEvents: 2, maxEvents: 9 });
+      expect(calls).toContainEqual(["gte", "events_attended", 2]);
+      expect(calls).toContainEqual(["lte", "events_attended", 9]);
+    });
+
+    it("keeps a real 0 bound, which hides rows", () => {
+      // Same null-vs-zero rule the points bounds follow: "attended 0 events" is
+      // the whole point of this filter, not an unset field.
+      expect(parseMemberFilter({ maxEvents: "0" }).maxEvents).toBe(0);
+      expect(callsFor({ maxEvents: 0 })).toContainEqual([
+        "lte",
+        "events_attended",
+        0,
+      ]);
+    });
+  });
+
+  describe("not seen since", () => {
+    it("⚠️ includes members never seen at all", () => {
+      // The null branch IS the filter. A bare .lt() drops nulls silently, so
+      // the officer asking "who has gone quiet?" would get an answer with the
+      // quietest members missing from it.
+      const or = callsFor({ notSeenSince: "2026-09-01" }).find(
+        ([method]) => method === "or"
+      );
+      expect(or?.[1]).toContain("last_seen_at.is.null");
+      expect(or?.[1]).toContain("last_seen_at.lt.");
+    });
+
+    it("🪤 anchors the cutoff in Central, not UTC", () => {
+      // A bare "2026-09-01" is read as UTC midnight and silently drops the last
+      // five hours of the Central day before it. September is CDT (UTC-5), so
+      // Central midnight is 05:00Z.
+      const or = callsFor({ notSeenSince: "2026-09-01" }).find(
+        ([method]) => method === "or"
+      );
+      expect(or?.[1]).toContain("2026-09-01T05:00:00.000Z");
+    });
+
+    it("rejects anything that is not a civil date", () => {
+      for (const bad of ["yesterday", "2026-9-1", "09/01/2026", ""]) {
+        expect(parseMemberFilter({ notSeenSince: bad }).notSeenSince, bad).toBeNull();
+      }
+    });
+
+    it("📌 coexists with the search as a SECOND or-group", () => {
+      // Separate `or=` params AND together, which is what two independent
+      // concerns want. The failure the search's own comment warns about is
+      // different — splitting ONE concern's alternatives across several calls
+      // ANDs them and matches nothing.
+      const groups = callsFor({ q: "dara", notSeenSince: "2026-09-01" }).filter(
+        ([method]) => method === "or"
+      );
+      expect(groups).toHaveLength(2);
+      expect(groups.some(([, body]) => String(body).includes("full_name.ilike"))).toBe(true);
+      expect(groups.some(([, body]) => String(body).includes("last_seen_at"))).toBe(true);
+    });
+  });
+
+  describe("attended / missed one event", () => {
+    it("scopes the embed to present rows and asks for a match", () => {
+      const calls = callsFor({ event: EVENT, eventMode: "attended" });
+      expect(calls).toContainEqual(["eq", "attendance.event_id", EVENT]);
+      // ⚠️ Not optional: a pending or rejected submission is not attendance.
+      expect(calls).toContainEqual(["eq", "attendance.status", "present"]);
+      expect(calls).toContainEqual(["not", "attendance", "is", null]);
+    });
+
+    it("inverts to an anti-join for 'missed'", () => {
+      const calls = callsFor({ event: EVENT, eventMode: "missed" });
+      expect(calls).toContainEqual(["is", "attendance", null]);
+      expect(calls).not.toContainEqual(["not", "attendance", "is", null]);
+      // The event and status clauses are identical in both modes — one embed,
+      // two readings of it.
+      expect(calls).toContainEqual(["eq", "attendance.event_id", EVENT]);
+      expect(calls).toContainEqual(["eq", "attendance.status", "present"]);
+    });
+
+    it("🔓 drops an event id that is not a uuid", () => {
+      // Interpolated into the query, so it is format-checked before it can get
+      // there — the same discipline customFieldColumn applies to a key.
+      for (const bad of ["' or 1=1", "abc", "11111111-2222-4333-8444", ""]) {
+        expect(parseMemberFilter({ event: bad }).event, bad).toBeNull();
+      }
+      const calls = callsFor({ event: null, eventMode: "missed" });
+      expect(calls.some(([, c]) => String(c).startsWith("attendance"))).toBe(false);
+    });
+
+    it("needs the embed only when an event is chosen", () => {
+      expect(needsAttendanceEmbed(parseMemberFilter({}))).toBe(false);
+      expect(needsAttendanceEmbed(parseMemberFilter({ event: EVENT }))).toBe(true);
+      // The mode alone is not enough — there is nothing to have missed.
+      expect(
+        needsAttendanceEmbed(parseMemberFilter({ eventMode: "missed" }))
+      ).toBe(false);
+    });
+
+    it("⚠️ never puts the mode in the URL without its event", () => {
+      // A `eventMode=missed` with no event reads as an active filter in the
+      // controls and narrows nothing — and it would break the round trip.
+      const orphan = memberFilterToParams(
+        parseMemberFilter({ eventMode: "missed" })
+      );
+      expect(orphan.has("eventMode")).toBe(false);
+      expect(orphan.toString()).toBe("");
+
+      const paired = memberFilterToParams(
+        parseMemberFilter({ event: EVENT, eventMode: "missed" })
+      );
+      expect(paired.get("event")).toBe(EVENT);
+      expect(paired.get("eventMode")).toBe("missed");
+    });
+
+    it("omits the default mode but keeps the event", () => {
+      const params = memberFilterToParams(
+        parseMemberFilter({ event: EVENT, eventMode: "attended" })
+      );
+      expect(params.get("event")).toBe(EVENT);
+      expect(params.has("eventMode")).toBe(false);
+    });
+  });
+
+  it("counts what the Advanced panel must open for", () => {
+    // ⚠️ The panel opens on this, so an active filter can never be hidden
+    // behind a collapsed lid — the phase-1 defect in a new costume.
+    const filter = parseMemberFilter({
+      event: EVENT,
+      pending: "has",
+      notSeenSince: "2026-09-01",
+      minEvents: "2",
+    });
+    expect(hasRelationalFilter(filter)).toBe(true);
+    expect(relationalFilterCount(filter)).toBe(4);
+  });
+
+  it("round-trips every field through the URL", () => {
+    const filter = parseMemberFilter({
+      event: EVENT,
+      eventMode: "missed",
+      pending: "has",
+      notSeenSince: "2026-09-01",
+      minEvents: "2",
+      maxEvents: "9",
+    });
+    const back = parseMemberFilter(
+      Object.fromEntries(memberFilterToParams(filter))
+    );
+    expect(back).toEqual(filter);
+  });
+
+  it("survives a change to any other control", () => {
+    const filter = parseMemberFilter(
+      { event: EVENT, eventMode: "missed", pending: "has", notSeenSince: "2026-09-01" },
+      NO_FIELDS
+    );
+    const next = new URLSearchParams(
+      memberFilterUrl(filter, { q: "dara" }, NO_FIELDS)
+    );
+    expect(next.get("event")).toBe(EVENT);
+    expect(next.get("eventMode")).toBe("missed");
+    expect(next.get("pending")).toBe("has");
+    expect(next.get("notSeenSince")).toBe("2026-09-01");
+  });
+
+  it("never windows the result, however many predicates are applied", () => {
+    const calls = callsFor({
+      event: EVENT,
+      eventMode: "missed",
+      pending: "has",
+      notSeenSince: "2026-09-01",
+      minEvents: 1,
+      maxEvents: 9,
+      q: "a",
+      dues: "unpaid",
+      source: "self_checkin",
+    });
+    expect(calls.some(([m]) => m === "range" || m === "limit")).toBe(false);
+  });
+});
+
 describe("chunk arithmetic", () => {
   it("produces inclusive PostgREST bounds, zero-based", () => {
     expect(chunkRange(0)).toEqual({ from: 0, to: READ_CHUNK - 1 });
@@ -816,11 +1045,16 @@ describe("filter control state", () => {
   const base = parseMemberFilter({});
 
   it("shows an empty box for every unset field, so CLEAR empties them all", () => {
-    // The exact post-CLEAR filter: nothing narrowing.
+    // The exact post-CLEAR filter: nothing narrowing. Every box empty, and the
+    // assertion is exhaustive on purpose — a new typed-into filter that forgets
+    // its empty state fails here rather than on the officer's screen.
     expect(memberFilterFields(base)).toEqual({
       q: "",
       minPoints: "",
       maxPoints: "",
+      minEvents: "",
+      maxEvents: "",
+      notSeenSince: "",
     });
   });
 
@@ -838,11 +1072,19 @@ describe("filter control state", () => {
         q: "dara",
         minPoints: 15,
         maxPoints: 40,
+        minEvents: 2,
+        maxEvents: 9,
+        notSeenSince: "2026-09-01",
       })
     ).toEqual({
       q: "dara",
       minPoints: "15",
       maxPoints: "40",
+      minEvents: "2",
+      maxEvents: "9",
+      // A date passes through as its civil string — no Date round trip, which
+      // is what would shift it a day for anyone east or west of the server.
+      notSeenSince: "2026-09-01",
     });
   });
 

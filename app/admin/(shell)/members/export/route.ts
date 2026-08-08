@@ -4,6 +4,7 @@ import {
   applyMemberFilter,
   isDefaultFilter,
   memberFilterToParams,
+  needsAttendanceEmbed,
   parseMemberFilter,
 } from "@/lib/filters";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
@@ -64,6 +65,16 @@ export const dynamic = "force-dynamic";
 // what happened to be selected here.
 const EXPORT_COLUMNS =
   "id, eid, full_name, email, active, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_current_term, custom_fields" as const;
+
+// The same list plus phase 6's attendance embed, spelled out in full rather than
+// concatenated for the reason above: PostgREST types the row off the literal.
+//
+// ⚠️ This has to stay in step with EXPORT_COLUMNS by hand, and the export
+// catalogue is what makes that safe — a column added to one and not the other
+// shows up as a missing field in the file rather than as a type error. Change
+// them together.
+const EXPORT_COLUMNS_WITH_ATTENDANCE =
+  "id, eid, full_name, email, active, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_current_term, custom_fields, attendance!left(event_id)" as const;
 
 /**
  * Rows per PostgREST request while paging through the result.
@@ -136,11 +147,24 @@ export async function GET(request: Request): Promise<Response> {
       );
     }
 
-    const base = applyMemberFilter(
-      db.from("member_directory").select(EXPORT_COLUMNS, { count: "exact" }),
-      filter,
-      fields
-    );
+    // 🪤 Branches on the filter for the same reason the directory page does, and
+    // it MUST branch the same way: the attendance embed lives in the select, and
+    // an export that forgot it would answer PGRST100 on exactly the filters that
+    // work on screen. Two `as const` literals, never a concatenation — see the
+    // note on EXPORT_COLUMNS_WITH_ATTENDANCE.
+    const base = needsAttendanceEmbed(filter)
+      ? applyMemberFilter(
+          db
+            .from("member_directory")
+            .select(EXPORT_COLUMNS_WITH_ATTENDANCE, { count: "exact" }),
+          filter,
+          fields
+        )
+      : applyMemberFilter(
+          db.from("member_directory").select(EXPORT_COLUMNS, { count: "exact" }),
+          filter,
+          fields
+        );
 
     // ⚠️ applyMemberFilter applies no window at all, and that is the whole
     // design: the range below belongs to this caller, so the file is provably

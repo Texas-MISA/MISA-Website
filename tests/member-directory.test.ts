@@ -997,3 +997,219 @@ describe("categorical filters against the view", () => {
     expect(exported).toHaveLength(count);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Stage 6 phase 6 — the relational filters against real PostgREST.
+//
+// One of these can only be checked here. `attendance!left(event_id)` +
+// `is.null` / `not.is.null` is an anti-join expressed through an embed, and
+// whether PostgREST resolves the member_directory -> attendance relationship at
+// all is a property of the deployed schema rather than of anything this repo
+// can assert in a pure test. The headline property is that the two modes
+// PARTITION the roster: attended + missed = everyone, nobody counted twice and
+// nobody dropped.
+//
+// `t3qrel` is a strict narrowing of `t3q`, like every other block's marker.
+// ---------------------------------------------------------------------------
+const REL_MARKER = "t3qrel";
+
+describe("relational filters against the view", () => {
+  const attended: string[] = [];
+  const missed: string[] = [];
+  let neverSeenId = "";
+  let pendingId = "";
+  let relEventId = "";
+  let emptyEventId = "";
+
+  /** The embed the event filter needs. The real callers hold two literals and
+   * branch; this block only ever uses the embedded form. */
+  const REL_COLUMNS =
+    "id, full_name, source, pending_count, last_seen_at, events_attended, attendance!left(event_id)" as const;
+
+  beforeAll(async () => {
+    const event = await createCurrentTermEvent(db, track, { points: 2 });
+    relEventId = event.id;
+    const empty = await createCurrentTermEvent(db, track, { points: 1 });
+    emptyEventId = empty.id;
+
+    // Three who attended, three who did not, one never seen at all, and one
+    // carrying a pending submission.
+    for (let i = 0; i < 6; i++) {
+      const base = testIdentity();
+      const identity = { ...base, eid: base.eid.replace("t3q", REL_MARKER) };
+      const id = await createTestMember(db, track, identity);
+
+      if (i % 2 === 0) {
+        await createTestAttendance(db, track, {
+          eventId: relEventId,
+          memberId: id,
+          submittedName: identity.fullName,
+          submittedEid: identity.eid,
+          submittedEmail: identity.email,
+          submittedAt: new Date(),
+          status: "present",
+        });
+        attended.push(id);
+      } else {
+        missed.push(id);
+      }
+    }
+
+    const neverBase = testIdentity();
+    neverSeenId = await createTestMember(db, track, {
+      ...neverBase,
+      eid: neverBase.eid.replace("t3q", REL_MARKER),
+    });
+    missed.push(neverSeenId);
+
+    const pendingBase = testIdentity();
+    const pendingIdentity = {
+      ...pendingBase,
+      eid: pendingBase.eid.replace("t3q", REL_MARKER),
+    };
+    pendingId = await createTestMember(db, track, pendingIdentity);
+    missed.push(pendingId);
+    await createTestAttendance(db, track, {
+      eventId: relEventId,
+      memberId: pendingId,
+      submittedName: pendingIdentity.fullName,
+      submittedEid: pendingIdentity.eid,
+      submittedEmail: pendingIdentity.email,
+      submittedAt: new Date(),
+      status: "pending",
+    });
+  }, 60_000);
+
+  const mine = (params: Record<string, string>) =>
+    parseMemberFilter({ q: REL_MARKER, state: "all", ...params });
+
+  async function run(params: Record<string, string>) {
+    const { data, error, count } = await applyMemberFilter(
+      db.from("member_directory").select(REL_COLUMNS, { count: "exact" }),
+      mine(params),
+      []
+    );
+    if (error) throw new Error(`relational query failed: ${error.message}`);
+    return { ids: (data ?? []).map((r) => r.id ?? ""), count: count ?? 0 };
+  }
+
+  it("resolves the member_directory to attendance relationship at all", async () => {
+    // If PostgREST cannot infer it, every assertion below fails as PGRST200 and
+    // this one says why in a single line rather than six.
+    const { ids } = await run({ event: relEventId, eventMode: "attended" });
+    expect(ids.length).toBeGreaterThan(0);
+  });
+
+  it("attended and missed PARTITION the roster exactly", async () => {
+    const a = await run({ event: relEventId, eventMode: "attended" });
+    const m = await run({ event: relEventId, eventMode: "missed" });
+    const everyone = await run({});
+
+    expect(a.ids.sort()).toEqual([...attended].sort());
+    expect(m.ids.sort()).toEqual([...missed].sort());
+
+    // The headline property: no overlap, no gap, and the counts agree with the
+    // rows on both sides.
+    expect(a.count).toBe(a.ids.length);
+    expect(m.count).toBe(m.ids.length);
+    expect(a.count + m.count).toBe(everyone.count);
+    expect(a.ids.filter((id) => m.ids.includes(id))).toEqual([]);
+  });
+
+  it("counts a PENDING submission as missed, not attended", async () => {
+    // status='present' on the embed is load-bearing. A member whose check-in is
+    // still in the queue did not attend as far as any credit goes, and treating
+    // them as present here would disagree with the leaderboard.
+    const a = await run({ event: relEventId, eventMode: "attended" });
+    const m = await run({ event: relEventId, eventMode: "missed" });
+    expect(a.ids).not.toContain(pendingId);
+    expect(m.ids).toContain(pendingId);
+  });
+
+  it("handles an event nobody attended", async () => {
+    const a = await run({ event: emptyEventId, eventMode: "attended" });
+    const m = await run({ event: emptyEventId, eventMode: "missed" });
+    const everyone = await run({});
+
+    expect(a.ids).toHaveLength(0);
+    expect(a.count).toBe(0);
+    expect(m.count).toBe(everyone.count);
+  });
+
+  it("not-seen-since includes members never seen at all", async () => {
+    // The null branch. A bare .lt() drops them, and they are the most
+    // gone-quiet members on the roster.
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const { ids } = await run({ notSeenSince: tomorrow });
+
+    expect(ids).toContain(neverSeenId);
+    expect(ids.length).toBe((await run({})).count);
+  });
+
+  it("excludes members seen after the cutoff", async () => {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    const { ids } = await run({ notSeenSince: yesterday });
+
+    // The attenders were seen just now, so they fall out; the never-seen member
+    // stays, because null is not "after the cutoff".
+    for (const id of attended) expect(ids).not.toContain(id);
+    expect(ids).toContain(neverSeenId);
+  });
+
+  it("finds members with a check-in still waiting", async () => {
+    const { ids } = await run({ pending: "has" });
+    expect(ids).toEqual([pendingId]);
+  });
+
+  it("bounds events attended this term", async () => {
+    const none = await run({ maxEvents: "0" });
+    const some = await run({ minEvents: "1" });
+
+    // A real 0 bound hides rows rather than meaning "unset".
+    for (const id of attended) expect(none.ids).not.toContain(id);
+    expect(none.ids).toContain(neverSeenId);
+    expect(some.ids.sort()).toEqual([...attended].sort());
+  });
+
+  it("composes an event filter with a categorical one", async () => {
+    // Two predicates that each match something, ANDing to nothing — the
+    // property that proves they conjoin rather than replace each other. Every
+    // fixture here is admin-created, so self_checkin plus attended is empty.
+    const { ids, count } = await run({
+      event: relEventId,
+      eventMode: "attended",
+      source: "self_checkin",
+    });
+    expect(ids).toHaveLength(0);
+    expect(count).toBe(0);
+  });
+
+  it("the filtered count is what a chunked export of the same filter returns", async () => {
+    // §4.5's one-translation rule on the embed, which is the predicate most
+    // likely to diverge: the export builds a DIFFERENT select literal, so this
+    // is what pins the two literals staying in step.
+    const filter = mine({ event: relEventId, eventMode: "missed" });
+    const query = applyMemberFilter(
+      db.from("member_directory").select(REL_COLUMNS, { count: "exact" }),
+      filter,
+      []
+    );
+
+    const rows: { id: string | null }[] = [];
+    let total = 0;
+    for (let offset = 0; ; offset += CHUNK) {
+      const { data, error, count } = await query.range(offset, offset + CHUNK - 1);
+      if (error) throw new Error(`export query failed: ${error.message}`);
+      if (offset === 0) total = count ?? data.length;
+      rows.push(...data);
+      if (data.length < CHUNK || rows.length >= total) break;
+    }
+
+    expect(rows).toHaveLength(total);
+    expect(rows.map((r) => r.id ?? "").sort()).toEqual([...missed].sort());
+  });
+});

@@ -7,9 +7,11 @@ import {
   chunkRange,
   isDefaultFilter,
   memberFilterToParams,
+  needsAttendanceEmbed,
   parseMemberFilter,
   READ_CHUNK,
 } from "@/lib/filters";
+import { fetchEventOptions } from "@/lib/event-options";
 import { exportCatalogue } from "@/lib/export";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
 import type { FieldDefinition } from "@/lib/members";
@@ -50,9 +52,41 @@ export const metadata: Metadata = { title: "Members" };
 const COLUMNS =
   "id, eid, full_name, email, active, source, total_points, dues_paid_current_term, custom_fields, updated_at" as const;
 
+// The same list plus the attendance embed phase 6's event filter needs.
+//
+// 🪤 **Two literals and a branch, never `COLUMNS + ", attendance!left(…)"`.**
+// PostgREST types the returned row off the string *literal*, so a concatenation
+// widens it to plain `string` and collapses every field access at once. That is
+// the same GenericStringError break recorded on AUDITED_ADJUSTMENT_COLUMNS, and
+// building this string dynamically is the most natural way to reintroduce it.
+//
+// One `!left` embed serves both modes: `attendance=is.null` is "missed",
+// `not.is.null` is "attended", and the two partition the roster exactly
+// (measured: 15 + 17 = 32 on the seed). It is applied ONLY when an event filter
+// is set — unfiltered it still returns the right rows and the right count, but
+// it nests every member's whole attendance history into the payload for nothing.
+const COLUMNS_WITH_ATTENDANCE =
+  "id, eid, full_name, email, active, source, total_points, dues_paid_current_term, custom_fields, updated_at, attendance!left(event_id)" as const;
+
 type DirectoryQueryResult =
   | { kind: "ok"; rows: MemberRow[]; total: number }
   | { kind: "error" };
+
+/**
+ * The un-embedded directory select — used for real in the common branch, and
+ * used for its *type* by both.
+ *
+ * A function rather than a bare value so the row shape can be derived without
+ * building a query object that might never be issued, and so the COLUMNS
+ * literal stays the single source of that shape rather than being restated.
+ */
+function narrowSelect(db: ReturnType<typeof createAdminClient>) {
+  return db.from("member_directory").select(COLUMNS, { count: "exact" });
+}
+
+type DirectoryRow = NonNullable<
+  Awaited<ReturnType<typeof narrowSelect>>["data"]
+>[number];
 
 async function fetchDirectory(
   db: ReturnType<typeof createAdminClient>,
@@ -67,11 +101,21 @@ async function fetchDirectory(
   // applyMemberFilter takes them as a required argument on purpose: forgetting
   // to load them is then a compile error rather than a directory that silently
   // falls back to sorting by name.
-  const query = applyMemberFilter(
-    db.from("member_directory").select(COLUMNS, { count: "exact" }),
-    filter,
-    fields
-  );
+  //
+  // 🪤 The select branches on the filter because the attendance embed has to be
+  // in the select and cannot be assembled dynamically — see the note on
+  // COLUMNS_WITH_ATTENDANCE. `needsAttendanceEmbed` keeps the *decision* in
+  // lib/filters.ts even though the literal cannot live there, so the page never
+  // decides for itself what the filter needs.
+  const query = needsAttendanceEmbed(filter)
+    ? applyMemberFilter(
+        db
+          .from("member_directory")
+          .select(COLUMNS_WITH_ATTENDANCE, { count: "exact" }),
+        filter,
+        fields
+      )
+    : applyMemberFilter(narrowSelect(db), filter, fields);
 
   // ⚠️ Read in chunks rather than asking for the whole result at once. The
   // directory stopped paginating on 2026-08-07 and shows every matching member,
@@ -88,7 +132,13 @@ async function fetchDirectory(
   // Rows typed off the builder rather than restated, so the COLUMNS literal
   // stays the single source of the row shape (PostgREST types the result from
   // that literal — see the note on COLUMNS).
-  const raw: NonNullable<Awaited<typeof query>["data"]> = [];
+  //
+  // 📌 Typed off the NARROW select specifically, not off `query`. Since phase 6
+  // `query` is a union of two row shapes and pushing one branch's rows into an
+  // array typed as the other does not compile. The narrow shape is the right
+  // one: the embed adds a field nothing below reads, and an embed row is
+  // structurally assignable to it.
+  const raw: DirectoryRow[] = [];
   let total = 0;
 
   for (let index = 0; ; index++) {
@@ -149,7 +199,15 @@ export default async function AdminMembersPage({
   const fields = await fetchFieldDefinitions(db);
 
   const filter = parseMemberFilter(params, fields);
-  const result = await fetchDirectory(db, filter, fields);
+
+  // The directory read and the event picker are independent, so they go
+  // together. fetchEventOptions is the same all-status list the attendance queue
+  // and manual entry offer — an officer asking who missed a cancelled event is
+  // asking a real question, and a published-only picker could not answer it.
+  const [result, events] = await Promise.all([
+    fetchDirectory(db, filter, fields),
+    fetchEventOptions(db),
+  ]);
 
   // The filter, serving two jobs at once: it is the export's query string, and
   // it is the key that resets the selection when the officer narrows the view.
@@ -185,7 +243,7 @@ export default async function AdminMembersPage({
       </p>
 
       <div className="mt-6">
-        <MemberFilters filter={filter} definitions={fields} />
+        <MemberFilters filter={filter} definitions={fields} events={events} />
       </div>
 
       <div className="mt-8">

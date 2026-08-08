@@ -39,6 +39,12 @@
 // The only import here, and deliberately a pure one: lib/members.ts owns the
 // key format and the `cf:` namespace, so both modules cannot drift on what a
 // custom sort key looks like. Still no next/* and no supabase-js.
+// lib/events.ts is pure too — no next/* and no supabase-js — so importing the
+// Central wall-clock conversion here keeps this module's contract intact. It is
+// the same function every other date range in the app anchors on, which is the
+// point: a second implementation is how two screens start disagreeing about
+// where a day begins.
+import { centralWallTimeToInstant } from "@/lib/events";
 import {
   customFieldColumn,
   customFieldKey,
@@ -156,6 +162,35 @@ export const MEMBER_SOURCES = ["all", "admin", "self_checkin"] as const;
 export type MemberSource = (typeof MEMBER_SOURCES)[number];
 
 /**
+ * Whether a chosen event is being asked about as attendance or as absence
+ * (phase 6).
+ *
+ * Only meaningful alongside `event`, and dropped from the URL without one — a
+ * `mode=missed` with nothing to have missed is a filter that reads as active and
+ * narrows nothing.
+ */
+export const EVENT_MODES = ["attended", "missed"] as const;
+export type EventMode = (typeof EVENT_MODES)[number];
+
+/** Has an unresolved check-in waiting on an officer, or either (phase 6). */
+export const MEMBER_PENDING = ["all", "has"] as const;
+export type MemberPending = (typeof MEMBER_PENDING)[number];
+
+/**
+ * A uuid, as PostgREST will be asked to compare one.
+ *
+ * 🔓 An event id arrives from a URL and is interpolated into a query, so it is
+ * format-checked before it can get there — the same discipline `customFieldColumn`
+ * applies to a definition key and the export route applies to its `ids`. Anything
+ * that is not a uuid is dropped rather than passed through.
+ */
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A `YYYY-MM-DD` civil date, which is what the date inputs emit. */
+const CIVIL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
  * The most characters a custom-field filter value may carry.
  *
  * An option is capped at 80 by `saveFieldDefinition`, so this is that bound
@@ -226,6 +261,59 @@ export type MemberFilter = {
    * phase 6's relational filters rather than smuggled in here.
    */
   custom: Record<string, string>;
+
+  // ---------------------------------------------------------------------
+  // The relational filters (phase 6).
+  //
+  // ⚠️ These are the first that narrow on data the directory does NOT
+  // display, which cuts against the phase-3 trim rather than following it.
+  // The trim's argument was that a filter with no control on screen leaves a
+  // count nobody can account for — so the answer is not to hide them but to
+  // give them a labelled panel of their own that says what they are. See
+  // member-filters.tsx; the panel opens whenever one of these is set, which is
+  // what keeps the rule intact.
+  // ---------------------------------------------------------------------
+
+  /**
+   * The event being asked about, or null.
+   *
+   * 🔓 A uuid, format-checked in `parseMemberFilter` before it can reach a
+   * query. Nothing else here is interpolated from a URL as an identifier.
+   */
+  event: string | null;
+  /** How to read `event`. Ignored, and dropped from the URL, without one. */
+  eventMode: EventMode;
+  /**
+   * Has at least one check-in still waiting on an officer.
+   *
+   * ⚠️ `pending_count` is ALL-TIME, unlike every other aggregate on the view —
+   * a submission from last term still needs somebody, which is the same reason
+   * the member detail page labels it that way. Filtering on it therefore does
+   * not mean "this term".
+   */
+  pending: MemberPending;
+  /**
+   * A civil date; matches members last seen strictly before it, **including
+   * those never seen at all**.
+   *
+   * ⚠️ The null half is the whole point and is easy to lose. `last_seen_at` is
+   * null for a member who has never been marked present, and a bare `.lt()`
+   * drops nulls silently — so the officer asking "who has gone quiet?" would
+   * get an answer with the quietest members missing from it. Same shape as the
+   * `attendance_rate` null-vs-zero rule.
+   */
+  notSeenSince: string | null;
+  /**
+   * Bounds on `events_attended`, current-term.
+   *
+   * 📌 Returning from the phase-3 trim, which removed them along with their
+   * column. They come back for the same reason `source` did in 5c: the query
+   * ("who has attended fewer than three things?") is real and had nowhere to
+   * live. What makes that acceptable is the control, not the column.
+   */
+  minEvents: number | null;
+  maxEvents: number | null;
+
   sort: MemberSort;
   dir: "asc" | "desc";
 };
@@ -368,6 +456,30 @@ export function parseMemberFilter(
     ? (rawSource as MemberSource)
     : "all";
 
+  // 🔓 Dropped unless it is a uuid. The id is interpolated into the query, so
+  // "it came from the picker" is not a property this function can verify.
+  const rawEvent = one(params, "event").trim();
+  const event: string | null = UUID_RE.test(rawEvent) ? rawEvent : null;
+
+  const rawMode = one(params, "eventMode");
+  const eventMode: EventMode = (EVENT_MODES as readonly string[]).includes(
+    rawMode
+  )
+    ? (rawMode as EventMode)
+    : "attended";
+
+  const rawPending = one(params, "pending");
+  const pending: MemberPending = (MEMBER_PENDING as readonly string[]).includes(
+    rawPending
+  )
+    ? (rawPending as MemberPending)
+    : "all";
+
+  const rawNotSeen = one(params, "notSeenSince").trim();
+  const notSeenSince: string | null = CIVIL_DATE_RE.test(rawNotSeen)
+    ? rawNotSeen
+    : null;
+
   // Officer-defined field filters, read by walking the definitions rather than
   // the params — so an unknown `cf:` param is ignored by construction and never
   // reaches the query, the same way this function ignores every retired key.
@@ -412,6 +524,12 @@ export function parseMemberFilter(
     dues,
     source,
     custom,
+    event,
+    eventMode,
+    pending,
+    notSeenSince,
+    minEvents: intOrNull(one(params, "minEvents"), 10_000),
+    maxEvents: intOrNull(one(params, "maxEvents"), 10_000),
     sort,
     dir,
   };
@@ -444,7 +562,21 @@ export function memberFilterToParams(
   if (merged.state !== "active") params.set("state", merged.state);
   if (merged.dues !== "all") params.set("dues", merged.dues);
   if (merged.source !== "all") params.set("source", merged.source);
+  if (merged.pending !== "all") params.set("pending", merged.pending);
   if (merged.q) params.set("q", merged.q);
+  if (merged.notSeenSince) params.set("notSeenSince", merged.notSeenSince);
+
+  // ⚠️ The mode rides on the event, never alone. A URL carrying
+  // `eventMode=missed` with no event describes a filter that reads as active in
+  // the controls and narrows nothing — the phase-1 defect in miniature — and it
+  // would also break the round trip, since parse would hand back a filter that
+  // does not re-serialize to the same string.
+  if (merged.event) {
+    params.set("event", merged.event);
+    if (merged.eventMode !== "attended") {
+      params.set("eventMode", merged.eventMode);
+    }
+  }
 
   // Sorted by key so the query string is a function of the filter and not of
   // object insertion order — two officers who picked the same filters in a
@@ -458,6 +590,8 @@ export function memberFilterToParams(
   const numbers: [keyof MemberFilter, string][] = [
     ["minPoints", "minPoints"],
     ["maxPoints", "maxPoints"],
+    ["minEvents", "minEvents"],
+    ["maxEvents", "maxEvents"],
   ];
   for (const [key, name] of numbers) {
     const value = merged[key];
@@ -486,6 +620,9 @@ export type MemberFilterFields = {
   q: string;
   minPoints: string;
   maxPoints: string;
+  minEvents: string;
+  maxEvents: string;
+  notSeenSince: string;
 };
 
 /**
@@ -511,7 +648,63 @@ export function memberFilterFields(filter: MemberFilter): MemberFilterFields {
     q: filter.q,
     minPoints: show(filter.minPoints),
     maxPoints: show(filter.maxPoints),
+    minEvents: show(filter.minEvents),
+    maxEvents: show(filter.maxEvents),
+    // A date input reads "" for unset, exactly as the number boxes do.
+    notSeenSince: filter.notSeenSince ?? "",
   };
+}
+
+/**
+ * Is any relational filter (phase 6) active?
+ *
+ * ⚠️ The Advanced panel is collapsible, and a collapsed panel hiding an applied
+ * filter is the phase-1 defect wearing a lid — a count the officer cannot
+ * account for. The panel therefore opens whenever this is true, and this lives
+ * here rather than in the component so the panel and the query cannot disagree
+ * about what "active" means.
+ */
+export function hasRelationalFilter(filter: MemberFilter): boolean {
+  return (
+    filter.event !== null ||
+    filter.pending !== "all" ||
+    filter.notSeenSince !== null ||
+    filter.minEvents !== null ||
+    filter.maxEvents !== null
+  );
+}
+
+/** How many of them, for the collapsed panel's summary. */
+export function relationalFilterCount(filter: MemberFilter): number {
+  return [
+    filter.event !== null,
+    filter.pending !== "all",
+    filter.notSeenSince !== null,
+    filter.minEvents !== null,
+    filter.maxEvents !== null,
+  ].filter(Boolean).length;
+}
+
+/**
+ * Does this filter need `attendance` embedded in the SELECT?
+ *
+ * 🪤 The embed cannot live in `applyMemberFilter`, because PostgREST needs it in
+ * the `select` — which the caller builds before this module ever sees the query.
+ * And the select string cannot be assembled dynamically: PostgREST types the
+ * returned row off the string **literal**, so a concatenation widens it to plain
+ * `string` and collapses every field access at once (the `GenericStringError`
+ * break, which has now cost a build three times).
+ *
+ * So each caller holds two `as const` literals and branches on this. The
+ * *decision* stays here, in the one module that owns the translation, even
+ * though the literal cannot.
+ *
+ * The embed is deliberately not applied unconditionally: with no event filter it
+ * still returns the right rows and the right count, but it nests every member's
+ * entire attendance history into the payload for nothing.
+ */
+export function needsAttendanceEmbed(filter: MemberFilter): boolean {
+  return filter.event !== null;
 }
 
 /**
@@ -578,11 +771,29 @@ export type FilterableQuery<Q> = {
   eq(column: string, value: string | number | boolean): Q;
   gte(column: string, value: string | number): Q;
   lte(column: string, value: string | number): Q;
-  /** One PostgREST `or=(…)` group, as its comma-separated body. Arrives ahead of
-   * the roadmap, which files `in`/`or`/`not` under phase 6's relational filters
-   * — but free-text search across three columns is an `or` and nothing else.
-   * `lt` left with the joined-date range and returns with `in`/`not` in phase 6. */
+  /**
+   * One PostgREST `or=(…)` group, as its comma-separated body. Arrived in phase
+   * 3 for the free-text search, ahead of the roadmap that filed it under phase 6.
+   *
+   * ⚠️ Phase 6 makes a SECOND call to this, for the not-seen-since null branch,
+   * and the distinction matters: separate `or=` params **AND** together, which
+   * is what two independent concerns want. The failure the phase-3 comment warns
+   * about is different — splitting ONE concern's three alternatives across three
+   * calls ANDs them and matches nothing. Two groups, two concerns: correct.
+   */
   or(filters: string): Q;
+  /**
+   * `is` and `not` (phase 6), and between them they express the event filter.
+   *
+   * 📌 The roadmap predicted this phase would need `in`, `not` and `lt`. That
+   * came from assuming attendees would be resolved to a uuid list; embedding
+   * `attendance` in the select instead means the whole filter is
+   * `attendance=is.null` / `attendance=not.is.null`, so `in` and `lt` are still
+   * not needed. Measured reason for the embed: a uuid list 414s at ~220 ids
+   * (Kong's 8KB header buffer) and §2.2's worst case is 150 attendees an event.
+   */
+  is(column: string, value: null): Q;
+  not(column: string, operator: string, value: null): Q;
   order(
     column: string,
     options?: { ascending?: boolean; nullsFirst?: boolean }
@@ -667,6 +878,65 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
     const column = customFieldColumn(key);
     if (column === null) continue;
     q = q.eq(column, value);
+  }
+
+  // -------------------------------------------------------------------------
+  // The relational filters (phase 6).
+  // -------------------------------------------------------------------------
+
+  // ⚠️ ALL-TIME, unlike every other aggregate on the view. A submission from
+  // last term still needs an officer, so scoping this to the current term would
+  // hide exactly the rows that have been waiting longest.
+  if (filter.pending === "has") q = q.gte("pending_count", 1);
+
+  if (filter.minEvents !== null) q = q.gte("events_attended", filter.minEvents);
+  if (filter.maxEvents !== null) q = q.lte("events_attended", filter.maxEvents);
+
+  // "Not seen since <date>", and the null branch is the whole filter rather than
+  // a nicety.
+  //
+  // ⚠️ A member who has never been marked present has `last_seen_at` null, and a
+  // bare `.lt()` drops nulls silently — so the officer asking "who has gone
+  // quiet?" would get an answer with the quietest members missing. Same shape as
+  // the attendance_rate null-vs-zero rule, and decided the same way.
+  //
+  // ⚠️ Central-anchored. A bare `.lt("last_seen_at", "2026-09-01")` is read as
+  // UTC midnight and silently drops five hours of a Central day — the
+  // `new Date("2026-09-01T18:00")` class of bug, and it fails plausibly.
+  //
+  // 📌 This is the SECOND `or` group on the query when a search is also active.
+  // Separate `or=` params AND together, which is what two independent concerns
+  // want; the failure the search comment warns about is splitting ONE concern
+  // across several calls.
+  if (filter.notSeenSince !== null) {
+    const cutoff = centralWallTimeToInstant(
+      filter.notSeenSince,
+      "00:00"
+    ).toISOString();
+    q = q.or(`last_seen_at.is.null,last_seen_at.lt.${cutoff}`);
+  }
+
+  // Attended or missed one specific event — the only filter here that is not a
+  // column on the view.
+  //
+  // 🪤 It reads as two clauses and is really three: the embed itself lives in
+  // the caller's `select` (see needsAttendanceEmbed for why it cannot live
+  // here), and these narrow it. Without the embed PostgREST answers
+  // `PGRST100`, so the two halves are load-bearing on each other — which is
+  // exactly why the decision is exported from this module rather than left for
+  // each caller to remember.
+  //
+  // `status = 'present'` is not optional: a pending or rejected submission is
+  // not attendance, and present_requires_resolution guarantees a present row
+  // has both ids. One `!left` embed serves both modes — `is.null` for missed,
+  // `not.is.null` for attended — and the two partition the roster exactly.
+  if (filter.event !== null) {
+    q = q.eq("attendance.event_id", filter.event);
+    q = q.eq("attendance.status", "present");
+    q =
+      filter.eventMode === "attended"
+        ? q.not("attendance", "is", null)
+        : q.is("attendance", null);
   }
 
   // Nulls last in both directions. None of the four BUILT-IN sortable columns is
