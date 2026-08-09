@@ -560,6 +560,7 @@ export type Database = {
         Row: {
           full_name: string | null
           id: string | null
+          term: string | null
           total_points: number | null
         }
         Relationships: []

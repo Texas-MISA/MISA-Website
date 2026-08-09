@@ -37,6 +37,20 @@ const ANON_READABLE = new Set([
 ]);
 
 /**
+ * The exact columns anon may read from `leaderboard`.
+ *
+ * Pinned as a set, not a count: the assertion exists so that adding `eid` or
+ * `email` to the one public view fails here instead of quietly making it the
+ * next `member_directory`.
+ *
+ * 📌 `term` was appended by migration 21 (Stage 7 phase 1) so the public
+ * board's heading and its rows come from one query. Widening this list is a
+ * privacy decision every time — a term string names nobody, which is why that
+ * one was allowed; do not treat a red assertion here as a test to update.
+ */
+const LEADERBOARD_COLUMNS = ["full_name", "id", "term", "total_points"];
+
+/**
  * Every view the migrations create, read from source.
  *
  * Deliberately not a hardcoded list: a view added in a later migration is
@@ -98,11 +112,7 @@ describe("anon access", () => {
     expect(error).toBeNull();
     expect((data ?? []).length).toBeGreaterThan(0);
     for (const row of data ?? []) {
-      expect(Object.keys(row).sort()).toEqual([
-        "full_name",
-        "id",
-        "total_points",
-      ]);
+      expect(Object.keys(row).sort()).toEqual(LEADERBOARD_COLUMNS);
     }
   });
 

@@ -18,6 +18,10 @@ const NAV = [
   { href: "/projects", label: "Projects" },
   { href: "/contact", label: "Contact Us" },
   { href: "/attend", label: "Check In" },
+  // Stage 7. /leaderboard carries robots noindex,nofollow (§9 #1) — linking it
+  // from the nav makes it crawlable but not indexable, which is exactly what
+  // that meta tag is for. The board has to be glanceable to be worth building.
+  { href: "/leaderboard", label: "Leaderboard" },
 ] as const;
 
 const SOCIALS = [

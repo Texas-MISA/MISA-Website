@@ -1,9 +1,43 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.49
-**Status:** Stages 0–5 complete. **Stage 6 (member directory) — ✅ COMPLETE, all 9 phases.** **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases.** **Stage 7 (member-facing views: `/leaderboard` and `/lookup`) is next.**
+**Version:** 1.50
+**Status:** Stages 0–5 complete. **Stage 6 (member directory) — ✅ COMPLETE, all 9 phases.** **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases.** **Stage 7 (member-facing views) — phase 1 (`/leaderboard`) built; phase 2 (`/lookup`) next.**
 **Last updated:** August 2026
 
+> **v1.50: Stage 7 phase 1 — `/leaderboard`, and the term pin that never worked.**
+> Migration 21. The board itself is a small page; the finding underneath it is not.
+>
+> - 🔓 **`app_settings.current_term` — the documented override for pinning the
+>   board on a finished term (§4.4, §4.7, §9 #4) — has never worked for any
+>   caller subject to RLS.** `current_term()` was invoker-rights and reads a
+>   deny-all table, so it silently returned the *derived* term to `anon` and to
+>   `authenticated` while the service role saw the pin. Measured, not reasoned
+>   about; the table is in §4.4.
+> - 🪤 **"The view runs as its owner" is true and does not reach this.** Owner
+>   rights cover the tables a view names *directly*; a plain function called from
+>   inside the view still executes as the invoker. So a pinned board served anon
+>   the wrong label **and the wrong rows**, with no error.
+> - Latent since migration 1 and harmless until now — every admin screen reads
+>   through `createAdminClient()`, and `leaderboard` had **no reader at all**
+>   until this phase. It lands precisely on the first anon-facing term-scoped
+>   page. Fixed with `security definer` + `set search_path = ''`, which exposes
+>   one derived term string; an RLS policy on `app_settings` was the looser
+>   alternative and would have handed anon `updated_by` as well.
+> - **`term` is appended to `leaderboard`** so the heading and the rows come from
+>   one query. Append-only, so grants survive and no re-grant is restated.
+>   `tests/security.test.ts`'s exact-column assertion moves to four names in the
+>   same commit — a privacy decision each time, not a red test to update.
+> - 🪤 **Stage 5's revalidation carry-forward was resolved by NOT following it.**
+>   It named `revalidatePoints`; five modules move public standings, one of which
+>   (`submitCheckin`) revalidates nothing today. The board is `force-dynamic`, so
+>   there is no cache to go stale and no call site to forget.
+> - **Two stale sentences corrected:** §4.4 opened by claiming the view keeps
+>   attendance and bonus points separate (it adds them — §9 #11), and Stage 7's
+>   term bullet called the term "officer-set with no automatic rollover" (it
+>   rolls over automatically; the setting is a pin). Both were pre-existing
+>   self-contradictions, and both are the kind `tests/docs.test.ts` explicitly
+>   cannot catch.
+>
 > **v1.49: Stage 6 closes, and the read-through earned its keep again.** Phase 9 —
 > the closing pass over every document, checking load-bearing claims against the
 > code that implements them rather than proofreading them. **No migration.**
@@ -2097,43 +2131,58 @@ Two properties of this function shape the review screen, and both are easy to ge
 
 ### 4.4 Leaderboard view
 
-Points now come from two sources, and the view keeps them separate rather than collapsing them into one number:
+Points come from two sources, and the view **adds them into one number** — the split is kept only in `member_directory` (§4.5), which officers alone can reach. ⚠️ This paragraph used to open *"the view keeps them separate rather than collapsing them into one number"*, which contradicted the sentence directly beneath it and §9 #11; it was residual v1.16 wording, corrected in v1.50.
 
-**One leaderboard, one row per member, current term only** (Open Decision #4, resolved). It exposes a single `total_points` figure — attendance and bonus points are summed together, not broken out. The term it ranks comes from `app_settings.current_term`, set by an officer:
+**One leaderboard, one row per member, current term only** (Open Decision #4, resolved). It exposes a single `total_points` figure — attendance and bonus points are summed together, not broken out. The term it ranks is `current_term()`: derived from today's date unless an officer has pinned `app_settings.current_term` (§4.7).
 
 ```sql
-create or replace view leaderboard as
+create or replace view public.leaderboard as
 with cur as (
-  select current_term from app_settings
+  select public.current_term() as term
 ),
 attendance_pts as (
   select a.member_id, coalesce(sum(e.points), 0) as pts
-  from attendance a
-  join events e on e.id = a.event_id
+  from public.attendance a
+  join public.events e on e.id = a.event_id
   where a.status = 'present'
     and e.status <> 'cancelled'
-    and e.term = (select current_term from cur)
+    and e.term = (select term from cur)
   group by a.member_id
 ),
 bonus_pts as (
   select member_id, coalesce(sum(points), 0) as pts
-  from point_adjustments
+  from public.point_adjustments
   where voided_at is null
-    and term = (select current_term from cur)
+    and term = (select term from cur)
   group by member_id
 )
 select
   m.id,
   m.full_name,
-  coalesce(ap.pts, 0) + coalesce(bp.pts, 0) as total_points
-from members m
+  coalesce(ap.pts, 0) + coalesce(bp.pts, 0) as total_points,
+  (select term from cur)                    as term   -- appended by migration 21
+from public.members m
 left join attendance_pts ap on ap.member_id = m.id
 left join bonus_pts      bp on bp.member_id = m.id
 where m.active
 order by total_points desc, m.full_name;
 ```
 
-**Ties break alphabetically**, since `events_attended` is no longer in the view to break them with.
+**Ties break alphabetically**, since `events_attended` is no longer in the view to break them with. The page numbers them with **standard competition ranking** — equal totals share a rank and the next rank skips (1, 2, 2, 4) — because the alphabetical tie-break decides only what order two tied members are printed in, and numbering them 2 and 3 would claim one placed higher.
+
+**`term` is the fourth column, appended by migration 21** (Stage 7 phase 1) so the public board's heading and its rows come from one query and cannot disagree. It is append-only — `create or replace view` cannot reorder, rename, retype or drop a column, which is why it sits last, and no drop means migration 8's `grant select … to anon, authenticated` survives untouched.
+
+🔓 **The defect that column was built around is worth knowing on its own, because it defeats the obvious reasoning about views.** `current_term()` was `stable` and invoker-rights, and it reads `app_settings`, which is RLS deny-all with zero policies. So *any* caller subject to RLS got no row, the `coalesce` fell through, and it silently returned `term_of(now())` — the derived term — while the service role saw the pin. **The views did not save it.** Owner rights (`security_invoker = false`) cover the tables a view references *directly*; a plain function called from inside the view still executes as the invoker. So with the board pinned to a finished term, an anon reader got both the wrong label *and* the wrong rows, with no error anywhere.
+
+Measured on the local stack, 2026-08-09, with the pin set to `Spring 2026`:
+
+| role | `current_term()` | `leaderboard` rows |
+|---|---|---|
+| `postgres` (service role) | Spring 2026 | Spring 2026 ✅ |
+| `authenticated` | Fall 2026 | Fall 2026 ❌ |
+| `anon` | Fall 2026 | Fall 2026 ❌ |
+
+Latent since migration 1 and harmless until now, because every admin screen reads through `createAdminClient()` (service role) and `leaderboard` had no reader at all. It lands on the first anon-facing term-scoped page, which is exactly what Stage 7 builds. **Migration 21 makes `current_term()` `security definer` with `set search_path = ''`.** An RLS policy on `app_settings` was the alternative and is the looser one: migration 12 already grants anon every privilege on every table and only RLS withholds them, so a policy would have exposed `updated_by` (an officer's uuid) and `updated_at` too. The definer function exposes one derived term string and nothing else. It stays `stable` and **must never become `immutable`** — it reads a table, and a generated column would then cache a term that later changes.
 
 **Rollover is automatic.** `current_term()` derives the term from today's date (§4.7), so the board moves to Fall on August 1 and Spring on January 1 with no officer action and nothing to forget. `app_settings.current_term` exists only as an override: set it to pin the board on a finished term, set it back to null to resume automatic behavior.
 
@@ -2141,7 +2190,7 @@ The one rough edge is early August, when the new term is live but has no events 
 
 **This reverses the position earlier versions of this document took.** Prior versions kept `attendance_points` and `bonus_points` as separate columns everywhere, arguing that a member should see how much of their standing came from showing up versus from discretionary grants, and that an officer should notice at a glance if the top of the board is driven by bonuses. That transparency is now gone from the public view: a member sees only a number, and cannot tell that five of their thirteen points were granted rather than earned. The oversight it provided moves to two officer-facing surfaces — the split columns in `member_directory` (§4.5) and the points ledger at `/admin/points` — so the check on discretionary grants still exists, but only officers can perform it. Accept the tradeoff knowingly; the underlying data is unchanged, so restoring the columns later is a view change with no migration.
 
-**Anon reaches this view, not the tables under it.** Postgres views run as their owner by default (`security_invoker = false`), which is what lets the anon role read aggregated standings while RLS still denies it direct access to `members`, `attendance`, `events`, and `app_settings`. The view *is* the security boundary — do not set `security_invoker = true` on it without re-checking §6.
+**Anon reaches this view, not the tables under it.** Postgres views run as their owner by default (`security_invoker = false`), which is what lets the anon role read aggregated standings while RLS still denies it direct access to `members`, `attendance`, `events`, and `app_settings`. The view *is* the security boundary — do not set `security_invoker = true` on it without re-checking §6. ⚠️ **That covers the tables the view names directly and stops at a function call** — see the `current_term()` note above, which is the same sentence being true and not reaching far enough.
 
 **Privacy note:** the view deliberately excludes `eid` and `email`. A public leaderboard should never expose identifiers that are used elsewhere as credentials.
 
@@ -2806,16 +2855,25 @@ Full spec, including the parse decision table: [`docs/dues-and-membership.md`](d
 ### Stage 7 — Member-Facing Views
 **Goal:** Members can answer their own questions.
 
+Two phases, each merged to `main` on completion, as Stage 6 did.
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1 | `/leaderboard`, **migration 21** (`current_term()` → `security definer`, `term` appended to the view), the nav link, the force-dynamic resolution of Stage 5's revalidation carry-forward | ✅ **built 2026-08-09** |
+| 2 | `/lookup` — the EID + email gate, the member's own history, dues status | |
+
 - `/leaderboard` — one row per member for the current term, ranked on `total_points`, ties alphabetical (§4.4)
 - **`/leaderboard` must set `robots: { index: false, follow: false }`** (§9 #1, resolved). The page is reachable by anyone with the link; it must not be crawlable. `app/admin/(shell)/layout.tsx` already does exactly this and is the pattern to copy. Getting this wrong is not a bug you can fix afterwards — once students' names are indexed against their point totals, the cache outlives the deploy that caused it
-- **The active term shown prominently on the page.** It is officer-set with no automatic rollover, so a stale term must be visible rather than silently assumed correct
+- **The active term shown prominently on the page.** ⚠️ This bullet used to add *"it is officer-set with no automatic rollover"*, which contradicted §4.4, §4.7 and §9 #4 — rollover **is** automatic and `app_settings.current_term` is only a pin. Corrected in v1.50. The reason to show the term stands and is in fact sharper: a *pinned* term is the stale one, and it must be visible rather than silently assumed to be today's. It arrives as a column on the view rather than a second query — see §4.4 for the invoker-rights defect that made the obvious implementation silently wrong
 - `/lookup` — EID + email, returns per-event attended/missed summary
 - **Dues status on `/lookup`, and only there** (v1.34). The member sees whether they are an official member for the current term and what they are paid through — the question they will otherwise ask an officer by text message. 🔓 **It stays behind the EID + email gate and goes nowhere else.** §6 accepts that check-in makes roster membership probeable with an EID alone; extending that to "has this person paid" is a different order of exposure, and the double gate is the entire reason this is acceptable. It must never reach `/leaderboard`, which is public and (§9 #1) uncorrectable once indexed
 - Any point adjustments shown with their reason. The public board is a bare total, so this is the *only* place a member can see why their total exceeds their attendance count — which makes it more important here, not less
 - Pending submissions shown distinctly from confirmed ones, so a member who checked in late knows their form was received and is awaiting review rather than assuming it vanished
 - Attendance-rate calculation and a visual summary of the semester
 
-**🪤 Carried forward from Stage 5 — add the `/leaderboard` revalidation the day the route ships.** `revalidatePoints` in `app/actions/points.ts` revalidates the ledger and the adjustment detail, and deliberately does not revalidate `/admin` (nothing on the dashboard aggregates points). It cannot yet revalidate `/leaderboard`, because there is no such route. Granting and voiding both move public standings, so a board that silently serves a stale cache is the failure mode — and it would be found three stages after the code that caused it. The comment in `revalidatePoints` says the same thing; this is the copy that will actually be read while building this stage.
+**🪤 Carried forward from Stage 5 — ✅ resolved in phase 1, and NOT the way it was written.** The carry-forward said to add `/leaderboard` to `revalidatePoints` the day the route shipped, because granting and voiding move public standings. That is true and it is incomplete: **five** modules move them — `points.ts` (grant, void), `attendance-review.ts` (approve, reject, reopen, bulk assign, manual entry), `attendance.ts` (a live check-in writes a `present` row and revalidates nothing at all today), `events.ts` (cancelling an event, or editing its `points`), and `member-merge.ts` (which already carried a `revalidatePath("/leaderboard")` written in phase 8 against a route that did not exist, so it revalidated a 404).
+
+Correctness resting on five call sites staying complete is the shape this codebase keeps writing invariants against, and the failure is silent. **`/leaderboard` is `export const dynamic = "force-dynamic"` instead**, so there is no cache to go stale and no call site to forget. The cost is one read per request over a view returning one row per active member — 29 today, 500 in §2.2's worst case; the landing page already does this. The now-dead merge call was removed and `revalidatePoints`' comment rewritten to say that adding a path there means changing that line first.
 
 **Exit criteria:** a member can determine their own standing, why it is what it is, which specific events they missed, and whether anything of theirs is still pending — without asking an officer.
 **Effort:** 3 days.

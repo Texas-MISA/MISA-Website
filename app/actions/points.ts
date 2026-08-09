@@ -375,6 +375,13 @@ function revalidatePoints(id: string | null) {
   if (id) revalidatePath(`${LEDGER}/${id}`);
   // Not /admin: unlike the attendance pending badge, nothing on the dashboard
   // aggregates points today. The day a points tile lands there, this is where
-  // its revalidate belongs. /leaderboard likewise, when Stage 7 ships it —
-  // granting and voiding both move public standings.
+  // its revalidate belongs.
+  //
+  // ⚠️ /leaderboard is deliberately NOT here, and this replaces the Stage 5
+  // carry-forward that said to add it (resolved in Stage 7 phase 1). Granting
+  // and voiding do move public standings — but so do approving attendance, a
+  // live check-in, cancelling an event, editing an event's points, and a member
+  // merge, which is five modules that would each have to remember. The board is
+  // `export const dynamic = "force-dynamic"` instead, so there is nothing to
+  // revalidate. Adding a path here means changing that line first.
 }

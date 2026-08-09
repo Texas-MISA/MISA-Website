@@ -501,7 +501,12 @@ export async function commitMerge(
 
     revalidatePath(DIRECTORY);
     revalidatePath(`${DIRECTORY}/${survivorId}`);
-    revalidatePath("/leaderboard");
+    // A merge moves public standings (the loser's points land on the survivor),
+    // and this used to call revalidatePath("/leaderboard") — written in phase 8
+    // against a route that did not exist yet, so it revalidated a 404. Stage 7
+    // built the board as `force-dynamic`, so there is nothing to revalidate;
+    // see the note in revalidatePoints (app/actions/points.ts) for why all five
+    // standings-moving modules resolve it that way rather than each remembering.
 
     return { status: "done", counts: derived.counts, survivorId };
   } catch (e) {
