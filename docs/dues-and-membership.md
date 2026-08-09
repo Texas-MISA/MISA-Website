@@ -1,10 +1,17 @@
 # Dues & membership status — Venmo reconciliation
 
-**Status:** **phases 1, 2 and 3 of 4 built, 2026-08-06** — migration 19,
-`lib/dues.ts`, `lib/dues-roster.ts`, `app/actions/dues.ts`,
-`/admin/dues/import`, and now the ledger at `/admin/dues` with the editor at
-`/admin/dues/[id]`. Phase 4 (the directory column's UI and the `dues` filter)
-is unbuilt. Decided 2026-08-05. This document is the
+**Status:** ✅ **COMPLETE — all 4 phases.** Phases 1–3 on 2026-08-06 (migration
+19, `lib/dues.ts`, `lib/roster-index.ts`, `app/actions/dues.ts`,
+`/admin/dues/import`, the ledger at `/admin/dues` and the editor at
+`/admin/dues/[id]`); **phase 4 on 2026-08-07** — the roster-facing half: the
+`dues` filter and sort, the Paid / Not Paid column, the member detail page's
+Dues section, and one export-catalogue entry. Decided 2026-08-05.
+
+📌 **Two names in this document moved after it was written.**
+`lib/dues-roster.ts` became **`lib/roster-index.ts`** in Stage 6 phase 7b, when
+the roster import became a second caller and it gained `emailLower` — the module
+is unchanged in purpose, and everything this document says about it still holds.
+`scoreMemberCandidates` never existed at all; see the corrections below. This document is the
 reference for *why*
 Stage 6.5 is shaped the way it is; the normative summary lives in the
 architecture doc (§4.1, §4.5, §4.7, §5, §6, §7 Stage 6.5, §9 #12).
@@ -238,6 +245,10 @@ intact: a note reading `rp8571 dues` for a roster that contains `rp8571` links;
 a note reading `rp8517` does not, and goes to the queue. The queue *may* offer
 ranked suggestions — reuse `scoreMemberCandidates` from `lib/attendance.ts`
 rather than growing a second ranker — with nothing preselected.
+🐛 **`scoreMemberCandidates` is not a real export** — see the corrections
+section above; the ranker is `scoreMemberMatch` / `rankMemberSuggestions`. The
+instruction is right and the name is wrong, which is the more dangerous shape:
+`rankPaymentSuggestions` did reuse the real one.
 
 ## Implementation
 

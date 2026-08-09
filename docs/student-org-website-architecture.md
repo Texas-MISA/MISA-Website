@@ -1,9 +1,48 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.48
-**Status:** Stages 0–5 complete; Stage 6 (member directory) — **phases 1 through 8 of 9 built, and its exit criteria are MET**. **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases**. **Only phase 9, the closing read-through, remains.**
+**Version:** 1.49
+**Status:** Stages 0–5 complete. **Stage 6 (member directory) — ✅ COMPLETE, all 9 phases.** **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases.** **Stage 7 (member-facing views: `/leaderboard` and `/lookup`) is next.**
 **Last updated:** August 2026
 
+> **v1.49: Stage 6 closes, and the read-through earned its keep again.** Phase 9 —
+> the closing pass over every document, checking load-bearing claims against the
+> code that implements them rather than proofreading them. **No migration.**
+>
+> - 🔓 **`tests/docs.test.ts` is new, and it is the durable half of this phase.**
+>   Modelled on `tests/security.test.ts`: it walks `app/` and asserts every route
+>   appears in §5, and asserts every `lib/*.ts` and `app/actions/*.ts` module
+>   appears in §10 **and** in `CLAUDE.md`'s Layout. Scoped to those blocks, never
+>   a whole-file grep — a name can sit in a changelog while the map a reader
+>   navigates by never gains a line, which is exactly how six modules hid.
+>   ⚠️ **It checks that a name is PRESENT and cannot check that the sentence
+>   around it is true.** Phase 8's inverted claim would sail straight past it.
+> - **What it found immediately:** `/admin/attendance/new` missing from §5 —
+>   built in Stage 5 and undocumented ever since — plus the phase-7 and phase-8
+>   routes, six `lib/` modules and three action modules.
+> - 🪤 **The guard had a false pass, found by breaking it on purpose.**
+>   `toContain("merge.ts")` is satisfied by `member-merge.ts`, and
+>   `presets.ts` by `member-presets.ts`. Four pairs in this repo differ only by a
+>   `member-` prefix. It now matches on a boundary, and that is pinned by a test
+>   of its own. A guard never seen red is a guard nobody knows works.
+> - **Corrected in the DDL:** §4.1 quoted `members_normalized_id`, an index
+>   renamed by migration 16 — and both the merge tool and the roster import
+>   reason about "the two unique indexes on `members`" *by name*, so a reader
+>   checking that claim would have found one that does not exist. §4.1 was also
+>   missing `member_field_definitions` and `member_filter_presets` entirely, and
+>   `admin_audit`'s documented `entity_type` check was missing `'member_preset'`.
+> - **§6 gained two rows**, for the two most consequential new operations: the
+>   roster import as PII *ingress* (never persisted, create-only), and the merge
+>   as the only officer action that permanently deletes a row.
+> - **§2.2's `MEMBER_SCAN_LIMIT` list gained a fifth caller** — the merge picker,
+>   which is the sharpest of them, because it truncates the list a duplicate has
+>   to be *found* in rather than one you are choosing among.
+> - 🔓 **`seed.sql`'s wipe list was missing two tables**, which is the confirmed
+>   cause of production still carrying a `shirt_size` definition from the phase-4
+>   walkthrough. `scripts/seed-remote.sh` can only clear what the list names.
+>   Both added, with `member_filter_presets` before the `auth.users` delete
+>   (`created_by` has no cascade), and both now **asserted** in the seed's own
+>   check block — so "the wipe list is complete" is verified rather than claimed.
+>
 > **v1.48: the merge tool.** Stage 6 phase 8 — merging a duplicate member into
 > another, from `/admin/members/[id]`. **No migration.**
 >
@@ -1452,7 +1491,8 @@ Run against a deliberately pessimistic year: **500 registered members, 3 events 
 **What actually breaks, in order:**
 
 1. 🔴 **`RATE_LIMIT_MAX = 90` per IP per 10 minutes fails at exactly this size.** A venue's WiFi puts the whole room behind one address, so the 91st person through the door is refused. The constant's own comment says it is "sized for the room" — the room it was sized for was about ninety people. At a recruiting event it is half that, because a first-timer spends two slots (submit, then confirm). Staggered arrivals soften it in practice; as a worst case it is a hard wall. It fails *open* on error, so only the limit working correctly turns anyone away.
-2. 🔴 **`MEMBER_SCAN_LIMIT = 400` is below 500 and truncates silently.** The roster scan feeding the resolution form, manual entry, the grant picker, and the near-miss ranker takes the first 400 active members and reports nothing. The candidate query does not even order, so it is an arbitrary 400 of 500. **`pg_trgm` is the documented growth path and 500 members crosses into it.**
+2. 🔴 **`MEMBER_SCAN_LIMIT = 400` is below 500 and truncates silently.** The roster scan feeding the resolution form, manual entry, the grant picker, the near-miss ranker and — since Stage 6 phase 8 — **the merge picker** takes the first 400 members and reports nothing. The candidate query does not even order, so it is an arbitrary 400 of 500. **`pg_trgm` is the documented growth path and 500 members crosses into it.**
+   - ⚠️ **The merge picker is the sharpest of the five, and it is the newest** (v1.49). The other four truncate a list of people you are *choosing among*; this one truncates the list a **duplicate has to be found in**, so past the cap a duplicate is neither suggested by the ranker nor selectable from the picker, with nothing on screen to say so — and merging is the only way to clean one up. `fetchMergeCandidates` also deliberately includes inactive members, since a ghost is usually the deactivated half of a pair, which means it reaches the cap sooner than the active-only pickers do.
 3. 🟡 **`MAX_GRANT_MEMBERS = 50`** turns crediting a 150-person event into three grants. It refuses rather than truncating (§9's rule for oversized selections), so it is friction, not a defect.
 4. 🟡 **Near-miss ranking gets denser with the roster.** EIDs are name-derived, so the distance-2 population scales with membership — the exact load the `MIN_SUGGESTION_SCORE` floor carries. At 500 the floor is doing more work than the calibration it was set against, and recalibration is empirical (§7's stage trap), not arithmetic.
 
@@ -1636,8 +1676,14 @@ create table members (
 -- Identity is the normalized ID, not the raw one, so 'ut-123', 'UT 123', and
 -- 'UT123' cannot become three members. Email is matched case-insensitively
 -- for the same reason.
-create unique index members_normalized_id on members (normalized_eid);
-create unique index members_email_lower   on members (lower(email));
+-- 📌 The index is `members_normalized_eid`, not `..._id`: migration 16 renamed
+-- it with the column. This block quoted the pre-rename name until v1.49, which
+-- matters because both names are quotable — the merge tool and the roster
+-- import both reason about "the two unique indexes on members" BY NAME, and a
+-- reader checking the claim against this DDL would have found one that does not
+-- exist.
+create unique index members_normalized_eid on members (normalized_eid);
+create unique index members_email_lower    on members (lower(email));
 create index members_custom_fields_gin on members using gin (custom_fields);
 
 -- The schedule. Created in advance, but editable at any time — see 4.6.
@@ -1841,10 +1887,17 @@ create index dues_payments_review_idx on dues_payments (imported_at desc)
 -- grants need the same accountability, and three parallel tables would drift.
 create table admin_audit (
   id          bigserial primary key,
+  -- ⚠️ Widened by migrations 14 ('roster'), 18 ('member_field'), 19
+  -- ('dues_payment') and 20 ('member_preset'). `AuditEntityType` in
+  -- app/actions/audit.ts is the TypeScript mirror and has drifted from this
+  -- list TWICE — treat widening the check and widening the union as one edit.
+  -- admin_audit is append-only (P0001 on UPDATE and DELETE alike), so a row
+  -- filed under a wrong type can never be corrected.
   entity_type text not null
                 check (entity_type in ('attendance','event','member',
                                        'point_adjustment','roster',
-                                       'member_field','dues_payment')),
+                                       'member_field','dues_payment',
+                                       'member_preset')),
   entity_id   uuid not null,
   actor_id    uuid not null references auth.users(id),
   acted_at    timestamptz not null default now(),
@@ -1886,7 +1939,62 @@ create table admin_profiles (
   role         text not null default 'officer'
                  check (role in ('officer','admin'))
 );
+
+-- Officer-defined member fields (migration 18, §7 Stage 6 phase 4). The
+-- definitions live here; the VALUES live in members.custom_fields above, and
+-- nothing in the database ties the two together — see 4.5 and §7.
+create table member_field_definitions (
+  id                uuid primary key default gen_random_uuid(),
+  -- 🔓 The format check is a SECURITY control, not a naming convention. This
+  -- key is interpolated into a PostgREST `order=` term AND (since phase 5c) a
+  -- filter predicate as `custom_fields->>key`. A spike measured what an
+  -- unconstrained key buys: a comma breaks out of the order term and is read as
+  -- a second order column, while a space and a `"` are accepted SILENTLY. The
+  -- same regex is enforced in the zod schema and again in customFieldColumn().
+  key               text not null
+                      check (key ~ '^[a-z][a-z0-9_]{0,39}$'),
+  label             text not null,
+  kind              text not null default 'select' check (kind in ('select')),
+  options           text[] not null check (valid_field_options(options)),
+  editable_inline   boolean not null default true,
+  show_in_directory boolean not null default true,
+  sort_order        integer not null default 0,
+  -- Archived, never deleted: a hard delete would leave stored answers keyed to
+  -- a definition nobody can look up.
+  archived_at       timestamptz,
+  created_by        uuid references auth.users(id),
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+-- ⚠️ Spans archived rows on purpose. Re-creating a field under an archived key
+-- would silently adopt every value still stored under it.
+create unique index member_field_definitions_key_idx
+  on member_field_definitions (key);
+
+-- Saved directory filters, shared by every officer (migration 20, phase 7a).
+create table member_filter_presets (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null check (length(trim(name)) between 1 and 80),
+  -- The canonical query string lib/filters.ts emits, NOT a jsonb copy of
+  -- MemberFilter: one representation of that type, and a string that is a
+  -- function of the filter rather than of click order — which is what lets the
+  -- UI mark the active preset by string equality.
+  --
+  -- 🔓 Non-empty is a correctness bound. An empty query is the default view, so
+  -- a preset holding one is a chip promising a narrowed roster and showing the
+  -- whole thing.
+  query       text not null check (length(query) between 1 and 2000),
+  created_by  uuid references auth.users(id),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+create unique index member_filter_presets_name_idx
+  on member_filter_presets (lower(name));
 ```
+
+📌 **`checkin_throttle` (migration 11) is deliberately not shown.** It is IP-keyed
+rate-limit state with a ten-minute window rather than domain data — which is also why
+`seed.sql` does not wipe it. `RATE_LIMIT_MAX` in §2.2 is the part worth knowing.
 
 ### 4.2 Design notes
 
@@ -2282,11 +2390,21 @@ $$;
 /admin/members/export  Route Handler — CSV or .xlsx of the selected rows and
                        chosen fields; writes the 'roster' audit receipt
                        (Stage 6 phase 5)
-/admin/members/[id]    Member detail — full history, adjustments, notes,
-                       and the current term's events with an attendance
-                       indicator (Stage 6 phase 3)
-/admin/members/fields  Custom field definitions — create, edit, archive
-                       (Stage 6 phase 4)
+/admin/members/[id]    Member detail — full history, adjustments, notes, the
+                       current term's events with an attendance indicator
+                       (Stage 6 phase 3), and the merge panel — closed by
+                       default, since it ends in a deleted row
+                       (Stage 6 phase 8)
+/admin/members/import  Upload a roster CSV — parse, preview, confirm. Create-only:
+                       a row matching an existing member on either unique index
+                       is shown and skipped         (Stage 6 phase 7b)
+/admin/members/presets Saved directory filters — rename and delete. Saving one
+                       happens on /admin/members, where there is a filter to save
+                       (Stage 6 phase 7a)
+/admin/members/fields  Custom field definitions — list
+/admin/members/fields/new     Create a definition
+/admin/members/fields/[id]    Edit or archive one; the key is never editable
+                       (all three: Stage 6 phase 4)
 /admin/points          Point adjustment ledger — every grant, filterable by officer
 /admin/points/new      Grant points to one or more members in a single action
 /admin/points/[id]     Adjustment detail — void it with a reason, and its history
@@ -2300,9 +2418,17 @@ $$;
                        or the term count, void it with a reason, and its
                        history                       (Stage 6.5 phase 3)
 /admin/attendance      Review queue — all submissions, filterable by status
+/admin/attendance/new  Officer manual entry — the recovery path for a member the
+                       check-in form refused                    (Stage 5 phase 3)
 /admin/attendance/[id] Submission detail: raw form data, suggestions, override actions
-/admin/audit           Full activity log across all entities
+/admin/audit           Full activity log across all entities    (NOT BUILT)
 ```
+
+📌 **This table is checked against the filesystem by `tests/docs.test.ts`** (phase 9), which
+walks `app/` for `page.tsx` and `route.ts` and asserts every resulting URL appears above. It
+found `/admin/attendance/new` missing here — built in Stage 5, undocumented ever since — along
+with the phase-7 and phase-8 routes. The check runs **one way only**, code → table, so a route
+planned but unbuilt stays legal to write down: `/leaderboard` and `/lookup` below are Stage 7.
 
 Everything under `/admin/*` (except `/admin/login`) is gated by `proxy.ts` (Next 16's rename of `middleware.ts`), which checks for a valid session and a matching `admin_profiles` row.
 
@@ -2332,6 +2458,8 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | `/lookup` reveals dues status | Stage 7's member self-service page will show the member their own dues status, which widens the accepted "is this EID on the roster" oracle (see the row above) to "has this person paid". **Materially more sensitive than roster membership**, and accepted only because `/lookup` already requires EID **and** matching email — a stricter gate than the check-in oracle, which needs the EID alone. Do not relax that gate, and do not add dues status to any surface reachable with the EID alone, `/leaderboard` included (§9 #1, #12). |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
 | Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. **Verified July 2026** — check it by response behaviour rather than by the dashboard label: the production alias must return `200` while a per-deployment URL returns `302` to `vercel.com/sso-api`. If both return `200`, protection is Disabled and every preview is publicly writable. |
+| Bulk roster import brings PII *in* (Stage 6 phase 7b) | The mirror of the export row, and the file is the same shape: a spreadsheet of names, emails and EIDs. 🔓 **It is never persisted** — the client reads it with `FileReader` and holds the text in component state between the preview and the commit, so no staging table and no temp file ever holds it. The import is **create-only**: a row matching an existing member on `normalized_eid` *or* `lower(email)` is shown and skipped, so a stale spreadsheet cannot overwrite a correction an officer made. One `member.imported` audit row per member created. |
+| A merge permanently deletes a member row (Stage 6 phase 8) | The only destructive operation in the officer UI, and the one place where getting the wrong row costs data rather than a correction. Mitigated by preview-and-confirm, a two-click commit, suggestions that are never preselected and a floor tuned to refuse "same name, nothing else". The deleted row's own `admin_audit` history becomes **unreachable** — entity_id points at nothing and there is no page for a member that does not exist — so the single `member.merged` row written against the *survivor* carries the loser's name, EID and **id**, and is the only surviving record. ⚠️ `point_adjustments.member_id` is `on delete cascade`, so the delete is guarded by a re-count that refuses unless every referencing table is empty; see §7 Stage 6 phase 8. |
 | Admin privilege escalation | `admin_profiles` is not writable by any client role; officers are added via the Supabase dashboard or a seeded SQL script |
 
 **Threat model boundary:** this system protects against casual abuse and accidental data exposure. It is not designed to withstand a determined attacker. Scope the security work accordingly — the RLS policies matter far more than, say, elaborate bot detection.
@@ -2509,7 +2637,7 @@ contact form's backend — it renders disabled, with email as the working path.
 
 ---
 
-### Stage 6 — Member Directory 🔨 phases 1, 2a, 2 and 3 of 9 built & deployed · re-planned 2026-08-01 (v1.26)
+### Stage 6 — Member Directory ✅ complete, all 9 phases · re-planned 2026-08-01 (v1.26), closed 2026-08-08 (v1.49)
 **Goal:** Officers can slice the roster any way they need and get the result out of the system in one action. This is the screen officers will actually live in.
 
 **Nine phases** — six originally, re-planned after phase 1 shipped (see the v1.26 note at the top of this document for the four decisions and their reasoning). Same shape as Stage 5: each ends in something demonstrable and merges to `main` as it lands. `tasks.md` carries the working detail.
@@ -2529,7 +2657,7 @@ contact form's backend — it renders disabled, with email as the working path.
 | 7a | Saved filter presets — shared, named directory filters (**migration 20**) | ✅ built, browser-verified & deployed |
 | 7b | CSV roster import — preview-then-commit, create-only, duplicate detection on **both** unique indexes | ✅ built & browser-verified — no migration |
 | 8 | The merge tool — repoints, collision resolution, one audit row | ✅ built & browser-verified — no migration |
-| 9 | Docs and a closing read-through | ← **next** |
+| 9 | Docs and a closing read-through — plus `tests/docs.test.ts`, a standing guard against the drift this pass keeps finding | ✅ done — no migration |
 
 ✅ **Phase 1 was walked through a browser (2026-08-01), and it earned its keep.** Sorting, the tie-break across a page boundary, pagination, and the rate-threshold arithmetic were all correct. The screen was not: the five numeric filter boxes were uncontrolled (`defaultValue`), which React reads only at mount, so CLEAR — a client-side push with no remount — left the officer's typed numbers on screen above a count that no longer applied them. Displayed filter and applied filter disagreed, which is the same partial-list failure phase 5's export exists to avoid, arriving through the filter instead of through pagination. Fixed by moving both translations into `lib/filters.ts` (`memberFilterFields`, `memberFilterUrl`).
 
@@ -2606,7 +2734,7 @@ Three paths out of the system, and they are not redundant: the clipboard is for 
 
 **1. Duplicate members still accumulate, and nothing merges them — but the main source is gone** (revised v1.22). Check-in used to match on `normalized_eid`, then `lower(email)`, then *create*, so a member who mistyped **both** was indistinguishable from a genuinely new person — the two were the same insert — and someone mistyping repeatedly could leave several ghosts. Under §4.2's confirmation flow that submission is refused and re-prompted, writing nothing. What remains is narrower: someone who ticks "this is my first MISA event" *and* types badly, which is a single row rather than a stream, plus the officer-queued collision noted below. Ghosts stay findable — `members.source = 'self_checkin'` marks every auto-created row. ✅ **Built in phase 8**, and building it corrected this paragraph. It said a merge "can hit `attendance_one_per_event` when both identities attended the same event" — it **cannot**. That index is keyed on `(event_id, normalized_eid)`, the *submitted* EID, not on `member_id`, so repointing never touches an indexed column and the guard is structurally unreachable. The failure is silent instead: two `present` rows for one event, counted twice by both views. The resolution this paragraph proposed is still right — keep one, reject the other — but it is the application's job rather than the database's, and that is why the phase needed a pure planner rather than three UPDATEs. The merge repoints `attendance.member_id`, `point_adjustments.member_id`, **`dues_payments.member_id`** (added by Stage 6.5) and merges `members.custom_fields`; preview-and-confirm like the CSV import; one `admin_audit` row on the survivor naming the loser, because the loser's row — and therefore its own history — is deleted.
 
-**1a. A confirmed first-timer can leave a member row with no attendance.** If an officer has already queued a manual row carrying that EID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`, leaving a `self_checkin` row credited with nothing. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check, against §4.2's "three checks, not one". Another row for the directory to surface, and another reason merge tooling should assume the roster is untidy.
+**1a. A confirmed first-timer can leave a member row with no attendance.** If an officer has already queued a manual row carrying that EID for the event, the member is created and the attendance insert then fails on `attendance_one_per_event`, leaving a `self_checkin` row credited with nothing. 📌 **This one really does trip the index, unlike the merge above, and the difference is the whole point of the correction there**: here both rows carry the *same submitted EID*, which is what the index is keyed on. Do not "fix" this paragraph to match that one. Pre-existing, rare, and deliberately not fixed in v1.22: the pre-check that would catch it is a fourth duplicate check, against §4.2's "three checks, not one". Another row for the directory to surface, and another reason merge tooling should assume the roster is untidy.
 
 **2. A valid-but-wrong EID silently credits the wrong member.** The ID lookup runs *before* the email lookup, so someone who mistypes into **another member's** real EID is recorded as that person, even though their own email was correct and would have matched. It is rare and it is not obviously fixable by reordering — people mistype and share emails too, so email-first trades one silent mis-credit for another — but it is the one path where the exact-match design attributes attendance to the wrong human with nothing surfaced to anyone. The directory is where it would be noticed ("why does this member have an event they didn't attend?"), so the member detail page should make a member's attendance easy to scan, and any merge tooling should assume mis-credits exist. Revisit if it ever actually happens; a cheap partial mitigation is to flag, at check-in, when the matched member's email differs from the submitted one.
 
@@ -2859,6 +2987,20 @@ One decision, and it earns a place here rather than in Stage 10 because it const
                              nothing), commitImport (re-parses server-side
                              rather than trusting the preview), and the
                              corrections: reassign, set terms, void
+    presets.ts               Stage 6 phase 7a — savePreset (create or update in
+                             one action, no CAS: one full-page form, the same
+                             argument saveFieldDefinition makes) and
+                             deletePreset, a REAL delete because nothing is
+                             keyed to a preset
+    member-import.ts         phase 7b — previewRosterImport / commitRosterImport.
+                             Create-only, one atomic insert rather than an
+                             upsert: members has TWO unique indexes and
+                             onConflict takes one target
+    member-merge.ts          phase 8 — previewMerge / commitMerge. The write
+                             ORDER is a safety property, not tidiness: reject
+                             collisions, repoint all three tables, update the
+                             survivor, then RE-COUNT and refuse to delete unless
+                             every count is zero
     audit.ts                 shared admin_audit writer (no "use server")
 /lib
   supabase/
@@ -2927,6 +3069,38 @@ One decision, and it earns a place here rather than in Stage 10 because it const
                              lexicographically: every "which term is later"
                              question goes through termIndex / isLaterTerm
                              here, never a string compare at a call site
+  csv.ts                     the CSV tokenizer, extracted from dues.ts in phase
+                             7b when the roster import became its second caller.
+                             ONE implementation on purpose: the multi-line
+                             quoted field it exists to handle is exactly what a
+                             hand-rolled copy gets wrong
+  roster-index.ts            phase 7b, was dues-roster.ts. The uncapped
+                             {memberId, normalizedEid, emailLower} index every
+                             bulk operation matches against, paged in 1000s.
+                             ⚠️ BOTH axes, because members carries two unique
+                             indexes and a row collides if it matches either
+  presets.ts                 phase 7a — the saved-filter core. A preset is a NAME
+                             over the canonical query string lib/filters.ts
+                             already emits, never a second copy of MemberFilter.
+                             🪤 canonicalPresetQuery runs on WRITE only, and
+                             against storableFields — a rename is a write, and
+                             canonicalising a stored query against the LIVE
+                             definitions drops a cf: clause whose field is
+                             archived. member-presets.ts is the read
+  member-presets.ts          fetchPresets — uncapped, like member-fields.ts
+  member-import.ts           phase 7b — the roster-import core. importColumns is
+                             built FROM export.ts's catalogue, so a downloaded
+                             CSV imports straight back and the header namespace
+                             cannot fork. Headers are matched by NAME, never by
+                             position
+  merge.ts                   phase 8 — the merge core. 🔓 It exists because
+                             attendance_one_per_event CANNOT catch a merge: the
+                             index is keyed on (event_id, normalized_eid), not
+                             member_id, so repointing never trips it and the
+                             survivor is silently credited twice for one event.
+                             rankDuplicateCandidates is a new CALLER of
+                             scoreMemberMatch with its own floor — between two
+                             members the two +100 signals are impossible
 /supabase
   /migrations                versioned SQL
   seed.sql

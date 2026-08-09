@@ -1,10 +1,19 @@
 -- Development seed data. Run by `supabase db reset`, or applied to a remote
 -- dev project with scripts/seed-remote.sh.
 --
--- DESTRUCTIVE: wipes members, events, attendance, point_adjustments, and
+-- DESTRUCTIVE: wipes members, events, attendance, point_adjustments,
+-- dues_payments, member_field_definitions, member_filter_presets and
 -- admin_audit before inserting. The guard below refuses to run if auth.users
 -- contains any account other than the seed officer, which is the signal that
 -- you are pointed at something real.
+--
+-- 📌 Keep that list in step with the deletes. It is not decoration: the wipe
+-- list IS the definition of "this database matches the seed", so a table
+-- missing from it is drift nobody can see. Two were missing until 2026-08-08 —
+-- see the note on the deletes.
+--
+-- `checkin_throttle` is deliberately NOT wiped: IP-keyed rate-limit state with
+-- a ten-minute window, not seed data, and it expires on its own.
 --
 -- Every identity here is fabricated. Emails use example.edu (RFC 2606
 -- reserved, can never resolve) and EIDs are synthetic. Never replace
@@ -34,6 +43,24 @@ delete from attendance;
 -- be re-seeded at all.
 delete from dues_payments;
 delete from events;
+-- 🔓 Both added 2026-08-08 (Stage 6 phase 9), and their absence had already
+-- caused real drift rather than being a tidy-up. `scripts/seed-remote.sh` can
+-- only clear what this list names, so production still carried a `shirt_size`
+-- definition left over from the phase-4 walkthrough long after "production IS
+-- the seed" was recorded as true. `db reset` hid it locally because it drops
+-- the whole database rather than running these deletes.
+--
+-- 📌 The generalisable rule, and the reason the assert block below now counts
+-- both: **this wipe list is the definition of "matches the seed", and a table
+-- missing from it is invisible drift.** Any migration that adds a table has to
+-- decide whether it belongs here.
+--
+-- ⚠️ member_filter_presets must go BEFORE the auth.users delete at the end:
+-- `created_by` references auth.users with no cascade, so a preset saved by the
+-- seed officer would block that delete and abort the re-seed — the same shape
+-- as the dues_payments note above, and the same failure.
+delete from member_filter_presets;
+delete from member_field_definitions;
 delete from members;
 alter table admin_audit disable trigger admin_audit_no_delete;
 delete from admin_audit;
@@ -382,7 +409,7 @@ from point_adjustments p where p.voided_at is not null;
 do $$
 declare
   n_members int; n_events int; n_present int; n_pending int; n_rejected int;
-  n_adjust int; n_audit int; n_board int;
+  n_adjust int; n_audit int; n_board int; n_fields int; n_presets int;
 begin
   select count(*) into n_members from members;
   select count(*) into n_events  from events;
@@ -392,6 +419,11 @@ begin
   select count(*) into n_adjust from point_adjustments;
   select count(*) into n_audit  from admin_audit;
   select count(*) into n_board  from leaderboard;
+  -- Added with the two deletes above: the seed creates neither, so the only
+  -- correct answer is zero, and asserting it is what turns "the wipe list is
+  -- complete" from a claim into a check.
+  select count(*) into n_fields  from member_field_definitions;
+  select count(*) into n_presets from member_filter_presets;
 
   if n_members <> 32 then raise exception 'seed: expected 32 members, got %', n_members; end if;
   if n_events  <> 15 then raise exception 'seed: expected 15 events, got %', n_events; end if;
@@ -401,4 +433,6 @@ begin
   if n_adjust <> 6 then raise exception 'seed: expected 6 point adjustments, got %', n_adjust; end if;
   if n_audit  <> 2 then raise exception 'seed: expected 2 audit rows, got %', n_audit; end if;
   if n_board  <> 29 then raise exception 'seed: expected 29 leaderboard rows, got %', n_board; end if;
+  if n_fields  <> 0 then raise exception 'seed: expected 0 custom field definitions, got % (the wipe list missed member_field_definitions until 2026-08-08)', n_fields; end if;
+  if n_presets <> 0 then raise exception 'seed: expected 0 saved views, got %', n_presets; end if;
 end $$;

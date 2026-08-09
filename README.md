@@ -53,10 +53,14 @@ npx supabase db push          # apply pending migrations to the linked project
 ```
 app/(public)/     the public site: landing, about, gallery, officers,
                   projects, contact, and /attend
-app/admin/        officer area: login, dashboard, events, attendance, points
-app/actions/      Server Actions — every write in the system
-lib/              domain cores (checkin, events, attendance, points), all pure
-                  and free of next/* imports so they are testable
+app/admin/        officer area: login, dashboard, events, attendance, points,
+                  members (directory, import, merge, saved views, custom
+                  fields) and dues
+app/actions/      Server Actions — every write in the system, plus the one
+                  Route Handler (the roster export, which needs response headers)
+lib/              domain cores (checkin, events, attendance, points, members,
+                  dues, merge, filters, export), all pure and free of next/*
+                  imports so they are testable
 supabase/         versioned migrations + seed data
 tests/            Vitest; integration tests run against the local stack
 docs/             architecture, decisions, and the site inventory
@@ -68,6 +72,7 @@ docs/             architecture, decisions, and the site inventory
 - **[`CLAUDE.md`](CLAUDE.md)** — invariants and traps. Read before changing anything; several entries record a bug that cost hours and would otherwise be reintroduced.
 - **[`tasks.md`](tasks.md)** — short-horizon checklist and the current handoff state.
 - **[`docs/attend-confirmation-flow.md`](docs/attend-confirmation-flow.md)** — the `/attend` first-time confirmation spec.
+- **[`docs/dues-and-membership.md`](docs/dues-and-membership.md)** — how dues are reconciled from Venmo statements, and why membership status is calculated rather than ticked.
 - **[`docs/existing-site-inventory.md`](docs/existing-site-inventory.md)** — what was carried over from the old Squarespace site, and what was deliberately left as a placeholder.
 
 ## For the next officer
