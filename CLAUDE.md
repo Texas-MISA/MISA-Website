@@ -6,7 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–5 complete. ✅ Stage 6 (member directory) is COMPLETE — all 9 phases. ✅ Stage 6.5 (dues) is COMPLETE — all 4 phases. 🔨 Stage 7 (member-facing views) is IN PROGRESS: phase 1 (`/leaderboard`) built 2026-08-09, doc v1.50; phase 2 (`/lookup`) is next.**
+**Stages 0–5 complete. ✅ Stage 6 (member directory) is COMPLETE — all 9 phases. ✅ Stage 6.5 (dues) is COMPLETE — all 4 phases. ✅ Stage 7 (member-facing views) is COMPLETE — both phases, browser-verified, exit criteria met (2026-08-09, doc v1.51). Stage 8 (hardening & data integrity) is next.**
+
+✅ **Stage 7 phase 2 shipped 2026-08-09** — **`/lookup`**, the member's own history. **No migration.**
+  - 🔓 **The EID + email gate is a CONJUNCTION in ONE query, and the obvious reuse would have broken it silently.** `findMember` in `lib/checkin.ts` is an ordered *fallback* — EID, then email — because a check-in must recognise someone who mistypes one field. That is right there and catastrophic here: copying the shape resolves on either half alone, reducing the one page that shows **dues status** to the EID-only oracle §6 accepts only for check-in. `findMemberByBoth` never runs two lookups and never uses `.or()`; two behavioural tests plus a source assertion exist purely to fail if someone makes it "more forgiving". The email side goes through `escapeIlike`, so a `%` is a literal rather than a wildcard past half the gate.
+  - 🔓 **One `unmatched` outcome and one message for every miss.** Distinguishing "no such EID" from "that email doesn't match" would be a **strictly stronger** oracle than the accepted one — confirm the EID, then walk the email.
+  - 🔓 **The response carries no identifier the caller did not already supply.** Name and own aggregates yes; the stored email and EID no. §6's "emails and EIDs never returned to unauthenticated clients under any route" then holds by construction, and a test asserts the serialized profile contains neither. Verified live too.
+  - **`app/actions/lookup.ts` is the one unauthenticated READ path**, single-export like `attendance.ts` (the one WRITE path). Two files, two symbols; the difference is what each may do. It writes exactly one row anywhere — the throttle record — in **its own bucket** via `hashClientIp("lookup")`, because `RATE_LIMIT_MAX` (90) is a *room capacity* and a standings lookup must not consume a check-in slot behind a venue's NAT.
+  - **Voided adjustments are hidden here** and stay in the officer ledger: a struck-through line a member cannot act on generates the officer question this page exists to prevent. No `awarded_by` either — the reason is the member's business, the officer's uuid is not.
+  - 🪤 **The site header ran out of room and failed SILENTLY.** The wordmark is absolutely centred so the side groups cannot shift it — which also means nothing stops a group growing *underneath* it: the wordmark wins the z-order and the nav item simply vanishes. Measured at 1646px: six items cleared it by 61px, eight overflowed by **199px** and hid "Leaderboard" behind the logo. Fixed by splitting the nav across the wordmark (site pages left, member pages right) and moving the desktop breakpoint `lg` → `xl` — at 1024 the *original* six already collided, so this was pre-existing and the two new links only made it visible. **Adding a nav item means re-measuring.**
 
 ✅ **Stage 7 phase 1 shipped 2026-08-09** — **`/leaderboard`**, the first reader the view has ever had. **Migration 21.**
   - 🔓 **`app_settings.current_term` — the documented pin (§4.4, §4.7, §9 #4) — had never worked for any caller subject to RLS, and the page would have inherited it.** `current_term()` was `stable` and invoker-rights; it reads `app_settings`, which is deny-all with zero policies. So the `coalesce` fell through and it silently returned the **derived** term. Measured with the pin at `Spring 2026`: service role saw Spring, `authenticated` and `anon` both saw Fall — **wrong label and wrong rows**, no error anywhere.
@@ -303,6 +311,11 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **The public `leaderboard` shows a single `total_points`; `member_directory` keeps `attendance_points` and `bonus_points` split.** This asymmetry is deliberate (§4.4) — the officer-facing directory and the `/admin/points` ledger are where discretionary grants stay visible, since the public board no longer reveals them. Don't "fix" the inconsistency by collapsing the directory columns too.
 - **Both views are scoped to `current_term()`.** Any new aggregate must use the same scope, denominators included — an all-time `events_possible` against a current-term `events_attended` understates every rate and still looks plausible. (§4.4, §4.5)
 - 🔓 **A view's owner rights cover the tables it names directly and stop at a function call.** `security_invoker = false` is what lets `leaderboard` and `member_directory` aggregate past deny-all tables — but a plain (non-`security definer`) function invoked *inside* the view still executes as the caller. `current_term()` reads `app_settings`, which is deny-all with zero policies, so until migration 21 every RLS-subject reader silently got the **derived** term instead of the officer's pin: wrong label *and* wrong rows, no error. Fixed with `security definer` + `set search_path = ''` (mandatory — without it the caller controls name resolution inside a body running with owner rights). **`current_term()` must stay `stable` and never become `immutable`**: it reads a table, and a generated column would cache a term that later changes. The generalisable part is that "the view runs as owner" is not a claim about anything the view *calls*.
+- 🔓 **`/lookup`'s gate is a conjunction expressed in ONE query, never `/attend`'s ordered fallback.** `findMember` in `lib/checkin.ts` resolves EID *then* email because a check-in must forgive one mistyped field; `findMemberByBoth` in `lib/lookup.ts` requires both to name the same row, because this is the only surface that reveals **dues status** and §6 accepts that exposure *solely* on the strength of the narrower gate. Two lookups, or an `.or()`, silently reduces it to EID-alone. The email predicate goes through `escapeIlike` so a `%` cannot become a wildcard past half the gate. Pinned by two tests and a source assertion.
+- 🔓 **One failure, one message, for every `/lookup` miss.** Never distinguish "no such EID" from "that email doesn't match" — that is a *stronger* oracle than the one §6 accepted, reachable on the most sensitive page.
+- 🔓 **`/lookup` returns no identifier the caller did not already supply.** The member's name and their own aggregates, never the stored email or EID. That is what keeps "no unauthenticated route returns an email or student ID" true by construction rather than by argument.
+- **`/lookup` throttles in its own bucket** (`hashClientIp("lookup")`, `LOOKUP_RATE_LIMIT_MAX`). `RATE_LIMIT_MAX` is a **room capacity**, not a security number, so a shared budget would let members checking their standing at a meeting exhaust the slots the people behind them need to check in with — and the check-in is the one that must not fail.
+- 🪤 **The site header's nav cannot grow without measuring.** The wordmark is absolutely centred so the side groups cannot shift it off-centre; nothing stops a group growing *underneath* it, and the wordmark wins the z-order, so the failure is a nav item that silently disappears rather than a broken layout. Six items cleared it by 61px at 1646; eight overflowed by 199px. The nav is split across the wordmark (site pages left, member pages right) and the desktop breakpoint is `xl`, not `lg`. Re-measure at both 1280 and a wide viewport when adding an item.
 - **The board's term label comes from the same row as its numbers.** `leaderboard.term` exists so `/leaderboard` asks once; a second `rpc("current_term")` for the heading is two sources for one fact, and it is the exact query that was silently wrong above. Don't "simplify" the column away.
 - **`/leaderboard` is `force-dynamic`, and that is a correctness choice.** Five modules move public standings — `points.ts`, `attendance-review.ts`, `attendance.ts`, `events.ts`, `member-merge.ts` — so a cached board depends on five call sites staying complete, and it fails silently. There is no `revalidatePath("/leaderboard")` anywhere on purpose; adding one means changing that line first. (This supersedes Stage 5's carry-forward, which named only `revalidatePoints`.)
 - **A view has no RLS, so the blanket grants do not protect it. Every non-public view must explicitly `revoke all … from anon`, and every recreate must re-issue that revoke.** `20260730000012_api_role_grants.sql` grants `all privileges on all tables in schema public` to anon and argues it is safe because "RLS is the security boundary". That is true for tables and **false for views** — `grant all on all tables` includes views, and `member_directory` deliberately runs as owner (`security_invoker` off) so it can aggregate *past* the deny-all tables underneath. Found in production 2026-08-02: the anon key could read every member's student ID and email, breaking the "no unauthenticated route returns an email or student ID" invariant three sections below. Fixed in migration 15.
@@ -336,8 +349,10 @@ Per §10:
 
 ```
 app/(public)/           landing, /about, /gallery, /officers, /projects,
-                        /contact, /attend, /leaderboard (Stage 7 phase 1);
-                        /lookup is phase 2.
+                        /contact, /attend, /leaderboard (Stage 7 phase 1),
+                        /lookup (phase 2 — the EID + email gate, the member's
+                        own history and dues status; _components/lookup-form.tsx
+                        is the client half, useActionState only).
                         leaderboard/page.tsx is a Server Component reading the
                         ANON client — leaderboard is the one view anon may read,
                         and going through lib/supabase/server.ts is what keeps
@@ -358,8 +373,13 @@ app/admin/(shell)/      authed chrome + dashboard, events/, attendance/,
                         status-pill.tsx and audit-trail.tsx are shared by more
                         than one route subtree and live here rather than in one
 app/actions/            attendance.ts (submitCheckin ONLY — the one
-                        unauthenticated write path, kept a single-export file
+                        unauthenticated WRITE path, kept a single-export file
                         so the §6 attack surface is a one-file answer),
+                        lookup.ts (lookupMember ONLY — the one unauthenticated
+                        READ path, Stage 7 phase 2, same single-export shape
+                        for the same reason. Two files, two symbols, and the
+                        difference between them is what each may do: this one
+                        writes exactly one row anywhere, the throttle record),
                         attendance-review.ts (officer resolution mutations),
                         points.ts (grantPoints, voidAdjustment — and nothing
                         else: an adjustment is immutable except for voiding),
@@ -377,6 +397,24 @@ lib/checkin.ts          check-in resolution core + ORPHAN_WINDOW_HOURS + rate li
                         no next/* imports, so tests can inject clients and timestamps.
                         Member lookup and member creation are separate: only the
                         confirmed first-time pass reaches createMember
+lib/lookup.ts           the member self-service core (Stage 7 phase 2) — pure,
+                        same contract as lib/checkin.ts. 🔓 The gate is a
+                        CONJUNCTION expressed in ONE query (normalized_eid AND
+                        lower(email) on the same row), never lib/checkin.ts's
+                        ordered fallback: that shape would reduce it to
+                        EID-alone, which is exactly the gate §6 says is not
+                        sufficient to reveal dues status. One `unmatched` for
+                        every miss; no identifier returned that the caller did
+                        not supply; every date preformatted, because the
+                        profile crosses into a Client Component as action state
+lib/request-ip.ts       hashClientIp(scope) — the shared, SCOPED client hash
+                        both unauthenticated endpoints throttle on. The scope
+                        is what keeps /attend and /lookup in disjoint buckets:
+                        RATE_LIMIT_MAX is a room capacity, so one shared budget
+                        would let standings lookups crowd out check-ins behind
+                        a venue's NAT. ⚠️ It imports next/headers, so it must
+                        NEVER be imported by lib/checkin.ts — a Client
+                        Component imports that file for ORPHAN_WINDOW_HOURS
 lib/attendance.ts       resolution core: Postgres interval parsing, gap
                         description, member-candidate scoring, previewResolution,
                         canApprove, planBulkAssign — pure, same contract as

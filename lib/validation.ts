@@ -52,6 +52,18 @@ export const checkinSchema = z.object({
 
 export type CheckinFields = z.infer<typeof checkinSchema>;
 
+// Member self-service lookup (§7 Stage 7). The same two identity fields
+// check-in validates, with the same rules — reused via `.pick()` rather than
+// restated, so a change to what counts as a valid EID cannot apply to one
+// unauthenticated endpoint and not the other.
+//
+// 🔓 The DIFFERENCE is not here: /attend resolves EID *or* email, and /lookup
+// requires both to name the same member. That is a property of the query, not
+// of the schema — see findMemberByBoth in lib/lookup.ts.
+export const lookupSchema = checkinSchema.pick({ eid: true, email: true });
+
+export type LookupFields = z.infer<typeof lookupSchema>;
+
 // Officer sign-in (§5). Deliberately no minimum length on the password: the
 // login form is not where a password policy belongs — enforcing it here leaks
 // the policy to anyone probing the form and rejects any account created before

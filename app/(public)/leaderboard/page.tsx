@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 
@@ -224,12 +225,21 @@ export default async function LeaderboardPage() {
           )}
         </div>
 
-        {/* 📌 Phase 2 adds a link to /lookup here — the board is a bare total
-            by design (§9 #11), so this page cannot tell a member which of their
-            points were attendance and which were granted, and /lookup is where
-            that breakdown lives. Deliberately NOT linked yet: each phase merges
-            to main and deploys, so linking it now would ship a 404 to
-            production for the length of a phase. */}
+        {/* The board is a bare total by design (§9 #11), so it cannot tell a
+            member which of their points were attendance and which were granted.
+            /lookup is where that breakdown lives — link it, or the answer is
+            "ask an officer", which is what this stage exists to end. */}
+        <p className="mt-8 text-sm text-foreground/70">
+          Want your own breakdown — which events you attended, what&apos;s still
+          pending, and why your total is what it is?{" "}
+          <Link
+            href="/lookup"
+            className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+          >
+            Look up your attendance
+          </Link>
+          .
+        </p>
       </div>
     </section>
   );

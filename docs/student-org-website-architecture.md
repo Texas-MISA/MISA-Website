@@ -1,9 +1,38 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.50
-**Status:** Stages 0–5 complete. **Stage 6 (member directory) — ✅ COMPLETE, all 9 phases.** **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases.** **Stage 7 (member-facing views) — phase 1 (`/leaderboard`) built; phase 2 (`/lookup`) next.**
+**Version:** 1.51
+**Status:** Stages 0–5 complete. **Stage 6 (member directory) — ✅ COMPLETE, all 9 phases.** **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases.** **Stage 7 (member-facing views) — ✅ COMPLETE, both phases; exit criteria met.** Stage 8 (hardening & data integrity) is next.
 **Last updated:** August 2026
 
+> **v1.51: Stage 7 phase 2 — `/lookup`, and the gate that had to be one query.**
+> **No migration.** `lib/lookup.ts`, `lib/request-ip.ts`, `app/actions/lookup.ts`.
+>
+> - 🔓 **The EID + email gate is a CONJUNCTION expressed in a single query, and
+>   the obvious reuse would have broken it silently.** `findMember` in
+>   `lib/checkin.ts` is an ordered *fallback* — EID, then email — because a
+>   check-in must recognise someone who mistypes one field. Copying that shape
+>   into `/lookup` resolves on either half alone, which reduces the page that
+>   shows dues status to the EID-only oracle §6 accepts only for check-in. Two
+>   behavioural tests and a source assertion exist purely to fail if someone
+>   makes it "more forgiving".
+> - 🔓 **One failure message for every miss.** Splitting "no such EID" from
+>   "that email doesn't match" would be a *stronger* oracle than the accepted
+>   one, on the most sensitive surface.
+> - 🔓 **No identifier is returned that the caller did not already supply**, so
+>   §6's "emails and EIDs never returned to unauthenticated clients" holds by
+>   construction rather than by argument.
+> - **A second unauthenticated POST endpoint**, held to `attendance.ts`'s
+>   single-export shape. Two files, two symbols, and the difference between them
+>   is what each may do — this one writes only its throttle row, in **its own
+>   bucket**, because `RATE_LIMIT_MAX` is a room capacity and a standings lookup
+>   must not consume a check-in slot behind a venue's NAT.
+> - 🪤 **The site header ran out of room and failed silently.** The wordmark is
+>   absolutely centred, so nothing stops a nav group growing underneath it — the
+>   logo wins the z-order and the nav item disappears. Six items cleared it by
+>   61px; eight overflowed by 199px. The nav is now split across the wordmark
+>   and the desktop breakpoint moved `lg` → `xl`, which also fixes a collision
+>   that predated this stage.
+>
 > **v1.50: Stage 7 phase 1 — `/leaderboard`, and the term pin that never worked.**
 > Migration 21. The board itself is a small page; the finding underneath it is not.
 >
@@ -2477,7 +2506,12 @@ $$;
 walks `app/` for `page.tsx` and `route.ts` and asserts every resulting URL appears above. It
 found `/admin/attendance/new` missing here — built in Stage 5, undocumented ever since — along
 with the phase-7 and phase-8 routes. The check runs **one way only**, code → table, so a route
-planned but unbuilt stays legal to write down: `/leaderboard` and `/lookup` below are Stage 7.
+planned but unbuilt stays legal to write down; `/admin/audit` above is the standing example.
+
+📌 **The guard-the-guard case used to name `/lookup`, and Stage 7 built it** — so that assertion
+went red for the right reason and now names `/admin/audit` instead. Whoever builds that will land
+there next: pick another planned route rather than deleting the test, which is what keeps the
+one-way rule honest.
 
 Everything under `/admin/*` (except `/admin/login`) is gated by `proxy.ts` (Next 16's rename of `middleware.ts`), which checks for a valid session and a matching `admin_profiles` row.
 
@@ -2494,8 +2528,10 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Anon key over-permission | RLS: anon role can `select` only from `leaderboard` and published `events`. All writes go through Server Actions. |
 | Spam / bot submissions | Honeypot field, per-IP rate limit on the check-in action, submissions rejected outside any open window |
 | Check-in on behalf of someone else | Accepted risk for v1 — same as a paper sign-in sheet. Mitigate later with a rotating per-event code displayed at the venue. |
-| Attendance data enumeration | `/lookup` requires EID **and** matching email before returning history |
-| Roster PII exposure | Emails and EIDs never returned to unauthenticated clients under any route |
+| Attendance data enumeration | `/lookup` requires EID **and** matching email before returning history. 🔓 **Built as ONE query carrying both predicates** (`findMemberByBoth`, Stage 7 phase 2), never `lib/checkin.ts`'s ordered fallback — that shape resolves on the EID *or* the email, which would silently reduce this to the EID-alone gate the row below accepts only for check-in. Two tests exist purely to fail if someone "makes it more forgiving". The email side goes through `escapeIlike`, so a `%` is a literal rather than a wildcard past half the gate. |
+| `/lookup` distinguishing its failures | 🔓 **One `unmatched` outcome and one message for every miss** — never "no such EID" versus "that email doesn't match". Splitting them would hand back a *strictly stronger* oracle than check-in's: confirm the EID first, then walk the email, on the page that reveals dues status. The one-message rule is what keeps the double gate meaningful rather than decorative. |
+| Roster PII exposure | Emails and EIDs never returned to unauthenticated clients under any route. `/lookup` is the closest case and holds it **by construction**: the profile it returns carries the member's name and their own aggregates, and no identifier the caller did not already supply — not the stored email, not the stored EID. A test asserts the serialized response contains neither. |
+| A second unauthenticated POST endpoint (Stage 7 phase 2) | `app/actions/lookup.ts` joins `app/actions/attendance.ts` as something anyone can post to. Both are **single-export** files so "what can an anonymous user POST to" stays a two-file, two-symbol answer, and the difference between them is what each may do: `attendance.ts` writes, `lookup.ts` only reads. The one row `lookup.ts` writes anywhere is its throttle record. Honeypot first, echo caps before validation, zod, then the gate. 🔓 **Its own throttle bucket** (`hashClientIp("lookup")`, `LOOKUP_RATE_LIMIT_MAX = 30`), disjoint from check-in's: `RATE_LIMIT_MAX` is a *room capacity*, so a shared budget would let members checking their standing at a meeting exhaust the slots the people behind them need to check in with — and the check-in is the one that must not fail. |
 | Roster pollution via self-registration | The check-in form can create members (§4.2), so junk rows are reachable by anyone who can submit during an open window. Bounded by the window, honeypot, and rate limit; contained by matching on ID and then email before creating, and since v1.22 by requiring an explicit "this is my first MISA event" claim plus a confirmation pass. Visible via `members.source = 'self_checkin'` in the directory. Impact is cleanup, not data loss. **Note what the confirmation is:** a guard against honest typos, not a control. A scripted POST carrying `step=confirm` creates a member in one request without the review screen ever rendering — correct, because the server re-derives the whole outcome rather than trusting the previewed payload, but it means the throttle is still the only thing standing in an attacker's way. |
 | Roster membership is probeable | **Accepted, and it contradicts the officer-login row on purpose** (v1.22). §4.2's re-prompt says "we don't have that info on file", so anyone submitting during a check-in window learns whether a given EID is on the roster. Officer sign-in deliberately does the opposite — one identical failure for "wrong password" and "no such user" — and the two will read as an inconsistency to whoever finds them next unless the difference is written down. The roster is a club list, not a security boundary, and UT EIDs are semi-public; the alternative was an indistinguishable failure that gives a member with a typo no way to tell what went wrong. Bounded three ways: event resolution runs first, so the oracle is closed outside check-in windows entirely; the per-IP throttle applies to both passes; and the answer is a bare boolean — no name, email, or ID of the matched member ever reaches the client, including on the confirmation screen. |
 | Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. Triggers reject `UPDATE` and `DELETE`, so the log is append-only for the app and every client role. **Note the limit:** a table owner can disable the trigger, so this constrains the application, not someone with direct database access. Stage 8's RLS policies are what close the client-role path properly. |
@@ -2504,7 +2540,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Dues records are financial-adjacent PII | `dues_payments` holds who paid, how much, when, their Venmo display name and handle, and their free-text note — a category of data nothing else in this system carries, and the reason the threat-model boundary below had to be narrowed. **What it deliberately does not hold: no card numbers, no bank details, no Venmo credentials, and no ability to move money.** The site reads a statement after the fact; the payment happened elsewhere (§1.3, §2.2). Mitigations are the ones already in place rather than new machinery — RLS deny-all on the table, reachable only through `member_directory` (which exposes a **boolean**, never an amount) and officer-authenticated screens, every correction and void audited. Treat a dump of this table as materially worse than a roster dump when scoping Stage 8. |
 | The uploaded statement is the whole org's payment history in one file | An officer uploads a CSV that, by construction, contains every dues transaction for a month — a larger single artifact than anything else that enters this system. **Never persist the file**: parse it, keep the rows, discard the text. Bound the accepted size and row count and refuse rather than truncate (the §2.2 cap rule). The two-step preview keeps the text in the browser between steps rather than in a staging table, so there is no server-side copy to leak or forget. Parse defensively — an uploaded CSV is untrusted input even when the officer uploading it is not. |
 | Payment notes are member-supplied text | The note is written by the payer, so it is attacker-chosen in exactly the way member names are (see the formula-injection row above), and it reaches both the officer's screen and any export that includes it. Same mitigation, same writer: escape it in `lib/export.ts`'s CSV path, render it as text and never as markup. A note can also *name another member's EID* — that is a reconciliation hazard rather than an injection one, and it is why matching requires exactly one resolving token and queues anything ambiguous. |
-| `/lookup` reveals dues status | Stage 7's member self-service page will show the member their own dues status, which widens the accepted "is this EID on the roster" oracle (see the row above) to "has this person paid". **Materially more sensitive than roster membership**, and accepted only because `/lookup` already requires EID **and** matching email — a stricter gate than the check-in oracle, which needs the EID alone. Do not relax that gate, and do not add dues status to any surface reachable with the EID alone, `/leaderboard` included (§9 #1, #12). |
+| `/lookup` reveals dues status | ✅ **Built, Stage 7 phase 2.** The member self-service page shows the member their own dues status, which widens the accepted "is this EID on the roster" oracle (see the row above) to "has this person paid". **Materially more sensitive than roster membership**, and accepted only because `/lookup` requires EID **and** matching email — a stricter gate than the check-in oracle, which needs the EID alone. Do not relax that gate, and do not add dues status to any surface reachable with the EID alone, `/leaderboard` included (§9 #1, #12). The two rows near the top of this table are what make the gate real rather than nominal: one query with both predicates, and one indistinguishable failure. |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
 | Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. **Verified July 2026** — check it by response behaviour rather than by the dashboard label: the production alias must return `200` while a per-deployment URL returns `302` to `vercel.com/sso-api`. If both return `200`, protection is Disabled and every preview is publicly writable. |
 | Bulk roster import brings PII *in* (Stage 6 phase 7b) | The mirror of the export row, and the file is the same shape: a spreadsheet of names, emails and EIDs. 🔓 **It is never persisted** — the client reads it with `FileReader` and holds the text in component state between the preview and the commit, so no staging table and no temp file ever holds it. The import is **create-only**: a row matching an existing member on `normalized_eid` *or* `lower(email)` is shown and skipped, so a stale spreadsheet cannot overwrite a correction an officer made. One `member.imported` audit row per member created. |
@@ -2860,7 +2896,7 @@ Two phases, each merged to `main` on completion, as Stage 6 did.
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | `/leaderboard`, **migration 21** (`current_term()` → `security definer`, `term` appended to the view), the nav link, the force-dynamic resolution of Stage 5's revalidation carry-forward | ✅ **built 2026-08-09** |
-| 2 | `/lookup` — the EID + email gate, the member's own history, dues status | |
+| 2 | `/lookup` — the EID + email gate, the member's own history, dues status. `lib/lookup.ts`, `lib/request-ip.ts`, `app/actions/lookup.ts`. **No migration** | ✅ **built 2026-08-09** |
 
 - `/leaderboard` — one row per member for the current term, ranked on `total_points`, ties alphabetical (§4.4)
 - **`/leaderboard` must set `robots: { index: false, follow: false }`** (§9 #1, resolved). The page is reachable by anyone with the link; it must not be crawlable. `app/admin/(shell)/layout.tsx` already does exactly this and is the pattern to copy. Getting this wrong is not a bug you can fix afterwards — once students' names are indexed against their point totals, the cache outlives the deploy that caused it
@@ -2875,7 +2911,17 @@ Two phases, each merged to `main` on completion, as Stage 6 did.
 
 Correctness resting on five call sites staying complete is the shape this codebase keeps writing invariants against, and the failure is silent. **`/leaderboard` is `export const dynamic = "force-dynamic"` instead**, so there is no cache to go stale and no call site to forget. The cost is one read per request over a view returning one row per active member — 29 today, 500 in §2.2's worst case; the landing page already does this. The now-dead merge call was removed and `revalidatePoints`' comment rewritten to say that adding a path there means changing that line first.
 
-**Exit criteria:** a member can determine their own standing, why it is what it is, which specific events they missed, and whether anything of theirs is still pending — without asking an officer.
+**What phase 2 settled that the checklist above did not say**
+
+- 🔓 **The gate is one query carrying both predicates, and that is a security control rather than an implementation detail.** `findMember` in `lib/checkin.ts` is an ordered *fallback* — EID, then email — because a check-in has to recognise someone who fat-fingers one field. Reusing that shape here would resolve on either half alone and quietly reduce this page to the EID-only oracle §6 accepts for check-in, on the one surface that shows dues status. `lib/lookup.ts` never runs two lookups and never uses `.or()`; two tests and a source assertion exist to fail if someone makes it "more forgiving".
+- 🔓 **One failure message for every miss.** Distinguishing "no such EID" from "that email doesn't match" would be a *stronger* oracle than the accepted one — confirm the EID, then walk the email.
+- 🔓 **The response returns no identifier the caller did not already supply.** The name and the member's own aggregates, yes; the stored email and EID, no. That keeps §6's "emails and EIDs never returned to unauthenticated clients under any route" true by construction, and a test asserts the serialized profile contains neither.
+- **Its own throttle bucket**, via `hashClientIp(scope)` — extracted so both unauthenticated endpoints derive the client identically. `RATE_LIMIT_MAX` is a *room capacity*, so sharing one budget would let standings lookups crowd out check-ins behind a venue's NAT.
+- **Every value crossing into the Client Component is preformatted.** The profile is action state, so `Intl.DateTimeFormat` would otherwise run on both sides of hydration — the ICU-data mismatch the "Server Components own date formatting" rule exists for, arriving through a new door.
+- **Voided adjustments are hidden here** and kept in the officer ledger. A struck-through line a member cannot act on generates the officer question this page exists to prevent.
+- 🪤 **The nav ran out of room, and the header failed silently.** The wordmark is absolutely centred so the side groups cannot shift it, which also means nothing stops a group growing *underneath* it — the wordmark wins the z-order and the nav item simply disappears. Measured at 1646px: six items cleared it by 61px; eight overflowed by 199px and hid "Leaderboard" behind the logo. Fixed by splitting the nav across the wordmark (site pages left, member pages right) and moving the desktop breakpoint from `lg` to `xl` — at 1024 the *original* six already collided, so this was a pre-existing bug the two new links only made visible.
+
+**Exit criteria:** ✅ **met 2026-08-09.** A member can determine their own standing, why it is what it is, which specific events they missed, and whether anything of theirs is still pending — without asking an officer. Demonstrated end to end in a browser: `pn8571` + a case-folded `PRIYA.NAIR@Example.EDU` returns 27 points split 17 attendance / 10 bonus, a 67% rate over 8 of 12 completed events, a thirteen-row grid marked attended / missed / upcoming, the +10 grant with its reason, and the dues line — while the same EID with another member's email returns one generic miss.
 **Effort:** 3 days.
 
 ---
@@ -3033,7 +3079,13 @@ One decision, and it earns a place here rather than in Stage 10 because it const
                              step and the commit step, so nothing is staged
                              server-side
   /actions
-    attendance.ts            submitCheckin ONLY — see note below
+    attendance.ts            submitCheckin ONLY — see note below. The one
+                             unauthenticated WRITE path
+    lookup.ts                lookupMember ONLY (Stage 7 phase 2) — the one
+                             unauthenticated READ path, held to the same
+                             single-export shape for the same §6 reason. It
+                             writes exactly one row anywhere: the throttle
+                             record, in its own bucket
     attendance-review.ts     officer resolution mutations
     events.ts
     points.ts                grantPoints, voidAdjustment — and nothing else
@@ -3073,6 +3125,26 @@ One decision, and it earns a place here rather than in Stage 10 because it const
   points.ts                  point categories, formatting, grant bounds
   events.ts                  event domain core
   checkin.ts                 check-in resolution core
+  lookup.ts                  the member self-service core (Stage 7 phase 2).
+                             Pure, same contract as checkin.ts. 🔓 Its gate is
+                             a CONJUNCTION in ONE query — normalized_eid AND
+                             lower(email) on the same row — never checkin.ts's
+                             ordered fallback, which would reduce it to
+                             EID-alone and is exactly the gate §6 says is not
+                             sufficient to reveal dues status. One `unmatched`
+                             for every miss, no identifier returned that the
+                             caller did not supply, and every date already
+                             formatted because the profile crosses into a
+                             Client Component as action state
+  request-ip.ts              hashClientIp(scope) — the shared, SCOPED client
+                             hash both unauthenticated endpoints throttle on.
+                             The scope keeps /attend and /lookup in disjoint
+                             buckets: RATE_LIMIT_MAX is a room capacity, so a
+                             shared budget would let standings lookups crowd
+                             out check-ins behind a venue's NAT.
+                             ⚠️ Imports next/headers, so it must never be
+                             imported by checkin.ts, which a Client Component
+                             imports
   auth.ts                    getOfficer / requireOfficer
   event-options.ts           all-status event list, shared by queue filter,
                              resolution form, manual entry
