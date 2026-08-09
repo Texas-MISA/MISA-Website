@@ -183,6 +183,32 @@ from raw
 -- `not exists` that quietly skips when the draw happens to fill its slot.
 order by last_name;
 
+-- @chunk member-field-definitions
+-- One officer-defined custom field (§4.5, migration 18).
+--
+-- 📌 This exists because production HAS it and the officer decided to keep it
+-- (2026-08-09), which closes the open question phase 9 left. The row arrived on
+-- the remote as a leftover from the phase-4 walkthrough, and phase 9 then added
+-- member_field_definitions to the wipe list above — so the next re-seed would
+-- have deleted a column somebody was using. Seeding it is what makes "production
+-- IS the seed" true in the direction that keeps the column: the wipe clears the
+-- table, this puts back exactly the definition the remote already carries.
+--
+-- Deliberately NO member holds a value. Production has none either, and an
+-- orphan-free start is the honest one — fieldOptions() handles a stored value
+-- whose option was later removed, but the seed should not manufacture that case
+-- for every developer. It is also what keeps the export and directory fixtures
+-- unchanged: a populated column would shift what every export test sees.
+--
+-- created_by is the seed officer rather than NULL, so the FK says something
+-- true (a person defined this) and fetchOfficerNames has a name to resolve.
+insert into member_field_definitions
+  (key, label, kind, options, show_in_directory, editable_inline, sort_order, created_by)
+values
+  ('shirt_size', 'Shirt Size', 'select',
+   array['2XS','XS','S','M','L','XL','2XL','3XL'],
+   true, true, 0, '00000000-0000-4000-8000-5eed00000001');
+
 -- @chunk events
 -- A Fall 2026 semester: twelve completed events plus one cancelled, then two
 -- that have not happened yet. term is generated from starts_at, never set here.
@@ -419,9 +445,14 @@ begin
   select count(*) into n_adjust from point_adjustments;
   select count(*) into n_audit  from admin_audit;
   select count(*) into n_board  from leaderboard;
-  -- Added with the two deletes above: the seed creates neither, so the only
-  -- correct answer is zero, and asserting it is what turns "the wipe list is
+  -- Added with the two deletes above, which is what turns "the wipe list is
   -- complete" from a claim into a check.
+  --
+  -- 📌 n_fields was 0 until 2026-08-09 and is now 1: the officer chose to KEEP
+  -- the shirt_size definition production had been carrying, so the seed creates
+  -- it rather than the wipe silently removing it. The assertion still does the
+  -- same job — it fails if the wipe stops working (count climbs past 1 on a
+  -- re-seed) or if the insert is lost (count drops to 0).
   select count(*) into n_fields  from member_field_definitions;
   select count(*) into n_presets from member_filter_presets;
 
@@ -433,6 +464,6 @@ begin
   if n_adjust <> 6 then raise exception 'seed: expected 6 point adjustments, got %', n_adjust; end if;
   if n_audit  <> 2 then raise exception 'seed: expected 2 audit rows, got %', n_audit; end if;
   if n_board  <> 29 then raise exception 'seed: expected 29 leaderboard rows, got %', n_board; end if;
-  if n_fields  <> 0 then raise exception 'seed: expected 0 custom field definitions, got % (the wipe list missed member_field_definitions until 2026-08-08)', n_fields; end if;
+  if n_fields  <> 1 then raise exception 'seed: expected 1 custom field definition (shirt_size), got % — 0 means the insert was lost, more than 1 means the wipe is not clearing member_field_definitions', n_fields; end if;
   if n_presets <> 0 then raise exception 'seed: expected 0 saved views, got %', n_presets; end if;
 end $$;
