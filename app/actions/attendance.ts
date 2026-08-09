@@ -1,10 +1,7 @@
 "use server";
 
-import { createHash } from "node:crypto";
-
-import { headers } from "next/headers";
-
 import { checkRateLimit, resolveCheckin, type CheckinResult } from "@/lib/checkin";
+import { hashClientIp } from "@/lib/request-ip";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkinSchema } from "@/lib/validation";
 
@@ -12,6 +9,12 @@ import { checkinSchema } from "@/lib/validation";
 // everything request-shaped — honeypot, validation, rate limiting — and
 // delegates resolution to lib/checkin.ts, which is where the tested logic
 // lives. The service-role client exists only here and in lib/supabase/admin.
+//
+// 📌 THE ONE UNAUTHENTICATED **WRITE** PATH, and a single export so that "what
+// can an anonymous user POST to" stays a one-file, one-symbol answer (§6).
+// Stage 7 added app/actions/lookup.ts as the one unauthenticated **read** path,
+// held to the same shape for the same reason. Two files, two symbols, and the
+// distinction between them is what each is allowed to do.
 
 /**
  * The values the member typed, echoed back so the form can repopulate.
@@ -111,16 +114,14 @@ export async function submitCheckin(
     const db = createAdminClient();
     const now = new Date();
 
-    // Per-IP limit (§6). Hashed, never stored raw; x-forwarded-for's first
-    // entry is the client on Vercel. Absent header (local dev) buckets under
-    // one shared key, which only matters for testing the limiter itself.
+    // Per-IP limit (§6), in the "checkin" bucket — /lookup has its own, so a
+    // member checking their standing cannot eat a slot the next person needs
+    // to check in with (RATE_LIMIT_MAX is a room capacity).
     //
     // The confirm step pays a slot like any other submission. Exempting it
     // would make the second pass an unthrottled membership probe, and it is
     // the pass that writes.
-    const forwarded = (await headers()).get("x-forwarded-for");
-    const ip = forwarded?.split(",")[0]?.trim() || "unknown";
-    const ipHash = createHash("sha256").update(ip).digest("hex");
+    const ipHash = await hashClientIp("checkin");
     if ((await checkRateLimit(db, ipHash, now)) === "limited") {
       return { status: "rate_limited", submitted };
     }

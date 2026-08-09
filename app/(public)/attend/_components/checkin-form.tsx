@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
 import {
@@ -353,6 +354,18 @@ function ResultPanel({
     >
       <h2 className="font-display text-xl font-bold">{heading}</h2>
       <p className="mt-2 leading-6 text-foreground/85">{children}</p>
+      {/* Stage 7 phase 2. On every terminal outcome, including `pending` and
+          `duplicate` — those are the two where someone most wants to see for
+          themselves that the system has them, rather than take a sentence's
+          word for it. */}
+      <p className="mt-4 text-sm text-foreground/70">
+        <Link
+          href="/lookup"
+          className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+        >
+          Check your points and attendance
+        </Link>
+      </p>
     </div>
   );
 }

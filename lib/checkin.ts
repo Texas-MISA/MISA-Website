@@ -392,7 +392,12 @@ async function duplicateFromIndex(
 export async function checkRateLimit(
   db: Client,
   ipHash: string,
-  now: Date
+  now: Date,
+  // Defaults to the check-in ceiling so /attend's call is unchanged. /lookup
+  // passes its own, against its own bucket (see lib/request-ip.ts): sharing one
+  // budget would let standings lookups crowd out check-ins, and RATE_LIMIT_MAX
+  // is sized for the room rather than for the request count.
+  max: number = RATE_LIMIT_MAX
 ): Promise<"ok" | "limited"> {
   try {
     // Opportunistic prune so the table never needs a scheduled job.
@@ -408,7 +413,7 @@ export async function checkRateLimit(
       .eq("ip_hash", ipHash)
       .gte("submitted_at", windowStart);
     if (recent.error) throw recent.error;
-    if ((recent.count ?? 0) >= RATE_LIMIT_MAX) return "limited";
+    if ((recent.count ?? 0) >= max) return "limited";
 
     const inserted = await db
       .from("checkin_throttle")

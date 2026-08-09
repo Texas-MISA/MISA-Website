@@ -119,13 +119,18 @@ describe("the route table documents every route", () => {
   });
 
   it("does not require a documented route to exist yet", () => {
-    // The check runs ONE WAY, code → docs, on purpose. §5 also describes
-    // `/leaderboard` and `/lookup`, which are Stage 7 and unbuilt — the table is
-    // a plan as well as a record, and a planned route must stay legal to write
-    // down. The reverse check would force the plan out of the document.
-    expect(table).toContain("/leaderboard");
-    expect(table).toContain("/lookup");
-    expect(routeDirectories()).not.toContain("/lookup");
+    // The check runs ONE WAY, code → docs, on purpose: the table is a plan as
+    // well as a record, and a planned route must stay legal to write down. The
+    // reverse check would force the plan out of the document.
+    //
+    // 📌 The standing example USED to be `/lookup`, which Stage 7 then built —
+    // so this assertion went red for the right reason and needed a route that
+    // is still only planned. `/admin/audit` is the one, marked NOT BUILT in §5
+    // since v1.20 and carried as an open item with its own trigger.
+    // Whoever builds it will land here next; pick another planned route, and
+    // do not delete the test — it is what keeps the one-way rule honest.
+    expect(table).toContain("/admin/audit");
+    expect(routeDirectories()).not.toContain("/admin/audit");
   });
 });
 
