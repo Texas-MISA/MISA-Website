@@ -13,6 +13,7 @@ import {
   type MemberSuggestion,
   type ResolutionWarning,
 } from "@/lib/attendance";
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import { normalizeEid, ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 import { fetchEventOptions } from "@/lib/event-options";
@@ -83,16 +84,22 @@ async function fetchSubmission(id: string): Promise<SubmissionDetail | null> {
 
   if (error) {
     console.error("submission query failed:", error.message);
-    return null;
+    // 🔓 Throw rather than return null. The caller's `if (!x) notFound()` cannot
+    // tell a failed read from a deleted row, so returning null here told an
+    // officer the record does not exist. The segment error boundary is the
+    // right destination for a read that broke.
+    throw new Error("Could not read this submission.");
   }
   return data as unknown as SubmissionDetail | null;
 }
 
 /** Ranked suggestions from nearby_events(), annotated with each event's real
  * check-in window. The ranking is the database's; this only describes it. */
+type SuggestionResult<T> = { kind: "ok"; suggestions: T[] } | { kind: "error" };
+
 async function fetchEventSuggestions(
   submittedAt: string
-): Promise<EventSuggestionView[]> {
+): Promise<SuggestionResult<EventSuggestionView>> {
   const db = createAdminClient();
 
   // ORPHAN_WINDOW_HOURS is always passed explicitly — the SQL default is for
@@ -101,11 +108,16 @@ async function fetchEventSuggestions(
     ts: submittedAt,
     window_hours: ORPHAN_WINDOW_HOURS,
   });
+  // 🔓 Was `return []`, and the page then computed `outsideWindow` FROM that
+  // emptiness — so a failed RPC rendered "there is nothing to suggest. That is
+  // normal for a submission that has been waiting a while." A failure
+  // affirmatively explained away as expected behaviour, on the screen an
+  // officer uses to decide whether someone gets credit.
   if (error) {
     console.error("nearby_events rpc failed:", error.message);
-    return [];
+    return { kind: "error" };
   }
-  if (nearby.length === 0) return [];
+  if (nearby.length === 0) return { kind: "ok", suggestions: [] };
 
   // nearby_events() returns no window columns, so the gap it computed is
   // event-relative. Fetch the windows to say what actually refused the check-in.
@@ -120,21 +132,24 @@ async function fetchEventSuggestions(
     );
   if (windowError) {
     console.error("suggestion window query failed:", windowError.message);
-    return [];
+    return { kind: "error" };
   }
 
-  return buildEventSuggestions(
-    nearby,
-    new Map(windows.map((row) => [row.id, row])),
-    submittedAt
-  );
+  return {
+    kind: "ok",
+    suggestions: buildEventSuggestions(
+      nearby,
+      new Map(windows.map((row) => [row.id, row])),
+      submittedAt
+    ),
+  };
 }
 
 async function fetchMemberSuggestions(
   submission: SubmissionDetail
-): Promise<MemberSuggestion[]> {
+): Promise<SuggestionResult<MemberSuggestion>> {
   // Already linked — the officer needs no help finding the member.
-  if (submission.member_id) return [];
+  if (submission.member_id) return { kind: "ok", suggestions: [] };
 
   const db = createAdminClient();
   // Scanned, not probed: `ilike '%jon%'` cannot match `John`, so a probe-based
@@ -151,9 +166,11 @@ async function fetchMemberSuggestions(
     .eq("active", true)
     .limit(MEMBER_SCAN_LIMIT);
 
+  // Same shape as the event suggestions above: an unread roster must not read
+  // as "nothing on the roster looks like a match".
   if (error) {
     console.error("member candidate query failed:", error.message);
-    return [];
+    return { kind: "error" };
   }
 
   const candidates: MemberCandidate[] = data.map((row) => ({
@@ -165,17 +182,20 @@ async function fetchMemberSuggestions(
     active: row.active,
   }));
 
-  return rankMemberSuggestions(
-    {
-      fullName: submission.submitted_name,
-      email: submission.submitted_email,
-      eid: submission.submitted_eid,
-      normalizedEid:
-        submission.normalized_eid ??
-        normalizeEid(submission.submitted_eid),
-    },
-    candidates
-  );
+  return {
+    kind: "ok",
+    suggestions: rankMemberSuggestions(
+      {
+        fullName: submission.submitted_name,
+        email: submission.submitted_email,
+        eid: submission.submitted_eid,
+        normalizedEid:
+          submission.normalized_eid ??
+          normalizeEid(submission.submitted_eid),
+      },
+      candidates
+    ),
+  };
 }
 
 export default async function SubmissionDetailPage({
@@ -201,7 +221,7 @@ export default async function SubmissionDetailPage({
   const suffix = query.toString() ? `?${query.toString()}` : "";
   const backToQueue = `/admin/attendance${suffix}`;
 
-  const [eventSuggestions, memberSuggestions, eventOptions, memberOptions] =
+  const [eventSuggestions, memberSuggestions, eventOptionsResult, memberOptionsResult] =
     await Promise.all([
       fetchEventSuggestions(submission.submitted_at),
       fetchMemberSuggestions(submission),
@@ -210,6 +230,17 @@ export default async function SubmissionDetailPage({
         includeId: submission.member_id,
       }),
     ]);
+
+  // 🔓 These two pickers ARE the manual escape hatch this screen exists for —
+  // an officer resolves a submission by naming the event and the member by
+  // hand. An unread list rendered as an empty dropdown left them unable to do
+  // that, with nothing saying why.
+  const eventOptions =
+    eventOptionsResult.kind === "ok" ? eventOptionsResult.options : [];
+  const memberOptions =
+    memberOptionsResult.kind === "ok" ? memberOptionsResult.options : [];
+  const optionsFailed =
+    eventOptionsResult.kind === "error" || memberOptionsResult.kind === "error";
 
   const warnings = previewResolution({
     event: submission.events,
@@ -326,8 +357,14 @@ export default async function SubmissionDetailPage({
           </p>
           <div className="mt-4">
             <EventSuggestions
-              suggestions={eventSuggestions}
-              outsideWindow={eventSuggestions.length === 0}
+              suggestions={
+                eventSuggestions.kind === "ok" ? eventSuggestions.suggestions : []
+              }
+              failed={eventSuggestions.kind === "error"}
+              outsideWindow={
+                eventSuggestions.kind === "ok" &&
+                eventSuggestions.suggestions.length === 0
+              }
             />
           </div>
         </section>
@@ -342,7 +379,10 @@ export default async function SubmissionDetailPage({
           </p>
           <div className="mt-4">
             <MemberSuggestions
-              suggestions={memberSuggestions}
+              suggestions={
+                memberSuggestions.kind === "ok" ? memberSuggestions.suggestions : []
+              }
+              failed={memberSuggestions.kind === "error"}
               submittedEid={submission.submitted_eid}
             />
           </div>
@@ -356,6 +396,14 @@ export default async function SubmissionDetailPage({
           one save. Nothing above is preselected; the choice is yours.
         </p>
         <div className="mt-6">
+          {/* 🔓 These pickers ARE the manual escape hatch. An empty one left
+              the officer unable to resolve the submission at all, silently. */}
+          {optionsFailed && (
+            <ReadError
+              what="the event and member lists, so the pickers below are empty"
+              className="mb-4"
+            />
+          )}
           <ResolutionForm
             id={submission.id}
             // The raw PostgREST string. A Date round trip truncates its

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import { fetchEventOptions } from "@/lib/event-options";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
@@ -34,13 +35,24 @@ export default async function MemberPresetsPage() {
   await requireOfficer();
 
   const db = createAdminClient();
-  const [presets, definitions, events] = await Promise.all([
+  const [presetsResult, definitions, eventsResult] = await Promise.all([
     fetchPresets(db),
     fetchFieldDefinitions(db),
     fetchEventOptions(db),
   ]);
 
-  const eventLabels = new Map(events.map((event) => [event.id, event.label]));
+  // A preset summary naming an event needs the labels; an unread list makes
+  // those summaries read as though the event is gone rather than unreadable.
+  const events = eventsResult.kind === "ok" ? eventsResult.options : [];
+  // 🔓 "No saved views yet…" is onboarding copy. Shown for a FAILED read it
+  // tells an officer their team's saved views do not exist.
+  const presets = presetsResult.kind === "ok" ? presetsResult.presets : [];
+  const presetsFailed = presetsResult.kind === "error";
+  const eventsFailed = eventsResult.kind === "error";
+
+  const eventLabels = new Map<string, string>(
+    events.map((event) => [event.id, event.label])
+  );
 
   // Each stored query is parsed exactly as the directory would parse it, so the
   // summary describes what the view will ACTUALLY narrow to rather than what it
@@ -62,6 +74,12 @@ export default async function MemberPresetsPage() {
 
   return (
     <div>
+      {eventsFailed && (
+        <ReadError
+          what="the event list, so a saved view naming an event reads incompletely"
+          className="mb-6"
+        />
+      )}
       <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
         Saved views
       </h1>
@@ -79,7 +97,9 @@ export default async function MemberPresetsPage() {
       </p>
 
       <div className="mt-10">
-        {rows.length === 0 ? (
+        {presetsFailed ? (
+          <ReadError what="the saved views" />
+        ) : rows.length === 0 ? (
           <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
             No saved views yet. Filter the directory, then use{" "}
             <span className="font-medium">Save this view…</span> under the

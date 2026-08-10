@@ -136,17 +136,22 @@ async function fetchOfficerOptions(
   if (selected && !ids.includes(selected)) ids.push(selected);
   if (ids.length === 0) return [];
 
-  const names = await fetchOfficerNames(db, ids);
+  const result = await fetchOfficerNames(db, ids);
+  const names = result.kind === "ok" ? result.names : null;
   return ids
     .map((id) => ({
       id,
-      // All three cases (§6). A revoked officer's grants are exactly what
+      // All four cases (§6). A revoked officer's grants are exactly what
       // someone auditing wants to filter on, so the id fragment keeps two
-      // anonymous entries apart.
-      label: names.has(id)
-        ? (names.get(id) ?? `an officer (…${id.slice(-4)})`)
-        : `a former officer (…${id.slice(-4)})`,
-      named: names.get(id) != null,
+      // anonymous entries apart — and a FAILED name lookup says so rather than
+      // labelling every officer in the list "a former officer".
+      label:
+        names === null
+          ? `an officer (…${id.slice(-4)}) — name unavailable`
+          : names.has(id)
+            ? (names.get(id) ?? `an officer (…${id.slice(-4)})`)
+            : `a former officer (…${id.slice(-4)})`,
+      named: names?.get(id) != null,
     }))
     .sort((a, b) =>
       a.named === b.named ? a.label.localeCompare(b.label) : a.named ? -1 : 1
@@ -155,6 +160,14 @@ async function fetchOfficerOptions(
 }
 
 /** The name behind an active `?member=` filter, for the chip. */
+// 🔓 Returns the label, or the sentinel below when the read failed. Three
+// distinct facts used to collapse into `null`: no filter, the query broke, and
+// the member row is gone. The middle one made the "filtered to Name" chip
+// DISAPPEAR while the ledger below stayed filtered — a narrowed list with no
+// visible cause, which this file's own comment at fetchOfficerOptions calls
+// "worse than one that is missing".
+const LABEL_UNAVAILABLE = "__label_unavailable__";
+
 async function fetchMemberLabel(memberId: string): Promise<string | null> {
   if (!memberId) return null;
   const db = createAdminClient();
@@ -166,7 +179,7 @@ async function fetchMemberLabel(memberId: string): Promise<string | null> {
 
   if (error) {
     console.error("member label query failed:", error.message);
-    return null;
+    return LABEL_UNAVAILABLE;
   }
   return data?.full_name ?? null;
 }
@@ -230,7 +243,11 @@ export default async function AdminPointsPage({
       <div className="mt-6">
         <PointFilters
           officers={officers}
-          memberLabel={memberLabel}
+          memberLabel={
+            memberLabel === LABEL_UNAVAILABLE
+              ? "a member (name unavailable)"
+              : memberLabel
+          }
           selected={{
             officer: filters.officer,
             category: filters.category,

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import { fetchEventOptions } from "@/lib/event-options";
 import { toCentralFields } from "@/lib/events";
@@ -30,10 +31,15 @@ export default async function NewAttendancePage({
   const suffix = query.toString() ? `?${query.toString()}` : "";
   const backToQueue = `/admin/attendance${suffix}`;
 
-  const [events, members] = await Promise.all([
+  const [eventsResult, membersResult] = await Promise.all([
     fetchEventOptions(createAdminClient()),
     fetchMemberOptions(createAdminClient()),
   ]);
+  // An empty picker and an unread one are different facts (Stage 8 phase 3).
+  const events = eventsResult.kind === "ok" ? eventsResult.options : [];
+  const members = membersResult.kind === "ok" ? membersResult.options : [];
+  const optionsFailed =
+    eventsResult.kind === "error" || membersResult.kind === "error";
 
   // Defaults computed on the server, in Central. A `new Date()` in the browser
   // would default to the officer's own zone, which is the wrong answer for
@@ -42,6 +48,12 @@ export default async function NewAttendancePage({
 
   return (
     <div>
+      {optionsFailed && (
+        <ReadError
+          what="the event and member lists, so the pickers below are empty"
+          className="mb-6"
+        />
+      )}
       <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
         Add a check-in
       </h1>

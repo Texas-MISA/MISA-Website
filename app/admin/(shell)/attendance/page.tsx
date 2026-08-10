@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LedgerExport } from "@/app/admin/(shell)/_components/ledger-export";
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import { fetchEventOptions } from "@/lib/event-options";
 import { formatInstant } from "@/lib/events";
@@ -98,10 +99,14 @@ export default async function AdminAttendancePage({
   const params = await searchParams;
   const filters = parseAttendanceFilter(params);
 
-  const [events, result] = await Promise.all([
+  const [eventsResult, result] = await Promise.all([
     fetchEventOptions(createAdminClient()),
     fetchSubmissions(filters),
   ]);
+  // The event filter's options. An unread list is not an empty one — say so
+  // rather than rendering a dropdown that looks like there are no events.
+  const events = eventsResult.kind === "ok" ? eventsResult.options : [];
+  const eventsFailed = eventsResult.kind === "error";
 
   // Built from the FILTER, not from the incoming query string, so a link back
   // to this view carries what was actually applied rather than whatever was
@@ -128,6 +133,13 @@ export default async function AdminAttendancePage({
         missing its event link, its member link, or both — open one to see what
         the member typed and what it most likely meant.
       </p>
+
+      {eventsFailed && (
+        <ReadError
+          what="the event list, so the event filter is empty"
+          className="mt-6"
+        />
+      )}
 
       <div className="mt-6">
         <AttendanceFilters

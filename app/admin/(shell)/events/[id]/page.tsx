@@ -13,6 +13,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 import { EventForm } from "../_components/event-form";
 import { EventStatusPill } from "../_components/event-table";
+import {
+  Notice,
+  ReadError,
+} from "@/app/admin/(shell)/_components/notice";
+
 import { EventLifecycle } from "./_components/event-lifecycle";
 
 // Edit one event, see who checked in, and move it through its lifecycle (§5).
@@ -46,17 +51,33 @@ export default async function EventDetailPage({
     .eq("id", id)
     .maybeSingle();
 
+  // 🔓 A FAILED read is not a missing row. This used to log the error and fall
+  // through to notFound(), which told an officer the record does not exist —
+  // indistinguishable from one that was deleted or merged away. Throwing sends
+  // it to the segment error boundary instead, which says the read failed and
+  // carries a digest that matches the server log.
   if (error) {
     console.error("event detail query failed:", error.message);
+    throw new Error("Could not read this event.");
   }
   if (!event) notFound();
 
-  const { data: attendance } = await db
+  // ⚠️ The error was not even destructured here. A failed read rendered
+  // "Nobody has checked in to this event." — and, worse, passed
+  // attendanceCount={0} to EventLifecycle, which RE-ENABLES the delete button
+  // and drops the "cancel instead" hint. The server action re-checks so no data
+  // was ever at risk, but the UI guard disarmed exactly when the page was least
+  // trustworthy.
+  const { data: attendance, error: attendanceError } = await db
     .from("attendance")
     .select("id, submitted_name, submitted_eid, submitted_at, status")
     .eq("event_id", id)
     .order("submitted_at", { ascending: true });
 
+  if (attendanceError) {
+    console.error("event attendance query failed:", attendanceError.message);
+  }
+  const attendanceFailed = attendanceError !== null;
   const rows = (attendance ?? []) as AttendanceRow[];
   const fields = toCentralFields(event.starts_at);
   const endFields = toCentralFields(event.ends_at);
@@ -88,10 +109,15 @@ export default async function EventDetailPage({
       )}
 
       <div className="mt-8">
+        {/* ⚠️ Fail SAFE when the count is unknown. A failed attendance read
+            gave rows.length === 0, which re-enabled DELETE on an event that may
+            well have check-ins. Sending 1 keeps the button disabled and the
+            "cancel instead" hint on screen; the server action re-checks either
+            way, so this is about not inviting the click. */}
         <EventLifecycle
           eventId={event.id}
           status={event.status}
-          attendanceCount={rows.length}
+          attendanceCount={attendanceFailed ? 1 : rows.length}
         />
       </div>
 
@@ -122,13 +148,13 @@ export default async function EventDetailPage({
 
       <section className="mt-12">
         <h2 className="font-display text-xl font-bold">
-          Check-ins ({rows.length})
+          Check-ins ({attendanceFailed ? "—" : rows.length})
         </h2>
         <div className="mt-4">
-          {rows.length === 0 ? (
-            <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
-              Nobody has checked in to this event.
-            </p>
+          {attendanceFailed ? (
+            <ReadError what="the check-ins for this event" />
+          ) : rows.length === 0 ? (
+            <Notice>Nobody has checked in to this event.</Notice>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[36rem] border-collapse text-sm">

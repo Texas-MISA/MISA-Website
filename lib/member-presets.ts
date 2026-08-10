@@ -33,7 +33,11 @@ const PRESET_COLUMNS = "id, name, query, created_by" as const;
  * differently per request. The list is short enough to read in one request, so
  * this is about a stable render rather than about chunk boundaries.
  */
-export async function fetchPresets(db: Client): Promise<Preset[]> {
+export type PresetsResult =
+  | { kind: "ok"; presets: Preset[] }
+  | { kind: "error" };
+
+export async function fetchPresets(db: Client): Promise<PresetsResult> {
   const { data, error } = await db
     .from("member_filter_presets")
     .select(PRESET_COLUMNS)
@@ -42,18 +46,25 @@ export async function fetchPresets(db: Client): Promise<Preset[]> {
 
   if (error) {
     console.error("preset query failed:", error.message);
-    // An empty list, not a throw — the same call the field definitions make. A
-    // failed read here must not take the roster down with it: the directory's
-    // own filters are the screen's job and do not depend on this. The cost is a
-    // missing chip row for one request, which is visible; the alternative is an
-    // error page in place of the members list.
-    return [];
+    // 🔓 A discriminated result, not `[]` (Stage 8 phase 3). The old comment
+    // argued the right half and drew the wrong conclusion: a failed read must
+    // indeed not take the roster down, and the fix for that is that the CALLER
+    // keeps rendering — not that the failure becomes invisible. Returning []
+    // made /admin/members/presets print "No saved views yet. Filter the
+    // directory, then use Save this view…" — onboarding copy for a first-time
+    // user, shown to someone whose saved views exist and could not be read.
+    // "The cost is a missing chip row, which is visible" was the mistake: an
+    // absent chip row looks exactly like having no presets.
+    return { kind: "error" };
   }
 
-  return data.map((row) => ({
-    id: row.id,
-    name: row.name,
-    query: row.query,
-    createdBy: row.created_by,
-  }));
+  return {
+    kind: "ok",
+    presets: data.map((row) => ({
+      id: row.id,
+      name: row.name,
+      query: row.query,
+      createdBy: row.created_by,
+    })),
+  };
 }

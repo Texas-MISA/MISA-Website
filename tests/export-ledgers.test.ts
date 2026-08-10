@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import type { OfficerNames } from "@/lib/admin-profiles";
 import { toCsv, toTsv, type ExportField } from "@/lib/export";
 import {
   ADJUSTMENT_DEFAULT_FIELDS,
@@ -18,13 +19,19 @@ import { toXlsx } from "@/lib/xlsx";
 
 // The archival export cores (Stage 8 phase 2). Pure — no database.
 
-const OFFICERS = new Map<string, string | null>([
-  ["officer-named", "Dana Reyes"],
-  // A current officer who never set a display name.
-  ["officer-anon", null],
-  // "officer-gone" is deliberately ABSENT: their admin_profiles row was
-  // revoked. describeOfficer must tell the three apart.
-]);
+const OFFICERS: OfficerNames = {
+  kind: "ok",
+  names: new Map<string, string | null>([
+    ["officer-named", "Dana Reyes"],
+    // A current officer who never set a display name.
+    ["officer-anon", null],
+    // "officer-gone" is deliberately ABSENT: their admin_profiles row was
+    // revoked. describeOfficer must tell the three apart.
+  ]),
+};
+
+/** The fourth case: the name lookup itself failed. */
+const OFFICERS_UNAVAILABLE: OfficerNames = { kind: "error" };
 
 function fieldsFor(
   catalogue: readonly ExportField[],
@@ -332,5 +339,44 @@ describe("the export routes read in chunks, so they need a TOTAL order", () => {
     expect(code).toContain("getOfficer()");
     expect(code).not.toContain("requireOfficer");
     expect(source).toContain('export const dynamic = "force-dynamic"');
+  });
+});
+
+describe("a failed officer-name lookup does not accuse anyone", () => {
+  // 🔓 The widest-blast-radius defect Stage 8 phase 3 fixed, and it had been
+  // hiding behind a comment calling it cosmetic.
+  //
+  // `describeOfficer` reads absence from the map as "no admin_profiles row",
+  // i.e. a REVOKED officer. `fetchOfficerNames` used to return an empty Map on
+  // error, which makes that true of every id at once — so one failed read
+  // relabelled every officer on every screen (the ledger, both dues surfaces,
+  // the member detail, the audit trail) as "a former officer". On the log whose
+  // entire purpose is saying who did what.
+
+  it("says the name is unavailable, not that they left", () => {
+    const fields = fieldsFor(ADJUSTMENT_EXPORT_FIELDS, ["officer"]);
+    const [cell] = projectAdjustmentRow(
+      ADJUSTMENT,
+      fields,
+      OFFICERS_UNAVAILABLE
+    );
+    expect(cell).toEqual({
+      kind: "text",
+      value: "an officer (name unavailable)",
+    });
+    // The specific words that must NOT appear.
+    expect(JSON.stringify(cell)).not.toContain("former");
+  });
+
+  it("still distinguishes a genuinely revoked officer when the read worked", () => {
+    // The case the failure mode was impersonating. Both must exist, or the fix
+    // has simply moved the collapse somewhere else.
+    const fields = fieldsFor(ADJUSTMENT_EXPORT_FIELDS, ["officer"]);
+    const [cell] = projectAdjustmentRow(
+      { ...ADJUSTMENT, awarded_by: "officer-gone" },
+      fields,
+      OFFICERS
+    );
+    expect(cell).toEqual({ kind: "text", value: "a former officer" });
   });
 });

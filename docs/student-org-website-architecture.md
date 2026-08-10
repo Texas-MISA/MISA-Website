@@ -1,9 +1,32 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.53
-**Status:** Stages 0–5 complete. **Stage 6 — ✅ COMPLETE. Stage 6.5 — ✅ COMPLETE. Stage 7 — ✅ COMPLETE.** **Stage 8 (hardening & data integrity) — phases 1 and 2 built; phase 3 (error boundaries, empty-vs-error) next.**
+**Version:** 1.54
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
 
+> **v1.54: Stage 8 phase 3 — the boundaries, and the lies underneath them.**
+> **No migration.** Stage 8 closes.
+>
+> - 🔓 **The bullet says "error boundaries, loading states, empty states"; the
+>   work was the EMPTY-VS-ERROR distinction.** `x.error ? [] : x.data` renders
+>   the empty state, so a failed read stopped saying "something went wrong" and
+>   started claiming *you have not paid*, *you missed every event*, *this member
+>   does not exist*.
+> - 🔓 **The widest one was hiding behind a comment calling it cosmetic.**
+>   `fetchOfficerNames` returned an empty Map on error, and `describeOfficer`
+>   reads absence as "revoked" — so one failed read relabelled **every officer
+>   on every screen** as "a former officer". Exactly the regression that
+>   function's header records as fixed, reintroduced through the error path.
+> - 🐛 `lib/lookup.ts` had **five** swallows and could print "You're an official
+>   member" directly above "No payment of yours covers a term yet".
+> - 🐛 **Four** `notFound()`-on-failure conflations, not two. They throw now.
+> - 🪤 `events/page.tsx` failing `current_term` silently **widened** the view
+>   from "this term" to every event ever, with the control reading "all".
+> - 🪤 `error.tsx` never wraps its own segment's layout, so `app/admin/error.tsx`
+>   exists solely to catch `AdminShellLayout`. Both boundaries were exercised by
+>   making the layout throw.
+> - 🪤 `loading.tsx` and granular `<Suspense>` conflict — one per route.
+>
 > **v1.53: Stage 8 phase 2 — the archives, and the extraction they required.**
 > **Migration 23** (one new `admin_audit` entity type, `archive`).
 >
@@ -3002,7 +3025,7 @@ Three phases, each merged to `main` on completion.
 |---|---|---|
 | 1 | The database enforces its own rules — **migration 22**: the `authenticated` revoke, the grant narrowing, and the constraint gaps; plus the anon/authenticated proof matrix | ✅ **built 2026-08-09** |
 | 2 | Attendance and adjustment export for archival — **migration 23** (the `archive` audit type), `lib/ledger-filters.ts`, `lib/export-ledgers.ts`, two Route Handlers | ✅ **built 2026-08-10** |
-| 3 | Error boundaries, loading states, empty states | |
+| 3 | Error boundaries, loading states, and the empty-vs-error correction. **No migration** | ✅ **built 2026-08-10** |
 
 - Write and test every RLS policy; attempt each forbidden operation with the anon key and confirm it fails
 - Confirm `admin_audit` is append-only: no client role can update or delete a row
@@ -3028,6 +3051,16 @@ Three phases, each merged to `main` on completion.
 - 🪤 **`signedPoints` must never reach a spreadsheet** — it renders U+2212 MINUS, which the formula guard rightly ignores and Excel rightly refuses to parse as a number.
 - 🐛 **The first real export exposed a default-set defect**: `voided_date` was not in the defaults while the ledger's `state` filter defaults to `all`, so a voided grant came out byte-identical to a live one. The screen has a strikethrough; a file does not.
 - ⚠️ **`parseFieldSelection` gained a `defaults` parameter.** It falls back by filtering the catalogue, so the member defaults against a ledger catalogue would have produced a file with no columns at all.
+
+**🔓 What phase 3 found**
+
+- The five admin **list** pages already distinguished error from empty; the rot was in the **detail pages and `lib/`**, where a read failure became an affirmative claim. `lib/roster-index.ts` had stated the argument since Stage 6.5 — *"an empty roster and a failed read are indistinguishable to a caller that gets `[]`"* — and two sibling helpers cited that reasoning and then declined to follow it.
+- **Fail-whole vs. per-section is a judgement about what the screen is.** `/lookup` fails entirely (five interlocking numbers, read as one answer); `members/[id]` degrades per section (an officer who came to edit notes should not be blocked by dues). Both honour the rule.
+- 🪤 **`error.tsx` never wraps its own segment's `layout.tsx`**, so `app/admin/error.tsx` is a separate, load-bearing file — and it renders without the admin nav, because the nav is what failed.
+- 🪤 **`loading.tsx` and granular `<Suspense>` conflict**: the prerenderer stops at the first boundary walking up. One strategy per route. A rendered fallback also commits the response to 200, so a later `notFound()` cannot be a 404 — accepted, since every admin route is noindex.
+- **The shared `Notice` was not cosmetic**: "no data" and "read failed" rendered in the identical blue, so fixing the logic without an error tone would have left them indistinguishable.
+
+📌 **Left undone, deliberately, with no trigger:** `fetchFieldDefinitions` still returns `[]` on error (10 callers, several of them Server Actions where a "notice" has no meaning), so `/admin/members/fields` can still render "No custom fields yet" for a failed read. Same for the three term/officer dropdown helpers in `events`, `points` and `dues`, which empty a control rather than assert a falsehood. And ~50 of the 57 `border-l-4` call sites still use the literal rather than `Notice`.
 
 **Exit criteria:** attempting to read the roster, write attendance, grant points, or alter an audit row directly with the anon key fails for every table. ✅ **Met in phase 1**, and widened: the same sweep runs for `authenticated`, which is the role that was actually leaking.
 **Effort:** 3–4 days. Historically the stage most likely to be skipped and most likely to be regretted.
