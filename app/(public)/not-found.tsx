@@ -4,9 +4,15 @@ import Link from "next/link";
 // site header and footer stay — a visitor who mistypes a URL lands somewhere
 // they can navigate from rather than on a bare framework page.
 //
-// 📌 The ROOT app/not-found.tsx would also handle unmatched URLs app-wide, but
-// it renders inside the root layout only, without the site chrome. Putting this
-// in (public) means every wrong URL under the public site keeps the nav.
+// 🪤 This file is NOT the one that catches a mistyped address, and assuming it
+// was is a mistake worth recording — it survived local testing and was only
+// caught against the deployed site. `(public)` is a route GROUP, so it does not
+// appear in the URL and does not participate in matching: an unmatched address
+// belongs to no segment and falls all the way to `app/not-found.tsx`. This file
+// fires only for a `notFound()` thrown by a page already inside the group.
+//
+// Both exist. This one gets the chrome from (public)/layout.tsx; the root one
+// renders SiteHeader and SiteFooter itself, because the root layout has neither.
 
 export default function PublicNotFound() {
   return (
