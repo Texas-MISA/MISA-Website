@@ -2,7 +2,13 @@
 
 import { useMemo, useState } from "react";
 
+import {
+  Action,
+  Download,
+  FieldPicker,
+} from "@/app/admin/(shell)/_components/export-controls";
 import { DEFAULT_EXPORT_FIELDS, type ExportField } from "@/lib/export";
+
 import { useSelection } from "./selection";
 
 // Selection and extraction controls (§7 Stage 6 phase 5).
@@ -139,6 +145,7 @@ export function ExportToolbar({
 
       {picking && (
         <FieldPicker
+          defaults={DEFAULT_EXPORT_FIELDS}
           catalogue={catalogue}
           chosen={chosen}
           onChange={setChosen}
@@ -196,107 +203,6 @@ export function ExportToolbar({
         )}
       </div>
     </div>
-  );
-}
-
-function FieldPicker({
-  catalogue,
-  chosen,
-  onChange,
-}: {
-  catalogue: ExportField[];
-  chosen: ReadonlySet<string>;
-  onChange: (next: ReadonlySet<string>) => void;
-}) {
-  function toggle(key: string) {
-    const next = new Set(chosen);
-    if (next.has(key)) next.delete(key);
-    else next.add(key);
-    onChange(next);
-  }
-
-  return (
-    <div className="border-t-2 border-black px-3 py-2">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
-        {catalogue.map((field) => (
-          <label key={field.key} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 accent-black"
-              checked={chosen.has(field.key)}
-              onChange={() => toggle(field.key)}
-            />
-            <span>{field.label}</span>
-            {field.source === "custom" && (
-              <span className="border border-black/40 px-1 text-[0.6rem] uppercase tracking-wider">
-                custom
-              </span>
-            )}
-          </label>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-3">
-        <button
-          type="button"
-          onClick={() => onChange(new Set(DEFAULT_EXPORT_FIELDS))}
-          className="text-xs underline decoration-1 underline-offset-2"
-        >
-          Reset to default
-        </button>
-        <button
-          type="button"
-          onClick={() => onChange(new Set(catalogue.map((f) => f.key)))}
-          className="text-xs underline decoration-1 underline-offset-2"
-        >
-          Select all fields
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Download({
-  href,
-  disabled,
-  primary = false,
-  children,
-}: {
-  href: string;
-  disabled: boolean;
-  primary?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <a
-      href={disabled ? undefined : href}
-      className={`border-2 border-black px-2 py-1 text-xs font-semibold uppercase tracking-wider ${
-        disabled ? "pointer-events-none opacity-40" : ""
-      } ${primary && !disabled ? "bg-black text-white" : ""}`}
-      aria-disabled={disabled}
-    >
-      {children}
-    </a>
-  );
-}
-
-function Action({
-  disabled,
-  onClick,
-  children,
-}: {
-  disabled: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className="border-2 border-black px-2 py-1 text-xs font-semibold uppercase tracking-wider disabled:opacity-40"
-    >
-      {children}
-    </button>
   );
 }
 

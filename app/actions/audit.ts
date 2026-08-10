@@ -45,8 +45,17 @@ type Client = SupabaseClient<Database>;
  * check and this line moved in the same commit. Like `member_field` it is its
  * own type rather than `member`, because "someone renamed a saved filter" is not
  * an event in any individual member's history.
+ *
+ * `archive` (migration 23, Stage 8 phase 2) likewise. It covers the attendance
+ * and adjustment archival exports, and it is one type rather than two because
+ * `after.entity` already says which ledger — the alternative was a new entity
+ * type per export target, which is how a vocabulary gets long enough that the
+ * next person adds to only one side of it. It is NOT filed under `attendance`
+ * or `point_adjustment`: those name a specific row, and a receipt spanning N
+ * rows filed against one of them reads as an action taken on that row.
  */
 export type AuditEntityType =
+  | "archive"
   | "attendance"
   | "dues_payment"
   | "event"
@@ -125,6 +134,12 @@ export type AuditAction =
   // 'roster' against a receipt uuid nothing else references, since an export
   // spans N members rather than naming one.
   | "roster.exported"
+  // Stage 8 phase 2. The archival siblings of roster.exported, and the same
+  // shape: not a mutation, filed against a receipt uuid nothing references,
+  // because an export spans N rows rather than naming one. ONE verb for both
+  // ledgers — `after.entity` says which, so a third archival target needs no
+  // third verb.
+  | "archive.exported"
   // Stage 6.5. One row per PAYMENT, not one per import — the entity is the
   // payment, the same reason points.granted is one row per adjustment. Batch
   // context travels in `note`, and `dues_payments.import_batch_id` already

@@ -235,7 +235,15 @@ export function exportCatalogue(
  */
 export function parseFieldSelection(
   raw: string | string[] | undefined | null,
-  catalogue: readonly ExportField[]
+  catalogue: readonly ExportField[],
+  // 📌 Parameterized in Stage 8 phase 2, when the attendance and adjustment
+  // archives became a second and third caller with their own catalogues. It
+  // defaults to the member list so no existing caller changes, but a ledger
+  // export passing the member defaults would fall back to a set of keys its
+  // catalogue does not contain — and `chosen.length > 0` would then be false
+  // for a request that named nothing, yielding an empty file rather than a
+  // sensible default.
+  defaults: readonly string[] = DEFAULT_EXPORT_FIELDS
 ): ExportField[] {
   const requested = new Set(
     (Array.isArray(raw) ? raw : [raw ?? ""])
@@ -247,7 +255,7 @@ export function parseFieldSelection(
   const chosen = catalogue.filter((field) => requested.has(field.key));
   if (chosen.length > 0) return chosen;
 
-  return catalogue.filter((field) => DEFAULT_EXPORT_FIELDS.includes(field.key));
+  return catalogue.filter((field) => defaults.includes(field.key));
 }
 
 /**

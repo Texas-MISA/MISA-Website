@@ -1,9 +1,30 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.52
-**Status:** Stages 0–5 complete. **Stage 6 — ✅ COMPLETE. Stage 6.5 — ✅ COMPLETE. Stage 7 — ✅ COMPLETE.** **Stage 8 (hardening & data integrity) — phase 1 built; phases 2 (archival export) and 3 (error boundaries) next.**
+**Version:** 1.53
+**Status:** Stages 0–5 complete. **Stage 6 — ✅ COMPLETE. Stage 6.5 — ✅ COMPLETE. Stage 7 — ✅ COMPLETE.** **Stage 8 (hardening & data integrity) — phases 1 and 2 built; phase 3 (error boundaries, empty-vs-error) next.**
 **Last updated:** August 2026
 
+> **v1.53: Stage 8 phase 2 — the archives, and the extraction they required.**
+> **Migration 23** (one new `admin_audit` entity type, `archive`).
+>
+> - 🔓 **The filter extraction is the phase, not the export.** `/admin/points`
+>   and `/admin/attendance` translated their filters inline, each with its own
+>   copy of the Central half-open date bound. An export route would have been a
+>   third copy of predicates that must agree with the screen — the exact drift
+>   `lib/filters.ts` exists to prevent. `lib/ledger-filters.ts` now serves both.
+> - 📌 Measured: `?to=2026-08-04` returns **170** where a UTC bound returns
+>   **168**. Two seeded rows sit in the five-hour slice a bare `.lte()` drops.
+> - 🐛 It also fixed a live 500 — `centralWallTimeToInstant("yesterday", …)`
+>   **throws** rather than returning an Invalid Date, so a hand-typed `?from=`
+>   was a server error on both ledgers.
+> - 🪤 **`.order("id")` is a tie-break on a chunked read**, missed on the first
+>   pass. A tie straddling a `.range()` boundary duplicates one row and drops
+>   another. Four ties per table in the seed alone.
+> - 🪤 **`signedPoints` renders U+2212**, which Excel will not parse as a
+>   number. Points go out as a typed number cell.
+> - 🐛 The first real export showed a voided grant as byte-identical to a live
+>   one; `voided_date` joined the default field set.
+>
 > **v1.52: Stage 8 phase 1 — the boundary, proved rather than assumed.**
 > **Migration 22.** The stage exists because two defects of this exact shape
 > already shipped; phase 1 found a third and a fourth.
@@ -2522,6 +2543,9 @@ $$;
 /admin/points          Point adjustment ledger — every grant, filterable by officer
 /admin/points/new      Grant points to one or more members in a single action
 /admin/points/[id]     Adjustment detail — void it with a reason, and its history
+/admin/points/export   Route Handler — the point-adjustment archive: the filtered
+                       ledger as CSV or .xlsx, plus the void columns the screen
+                       shows only as a strikethrough  (Stage 8 phase 2)
 /admin/dues            Dues ledger — every payment, filterable by state, term,
                        member, and date; the needs-review count is the number
                        an officer acts on            (Stage 6.5 phase 3)
@@ -2534,6 +2558,10 @@ $$;
 /admin/attendance      Review queue — all submissions, filterable by status
 /admin/attendance/new  Officer manual entry — the recovery path for a member the
                        check-in form refused                    (Stage 5 phase 3)
+/admin/attendance/export
+                       Route Handler — the attendance archive: the filtered queue
+                       as CSV or .xlsx, plus the resolution columns the queue
+                       never displays                           (Stage 8 phase 2)
 /admin/attendance/[id] Submission detail: raw form data, suggestions, override actions
 /admin/audit           Full activity log across all entities    (NOT BUILT)
 ```
@@ -2973,7 +3001,7 @@ Three phases, each merged to `main` on completion.
 | Phase | Scope | Status |
 |---|---|---|
 | 1 | The database enforces its own rules — **migration 22**: the `authenticated` revoke, the grant narrowing, and the constraint gaps; plus the anon/authenticated proof matrix | ✅ **built 2026-08-09** |
-| 2 | Attendance and adjustment export for archival | |
+| 2 | Attendance and adjustment export for archival — **migration 23** (the `archive` audit type), `lib/ledger-filters.ts`, `lib/export-ledgers.ts`, two Route Handlers | ✅ **built 2026-08-10** |
 | 3 | Error boundaries, loading states, empty states | |
 
 - Write and test every RLS policy; attempt each forbidden operation with the anon key and confirm it fails
@@ -2990,6 +3018,16 @@ Three phases, each merged to `main` on completion.
 - 🪤 **The proof matrix was vacuous on its first draft, and only breaking it on purpose showed that.** Probing `insert({})` and asserting "an error came back" passes even with full permission, because a thin payload trips NOT NULL first. Measured: no grant → `42501`; grant without a policy → `42501`; grant **plus** policy with `{}` → `23502`; grant plus policy with a real payload → **201 Created**. The test now asserts `42501` specifically, and was re-run against a deliberately opened hole to confirm it goes red.
 - 🪤 **`term_index()` is not a validator, and the obvious constraint using it was wrong.** `term_index('Autumn 2026')` returns **4052 — identical to `Spring 2026`** — because its season arm is `case when split_part(t,' ',1) = 'Fall' then 1 else 0 end`, so anything not literally `Fall` is filed as Spring. It never returns null for a bad season; it returns a plausible wrong answer, which is the §4.7 trap family in a new place. The constraint checks the shape (`^(Spring|Fall) [0-9]{4}$`) instead, and `term_index` stays lenient because it backs a stored generated column.
 - **Six older tables gained the constraints the two newest already had**, applying the doctrine `lib/validation.ts` already states — the EID-normalizes-to-≥3 rule (a `-` folds to `''` and every such member collides into one phantom identity), `events.points` bounds, the `events.category` enum, attendance's resolved-pair completeness, term shape, and text lengths. Each proved by SQLSTATE against the live database, the way Stage 1's exit criteria were.
+
+**🔓 What phase 2 found, and why the extraction had to come first**
+
+- The roster export is safe because `applyMemberFilter` is a **shared** translation: the route re-runs provably the query the screen counted. Points and attendance had no equivalent — their predicates were inline in the page bodies, each carrying **its own copy of the Central half-open date bound**, and an export route would have been the third copy. `lib/ledger-filters.ts` is now the one translation the screens and the routes share; the row window stays the caller's, because the screens cap at 200 and an archive must not.
+- 📌 **Measured, not argued:** `?to=2026-08-04` returns **170** submissions where a UTC-anchored bound returns **168**. The seed has two rows submitted on the evening of Aug 4 Central — precisely the five-hour slice a bare `.lte()` drops.
+- 🐛 **The extraction fixed a live 500.** Neither page validated `from`/`to`, and `centralWallTimeToInstant("yesterday", …)` does not return an Invalid Date — it **throws**. A hand-typed date on either ledger was a server error. `?status=xyz` was tightened too: it used to reach `.eq()` and match nothing, which is a filter narrowing with no control on screen.
+- 🪤 **`.order("id")` is a tie-break, and it was missed on the first pass.** A chunked read ordered only by a timestamp duplicates one row and **drops another** when a tie straddles a `.range()` boundary. The seed has four ties in each table; a room checking in together, or one multi-member grant, produces them in bulk.
+- 🪤 **`signedPoints` must never reach a spreadsheet** — it renders U+2212 MINUS, which the formula guard rightly ignores and Excel rightly refuses to parse as a number.
+- 🐛 **The first real export exposed a default-set defect**: `voided_date` was not in the defaults while the ledger's `state` filter defaults to `all`, so a voided grant came out byte-identical to a live one. The screen has a strikethrough; a file does not.
+- ⚠️ **`parseFieldSelection` gained a `defaults` parameter.** It falls back by filtering the catalogue, so the member defaults against a ledger catalogue would have produced a file with no columns at all.
 
 **Exit criteria:** attempting to read the roster, write attendance, grant points, or alter an audit row directly with the anon key fails for every table. ✅ **Met in phase 1**, and widened: the same sweep runs for `authenticated`, which is the role that was actually leaking.
 **Effort:** 3–4 days. Historically the stage most likely to be skipped and most likely to be regretted.
@@ -3209,6 +3247,22 @@ One decision, and it earns a place here rather than in Stage 10 because it const
   admin-profiles.ts          fetchOfficerNames — actor_id FKs auth.users,
                              which has no PostgREST path to admin_profiles
   site.ts / officers.ts      org copy and the officer roster
+  ledger-filters.ts          the points-ledger and attendance-queue filter
+                             cores (Stage 8 phase 2). Pure, typed structurally
+                             like filters.ts. ONE module for two screens
+                             because each carried its own copy of the Central
+                             half-open date bound, and an export route would
+                             have been the third. 🔓 The row window is the
+                             CALLER's: the screens cap at 200 and the archives
+                             must not, so neither builder calls .limit()
+  export-ledgers.ts          the archival export cores (Stage 8 phase 2) — two
+                             field catalogues and two projectRow equivalents.
+                             A sibling of export.ts rather than an extension:
+                             that file's catalogue is member-shaped, while the
+                             writers it exports are domain-agnostic and take
+                             exactly (ExportField[], ExportCell[][]). 🪤 Points
+                             go out as a NUMBER, never signedPoints — that
+                             renders U+2212, which Excel will not parse
   filters.ts                 directory filter → SQL translation. One filter
                              object, one translation; the row window stays
                              outside it, so the directory and the export are the
