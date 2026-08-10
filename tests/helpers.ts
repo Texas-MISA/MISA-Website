@@ -4,7 +4,13 @@ import type { Database } from "@/lib/types/database";
 
 // Shared fixtures for the integration tests. Everything targets the LOCAL
 // stack (enforced by tests/global-setup.ts) with the service-role key, since
-// attendance/members are deny-all under RLS until Stage 8.
+// every table is deny-all under RLS and only the service role bypasses it.
+//
+// 📌 That used to read "until Stage 8", on the assumption the stage would write
+// policies. It did not, and the assumption was wrong: 33 modules read through
+// createAdminClient() and the browser client has no importers at all, so the
+// correct policy set is the empty one and Stage 8 proved it rather than
+// replacing it. Deny-all is the end state, not a placeholder.
 //
 // Identities are obviously fake (t3-prefixed EIDs, example.edu mailboxes) —
 // the repo is public. Events are placed in 2030, far from all seed data
@@ -171,9 +177,69 @@ export async function createCurrentTermEvent(
   return { id: data.id, title: data.title, term: data.term! };
 }
 
+/**
+ * A client carrying a real **user JWT**, i.e. PostgREST `role = authenticated`.
+ *
+ * 🔓 The role no other client in this suite can reach, and the one the security
+ * boundary was never tested against. `anonClient()` covers "a stranger" and
+ * `testClient()` bypasses RLS entirely; neither is "somebody who signed up".
+ * tests/security.test.ts said so in prose for two stages —
+ * *"`authenticated` is not exercisable from here without minting a session,
+ * so service_role stands in"* — while `member_directory` was granted to exactly
+ * that role.
+ *
+ * The `apikey` stays the ANON key on purpose. It is the `Authorization` bearer
+ * that promotes the request; passing the service key here would silently
+ * bypass RLS and make every assertion below meaningless while still passing.
+ */
+export function authenticatedClient(
+  accessToken: string
+): SupabaseClient<Database> {
+  return createClient<Database>(
+    process.env.SUPABASE_TEST_URL!,
+    process.env.SUPABASE_TEST_ANON_KEY!,
+    {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    }
+  );
+}
+
+/**
+ * Sign in as `email` and return a client holding that user's JWT.
+ *
+ * Signs in through an anon-key client because that is what a browser does —
+ * `auth.admin.*` would mint a session without exercising the login path.
+ */
+export async function signInAs(
+  email: string,
+  password: string
+): Promise<SupabaseClient<Database>> {
+  const auth = createClient<Database>(
+    process.env.SUPABASE_TEST_URL!,
+    process.env.SUPABASE_TEST_ANON_KEY!,
+    { auth: { persistSession: false, autoRefreshToken: false } }
+  );
+  const { data, error } = await auth.auth.signInWithPassword({
+    email,
+    password,
+  });
+  if (error || !data.session) {
+    throw new Error(
+      `fixture sign-in failed for ${email}: ${error?.message ?? "no session"}`
+    );
+  }
+  return authenticatedClient(data.session.access_token);
+}
+
 // --- officer fixtures (Stage 4) -------------------------------------------
 
 const TEST_OFFICER_EMAIL = "test.officer@example.edu";
+// Fixed, not generated. getTestOfficer used to mint a random password and throw
+// it away, which was fine while nothing ever signed in — Stage 8 does, and a
+// password nobody kept cannot be used. Local-only and obviously fake; the
+// stack is disposable and global-setup.ts refuses any non-local URL.
+const TEST_PASSWORD = "test-only-not-a-real-password";
 let officerIdCache: string | null = null;
 
 /**
@@ -195,7 +261,7 @@ export async function getTestOfficer(
 
   const { data, error } = await db.auth.admin.createUser({
     email: TEST_OFFICER_EMAIL,
-    password: `test-only-${crypto.randomUUID()}`,
+    password: TEST_PASSWORD,
     email_confirm: true,
   });
 
@@ -209,6 +275,15 @@ export async function getTestOfficer(
     const found = await findOfficerId(db);
     if (!found) throw new Error("fixture officer exists but was not found");
     userId = found;
+    // The row already existed, so its password is whatever an earlier run set —
+    // possibly the old random one. Reset it, or signInAsOfficer() fails against
+    // a stack that has not been reset since Stage 8.
+    const { error: pwError } = await db.auth.admin.updateUserById(userId, {
+      password: TEST_PASSWORD,
+    });
+    if (pwError) {
+      throw new Error(`fixture officer password reset failed: ${pwError.message}`);
+    }
   } else {
     userId = data.user.id;
   }
@@ -239,6 +314,90 @@ async function findOfficerId(
     data.users.find((u) => u.email?.toLowerCase() === TEST_OFFICER_EMAIL)?.id ??
     null
   );
+}
+
+/** Signed in as the fixture officer — has an `admin_profiles` row. */
+export async function signInAsOfficer(
+  db: SupabaseClient<Database>
+): Promise<SupabaseClient<Database>> {
+  await getTestOfficer(db);
+  return signInAs(TEST_OFFICER_EMAIL, TEST_PASSWORD);
+}
+
+const TEST_OUTSIDER_EMAIL = "test.outsider@example.edu";
+let outsiderIdCache: string | null = null;
+
+/**
+ * 🔓 A signed-in user who is **NOT an officer** — no `admin_profiles` row.
+ *
+ * The category §6 leans on and nothing had ever tested. `enable_signup` is on,
+ * so this is not a hypothetical role: it is one confirmed email away for anyone
+ * on the internet. `lib/auth.ts` is what distinguishes them from an officer, and
+ * `lib/auth.ts` is **application** code — PostgREST never runs it, so any grant
+ * to `authenticated` is a grant to this person.
+ *
+ * Created the same way the officer is and never deleted, for the same reason.
+ */
+export async function getTestOutsider(
+  db: SupabaseClient<Database>
+): Promise<string> {
+  if (outsiderIdCache) return outsiderIdCache;
+
+  const { data, error } = await db.auth.admin.createUser({
+    email: TEST_OUTSIDER_EMAIL,
+    password: TEST_PASSWORD,
+    email_confirm: true,
+  });
+
+  if (error) {
+    if (!/already been registered|email_exists/i.test(error.message)) {
+      throw new Error(`fixture outsider create failed: ${error.message}`);
+    }
+    const { data: list, error: listError } = await db.auth.admin.listUsers({
+      page: 1,
+      perPage: 200,
+    });
+    if (listError) {
+      throw new Error(`fixture outsider lookup failed: ${listError.message}`);
+    }
+    const found = list.users.find(
+      (u) => u.email?.toLowerCase() === TEST_OUTSIDER_EMAIL
+    );
+    if (!found) throw new Error("fixture outsider exists but was not found");
+    outsiderIdCache = found.id;
+    const { error: pwError } = await db.auth.admin.updateUserById(found.id, {
+      password: TEST_PASSWORD,
+    });
+    if (pwError) {
+      throw new Error(`fixture outsider password reset failed: ${pwError.message}`);
+    }
+  } else {
+    outsiderIdCache = data.user.id;
+  }
+
+  // ⚠️ Deliberately NO admin_profiles row. That absence is the entire fixture —
+  // if a later change starts creating one here, every assertion that this role
+  // is denied would keep passing for the wrong reason.
+  const { data: profile } = await db
+    .from("admin_profiles")
+    .select("user_id")
+    .eq("user_id", outsiderIdCache)
+    .maybeSingle();
+  if (profile) {
+    throw new Error(
+      "fixture outsider has an admin_profiles row — it must not; that absence is the fixture"
+    );
+  }
+
+  return outsiderIdCache;
+}
+
+/** Signed in as a non-officer. See getTestOutsider. */
+export async function signInAsOutsider(
+  db: SupabaseClient<Database>
+): Promise<SupabaseClient<Database>> {
+  await getTestOutsider(db);
+  return signInAs(TEST_OUTSIDER_EMAIL, TEST_PASSWORD);
 }
 
 /** Audit rows written for one entity. Assertions only — cleanup() cannot

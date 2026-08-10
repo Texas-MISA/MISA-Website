@@ -6,7 +6,8 @@ import type { Database } from "@/lib/types/database";
 
 // Vitest global setup: the integration tests run against the LOCAL Supabase
 // stack (never the linked remote), using the service-role key so RLS —
-// deny-all on attendance/members until Stage 8 — doesn't block fixtures.
+// deny-all on every table, which Stage 8 confirmed is the end state rather
+// than a placeholder — doesn't block fixtures.
 // The local keys are well-known dev values published by the CLI; nothing
 // here is a secret.
 //
