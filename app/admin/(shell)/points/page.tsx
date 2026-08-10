@@ -2,13 +2,19 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
+import { LedgerExport } from "@/app/admin/(shell)/_components/ledger-export";
 import { requireOfficer } from "@/lib/auth";
+import { formatInstant } from "@/lib/events";
 import {
-  addCivilDays,
-  centralWallTimeToInstant,
-  formatInstant,
-} from "@/lib/events";
-import { POINT_CATEGORIES } from "@/lib/points";
+  adjustmentFilterToParams,
+  applyAdjustmentFilter,
+  parseAdjustmentFilter,
+  type AdjustmentFilter,
+} from "@/lib/ledger-filters";
+import {
+  ADJUSTMENT_DEFAULT_FIELDS,
+  ADJUSTMENT_EXPORT_FIELDS,
+} from "@/lib/export-ledgers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { PointFilters, type OfficerOption } from "./_components/point-filters";
@@ -38,18 +44,6 @@ const LIMIT = 200;
  */
 const OFFICER_SCAN_LIMIT = 1000;
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-type Filters = {
-  officer: string;
-  category: string;
-  member: string;
-  state: "all" | "live" | "voided";
-  from: string;
-  to: string;
-};
-
 type RawAdjustment = Omit<
   LedgerRow,
   "awardedLabel" | "voided" | "officerLabel"
@@ -60,49 +54,32 @@ type RawAdjustment = Omit<
 };
 
 async function fetchLedger(
-  filters: Filters
+  filters: AdjustmentFilter
 ): Promise<
   { kind: "ok"; rows: LedgerRow[]; total: number } | { kind: "error" }
 > {
   const db = createAdminClient();
 
-  let query = db
-    .from("point_adjustments")
-    .select(
-      "id, member_id, points, reason, category, event_id, term, " +
-        "awarded_by, awarded_at, voided_at, " +
-        "members(id, full_name, active), events(id, title)",
-      { count: "exact" }
-    )
+  // 📌 The predicates live in lib/ledger-filters.ts as of Stage 8 phase 2, so
+  // this screen and /admin/points/export are provably the same query — the
+  // property applyMemberFilter gives the directory and its export. What stays
+  // here is the ROW WINDOW: the order and the 200-row cap belong to this
+  // screen, and the export deliberately uses different ones.
+  const query = applyAdjustmentFilter(
+    db
+      .from("point_adjustments")
+      .select(
+        "id, member_id, points, reason, category, event_id, term, " +
+          "awarded_by, awarded_at, voided_at, " +
+          "members(id, full_name, active), events(id, title)",
+        { count: "exact" }
+      ),
+    filters
+  )
     // The (awarded_by, awarded_at desc) index serves this and the officer
     // filter together.
     .order("awarded_at", { ascending: false })
     .limit(LIMIT);
-
-  if (filters.officer) query = query.eq("awarded_by", filters.officer);
-  if (filters.category) query = query.eq("category", filters.category);
-  if (filters.member) query = query.eq("member_id", filters.member);
-
-  if (filters.state === "live") query = query.is("voided_at", null);
-  else if (filters.state === "voided") {
-    query = query.not("voided_at", "is", null);
-  }
-
-  // Central wall time made into instants, half-open at the top. A bare
-  // .lte("awarded_at", "2026-04-07") would be read as UTC midnight and
-  // silently drop the last five or six hours of a Central day.
-  if (filters.from) {
-    query = query.gte(
-      "awarded_at",
-      centralWallTimeToInstant(filters.from, "00:00").toISOString()
-    );
-  }
-  if (filters.to) {
-    query = query.lt(
-      "awarded_at",
-      centralWallTimeToInstant(addCivilDays(filters.to, 1), "00:00").toISOString()
-    );
-  }
 
   const { data, error, count } = await query;
   if (error) {
@@ -194,21 +171,6 @@ async function fetchMemberLabel(memberId: string): Promise<string | null> {
   return data?.full_name ?? null;
 }
 
-/** The active filters as a query string, so opening an adjustment and coming
- * back lands on the same view rather than the unfiltered default. */
-function filterSuffix(params: Record<string, string | undefined>): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value) query.set(key, value);
-  }
-  const encoded = query.toString();
-  return encoded ? `?${encoded}` : "";
-}
-
-function uuidOrEmpty(value: string | undefined): string {
-  return value && UUID_RE.test(value) ? value : "";
-}
-
 export default async function AdminPointsPage({
   searchParams,
 }: {
@@ -225,28 +187,7 @@ export default async function AdminPointsPage({
   await requireOfficer();
 
   const params = await searchParams;
-
-  const category =
-    params.category &&
-    (POINT_CATEGORIES as readonly string[]).includes(params.category)
-      ? params.category
-      : "";
-
-  const filters: Filters = {
-    officer: uuidOrEmpty(params.officer),
-    category,
-    member: uuidOrEmpty(params.member),
-    // Voided rows stay visible by default. The ledger's job is to show what
-    // happened, and a void is something that happened.
-    state:
-      params.state === "live"
-        ? "live"
-        : params.state === "voided"
-          ? "voided"
-          : "all",
-    from: params.from ?? "",
-    to: params.to ?? "",
-  };
+  const filters = parseAdjustmentFilter(params);
 
   const [result, officers, memberLabel] = await Promise.all([
     fetchLedger(filters),
@@ -254,15 +195,14 @@ export default async function AdminPointsPage({
     fetchMemberLabel(filters.member),
   ]);
 
-  const suffix = filterSuffix(params);
+  // Built from the FILTER, not the incoming query string, so a link back
+  // carries what was actually applied rather than whatever was typed.
+  const query = adjustmentFilterToParams(filters).toString();
+  const suffix = query ? `?${query}` : "";
 
   // "Filter to this member", keeping every other filter the officer set.
   function memberHref(memberId: string): string {
-    const next = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (value) next.set(key, value);
-    }
-    next.set("member", memberId);
+    const next = adjustmentFilterToParams({ ...filters, member: memberId });
     return `/admin/points?${next.toString()}`;
   }
 
@@ -315,6 +255,16 @@ export default async function AdminPointsPage({
                   ? `Showing the first ${result.rows.length} of ${result.total} matching adjustments.`
                   : `${result.total} matching adjustment${result.total === 1 ? "" : "s"}.`}
             </p>
+            <div className="mb-4">
+              <LedgerExport
+                path="/admin/points/export"
+                filterParams={query}
+                catalogue={ADJUSTMENT_EXPORT_FIELDS}
+                defaults={ADJUSTMENT_DEFAULT_FIELDS}
+                total={result.total}
+                noun="adjustment"
+              />
+            </div>
             <PointsTable
               rows={result.rows}
               hrefSuffix={suffix}

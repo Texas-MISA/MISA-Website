@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { LedgerExport } from "@/app/admin/(shell)/_components/ledger-export";
 import { requireOfficer } from "@/lib/auth";
 import { fetchEventOptions } from "@/lib/event-options";
+import { formatInstant } from "@/lib/events";
 import {
-  addCivilDays,
-  centralWallTimeToInstant,
-  formatInstant,
-} from "@/lib/events";
+  applyAttendanceFilter,
+  attendanceFilterToParams,
+  parseAttendanceFilter,
+  type AttendanceFilter,
+} from "@/lib/ledger-filters";
+import {
+  ATTENDANCE_DEFAULT_FIELDS,
+  ATTENDANCE_EXPORT_FIELDS,
+} from "@/lib/export-ledgers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { AttendanceFilters } from "./_components/attendance-filters";
@@ -24,59 +31,37 @@ export const metadata: Metadata = { title: "Attendance" };
 
 const LIMIT = 200;
 
-type Filters = {
-  status: string;
-  event: string;
-  from: string;
-  to: string;
-  sort: "oldest" | "newest";
-};
-
 type RawSubmission = Omit<SubmissionRow, "submittedLabel"> & {
   submitted_at: string;
 };
 
 async function fetchSubmissions(
-  filters: Filters
+  filters: AttendanceFilter
 ): Promise<
   { kind: "ok"; rows: SubmissionRow[]; total: number } | { kind: "error" }
 > {
   const db = createAdminClient();
 
-  let query = db
-    .from("attendance")
-    .select(
-      // No members(...) join: the queue does not show the linked member. It is
-      // on the submission detail page, which is where it can also be changed.
-      "id, submitted_name, submitted_eid, submitted_email, submitted_at, " +
-        "status, source, event_id, " +
-        "events(id, title, status)",
-      { count: "exact" }
-    )
+  // 📌 The predicates live in lib/ledger-filters.ts as of Stage 8 phase 2, so
+  // this screen and /admin/attendance/export are provably the same query — the
+  // property applyMemberFilter gives the directory and its export. What stays
+  // here is the ROW WINDOW: the order and the 200-row cap are this screen's,
+  // and the export deliberately uses different ones.
+  const query = applyAttendanceFilter(
+    db
+      .from("attendance")
+      .select(
+        // No members(...) join: the queue does not show the linked member. It
+        // is on the submission detail page, where it can also be changed.
+        "id, submitted_name, submitted_eid, submitted_email, submitted_at, " +
+          "status, source, event_id, " +
+          "events(id, title, status)",
+        { count: "exact" }
+      ),
+    filters
+  )
     .order("submitted_at", { ascending: filters.sort === "oldest" })
     .limit(LIMIT);
-
-  if (filters.status) query = query.eq("status", filters.status);
-
-  if (filters.event === "unassigned") query = query.is("event_id", null);
-  else if (filters.event) query = query.eq("event_id", filters.event);
-
-  // Date bounds are Central wall time made into instants, and half-open at the
-  // top. A bare .lte("submitted_at", "2026-04-07") would be read as UTC
-  // midnight and silently drop the last five or six hours of a Central day —
-  // the same class of bug as building a timestamp with new Date("…T18:00").
-  if (filters.from) {
-    query = query.gte(
-      "submitted_at",
-      centralWallTimeToInstant(filters.from, "00:00").toISOString()
-    );
-  }
-  if (filters.to) {
-    query = query.lt(
-      "submitted_at",
-      centralWallTimeToInstant(addCivilDays(filters.to, 1), "00:00").toISOString()
-    );
-  }
 
   const { data, error, count } = await query;
   if (error) {
@@ -96,17 +81,6 @@ async function fetchSubmissions(
   return { kind: "ok", rows, total: count ?? data.length };
 }
 
-/** The active filters as a query string, so opening a submission and coming
- * back lands on the same view rather than the unfiltered default. */
-function filterSuffix(params: Record<string, string | undefined>): string {
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params)) {
-    if (value) query.set(key, value);
-  }
-  const encoded = query.toString();
-  return encoded ? `?${encoded}` : "";
-}
-
 export default async function AdminAttendancePage({
   searchParams,
 }: {
@@ -122,36 +96,18 @@ export default async function AdminAttendancePage({
   await requireOfficer();
 
   const params = await searchParams;
-
-  // Absent status means pending: the queue exists for the unresolved rows, and
-  // an officer arriving from the dashboard badge wants those. "all" is the
-  // explicit escape hatch. Pending defaults to oldest-first so the queue
-  // drains from the top rather than rotting at the bottom (§9 #8 chose no
-  // enforced deadline, which makes the ordering the mitigation).
-  const status = params.status === "all" ? "" : (params.status ?? "pending");
-  const sort: Filters["sort"] =
-    params.sort === "newest"
-      ? "newest"
-      : params.sort === "oldest"
-        ? "oldest"
-        : status === "pending"
-          ? "oldest"
-          : "newest";
-
-  const filters: Filters = {
-    status,
-    event: params.event ?? "",
-    from: params.from ?? "",
-    to: params.to ?? "",
-    sort,
-  };
+  const filters = parseAttendanceFilter(params);
 
   const [events, result] = await Promise.all([
     fetchEventOptions(createAdminClient()),
     fetchSubmissions(filters),
   ]);
 
-  const suffix = filterSuffix(params);
+  // Built from the FILTER, not from the incoming query string, so a link back
+  // to this view carries what was actually applied rather than whatever was
+  // typed — a `?status=xyz` that the parse ignored no longer rides along.
+  const query = attendanceFilterToParams(filters).toString();
+  const suffix = query ? `?${query}` : "";
 
   return (
     <div>
@@ -177,7 +133,8 @@ export default async function AdminAttendancePage({
         <AttendanceFilters
           events={events}
           selected={{
-            status: params.status === "all" ? "all" : (params.status ?? "pending"),
+            // "" is every status, which the control spells "all".
+            status: filters.status === "" ? "all" : filters.status,
             event: filters.event,
             from: filters.from,
             to: filters.to,
@@ -200,6 +157,16 @@ export default async function AdminAttendancePage({
                   ? `Showing the first ${result.rows.length} of ${result.total} matching submissions.`
                   : `${result.total} matching submission${result.total === 1 ? "" : "s"}.`}
             </p>
+            <div className="mb-4">
+              <LedgerExport
+                path="/admin/attendance/export"
+                filterParams={query}
+                catalogue={ATTENDANCE_EXPORT_FIELDS}
+                defaults={ATTENDANCE_DEFAULT_FIELDS}
+                total={result.total}
+                noun="submission"
+              />
+            </div>
             <ReviewQueue
               rows={result.rows}
               events={events}

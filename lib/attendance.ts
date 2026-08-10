@@ -20,6 +20,40 @@ export const ATTENDANCE_SOURCES = ["self_checkin", "admin_manual"] as const;
 export type AttendanceSource = (typeof ATTENDANCE_SOURCES)[number];
 
 /**
+ * Human labels for the two unions above (Stage 8 phase 2).
+ *
+ * 📌 Why these did not exist before: the screens do not need them. `StatusPill`
+ * renders the raw value under a CSS `uppercase`, so "present" already displays
+ * as PRESENT, and the queue shows a source badge only for `admin_manual`. The
+ * archival export is the first consumer that puts these words into a file a
+ * human reads outside the app, where "self_checkin" is not a word.
+ *
+ * ⚠️ Fall back to the raw value, never to "Unknown". Both columns are `text`
+ * with a CHECK constraint, and the house rule (see `admin_audit.action`) is
+ * that a reader tolerates a value it has not heard of by showing it, rather
+ * than erasing it — an archive that silently blanks a status it does not
+ * recognise is worse than one that prints an unfamiliar word.
+ */
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  present: "Present",
+  rejected: "Rejected",
+};
+
+export function formatAttendanceStatus(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
+
+const SOURCE_LABELS: Record<string, string> = {
+  self_checkin: "Self check-in",
+  admin_manual: "Officer entry",
+};
+
+export function formatAttendanceSource(source: string): string {
+  return SOURCE_LABELS[source] ?? source;
+}
+
+/**
  * How many active members the roster scan will pull.
  *
  * Scanning rather than probing is deliberate: the canonical near-miss is `Jon`

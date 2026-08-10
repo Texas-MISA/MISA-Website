@@ -6,7 +6,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–5 complete. ✅ Stage 6, 6.5 and 7 are COMPLETE. 🔨 Stage 8 (hardening & data integrity) is IN PROGRESS: phase 1 built 2026-08-09, doc v1.52; phase 2 (archival export) and phase 3 (error boundaries) next.**
+**Stages 0–5 complete. ✅ Stage 6, 6.5 and 7 are COMPLETE. 🔨 Stage 8 (hardening & data integrity) is IN PROGRESS: phases 1 and 2 built 2026-08-09/10, doc v1.53; phase 3 (error boundaries, empty-vs-error) is next.**
+
+✅ **Stage 8 phase 2 shipped 2026-08-10** — **the attendance and adjustment archives.** **Migration 23** (one new `admin_audit` entity type).
+  - 🔓 **The extraction came first, and it is the point of the phase.** The roster export is safe because `applyMemberFilter` is a *shared* translation — the route re-runs provably the query the screen counted. Points and attendance had no equivalent: their predicates were inline in the page bodies, each with **its own copy of the Central half-open date bound**, and an export route would have been the third copy. `lib/ledger-filters.ts` is now the one translation both the screens and the routes use.
+  - 📌 **Measured proof the shared date bound is right**: `?to=2026-08-04` returns **170** submissions. A UTC-anchored bound would return **168** — the seed has 2 rows submitted on the evening of Aug 4 Central, which is exactly the 5-hour slice `.lte()` silently drops.
+  - 🐛 **Extracting it fixed a live 500.** Neither page validated `from`/`to`, and `centralWallTimeToInstant("yesterday", …)` does not return an Invalid Date — it **throws** at `lib/events.ts:99`. A hand-typed `?from=yesterday` was a 500 on both ledgers. Also tightened: `?status=xyz` on the queue used to reach `.eq()` and match nothing, which is "a filter with no control on screen" narrowing invisibly.
+  - 🪤 **`.order("id")` is a TIE-BREAK on a chunked read, and I missed it on the first pass.** The exports page in chunks of 1000; rows tied on `submitted_at`/`awarded_at` have no defined relative order, so a tie straddling a `.range()` boundary duplicates one row and **drops another** — surfacing as missing data in an archive. Not theoretical: the seed alone has **4 ties in each table**, and a room checking in together or one multi-member grant produces them in bulk.
+  - 🪤 **`signedPoints` must never reach a spreadsheet.** It renders **U+2212 MINUS**, not ASCII hyphen — so `guardFormula` correctly ignores it *and Excel refuses to parse it as a number*, leaving the column inert text that will not sum. Points go out as `{ kind: "number" }`.
+  - 🐛 **The first real export showed a defect no test would have caught**: the default field set omitted `voided_date`, and the ledger's `state` filter defaults to `all` — so a voided +8 grant came out **byte-identical to a live one**. The screen distinguishes them with a strikethrough a file cannot carry. `voided_date` is in the defaults now.
+  - ⚠️ **`parseFieldSelection` gained a `defaults` parameter.** It falls back by *filtering the catalogue*, so passing the member defaults to a ledger catalogue — which shares no key with it — would resolve to zero fields and emit a file with **no columns at all**. A test asserts every default key exists in its catalogue.
+  - **The archives carry more than the screens show**: attendance gains `resolved_at`/`resolved_by`/`resolution_note`, adjustments gain the void columns. That is what "archival" means.
+  - **Verified live**: counts match the screen exactly at every filter; 1709 rows exported across two chunks with **1709 unique**; the 5000-row cap **refuses** with the number named rather than truncating; the CSV guards a `=HYPERLINK` name and the xlsx does not; **403 "Forbidden"** past `proxy.ts` for a valid session with no `admin_profiles` row.
 
 ✅ **Stage 8 phase 1 shipped 2026-08-09** — **the boundary, proved rather than assumed.** **Migration 22.**
   - 🔓 **A signed-in NON-OFFICER could read every member's name, EID and email.** `member_directory` was granted to `authenticated` by migration 15 — the same migration that revoked it from `anon` — on the understanding that the role means "an officer". **It does not.** `authenticated` is what any valid user JWT carries, and production had `disable_signup: false`, so it was one confirmed email away for anybody. What makes someone an officer is an `admin_profiles` row, and **that check lives in `lib/auth.ts`, in the application — PostgREST never runs it.** Reproduced on the local stack *before* the fix (a signed-up user with no profile read back a real EID), then revoked. **A grant to `authenticated` is a grant to the public whenever signup is open.**
@@ -505,6 +516,24 @@ app/admin/(shell)/dues/import/
                         6.5 phase 2, built — the two-step upload. The client
                         component holds the CSV text in memory between preview
                         and commit; nothing is staged server-side
+lib/ledger-filters.ts   the points-ledger and attendance-queue filter cores
+                        (Stage 8 phase 2) — parse, apply, serialize. Pure and
+                        typed structurally like lib/filters.ts. ONE module for
+                        two screens on purpose: each carried its own copy of
+                        the Central half-open date bound, and the export routes
+                        would have been a third. 🔓 The row window is the
+                        CALLER's — the screens cap at 200 and the archives must
+                        not, so neither builder calls .limit() or .range(), and
+                        the recorder fake in tests refuses to implement them
+lib/export-ledgers.ts   the archival export cores (Stage 8 phase 2) — two field
+                        catalogues and two projectRow equivalents. A SIBLING of
+                        lib/export.ts, not an extension: that file's catalogue
+                        is member-shaped, while the writers it exports
+                        (toCsv/toTsv/toXlsx) are domain-agnostic and consume
+                        exactly (ExportField[], ExportCell[][]). 🪤 Points go
+                        out as a NUMBER, never signedPoints — that renders
+                        U+2212 MINUS, which the formula guard rightly ignores
+                        and Excel equally rightly refuses to parse as a number
 lib/filters.ts          directory filter core: parse → MemberFilter → query.
                         Pure; the query builder is typed structurally, not
                         imported from supabase-js, so tests drive a fake.
