@@ -1,9 +1,18 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.54
+**Version:** 1.55
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
 
+> **v1.55: Stage 9 starts fresh — the spreadsheet migration is dropped.**
+> Decided 2026-08-10. Historical data is not imported: the roster is entered as
+> current membership, and attendance, points and dues begin at zero. The cost is
+> that last year's standings do not carry over and the board opens empty; the
+> gain is that the one unestimable piece of Stage 9 disappears, along with the
+> prospect of importing the exact ambiguity §1.2 says the system exists to end.
+> ⚠️ Consequence for launch: production must be **cleared** of the seed first —
+> real data alongside fabricated data is worse than either.
+>
 > **v1.54: Stage 8 phase 3 — the boundaries, and the lies underneath them.**
 > **No migration.** Stage 8 closes.
 >
@@ -3071,12 +3080,18 @@ Three phases, each merged to `main` on completion.
 **Goal:** In real use by real members.
 
 - Custom domain purchase + DNS to Vercel; update Supabase redirect URLs
-- Migrate historical data from the existing spreadsheet tracker
 - Officer walkthrough and a one-page written handoff guide — the account side is just the shared login plus §2.3; the guide's real content is operations (review queue, semester wake-up check, event duplication)
 - Soft launch at one event with a paper backup sign-in sheet on hand
 
+🔓 **No historical data is migrated — the system starts fresh** (decided 2026-08-10, v1.55). The spreadsheet tracker is not imported: the roster is entered as current membership, and attendance, points and dues all begin at zero on the first real event.
+
+- **What it costs, stated plainly:** last year's standings do not carry over, so the leaderboard opens empty and nobody's accumulated points survive the switch. That is a real loss for anyone near the top of the old sheet, and it is worth telling members rather than letting them discover it.
+- **What it buys:** the migration was the one part of Stage 9 whose effort could not be estimated — the old estimate literally hedged on "how clean the existing data is" — and the one that would have imported the exact ambiguity §1.2 says this system exists to end: unmatched names, guessed events, arithmetic nobody can re-derive. Every migrated row would have to be trusted at precisely the level the spreadsheet was.
+- **Nothing needs building.** `/admin/members/import` (Stage 6 phase 7b) already takes a CSV of current members, create-only and matched by header name. There is deliberately **no** importer for historical attendance or point adjustments, and this decision is why one was never written.
+- ⚠️ **It does mean production must be CLEARED of the seed before launch.** Production currently *is* the fabricated seed (32 members, 15 events, 208 attendance rows). Starting fresh means `bash scripts/seed-remote.sh --force` and then a real roster import — real data sitting alongside fabricated data is worse than either alone.
+
 **Exit criteria:** one full event runs on the system with no manual intervention.
-**Effort:** 1–2 days plus migration time, which depends on how clean the existing data is.
+**Effort:** 1–2 days. The open-ended part was the migration; without it this is domain setup, the handoff guide, and one event.
 
 ---
 
