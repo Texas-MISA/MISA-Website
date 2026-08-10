@@ -50,3 +50,14 @@ yarn-error.log*
 # an uncaught EPIPE, and the process then spins instead of exiting while every
 # request hangs. See CLAUDE.md.
 dev.log
+
+# 🔓 Real Venmo statements. THIS REPOSITORY IS PUBLIC, and a downloaded
+# statement carries real payer names, real transaction IDs and real amounts for
+# people who never agreed to be in a git history — a third party's name in a
+# public repo is not something a later commit can take back.
+#
+# Keep them locally, never commit one. The fabricated example that IS committed
+# is docs/VenmoStatement_August_2026.csv, built entirely from seed members; it
+# is what any parser or import work should be developed against.
+docs/VenmoStatement_*.csv
+!docs/VenmoStatement_August_2026.csv

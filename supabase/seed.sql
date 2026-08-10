@@ -175,12 +175,20 @@ select
        else timestamptz '2026-07-25 12:00-05'
   end
 from raw
--- Load-bearing, not tidiness. The bulk attendance below draws with a seeded
--- random() over `cross join members`, so which member attends which event
--- depends on the physical row order here. Inserting in a different order
--- silently reshuffles the whole distribution — and the first symptom is a
--- fixture disappearing, because the rejected-duplicate row is guarded by a
--- `not exists` that quietly skips when the draw happens to fill its slot.
+-- The bulk attendance below draws with a seeded random() over
+-- `cross join members`, so which member attends which event depends on the
+-- physical row order here, and inserting in a different order reshuffles the
+-- whole distribution.
+--
+-- ⚠️ Keep this, but do NOT rely on it for reproducibility — that is what it was
+-- doing until 2026-08-10 and it does not work. An `order by` on an INSERT pins
+-- physical order only on a VIRGIN table, which is the `db reset` case; a
+-- re-seed deletes and re-inserts into a table with a free space map and real
+-- planner statistics, so both the scan order and the join plan can differ
+-- anyway. The two fixtures that used to depend on the draw landing a
+-- particular way are reserved out of it explicitly now — see the exclusions on
+-- the bulk insert. This clause just keeps the fresh-database case tidy and
+-- comparable.
 order by last_name;
 
 -- @chunk member-field-definitions
@@ -289,6 +297,28 @@ where e.status = 'published'
   and m.active
   -- Self-registered members only start attending from when they joined.
   and e.starts_at >= m.joined_at
+  -- 🔓 Two slots are RESERVED for the explicit fixtures below, and this
+  -- exclusion is what makes a re-seed reproducible. Added 2026-08-10.
+  --
+  -- Both fixtures used to be guarded by `not exists`, so each one silently
+  -- skipped whenever the draw happened to fill its slot — and the draw is NOT
+  -- stable across a re-seed. `order by last_name` above pins the physical row
+  -- order of members on a VIRGIN table, which is why `db reset` looked
+  -- deterministic, but a re-seed deletes and re-inserts into a table with a
+  -- free space map and real statistics, so the join plan and the scan order can
+  -- both differ. Measured on 2026-08-10: six consecutive re-seeds produced the
+  -- rejected fixture 4 times and skipped it twice, and the seed's own assert
+  -- block failed on the runs that skipped it.
+  --
+  -- 📌 Reserving the slots fixes it where pinning the order cannot, because a
+  -- WHERE predicate does not care what order the rows arrive in. The count of
+  -- rows this draws is stable regardless of plan — setseed() fixes the sequence
+  -- of random() values and there is exactly one call per candidate row — so
+  -- removing two candidates changes the total by a fixed amount, not a random
+  -- one. What was never stable is WHICH pairs get which value, and the fixtures
+  -- must not depend on that.
+  and not (m.full_name = 'Mira Petrova' and e.title = 'Alumni Panel')
+  and not (m.full_name = 'Zane Okonkwo' and e.title = 'Awards Banquet')
   and random() < 0.62;
 
 -- A couple of people at the cancelled event, to prove it stays in history but
@@ -348,29 +378,42 @@ values ('Toby Vance','tv7140','toby.vance@example.edu', timestamptz '2026-08-05 
 
 -- Rejected: a duplicate someone submitted twice. The partial unique index
 -- excludes rejected rows, so the corrected entry can coexist.
+--
+-- ⚠️ Unconditional since 2026-08-10, and the guard it lost was contradicting
+-- this comment. `attendance_one_per_event` is
+-- `(event_id, normalized_eid) where event_id is not null and status <> 'rejected'`,
+-- so a rejected row can ALWAYS be inserted beside a present one — that is the
+-- coexistence the comment describes. The old `not exists (… status <> 'rejected')`
+-- therefore protected no constraint; all it did was skip the fixture whenever
+-- the bulk draw had already seated Mira at this event, which made the seed's own
+-- assert block fail on a re-seed. Her slot is now reserved above, so the pair
+-- below is the only row she has at Alumni Panel.
 insert into attendance (event_id, member_id, submitted_name, submitted_eid, submitted_email, submitted_at, status, resolution_note, resolved_by, resolved_at)
 select e.id, m.id, m.full_name, m.eid, m.email, e.starts_at + interval '2 minutes',
        'rejected', 'Duplicate submission — kept the earlier row',
        '00000000-0000-4000-8000-5eed00000001', e.ends_at
 from events e
 join members m on m.full_name = 'Mira Petrova'
-where e.title = 'Alumni Panel'
-  and not exists (
-    select 1 from attendance a
-    where a.event_id = e.id and a.member_id = m.id and a.status <> 'rejected'
-  );
+where e.title = 'Alumni Panel';
 
 -- Officer-entered row for someone who never submitted the form.
+--
+-- 🪤 Unconditional since 2026-08-10, and this one had been silently LOSING for
+-- longer than the rejected row was. Its `not exists` had no status filter, so
+-- the bulk draw seating Zane at the Awards Banquet skipped it outright — which
+-- it did on all six measured re-seeds, meaning the seeded database carried no
+-- admin_manual row at all and nothing noticed, because the assert block never
+-- counted one. That is the invisible half of the same defect: the rejected row
+-- was asserted and failed loudly; this one was not and just quietly vanished.
+-- 📌 It is asserted now. Zane's slot is reserved above, so there is no bulk row
+-- here to collide with `attendance_one_per_event`.
 insert into attendance (event_id, member_id, submitted_name, submitted_eid, submitted_email, submitted_at, status, source, resolution_note, resolved_by, resolved_at)
 select e.id, m.id, m.full_name, m.eid, m.email, e.starts_at + interval '30 minutes',
        'present', 'admin_manual', 'Signed the paper sheet; phone was dead',
        '00000000-0000-4000-8000-5eed00000001', e.ends_at
 from events e
 join members m on m.full_name = 'Zane Okonkwo'
-where e.title = 'Awards Banquet'
-  and not exists (
-    select 1 from attendance a where a.event_id = e.id and a.member_id = m.id
-  );
+where e.title = 'Awards Banquet';
 
 -- @chunk point-adjustments
 -- Discretionary grants, including one voided and one negative.
@@ -436,6 +479,7 @@ do $$
 declare
   n_members int; n_events int; n_present int; n_pending int; n_rejected int;
   n_adjust int; n_audit int; n_board int; n_fields int; n_presets int;
+  n_manual int;
 begin
   select count(*) into n_members from members;
   select count(*) into n_events  from events;
@@ -455,6 +499,12 @@ begin
   -- re-seed) or if the insert is lost (count drops to 0).
   select count(*) into n_fields  from member_field_definitions;
   select count(*) into n_presets from member_filter_presets;
+  -- Added 2026-08-10 with the slot reservations above. This fixture had been
+  -- skipping itself on every measured re-seed and nothing caught it, because
+  -- an admin_manual row is `present` like any other and the present count
+  -- absorbed it. The rejected row failed loudly; this one just stopped
+  -- existing. 📌 An unasserted fixture is an optional fixture.
+  select count(*) into n_manual from attendance where source = 'admin_manual';
 
   if n_members <> 32 then raise exception 'seed: expected 32 members, got %', n_members; end if;
   if n_events  <> 15 then raise exception 'seed: expected 15 events, got %', n_events; end if;
@@ -466,4 +516,5 @@ begin
   if n_board  <> 29 then raise exception 'seed: expected 29 leaderboard rows, got %', n_board; end if;
   if n_fields  <> 1 then raise exception 'seed: expected 1 custom field definition (shirt_size), got % — 0 means the insert was lost, more than 1 means the wipe is not clearing member_field_definitions', n_fields; end if;
   if n_presets <> 0 then raise exception 'seed: expected 0 saved views, got %', n_presets; end if;
+  if n_manual  <> 1 then raise exception 'seed: expected 1 admin_manual attendance row (Zane Okonkwo at the Awards Banquet), got %', n_manual; end if;
 end $$;
