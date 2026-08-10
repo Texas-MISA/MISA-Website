@@ -234,7 +234,14 @@ async function buildProfile(
   // someone on the roster that they are not on it.
   if (!member) return null;
 
-  const term = currentTerm.error ? null : currentTerm.data;
+  // ⚠️ A failed term read is NOT "no term". It skips the events query below
+  // entirely, so the grid empties and the page claims the org has held no
+  // events — see the block after the reads.
+  if (currentTerm.error) {
+    console.error("lookup current_term failed:", currentTerm.error.message);
+    return null;
+  }
+  const term = currentTerm.data;
 
   // Published only: a cancelled event credits nobody, and a draft is not
   // something a member could have been asked to attend.
@@ -247,10 +254,45 @@ async function buildProfile(
         .order("starts_at", { ascending: true })
     : null;
 
-  const attendanceRows = attendance.error ? [] : (attendance.data ?? []);
-  const adjustmentRows = adjustments.error ? [] : (adjustments.data ?? []);
-  const paymentRows = payments.error ? [] : (payments.data ?? []);
-  const eventRows = termEvents?.error ? [] : (termEvents?.data ?? []);
+  // 🔓 Every one of these used to be `x.error ? [] : x.data`, and each turned a
+  // read failure into an affirmative lie on a MEMBER'S OWN page (Stage 7 phase
+  // 2's defect, found by Stage 8 phase 1's audit):
+  //
+  //   attendance  → the grid painted EVERY event missed, and the "Waiting on an
+  //                 officer" section vanished — the section this page exists
+  //                 for. Meanwhile the header stats come from member_directory,
+  //                 a different query, so the page showed "75% attendance"
+  //                 above a grid claiming nothing was attended.
+  //   adjustments → the "Points granted separately" section disappeared while a
+  //                 non-zero bonus figure stayed on screen, unexplained.
+  //   payments    → "No payment of yours covers a term yet" — printable
+  //                 directly beneath "You're an official member for Fall 2026",
+  //                 because dues status also comes from the view.
+  //   termEvents  → "No published events in Fall 2026 yet."
+  //
+  // 📌 Fail the WHOLE lookup rather than degrading section by section. These
+  // five numbers interlock — total, attendance points, bonus, rate, dues — and
+  // a member reads the screen as one answer, so a partial view invites exactly
+  // the wrong conclusion. The action already carries a `status: "error"` state
+  // whose copy says the honest thing: "This isn't a statement about your
+  // records; we just couldn't read them."
+  const reads = [
+    ["attendance", attendance.error],
+    ["adjustments", adjustments.error],
+    ["payments", payments.error],
+    ["term events", termEvents?.error],
+  ] as const;
+  for (const [label, failure] of reads) {
+    if (failure) {
+      console.error(`lookup ${label} read failed:`, failure.message);
+      return null;
+    }
+  }
+
+  const attendanceRows = attendance.data ?? [];
+  const adjustmentRows = adjustments.data ?? [];
+  const paymentRows = payments.data ?? [];
+  const eventRows = termEvents?.data ?? [];
 
   const attendedEventIds = new Set(
     attendanceRows

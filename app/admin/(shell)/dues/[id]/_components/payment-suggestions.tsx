@@ -1,3 +1,4 @@
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { describeMatchReason, type MemberSuggestion } from "@/lib/attendance";
 
 // Ranked suggestions for a payment nobody is credited with (§7 Stage 6.5 phase
@@ -14,9 +15,15 @@ import { describeMatchReason, type MemberSuggestion } from "@/lib/attendance";
 
 export function PaymentSuggestions({
   suggestions,
+  failed = false,
 }: {
   suggestions: MemberSuggestion[];
+  /** 🔓 The roster read failed. Never derived from `suggestions.length`. */
+  failed?: boolean;
 }) {
+  if (failed) {
+    return <ReadError what="the roster to suggest a member from" />;
+  }
   if (suggestions.length === 0) {
     return (
       <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">

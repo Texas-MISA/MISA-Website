@@ -1,4 +1,8 @@
-import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
+import {
+  describeOfficer,
+  fetchOfficerNames,
+  type OfficerNames,
+} from "@/lib/admin-profiles";
 import { formatInstant } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/types/database";
@@ -89,7 +93,7 @@ async function fetchTrail(
   entityType: string,
   entityId: string
 ): Promise<
-  | { kind: "ok"; rows: AuditRow[]; names: Map<string, string | null> }
+  | { kind: "ok"; rows: AuditRow[]; names: OfficerNames }
   | { kind: "error" }
 > {
   const db = createAdminClient();

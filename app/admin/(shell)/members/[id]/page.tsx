@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AuditTrail } from "@/app/admin/(shell)/_components/audit-trail";
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
 import { describeMatchReason } from "@/lib/attendance";
 import { normalizeEid } from "@/lib/checkin";
@@ -108,10 +109,17 @@ export default async function MemberDetailPage({
         .order("paid_at", { ascending: false }),
     ]);
 
+  // 🔓 A FAILED read is not a missing row. This used to log the error and fall
+  // through to notFound(), which told an officer the record does not exist —
+  // indistinguishable from one that was deleted or merged away. Throwing sends
+  // it to the segment error boundary instead, which says the read failed and
+  // carries a digest that matches the server log.
   if (directory.error) {
     console.error("member detail query failed:", directory.error.message);
+    throw new Error("Could not read this member.");
   }
   const member = directory.data;
+  // Genuinely absent: deleted, or merged into another member.
   if (!member) notFound();
 
   const term = currentTerm.error ? null : currentTerm.data;
@@ -127,9 +135,22 @@ export default async function MemberDetailPage({
         .order("starts_at", { ascending: true })
     : null;
 
-  const attendanceRows = attendance.error ? [] : (attendance.data ?? []);
-  const adjustmentRows = adjustments.error ? [] : (adjustments.data ?? []);
-  const paymentRows = payments.error ? [] : (payments.data ?? []);
+  // 🔓 Per-section failure flags, not `x.error ? []`. Each of these used to
+  // render a read failure as an affirmative claim: "No adjustments have been
+  // granted to this member", "No payments have been credited to this member",
+  // and — worst — a pending COUNT from the view above an empty list, or an
+  // events grid marking everything missed.
+  //
+  // 📌 Per-section here, where /lookup fails the whole page. This screen is
+  // sectioned and an officer often arrives to do one thing; blocking the notes
+  // editor because dues failed would be its own defect. The member-facing page
+  // has no such separation — its five numbers interlock.
+  const attendanceFailed = attendance.error !== null;
+  const adjustmentsFailed = adjustments.error !== null;
+  const paymentsFailed = payments.error !== null;
+  const attendanceRows = attendanceFailed ? [] : (attendance.data ?? []);
+  const adjustmentRows = adjustmentsFailed ? [] : (adjustments.data ?? []);
+  const paymentRows = paymentsFailed ? [] : (payments.data ?? []);
 
   // 🪤 Through the term index, never `max(term)` — see paidThroughTerm. Null
   // means no live payment covers anything, which is a different statement from
@@ -186,7 +207,12 @@ export default async function MemberDetailPage({
   // this phase — so an active-only list would hide exactly the rows this tool
   // exists to clean up. It is still bounded by MEMBER_SCAN_LIMIT; see the note
   // on that function.
-  const mergeCandidates = await fetchMergeCandidates(db, { excludeId: id });
+  const mergeResult = await fetchMergeCandidates(db, { excludeId: id });
+  // 🔓 An unread roster is not a roster with no duplicates. Returning [] here
+  // left the picker empty AND the suggestions absent, which reads as a
+  // confident "this member has no duplicates" — produced by never looking.
+  const mergeCandidates = mergeResult.kind === "ok" ? mergeResult.candidates : [];
+  const mergeFailed = mergeResult.kind === "error";
 
   const memberOptions = mergeCandidates
     .map((candidate) => ({
@@ -336,7 +362,14 @@ export default async function MemberDetailPage({
           </Row>
         </dl>
 
-        {pending.length > 0 && (
+        {/* ⚠️ `pending_count` comes from the VIEW and the list below from a
+            second read, so a failed read printed "3 submissions awaiting
+            review" above nothing at all. */}
+        {attendanceFailed && (
+          <ReadError what="this member's submissions" className="mt-4" />
+        )}
+
+        {!attendanceFailed && pending.length > 0 && (
           <ul className="mt-4 flex flex-col gap-2">
             {pending.map((row) => (
               <li key={row.id} className="text-sm">
@@ -375,10 +408,15 @@ export default async function MemberDetailPage({
             view is the authority on the numbers; the grid is the breakdown, and
             neither is derived from the other. */}
 
-        {termEvents?.error && (
-          <p className="mt-4 border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
-            Couldn&apos;t load this term&apos;s events.
-          </p>
+        {/* 🪤 `termEvents` is null when the current_term rpc failed, so this
+            section used to render its heading, "0 attended, 0 missed", and then
+            NOTHING — no table, no empty state, no error. All three branches
+            below were false at once. */}
+        {(termEvents?.error || termEvents === null) && (
+          <ReadError
+            what={termEvents === null ? "the current term" : "this term's events"}
+            className="mt-4"
+          />
         )}
 
         {termEvents && !termEvents.error && termEvents.data.length === 0 && (
@@ -432,7 +470,9 @@ export default async function MemberDetailPage({
 
       <section className="mt-12">
         <h2 className="font-display text-xl font-bold">Point adjustments</h2>
-        {adjustmentRows.length === 0 ? (
+        {adjustmentsFailed ? (
+          <ReadError what="this member's point adjustments" className="mt-4 max-w-3xl" />
+        ) : adjustmentRows.length === 0 ? (
           <p className="mt-4 max-w-3xl border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
             No adjustments have been granted to this member.
           </p>
@@ -518,7 +558,13 @@ export default async function MemberDetailPage({
               Not paid for {term ?? "the current term"}.
             </span>
           )}{" "}
-          {paidThrough === null ? (
+          {/* ⚠️ "Paid through" is derived from the payments read, while the
+              status above comes from the view — so a failed read produced
+              "Official for Fall 2026. No payment covers a term yet." in one
+              sentence. Say nothing rather than say that. */}
+          {paymentsFailed ? (
+            <>Couldn&apos;t read the payments, so &ldquo;paid through&rdquo; is unknown.</>
+          ) : paidThrough === null ? (
             <>No payment covers a term yet.</>
           ) : (
             <>
@@ -527,7 +573,9 @@ export default async function MemberDetailPage({
           )}
         </p>
 
-        {paymentRows.length === 0 ? (
+        {paymentsFailed ? (
+          <ReadError what="this member's payments" className="mt-4 max-w-3xl" />
+        ) : paymentRows.length === 0 ? (
           <p className="mt-4 max-w-3xl border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
             No payments have been credited to this member.
           </p>
@@ -617,6 +665,14 @@ export default async function MemberDetailPage({
           reads the same member the editor writes — the CAS token it posts comes
           from the preview rather than from here, so the two cannot disagree
           about which version of the row they are acting on. */}
+      {/* An unread roster is not a roster with no duplicates — the picker and
+          the suggestions would both be empty and say nothing. */}
+      {mergeFailed && (
+        <ReadError
+          what="the roster, so no merge candidates can be offered"
+          className="mt-12 max-w-3xl"
+        />
+      )}
       <MergePanel
         survivorId={id}
         survivorLabel={`${member.full_name} (${member.eid})`}

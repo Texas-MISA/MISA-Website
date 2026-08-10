@@ -1,4 +1,4 @@
-import { describeOfficer } from "@/lib/admin-profiles";
+import { describeOfficer, type OfficerNames } from "@/lib/admin-profiles";
 import { toCentralFields } from "@/lib/events";
 import { formatPointCategory } from "@/lib/points";
 import { formatAttendanceSource, formatAttendanceStatus } from "@/lib/attendance";
@@ -122,7 +122,7 @@ export const ATTENDANCE_DEFAULT_FIELDS: readonly string[] = [
 export function projectAttendanceRow(
   row: AttendanceExportRow,
   fields: readonly ExportField[],
-  officers: Map<string, string | null>
+  officers: OfficerNames
 ): ExportCell[] {
   return fields.map((field): ExportCell => {
     switch (field.key) {
@@ -232,7 +232,7 @@ export const ADJUSTMENT_DEFAULT_FIELDS: readonly string[] = [
 export function projectAdjustmentRow(
   row: AdjustmentExportRow,
   fields: readonly ExportField[],
-  officers: Map<string, string | null>
+  officers: OfficerNames
 ): ExportCell[] {
   return fields.map((field): ExportCell => {
     switch (field.key) {

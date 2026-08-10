@@ -23,6 +23,14 @@ import type { Database } from "@/lib/types/database";
 
 type Client = SupabaseClient<Database>;
 
+export type MemberOptionsResult =
+  | { kind: "ok"; options: MemberOption[] }
+  | { kind: "error" };
+
+export type MergeCandidatesResult =
+  | { kind: "ok"; candidates: MemberCandidate[] }
+  | { kind: "error" };
+
 export type MemberOption = {
   id: string;
   label: string;
@@ -35,7 +43,7 @@ const UUID_RE =
 export async function fetchMemberOptions(
   db: Client,
   opts: { includeId?: string | null; limit?: number } = {}
-): Promise<MemberOption[]> {
+): Promise<MemberOptionsResult> {
   const { includeId = null, limit = MEMBER_SCAN_LIMIT } = opts;
 
   // `id.eq.${…}` splices a string into a PostgREST filter expression, so this
@@ -55,16 +63,27 @@ export async function fetchMemberOptions(
     .order("full_name")
     .limit(limit);
 
+  // 🔓 A discriminated result, not `[]` (Stage 8 phase 3). The sharpest caller
+  // is the payment editor on dues/[id]: an empty picker there means the officer
+  // cannot credit a payment to anybody, on the screen built for exactly that,
+  // with money on the other end and nothing on screen saying why.
+  //
+  // ⚠️ This list ALREADY truncates silently at MEMBER_SCAN_LIMIT, so the cap
+  // path and the error path used to produce an identical screen. They no longer
+  // do; the cap remains a separate, tracked problem.
   if (error) {
     console.error("member options query failed:", error.message);
-    return [];
+    return { kind: "error" };
   }
 
-  return data.map((member) => ({
-    id: member.id,
-    label: `${member.full_name} (${member.eid})${member.active ? "" : " — inactive"}`,
-    active: member.active,
-  }));
+  return {
+    kind: "ok",
+    options: data.map((member) => ({
+      id: member.id,
+      label: `${member.full_name} (${member.eid})${member.active ? "" : " — inactive"}`,
+      active: member.active,
+    })),
+  };
 }
 
 /**
@@ -95,7 +114,7 @@ export async function fetchMemberOptions(
 export async function fetchMergeCandidates(
   db: Client,
   opts: { excludeId?: string | null; limit?: number } = {}
-): Promise<MemberCandidate[]> {
+): Promise<MergeCandidatesResult> {
   const { excludeId = null, limit = MEMBER_SCAN_LIMIT } = opts;
 
   const { data, error } = await db
@@ -103,12 +122,17 @@ export async function fetchMergeCandidates(
     .select("id, full_name, email, eid, normalized_eid, active")
     .limit(limit);
 
+  // A failed read here left the merge picker empty AND the duplicate
+  // suggestions absent — i.e. "this member has no duplicates", a confident
+  // claim about the roster produced by never reading it.
   if (error) {
     console.error("merge candidate query failed:", error.message);
-    return [];
+    return { kind: "error" };
   }
 
-  return data
+  return {
+    kind: "ok",
+    candidates: data
     .filter((row) => row.id !== excludeId)
     .map((row) => ({
       id: row.id,
@@ -117,5 +141,6 @@ export async function fetchMergeCandidates(
       eid: row.eid,
       normalizedEid: row.normalized_eid ?? "",
       active: row.active,
-    }));
+    })),
+  };
 }

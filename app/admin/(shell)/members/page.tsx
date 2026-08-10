@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import {
   applyMemberFilter,
@@ -207,7 +208,7 @@ export default async function AdminMembersPage({
   // together. fetchEventOptions is the same all-status list the attendance queue
   // and manual entry offer — an officer asking who missed a cancelled event is
   // asking a real question, and a published-only picker could not answer it.
-  const [result, events, presets] = await Promise.all([
+  const [result, eventsResult, presetsResult] = await Promise.all([
     fetchDirectory(db, filter, fields),
     fetchEventOptions(db),
     fetchPresets(db),
@@ -227,7 +228,16 @@ export default async function AdminMembersPage({
   // is a Client Component that has neither. Each stored query is parsed the way
   // the directory itself would parse it, so a preset naming a since-archived
   // field describes what it will ACTUALLY narrow to rather than what it once did.
+  // An unread event list is not an empty one — the filter says so below.
+  const events = eventsResult.kind === "ok" ? eventsResult.options : [];
+  const eventsFailed = eventsResult.kind === "error";
+
   const eventLabels = new Map(events.map((event) => [event.id, event.label]));
+  // An unread preset list is not "no saved views" — the chip row simply
+  // vanishing looks identical to having none.
+  const presets = presetsResult.kind === "ok" ? presetsResult.presets : [];
+  const presetsFailed = presetsResult.kind === "error";
+
   const chips: PresetChip[] = presets.map((preset) => ({
     id: preset.id,
     name: preset.name,
@@ -245,6 +255,15 @@ export default async function AdminMembersPage({
 
   return (
     <div>
+      {presetsFailed && (
+        <ReadError what="the saved views, so the chip row is missing" className="mb-6" />
+      )}
+      {eventsFailed && (
+        <ReadError
+          what="the event list, so the attendance filters are empty"
+          className="mb-6"
+        />
+      )}
       <div className="flex flex-wrap items-baseline justify-between gap-4">
         <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
           Members

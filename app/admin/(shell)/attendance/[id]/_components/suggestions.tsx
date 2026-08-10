@@ -1,4 +1,8 @@
 import {
+  Notice,
+  ReadError,
+} from "@/app/admin/(shell)/_components/notice";
+import {
   describeGap,
   describeMatchReason,
   diffEid,
@@ -58,17 +62,31 @@ export function buildEventSuggestions(
 export function EventSuggestions({
   suggestions,
   outsideWindow,
+  failed = false,
 }: {
   suggestions: EventSuggestionView[];
   outsideWindow: boolean;
+  /** 🔓 The read failed. Distinct from "nothing nearby" — see below. */
+  failed?: boolean;
 }) {
+  // ⚠️ `failed` is checked FIRST and is not derived from `suggestions.length`.
+  // It used to be: the page passed `outsideWindow={suggestions.length === 0}`,
+  // so a failed nearby_events RPC produced the sentence "That is normal for a
+  // submission that has been waiting a while" — a broken query explained away
+  // as expected behaviour, on the screen that decides whether someone is
+  // credited for attending.
+  if (failed) {
+    return (
+      <ReadError what="the suggested events" />
+    );
+  }
   if (suggestions.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <Notice>
         {outsideWindow
           ? "No published event is within 48 hours of this submission, so there is nothing to suggest. That is normal for a submission that has been waiting a while — pick the event by hand below."
           : "No nearby published events. Pick the event by hand below."}
-      </p>
+      </Notice>
     );
   }
 
@@ -110,17 +128,24 @@ export function EventSuggestions({
 export function MemberSuggestions({
   suggestions,
   submittedEid,
+  failed = false,
 }: {
   suggestions: MemberSuggestion[];
   submittedEid: string;
+  failed?: boolean;
 }) {
+  // A roster that was never read must not read as "nothing on the roster
+  // looks like a match" — that is a confident claim about people.
+  if (failed) {
+    return <ReadError what="the roster to suggest a member from" />;
+  }
   if (suggestions.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <Notice>
         Nothing on the roster looks like a close enough match to suggest. Search
         for the member by hand below, or leave this unlinked — a weak guess here
         would be worse than none.
-      </p>
+      </Notice>
     );
   }
 

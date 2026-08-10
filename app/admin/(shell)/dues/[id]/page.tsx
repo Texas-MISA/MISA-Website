@@ -15,6 +15,7 @@ import {
   termOf,
 } from "@/lib/dues";
 import { formatInstant } from "@/lib/events";
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { fetchMemberOptions } from "@/lib/member-options";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -73,7 +74,11 @@ async function fetchPayment(id: string): Promise<Payment | null> {
 
   if (error) {
     console.error("payment query failed:", error.message);
-    return null;
+    // 🔓 Throw rather than return null. The caller's `if (!x) notFound()` cannot
+    // tell a failed read from a deleted row, so returning null here told an
+    // officer the record does not exist. The segment error boundary is the
+    // right destination for a read that broke.
+    throw new Error("Could not read this payment.");
   }
   return data as unknown as Payment | null;
 }
@@ -97,8 +102,11 @@ async function fetchSuggestions(payment: Payment) {
     .limit(MEMBER_SCAN_LIMIT);
 
   if (error) {
+    // Same shape as attendance/[id]: an unread roster must not render as
+    // "nothing on the roster looks like a match", which is a claim about
+    // people — and here the consequence is somebody's dues.
     console.error("payment candidate query failed:", error.message);
-    return [];
+    return null;
   }
 
   const candidates: MemberCandidate[] = data.map((row) => ({
@@ -154,7 +162,7 @@ export default async function PaymentDetailPage({
     // includeId keeps a deactivated but currently-credited member in the list;
     // dropping them would silently unlink them on the next save.
     voided
-      ? Promise.resolve([])
+      ? Promise.resolve({ kind: "ok" as const, options: [] })
       : fetchMemberOptions(db, { includeId: payment.member_id }),
     review.noMember && !voided ? fetchSuggestions(payment) : Promise.resolve([]),
   ]);
@@ -260,7 +268,10 @@ export default async function PaymentDetailPage({
             preselected — pick below once you are sure.
           </p>
           <div className="mt-4">
-            <PaymentSuggestions suggestions={suggestions} />
+            <PaymentSuggestions
+              suggestions={suggestions ?? []}
+              failed={suggestions === null}
+            />
           </div>
         </section>
       )}
@@ -314,11 +325,20 @@ export default async function PaymentDetailPage({
                 </>
               )}
             </p>
+            {/* 🔓 Money, and silence. An unread roster left this picker empty,
+                so the officer could not credit the payment to anybody — on the
+                screen built for exactly that — with nothing saying why. */}
+            {members.kind === "error" && (
+              <ReadError
+                what="the roster, so no member can be picked"
+                className="mt-4"
+              />
+            )}
             <div className="mt-4">
               <PaymentEditor
                 id={payment.id}
                 updatedAt={payment.updated_at}
-                members={members}
+                members={members.kind === "ok" ? members.options : []}
                 memberId={payment.member_id}
                 startTerm={payment.start_term}
                 termsCovered={payment.terms_covered}

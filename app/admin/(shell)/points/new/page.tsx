@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import { fetchEventOptions } from "@/lib/event-options";
 import { fetchMemberOptions } from "@/lib/member-options";
@@ -31,13 +32,23 @@ export default async function NewGrantPage({
   const backToLedger = `/admin/points${suffix}`;
 
   const db = createAdminClient();
-  const [events, members] = await Promise.all([
+  const [eventsResult, membersResult] = await Promise.all([
     fetchEventOptions(db),
     fetchMemberOptions(db),
   ]);
+  const events = eventsResult.kind === "ok" ? eventsResult.options : [];
+  const members = membersResult.kind === "ok" ? membersResult.options : [];
+  const optionsFailed =
+    eventsResult.kind === "error" || membersResult.kind === "error";
 
   return (
     <div>
+      {optionsFailed && (
+        <ReadError
+          what="the member and event lists, so the pickers below are empty"
+          className="mb-6"
+        />
+      )}
       <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
         Grant points
       </h1>

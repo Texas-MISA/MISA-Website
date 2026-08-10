@@ -40,14 +40,26 @@ async function fetchTerms(): Promise<string[]> {
   return [...new Set(data.map((row) => row.term).filter(Boolean) as string[])];
 }
 
-async function fetchCurrentTerm(): Promise<string | null> {
+async function fetchCurrentTerm(): Promise<string> {
   const db = createAdminClient();
   // Never hardcode a term string (§4.7) — ask the database which one is
   // current, so an officer's app_settings override is honoured too.
   const { data, error } = await db.rpc("current_term");
   if (error) {
+    // 🔓 Throw rather than return null, and the reason is not tidiness.
+    //
+    // The caller does `params.term ?? currentTerm ?? ""`, and an empty term
+    // applies NO predicate — so a failed rpc silently widened the default view
+    // from "this term" to every event ever recorded, capped at 200. Worse, the
+    // term control then read "all", so the screen and the filter agreed with
+    // each other about the wrong thing and nothing looked out of place. An
+    // officer would have had no way to notice.
+    //
+    // There is no honest fallback here: without the current term this page
+    // cannot know what it is supposed to be showing. The error boundary can
+    // say so; a widened list cannot.
     console.error("current_term rpc failed:", error.message);
-    return null;
+    throw new Error("Could not determine the current term.");
   }
   return data;
 }
