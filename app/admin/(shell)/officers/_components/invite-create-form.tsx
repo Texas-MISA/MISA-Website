@@ -28,7 +28,9 @@ export function InviteCreateForm() {
 
   return (
     <div className="mt-4 space-y-4">
-      {state.status === "created" ? <InviteLink url={state.url} email={state.email} /> : null}
+      {state.status === "created" ? (
+        <InviteLink url={state.url} email={state.email} />
+      ) : null}
 
       {state.status === "already_registered" ? (
         <p
@@ -65,20 +67,34 @@ export function InviteCreateForm() {
       <form action={formAction} className="grid gap-4 sm:grid-cols-[2fr_1fr]">
         <div>
           <label htmlFor="email" className="block text-sm font-medium">
-            Their email
+            Their email{" "}
+            <span className="font-normal text-foreground/60">(optional)</span>
           </label>
           <input
             id="email"
             name="email"
             type="email"
-            required
             maxLength={254}
             autoComplete="off"
             // React 19 resets the form once the action resolves, so this is
             // driven from what the server echoed back. Always a string.
             defaultValue={submitted?.email ?? ""}
             className={`mt-1 ${inputClass}`}
+            aria-describedby="email-help"
           />
+          {/* 🔓 The officer is told what blank MEANS before they choose it. The
+              two options are not equally safe and the screen should not pretend
+              otherwise — a pinned address makes a forwarded link useless to
+              anyone else, and an open one makes the link a bearer credential. */}
+          <p id="email-help" className="mt-1 text-xs text-foreground/60">
+            Leave blank and the link works for whoever opens it — useful when you
+            don&apos;t know which address they&apos;ll use.{" "}
+            <strong className="font-medium">
+              Anyone who gets hold of an open link can use it,
+            </strong>{" "}
+            so send it directly. Fill it in and the link only creates that one
+            account.
+          </p>
           <FieldError messages={fieldErrors.email} />
         </div>
 
@@ -133,7 +149,7 @@ export function InviteCreateForm() {
   );
 }
 
-function InviteLink({ url, email }: { url: string; email: string }) {
+function InviteLink({ url, email }: { url: string; email: string | null }) {
   const [copied, setCopied] = useState(false);
 
   return (
@@ -142,7 +158,9 @@ function InviteLink({ url, email }: { url: string; email: string }) {
       className="border-l-4 border-green-800 bg-misa-panel px-4 py-3"
     >
       <p className="text-sm font-medium">
-        Invitation ready for {email}. Send them this link.
+        {email
+          ? `Invitation ready for ${email}. Send them this link.`
+          : "Open invitation ready. Send this link to one person."}
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <code className="min-w-0 flex-1 break-all border border-black/20 bg-white px-2 py-1 text-xs">
@@ -166,8 +184,10 @@ function InviteLink({ url, email }: { url: string; email: string }) {
       </div>
       <p className="mt-2 text-xs text-foreground/70">
         This is the only time it can be shown — only a fingerprint of it is
-        stored, so nothing can display it again. Anyone holding the link can
-        create the account, so send it directly to them.
+        stored, so nothing can display it again.{" "}
+        {email
+          ? "It only creates an account for that address."
+          : "It creates an officer account for whoever opens it and whatever address they choose, so treat it like a password."}
       </p>
     </div>
   );

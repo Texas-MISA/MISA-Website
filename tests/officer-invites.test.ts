@@ -14,7 +14,11 @@ import {
   tokenHashEquals,
 } from "@/lib/officer-invites";
 import { AUDITED_OFFICER_COLUMNS } from "@/lib/officer-roster";
-import { inviteAcceptSchema, inviteCreateSchema } from "@/lib/validation";
+import {
+  inviteAcceptSchema,
+  inviteCreateSchema,
+  openInviteEmailSchema,
+} from "@/lib/validation";
 
 import { anonClient, getTestOfficer, testClient } from "./helpers";
 
@@ -163,7 +167,7 @@ describe("invite liveness", () => {
 });
 
 describe("what a redeemer is allowed to send", () => {
-  it("🔓 DISCARDS a posted role", () => {
+  it("🔓 DISCARDS a posted role and a posted email", () => {
     // The single most important assertion in this file. A redeemer who edits
     // the DOM (or hand-rolls the POST) to add `role=admin` must not become an
     // admin. The guarantee is structural rather than a check: the schema has no
@@ -179,9 +183,26 @@ describe("what a redeemer is allowed to send", () => {
     });
 
     expect(parsed).not.toHaveProperty("role");
-    // Same for the email: the account created is the address the inviter
-    // pinned, so a forwarded link cannot be redeemed into another inbox.
+    // Same for the email. ⚠️ Since migration 25 an invite MAY be open, and the
+    // redeemer then supplies an address — but through openInviteEmailSchema
+    // below, never through this one. Keeping the key out of here is what makes
+    // the pinned path structurally safe: there is no parsed email in scope for
+    // the action to reach for, so "use the row's address" is not a rule anybody
+    // has to remember.
     expect(parsed).not.toHaveProperty("email");
+  });
+
+  it("accepts a redeemer's address only through the open-invite schema", () => {
+    const parsed = openInviteEmailSchema.parse({
+      email: "  New.Officer@Example.EDU  ",
+    });
+    // Folded, like every other address in this system.
+    expect(parsed.email).toBe("new.officer@example.edu");
+
+    expect(openInviteEmailSchema.safeParse({ email: "" }).success).toBe(false);
+    expect(openInviteEmailSchema.safeParse({ email: "nope" }).success).toBe(
+      false
+    );
   });
 
   it("refuses a short password and a mismatched confirmation", () => {
@@ -227,6 +248,28 @@ describe("what a redeemer is allowed to send", () => {
     expect(parsed.email).toBe("new.officer@example.edu");
     // Blank means "they fill it in", which is null rather than "".
     expect(parsed.displayName).toBeNull();
+  });
+
+  it("🔓 treats a blank invite address as an OPEN invite, not an error", () => {
+    // Migration 25. Blank is a deliberate choice by the officer, so it parses
+    // to null rather than "" — the column is nullable and null is what the rest
+    // of the system reads as "anyone with the link".
+    const open = inviteCreateSchema.parse({
+      email: "   ",
+      role: "officer",
+      displayName: "",
+    });
+    expect(open.email).toBeNull();
+
+    // A non-blank value still has to be a real address — "optional" must not
+    // become "unvalidated", or a typo'd address would silently produce an open
+    // invite instead of failing.
+    const typo = inviteCreateSchema.safeParse({
+      email: "not-an-address",
+      role: "officer",
+      displayName: "",
+    });
+    expect(typo.success).toBe(false);
   });
 
   it("refuses a role that is not one of the two", () => {
@@ -426,6 +469,58 @@ describe("officer_invites against real Postgres", () => {
       created_by: officerId,
     });
     expect(error?.code).toBe("23514");
+  });
+
+  it("🔓 accepts an OPEN invite with no address, and records who used it", async () => {
+    // Migration 25. The null is the information while the link is live: it says
+    // "anyone with this" rather than naming a recipient.
+    const token = mintInviteToken();
+    const { data: open, error } = await db
+      .from("officer_invites")
+      .insert({
+        email: null,
+        role: "officer",
+        token_hash: hashInviteToken(token),
+        expires_at: inviteExpiry(new Date()).toISOString(),
+        created_by: officerId,
+      })
+      .select("id, email, role")
+      .single();
+
+    expect(error).toBeNull();
+    expect(open!.email).toBeNull();
+    createdIds.push(open!.id);
+
+    // It is claimable exactly like a pinned one — the single-use guard does not
+    // depend on the address.
+    expect(await claim(open!.id)).not.toBeNull();
+    expect(await claim(open!.id)).toBeNull();
+
+    // 🔓 The role is still pinned. An open invite lets the holder choose who
+    // they are, never what they may do — which is the property that makes the
+    // looser address rule survivable.
+    expect(open!.role).toBe("officer");
+
+    // acceptInvite writes the redeemed address back, so the row answers "who did
+    // this link let in?" without going to admin_audit.
+    const redeemed = `${MARKER}.open.${Date.now() % 100000}@example.edu`;
+    await db
+      .from("officer_invites")
+      .update({
+        accepted_at: new Date().toISOString(),
+        accepted_user: officerId,
+        email: redeemed,
+      })
+      .eq("id", open!.id);
+
+    const { data: after } = await db
+      .from("officer_invites")
+      .select("email, claimed_at, accepted_at, revoked_at, expires_at")
+      .eq("id", open!.id)
+      .single();
+
+    expect(after!.email).toBe(redeemed);
+    expect(inviteState(after!, new Date()).kind).toBe("accepted");
   });
 
   it("🔓 is unreadable by the anon role", async () => {
@@ -631,9 +726,23 @@ describe("the shape of the invite actions", () => {
     expect(acceptSource).not.toMatch(/formData\.get\(["']role["']\)/);
   });
 
-  it("🔓 takes the email from the invite row, never from the form", () => {
-    expect(acceptSource).toContain("email: claimed.email");
-    expect(acceptSource).not.toMatch(/formData\.get\(["']email["']\)/);
+  it("🔓 takes the email from the invite row whenever one is pinned", () => {
+    // ⚠️ This assertion CHANGED with migration 25 and is weaker than it was, so
+    // it is worth being explicit about what it still guarantees.
+    //
+    // It used to be "the form is never consulted for an address, full stop".
+    // An open invite has to consult it. What survives — and what this pins — is
+    // that the two paths are structurally separate: the pinned branch assigns
+    // straight off the row, and the form is only read inside a branch that is
+    // reachable only when the row pinned nothing.
+    expect(acceptSource).toContain("targetEmail = invite.email");
+    expect(acceptSource).toContain("if (invite.email !== null)");
+    expect(acceptSource).toContain("openInviteEmailSchema.safeParse");
+
+    // The account is always created from the RESOLVED value. If this ever reads
+    // straight from the form, the pinned guarantee is gone.
+    expect(acceptSource).toContain("email: targetEmail");
+    expect(acceptSource).not.toMatch(/email:\s*fields\.email/);
   });
 
   it("claims before creating the account", () => {

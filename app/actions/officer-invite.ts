@@ -19,7 +19,7 @@ import {
 import { hashClientIp } from "@/lib/request-ip";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { inviteAcceptSchema } from "@/lib/validation";
+import { inviteAcceptSchema, openInviteEmailSchema } from "@/lib/validation";
 
 // Redeeming an officer invite (migration 24).
 //
@@ -41,9 +41,13 @@ import { inviteAcceptSchema } from "@/lib/validation";
 //     `role` field in inviteAcceptSchema, so there is nothing to tamper with;
 //     a hand-rolled POST carrying `role=admin` against an officer invite gets
 //     `officer`, and a test asserts it.
-//   * The EMAIL likewise. The account created is the address the inviter
-//     authorised, so a forwarded link cannot be redeemed into someone else's
-//     inbox.
+//   * The EMAIL likewise — WHEN THE INVITE PINS ONE. Then the account created is
+//     the address the inviter authorised, and a forwarded link is useless to
+//     anyone else. 🔓 Since migration 25 an invite may instead be OPEN
+//     (`email is null`), in which case the holder supplies their own address and
+//     the link IS a bearer credential. The two paths are kept structurally
+//     apart rather than merged behind a `??` — see the resolution below — so
+//     the pinned case still has no parsed email in scope to reach for.
 //   * Single use is enforced by a conditional UPDATE, not by a read-then-check.
 //     See the claim below.
 //
@@ -52,6 +56,17 @@ import { inviteAcceptSchema } from "@/lib/validation";
 
 export type SubmittedInviteAcceptValues = {
   displayName: string;
+  /**
+   * Echoed for the OPEN-invite case only — it is always "" for a pinned invite,
+   * where the field does not exist on the form.
+   *
+   * Not optional, and not `undefined`: React 19 resets an uncontrolled
+   * `<form action>` once the action resolves, and a nullish `defaultValue`
+   * following a non-nullish one makes React drop the value attribute entirely,
+   * so the reset clears the field at exactly the moment somebody is fixing a
+   * typo in it.
+   */
+  email: string;
 };
 
 export type AcceptInviteState =
@@ -76,7 +91,13 @@ export type AcceptInviteState =
   | {
       status: "invalid";
       fieldErrors: Partial<
-        Record<"displayName" | "password" | "confirmPassword" | "token", string[]>
+        Record<
+          // `email` appears here only for an OPEN invite, where the redeemer
+          // supplies one. A pinned invite can never produce this key, because
+          // that path never parses an email at all.
+          "displayName" | "password" | "confirmPassword" | "token" | "email",
+          string[]
+        >
       >;
       submitted: SubmittedInviteAcceptValues;
     }
@@ -101,6 +122,10 @@ export async function acceptInvite(
 
   const submitted: SubmittedInviteAcceptValues = {
     displayName: echoField(formData.get("displayName"), 240),
+    // Capped at twice the schema's own maximum: on the invalid path there is no
+    // parsed value to echo, so this is a raw form string and a hand-rolled POST
+    // could otherwise have the server reflect a megabyte into its own response.
+    email: echoField(formData.get("email"), 508),
   };
 
   const parsed = inviteAcceptSchema.safeParse({
@@ -115,11 +140,11 @@ export async function acceptInvite(
       const field = String(issue.path[0] ?? "password");
       (fieldErrors[field] ??= []).push(issue.message);
     }
-    // 🔓 `submitted` carries the display name and NOTHING else. Echoing a
-    // password back into the DOM to "preserve what they typed" would write a
-    // live credential into the page source and into React's action state; the
-    // React 19 form reset clearing both password fields is the correct
-    // behaviour here, not a defect to work around.
+    // 🔓 `submitted` carries the display name and (for an open invite) the
+    // address — and NEITHER PASSWORD. Echoing one back to "preserve what they
+    // typed" would write a live credential into the page source and into
+    // React's action state; the React 19 form reset clearing both password
+    // fields is the correct behaviour here, not a defect to work around.
     return { status: "invalid", fieldErrors, submitted };
   }
   const fields = parsed.data;
@@ -172,13 +197,45 @@ export async function acceptInvite(
       };
     }
 
+    // === Which address is this account for? ================================
+    //
+    // 🔓 The two cases are kept structurally apart, not merged behind a `??`.
+    //
+    // Pinned (`invite.email` non-null): the address comes off the row and the
+    // posted form is never consulted. `inviteAcceptSchema` has no email key, so
+    // there is no parsed value in scope that could be reached for by mistake —
+    // that is the guarantee, and it survives migration 25 intact.
+    //
+    // Open (`invite.email` null): the holder supplies it, parsed by its own
+    // schema, and the link is a bearer credential. Deliberate; see the header of
+    // migration 25.
+    let targetEmail: string;
+    if (invite.email !== null) {
+      targetEmail = invite.email;
+    } else {
+      const parsedEmail = openInviteEmailSchema.safeParse({
+        email: formData.get("email"),
+      });
+      if (!parsedEmail.success) {
+        return {
+          status: "invalid",
+          fieldErrors: {
+            email: parsedEmail.error.issues.map((issue) => issue.message),
+          },
+          submitted,
+        };
+      }
+      targetEmail = parsedEmail.data.email;
+    }
+
     // Re-checked here and not only in createInvite: an account can appear in the
     // 72 hours between the two, and `createUser` would otherwise fail AFTER the
-    // claim below had already burned the invite.
-    const existing = await findAccountByEmail(db, invite.email);
+    // claim below had already burned the invite. For an OPEN invite this is the
+    // only place it can happen at all — createInvite had no address to check.
+    const existing = await findAccountByEmail(db, targetEmail);
     if (existing.status === "error") return { status: "error" };
     if (existing.status === "found") {
-      return { status: "already_registered", email: invite.email };
+      return { status: "already_registered", email: targetEmail };
     }
 
     // === The claim. ========================================================
@@ -227,7 +284,9 @@ export async function acceptInvite(
 
     const { data: created, error: createError } =
       await db.auth.admin.createUser({
-        email: claimed.email,
+        // `targetEmail`, resolved above — the invite's own address when it
+        // pinned one, and never the form in that case.
+        email: targetEmail,
         password: fields.password,
         // No confirmation mail, for the reason scripts/create-officer.mjs:69-71
         // gives: the built-in sender is capped at 2 emails/hour and is not for
@@ -243,7 +302,7 @@ export async function acceptInvite(
       );
       // Lost the race to a signup between the check above and here.
       if (/already been registered|email_exists/i.test(createError?.message ?? "")) {
-        return { status: "already_registered", email: claimed.email };
+        return { status: "already_registered", email: targetEmail };
       }
       return { status: "error" };
     }
@@ -274,7 +333,17 @@ export async function acceptInvite(
 
     const { error: acceptError } = await db
       .from("officer_invites")
-      .update({ accepted_at: now.toISOString(), accepted_user: userId })
+      .update({
+        accepted_at: now.toISOString(),
+        accepted_user: userId,
+        // 🔓 Writes the address back, which matters only for an OPEN invite:
+        // the column was null while the link was "for anyone", and from here it
+        // names whoever actually used it. That makes "who did this link let in?"
+        // answerable from the row itself rather than only from admin_audit — and
+        // it is why the officers screen can list a past open invite by name.
+        // A no-op for a pinned invite, which already held this exact value.
+        email: targetEmail,
+      })
       .eq("id", claimed.id);
 
     if (acceptError) {
@@ -294,7 +363,7 @@ export async function acceptInvite(
       entityId: claimed.id,
       actorId: userId,
       action: "invite.accepted",
-      note: claimed.email,
+      note: targetEmail,
     });
     await writeAudit(db, {
       entityType: "officer",
@@ -302,7 +371,7 @@ export async function acceptInvite(
       actorId: userId,
       action: "officer.access_granted",
       after: profile,
-      note: `${claimed.email} accepted an invite as ${claimed.role}`,
+      note: `${targetEmail} accepted an invite as ${claimed.role}`,
     });
 
     // Sign them straight in rather than bouncing to the login form: they chose
@@ -312,15 +381,15 @@ export async function acceptInvite(
     // app/actions/auth.ts:9-12 gives.
     const supabase = await createClient();
     const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: claimed.email,
+      email: targetEmail,
       password: fields.password,
     });
 
     if (signInError) {
       console.error("invite auto sign-in failed:", signInError.message);
-      signInFailedFor = claimed.email;
+      signInFailedFor = targetEmail;
     } else {
-      signedInEmail = claimed.email;
+      signedInEmail = targetEmail;
     }
   } catch (e) {
     console.error(

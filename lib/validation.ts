@@ -551,17 +551,39 @@ export const mergeSchema = z.object({
  * row instead.
  */
 export const inviteCreateSchema = z.object({
+  // 🔓 OPTIONAL since migration 25, and the empty case is a security decision
+  // rather than a convenience.
+  //
+  // Filled in: the address is pinned, the redemption page renders it as
+  // read-only text, and the account created is the one that was authorised —
+  // so a forwarded link is useless to anybody else.
+  //
+  // Left blank: an OPEN invite. Whoever holds the link chooses their own
+  // address, which makes the link a BEARER CREDENTIAL — see the header of
+  // migration 25 for why that is allowed and what still contains it. The role
+  // is pinned either way: an open invite lets the holder choose who they are,
+  // never what they may do.
   email: z
     .string()
     .trim()
     .max(254, "Email is too long")
-    .pipe(z.email("Enter a valid email address"))
-    // Stored folded, which is what lets the supersede lookup be a plain
-    // `.eq("email", …)`. The alternative — matching with `.ilike()` — would
-    // treat `_` in a local part as a wildcard, so `a_b@x.com` would silently
-    // match `axb@x.com` and revoke the wrong person's invite. GoTrue folds
-    // addresses anyway, so nothing is lost.
-    .transform((value) => value.toLowerCase()),
+    // Folded before anything else looks at it, which is what lets the supersede
+    // lookup be a plain `.eq("email", …)`. The alternative — matching with
+    // `.ilike()` — would treat `_` in a local part as a wildcard, so
+    // `a_b@x.com` would silently match `axb@x.com` and revoke the wrong
+    // person's invite. GoTrue folds addresses anyway, so nothing is lost.
+    .transform((value) => value.toLowerCase())
+    .superRefine((value, ctx) => {
+      // Blank is legal; anything else has to be a real address. Validated here
+      // rather than with `.optional()` because the field always arrives as a
+      // string from the form — "" is the officer leaving it empty, not the key
+      // being absent.
+      if (value.length === 0) return;
+      if (!z.email().safeParse(value).success) {
+        ctx.addIssue({ code: "custom", message: "Enter a valid email address" });
+      }
+    })
+    .transform((value) => (value.length === 0 ? null : value)),
   role: z.enum(["officer", "admin"]),
   displayName: z
     .string()
@@ -596,9 +618,16 @@ export const officerRestoreSchema = z.object({
 /**
  * Redeeming an invite — the only unauthenticated write this feature adds.
  *
- * No email and no role: both are pinned on the invite row. The token is the
- * whole of the caller's authority, and it is re-hashed and re-looked-up
- * server-side rather than trusted from the page that rendered it.
+ * ⚠️ **No `role` and no `email` key, and that is still true after migration 25.**
+ * The role is pinned on the invite row, always. The address is too *whenever the
+ * inviter supplied one* — and because this schema cannot express an email at
+ * all, the pinned path has literally nothing for a tampered POST to reach. That
+ * is a structural guarantee rather than a check somebody could delete, and it is
+ * why the open-invite address is parsed by its own schema below instead of being
+ * folded in here as an optional field.
+ *
+ * The token is the whole of the caller's authority, and it is re-hashed and
+ * re-looked-up server-side rather than trusted from the page that rendered it.
  *
  * The confirm field is checked with `refine` rather than in the action so the
  * mismatch arrives as an ordinary field error next to the input, like every
@@ -631,3 +660,24 @@ export const inviteAcceptSchema = z
   });
 
 export type InviteAcceptFields = z.infer<typeof inviteAcceptSchema>;
+
+/**
+ * The address supplied by whoever redeems an OPEN invite (migration 25).
+ *
+ * 🔓 A separate schema, parsed **only** when `officer_invites.email is null`.
+ * Keeping it out of `inviteAcceptSchema` is what preserves the guarantee above:
+ * on a pinned invite the action never parses an email, so there is no code path
+ * by which a posted one could win. Merging the two — an `email` field marked
+ * optional — would mean the pinned path had a populated value sitting in
+ * `parsed.data` next to the invite's own, and the only thing standing between
+ * them would be remembering which to use.
+ */
+export const openInviteEmailSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .min(1, "Enter the email you'll sign in with")
+    .max(254, "Email is too long")
+    .pipe(z.email("Enter a valid email address"))
+    .transform((value) => value.toLowerCase()),
+});
