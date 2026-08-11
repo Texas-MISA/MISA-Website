@@ -8,6 +8,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Stages 0–5 complete. ✅ Stage 6, 6.5, 7 and 8 are COMPLETE. Stage 8 closed 2026-08-10 (doc v1.54) with phase 3. Stage 9 (launch) is next.**
 
+🔓 **Officer invite links shipped 2026-08-10 (doc v1.56) — migration 24, and the §6 claim it invalidates.** Officers are added by an expiring, single-use link from `/admin/officers` instead of a `scripts/create-officer.mjs` run that needs the production service role key in someone's environment. §2.3 says officers turn over every year, so the old path made routine turnover either one technical person's job or a reason to spread the service key around.
+  - 🔓 **This deliberately opens the privilege-escalation path §6's risk register said did not exist**, so that row is **rewritten** rather than left quietly stale, and §9 gains **#13**. A valid unexpired unclaimed invite is a *capability*. What contains it is in the Invariants below — all five properties, none optional.
+  - 🔓 **Only the token's SHA-256 is stored.** The row is not a credential, which is what makes an invite list safe to render. A test asserts the token appears nowhere in the entire row, not merely that `token_hash` differs.
+  - ⚠️ **Claim before create.** The conditional `UPDATE` is both the single-use and the concurrency guard; a failure after it burns the invite and grants nothing, which is the recoverable direction. **Four tests were confirmed to go red by dropping the predicate** — a guard never seen red is a guard nobody knows works.
+  - 🔓 **The role and email come off the stored row.** `inviteAcceptSchema` has no `role` or `email` key at all, so a tampered POST has nothing to reach — structural, not a check.
+  - **Any officer may invite (§9 #6's reasoning applied to privilege for the first time); the one refusal is self-revocation**, which is what keeps team-wide lockout unreachable from the UI.
+  - **Nothing is emailed** — no SMTP exists (the built-in sender is 2/hour and not for production), which is also what makes Supabase's own `inviteUserByEmail` unusable. The officer copies the link and sends it themselves, adding no service to hand over at turnover.
+  - ⚠️ **Local is at migration 25 and the remote at 24 until `db push` runs** — the second time the two have differed. See `tasks.md`.
+
 ✅ **Stage 8 phase 3 shipped 2026-08-10** — **error boundaries, and the empty-vs-error correction.** **No migration.**
   - 🔓 **The substantive half was never the files.** The house pattern for a failed read was `x.error ? [] : x.data`, which renders the EMPTY state — so a broken query did not say "something went wrong", it made an affirmative false claim. The five admin list pages already got this right; the rot was in the detail pages and `lib/`.
   - 🔓 **`fetchOfficerNames` returning an empty Map was the widest one, and a comment called it "cosmetic".** `describeOfficer` reads absence from the map as "no `admin_profiles` row", i.e. a REVOKED officer — so one failed read relabelled **every officer on every screen** as "a former officer": the ledger, both dues surfaces, the member detail, the audit trail. Exactly the regression that function's own header records as fixed, reintroduced through the error path, on the log whose purpose is saying who did what. It returns a discriminated `OfficerNames` now, and `describeOfficer` has a **fourth** case.
@@ -366,6 +375,16 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - 🔓 **One failure, one message, for every `/lookup` miss.** Never distinguish "no such EID" from "that email doesn't match" — that is a *stronger* oracle than the one §6 accepted, reachable on the most sensitive page.
 - 🔓 **`/lookup` returns no identifier the caller did not already supply.** The member's name and their own aggregates, never the stored email or EID. That is what keeps "no unauthenticated route returns an email or student ID" true by construction rather than by argument.
 - **`/lookup` throttles in its own bucket** (`hashClientIp("lookup")`, `LOOKUP_RATE_LIMIT_MAX`). `RATE_LIMIT_MAX` is a **room capacity**, not a security number, so a shared budget would let members checking their standing at a meeting exhaust the slots the people behind them need to check in with — and the check-in is the one that must not fail.
+- 🔓 **An officer invite is a CAPABILITY, and the token is the whole of it.** Migration 24 deliberately opens the privilege-escalation path §6's risk register used to say did not exist — a valid, unexpired, unclaimed `officer_invites` row lets its token-holder mint an officer account with no existing session. The trade is argued in §9 #13 and in the migration header; what contains it is five properties, none of which is optional:
+  - 🔓 **Only `sha256(token)` is stored.** The row is therefore not a credential — a backup, an open Studio tab, or any future screen listing invites holds nothing redeemable, which is what makes `/admin/officers` safe to build. A test asserts the token appears nowhere in the whole row, not merely that `token_hash` differs. **Never add a column that stores the token, and never "helpfully" return it from a read.**
+  - 🔓 **The email and the role come off the stored row, never off the form.** `inviteAcceptSchema` has no `role` and no `email` key at all, so a hand-rolled POST carrying `role=admin` has nothing to reach — the guarantee is structural rather than a check somebody could remove. Pinned behaviourally (the schema *discards* a posted role) and by source assertion.
+  - ⚠️ **Claim BEFORE creating the account.** The conditional `update … set claimed_at where claimed_at is null and accepted_at is null and revoked_at is null` is simultaneously the single-use guard and the concurrency guard: two people opening one link both pass the read, and exactly one updates a row. PostgREST cannot transact across statements (the `writeAudit` gap, the `commitMerge` gap), so a failure after the claim burns the invite and grants nothing — the recoverable direction. Reversing the order leaves an account with no access beside a live invite that can never be redeemed. Four tests go red if the predicate is dropped, verified by dropping it.
+  - **72 hours, fixed, and `inviteState` is the only definition of liveness.** The redemption page, the redemption action and the officers screen all call it, so a link cannot look usable on one and refuse on another. Precedence is revoked > accepted > stalled > expired, and it is deliberate: an officer's withdrawal outranks everything, and "you already have an account" outranks the clock.
+  - ⚠️ **Revoking your own access is refused, and that is what makes team-wide lockout unreachable.** Every revocation must be performed by a *different* officer, so the last one standing has nobody left who can remove them. Without it two officers revoke each other and the survivor revokes themselves, leaving an org whose only way back in is the service key and a checkout.
+- 🔓 **The invite messages are specific where `/lookup`'s are deliberately vague, and the asymmetry is the point.** `/lookup` gives one message for every miss because distinguishing them would build an oracle out of information the caller had not supplied. Here the caller already holds a 256-bit secret that exists in exactly one row, so telling them their own invite expired or was withdrawn reveals nothing and being vague only strands a legitimate new officer. **The generic message is reserved for a token matching NO row** — there is no reason to confirm to a guesser which strings are absent.
+- 🪤 **`/officer-invite/[token]` lives OUTSIDE `/admin`, and moving it in would break it.** `proxy.ts` matches `/admin/:path*` and redirects anyone without a session to `/admin/login` — which is every person who will ever open an invite link. Housing it under `/admin` means adding exceptions to the one file whose header warns that short-circuiting it "disables session refresh with no error anywhere". Out here the feature needs no change to `proxy.ts` at all.
+- 🔓 **The invite page THROWS on a failed read rather than saying the link is invalid.** The Stage 8 phase 3 rule at its sharpest: an error rendered as an affirmative absence would tell somebody holding a perfectly good invite that it is bad, and unlike an officer staring at an empty list they have no way to know better and nobody to ask. Unknown token → generic message; failed read → the error boundary.
+- **A roster read spanning `auth.users` and `admin_profiles` is two queries, always.** There is no PostgREST path between them (`lib/admin-profiles.ts` sits on the same seam from the other side), and the GoTrue admin API offers no filter-by-email, so `lib/officer-roster.ts` pages and stitches in memory. Its cap **refuses rather than truncates** — a short roster means an officer invisible on the management screen, or an existing account `createInvite` fails to notice and issues an unredeemable invite against.
 - 🪤 **The site header's nav cannot grow without measuring.** The wordmark is absolutely centred so the side groups cannot shift it off-centre; nothing stops a group growing *underneath* it, and the wordmark wins the z-order, so the failure is a nav item that silently disappears rather than a broken layout. Six items cleared it by 61px at 1646; eight overflowed by 199px. The nav is split across the wordmark (site pages left, member pages right) and the desktop breakpoint is `xl`, not `lg`. Re-measure at both 1280 and a wide viewport when adding an item.
 - **The board's term label comes from the same row as its numbers.** `leaderboard.term` exists so `/leaderboard` asks once; a second `rpc("current_term")` for the heading is two sources for one fact, and it is the exact query that was silently wrong above. Don't "simplify" the column away.
 - **`/leaderboard` is `force-dynamic`, and that is a correctness choice.** Five modules move public standings — `points.ts`, `attendance-review.ts`, `attendance.ts`, `events.ts`, `member-merge.ts` — so a cached board depends on five call sites staying complete, and it fails silently. There is no `revalidatePath("/leaderboard")` anywhere on purpose; adding one means changing that line first. (This supersedes Stage 5's carry-forward, which named only `revalidatePoints`.)
@@ -431,6 +450,20 @@ app/actions/            attendance.ts (submitCheckin ONLY — the one
                         for the same reason. Two files, two symbols, and the
                         difference between them is what each may do: this one
                         writes exactly one row anywhere, the throttle record),
+                        officer-invite.ts (acceptInvite ONLY — migration 24, the
+                        THIRD unauthenticated endpoint and by far the most
+                        consequential, because it CREATES AN OFFICER. Same
+                        single-export shape for the same §6 reason. The token is
+                        the whole of the caller's authority; the role and the
+                        email are read off the stored invite row, never off the
+                        form, and there is no `role` key in inviteAcceptSchema
+                        for a tampered POST to reach),
+                        invites.ts (migration 24, officer-facing — createInvite,
+                        which returns the one-time link, revokeInvite,
+                        revokeOfficerAccess, restoreOfficerAccess. Kept apart
+                        from officer-invite.ts so the unauthenticated surface
+                        stays a one-file answer. No role check, and the header
+                        says so — §9 #13),
                         attendance-review.ts (officer resolution mutations),
                         points.ts (grantPoints, voidAdjustment — and nothing
                         else: an adjustment is immutable except for voiding),
@@ -458,6 +491,28 @@ lib/lookup.ts           the member self-service core (Stage 7 phase 2) — pure,
                         every miss; no identifier returned that the caller did
                         not supply; every date preformatted, because the
                         profile crosses into a Client Component as action state
+lib/officer-invites.ts  the officer-invite core (migration 24) — pure, same
+                        contract as lib/events.ts. mintInviteToken,
+                        hashInviteToken (🔓 only the DIGEST is ever stored, so
+                        nothing that can read officer_invites holds a
+                        credential), INVITE_TTL_HOURS, MIN_OFFICER_PASSWORD, and
+                        inviteState — the ONE definition of liveness, so the
+                        redemption page, the redemption action and the officers
+                        screen cannot disagree about whether a link still works.
+                        ⚠️ Imports node:crypto, so like lib/request-ip.ts it must
+                        NEVER be imported by a Client Component. lib/validation.ts
+                        imports MIN_OFFICER_PASSWORD from it, which is safe only
+                        while every importer of validation.ts is server-side
+lib/officer-roster.ts   who can sign in, and who merely has an account
+                        (migration 24). 🪤 Spans TWO stores PostgREST cannot
+                        join — admin_profiles in `public`, and the email plus
+                        last sign-in in auth.users, reachable only through the
+                        GoTrue admin API. Same seam lib/admin-profiles.ts sits on
+                        from the other side. Every function returns a
+                        DISCRIMINATED result: an empty roster rendered for a
+                        failed read claims nobody is an officer, and a failed
+                        account lookup read as "no account" would issue an invite
+                        that can never be redeemed
 lib/request-ip.ts       hashClientIp(scope) — the shared, SCOPED client hash
                         both unauthenticated endpoints throttle on. The scope
                         is what keeps /attend and /lookup in disjoint buckets:
@@ -535,6 +590,20 @@ app/admin/(shell)/dues/[id]/
                         .tsx owns the row's CAS token and drives every select
                         from STATE, never defaultValue (the walkthrough defect);
                         payment-suggestions.tsx is inert and preselects nothing
+app/admin/(shell)/officers/
+                        migration 24 — officer turnover. Current officers,
+                        outstanding invitations, past invitations, and accounts
+                        that exist without access. The one-time link is rendered
+                        here and nowhere else, because nothing can reproduce it.
+                        Replaces scripts/create-officer.mjs for everyday use;
+                        the script stays as the bootstrap path on a fresh
+                        project and the recovery path when nobody can sign in
+app/(public)/officer-invite/[token]/
+                        migration 24 — the redemption page. Outside /admin
+                        deliberately (see the proxy.ts invariant), force-dynamic,
+                        robots noindex, and the email rendered as read-only TEXT
+                        rather than an input: there is nothing to tamper with,
+                        and the account created is the one that was authorised
 app/admin/(shell)/dues/import/
                         6.5 phase 2, built — the two-step upload. The client
                         component holds the CSV text in memory between preview
