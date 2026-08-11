@@ -15,6 +15,7 @@ import {
   MAX_OPTION_LENGTH,
   RESERVED_FIELD_KEYS,
 } from "@/lib/members";
+import { MIN_OFFICER_PASSWORD } from "@/lib/officer-invites";
 import {
   MAX_GRANT_MEMBERS,
   MAX_POINTS_PER_GRANT,
@@ -539,3 +540,94 @@ export const mergeSchema = z.object({
   survivorId: z.uuid(),
   loserId: z.uuid(),
 });
+
+/**
+ * Issuing an officer invite (migration 24).
+ *
+ * ⚠️ `role` is validated HERE because the inviter chooses it, and it is
+ * deliberately absent from `inviteAcceptSchema` below: the redeemer does not get
+ * a say, and the way that is guaranteed is that their schema has no such field
+ * to parse. app/actions/officer-invite.ts reads the role off the stored invite
+ * row instead.
+ */
+export const inviteCreateSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .max(254, "Email is too long")
+    .pipe(z.email("Enter a valid email address"))
+    // Stored folded, which is what lets the supersede lookup be a plain
+    // `.eq("email", …)`. The alternative — matching with `.ilike()` — would
+    // treat `_` in a local part as a wildcard, so `a_b@x.com` would silently
+    // match `axb@x.com` and revoke the wrong person's invite. GoTrue folds
+    // addresses anyway, so nothing is lost.
+    .transform((value) => value.toLowerCase()),
+  role: z.enum(["officer", "admin"]),
+  displayName: z
+    .string()
+    .trim()
+    .max(120, "Name is too long")
+    // Blank means "let them fill it in", which is a null column rather than an
+    // empty string — the same rule optionalText applies above.
+    .transform((value) => (value.length === 0 ? null : value)),
+});
+
+export type InviteCreateFields = z.infer<typeof inviteCreateSchema>;
+
+export const inviteRevokeSchema = z.object({ id: z.uuid() });
+
+/** Revoking an officer's access. The uuid is an auth.users id. */
+export const officerAccessSchema = z.object({ userId: z.uuid() });
+
+/**
+ * Granting access to an account that already exists — a returning officer, or
+ * anyone who signed up without ever being granted access.
+ *
+ * Carries `role` because the prior role does not survive a revoke: revoking
+ * DELETES the admin_profiles row, so there is nothing left to restore it from
+ * and the granting officer has to say what they mean. That is the safer
+ * direction — an inferred `admin` would be a privilege nobody chose.
+ */
+export const officerRestoreSchema = z.object({
+  userId: z.uuid(),
+  role: z.enum(["officer", "admin"]),
+});
+
+/**
+ * Redeeming an invite — the only unauthenticated write this feature adds.
+ *
+ * No email and no role: both are pinned on the invite row. The token is the
+ * whole of the caller's authority, and it is re-hashed and re-looked-up
+ * server-side rather than trusted from the page that rendered it.
+ *
+ * The confirm field is checked with `refine` rather than in the action so the
+ * mismatch arrives as an ordinary field error next to the input, like every
+ * other validation failure in this codebase.
+ */
+export const inviteAcceptSchema = z
+  .object({
+    token: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{43}$/, "That invitation link is not valid"),
+    displayName: z
+      .string()
+      .trim()
+      .min(1, "Enter the name other officers will see")
+      .max(120, "Name is too long"),
+    password: z
+      .string()
+      .min(
+        MIN_OFFICER_PASSWORD,
+        `Use at least ${MIN_OFFICER_PASSWORD} characters`
+      )
+      // GoTrue's own ceiling; a longer value fails at the API with a message
+      // the officer cannot act on.
+      .max(72, "Password is too long"),
+    confirmPassword: z.string(),
+  })
+  .refine((fields) => fields.password === fields.confirmPassword, {
+    message: "Those passwords do not match",
+    path: ["confirmPassword"],
+  });
+
+export type InviteAcceptFields = z.infer<typeof inviteAcceptSchema>;

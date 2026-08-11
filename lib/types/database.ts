@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -477,6 +472,54 @@ export type Database = {
           notes?: string | null
           source?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      officer_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_user: string | null
+          claimed_at: string | null
+          created_at: string
+          created_by: string
+          display_name: string | null
+          email: string
+          expires_at: string
+          id: string
+          revoked_at: string | null
+          revoked_by: string | null
+          role: string
+          token_hash: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_user?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          created_by: string
+          display_name?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          role?: string
+          token_hash: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_user?: string | null
+          claimed_at?: string | null
+          created_at?: string
+          created_by?: string
+          display_name?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          revoked_at?: string | null
+          revoked_by?: string | null
+          role?: string
+          token_hash?: string
         }
         Relationships: []
       }

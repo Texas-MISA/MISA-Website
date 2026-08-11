@@ -1,9 +1,24 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.55
+**Version:** 1.56
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
 
+> **v1.56: officer invite links (migration 24), and the §6 row they invalidate.**
+> Officers are added by an expiring, single-use link instead of a CLI run that
+> needs the production service role key — §2.3 says they turn over every year,
+> and the old path made routine turnover either one person's job or a reason to
+> spread the service key around. 🔓 **This deliberately opens the
+> privilege-escalation path §6's risk register said did not exist**, so that row
+> is rewritten rather than left to go quietly stale, and §9 gains **#13** for the
+> decision. What contains it: the email and role are pinned by the inviter and
+> read off the stored row rather than the redeemer's form, the link lasts 72
+> hours, it is single-use via a conditional `UPDATE` rather than a
+> read-then-check, and **only the token's SHA-256 is stored** — so nothing that
+> can read `officer_invites` holds a credential. Any officer may invite (§9 #6's
+> reasoning, applied to privilege for the first time); the one refusal is
+> revoking your own access, which is what keeps team-wide lockout unreachable.
+>
 > **v1.55: Stage 9 starts fresh — the spreadsheet migration is dropped.**
 > Decided 2026-08-10. Historical data is not imported: the roster is entered as
 > current membership, and attendance, points and dues begin at zero. The cost is
@@ -2547,6 +2562,13 @@ $$;
 /attend                Public check-in form
 /leaderboard           Public standings
 /lookup                Member self-service attendance history
+/officer-invite/[token]
+                       Redeem an officer invitation — set a password against an
+                       email the inviter pinned. Unauthenticated, and outside
+                       /admin deliberately: proxy.ts bounces every /admin path
+                       without a session to the login page, so an invite page
+                       under there would be unreachable by the only people who
+                       ever open it                             (migration 24)
 /admin/login           Officer sign-in
 /admin                 Dashboard — recent check-ins, pending review count
 /admin/events          Schedule list — filter by term, status, category
@@ -2595,6 +2617,11 @@ $$;
                        as CSV or .xlsx, plus the resolution columns the queue
                        never displays                           (Stage 8 phase 2)
 /admin/attendance/[id] Submission detail: raw form data, suggestions, override actions
+/admin/officers        Officer turnover — invite by link, withdraw an invitation,
+                       remove access, grant it to an account that already exists.
+                       Replaces scripts/create-officer.mjs for everyday use; the
+                       script stays as the bootstrap and recovery path
+                                                                (migration 24)
 /admin/audit           Full activity log across all entities    (NOT BUILT)
 ```
 
@@ -2644,7 +2671,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. **Verified July 2026** — check it by response behaviour rather than by the dashboard label: the production alias must return `200` while a per-deployment URL returns `302` to `vercel.com/sso-api`. If both return `200`, protection is Disabled and every preview is publicly writable. |
 | Bulk roster import brings PII *in* (Stage 6 phase 7b) | The mirror of the export row, and the file is the same shape: a spreadsheet of names, emails and EIDs. 🔓 **It is never persisted** — the client reads it with `FileReader` and holds the text in component state between the preview and the commit, so no staging table and no temp file ever holds it. The import is **create-only**: a row matching an existing member on `normalized_eid` *or* `lower(email)` is shown and skipped, so a stale spreadsheet cannot overwrite a correction an officer made. One `member.imported` audit row per member created. |
 | A merge permanently deletes a member row (Stage 6 phase 8) | The only destructive operation in the officer UI, and the one place where getting the wrong row costs data rather than a correction. Mitigated by preview-and-confirm, a two-click commit, suggestions that are never preselected and a floor tuned to refuse "same name, nothing else". The deleted row's own `admin_audit` history becomes **unreachable** — entity_id points at nothing and there is no page for a member that does not exist — so the single `member.merged` row written against the *survivor* carries the loser's name, EID and **id**, and is the only surviving record. ⚠️ `point_adjustments.member_id` is `on delete cascade`, so the delete is guarded by a re-count that refuses unless every referencing table is empty; see §7 Stage 6 phase 8. |
-| Admin privilege escalation | `admin_profiles` is not writable by any client role; officers are added via the Supabase dashboard or a seeded SQL script |
+| Admin privilege escalation | ⚠️ **This row was rewritten by migration 24, because its original sentence stopped being the whole truth.** It read: *"`admin_profiles` is not writable by any client role; officers are added via the Supabase dashboard or a seeded SQL script"*. Both halves are still literally true — no API role holds a write grant, and the service-role client behind `lib/auth.ts` is still the only writer — but the property they were shorthand for, **"becoming an officer requires somebody holding the service key"**, is what the invite flow deliberately ends. A valid, unexpired, unclaimed row in `officer_invites` is now a **capability**: whoever holds the matching token can mint an officer account without an existing session. That trade is recorded and argued in §9 #13; what contains it is that the capability is **narrow** (the email and the role are pinned by the inviter and read off the stored row, never off the redeemer's form), **short-lived** (72 hours), **single-use** (a conditional `UPDATE` claims it, so two people opening one link cannot both get in), **revocable** (any officer, instantly), and **attributable** (two `admin_audit` rows, under `officer_invite` and `officer`). 🔓 **The token itself is never stored** — only its SHA-256 — so a database backup, an open Studio tab or any future screen listing invites holds nothing redeemable. The residual risk is the link in transit: an officer who sends it to the wrong person has granted officer access to the wrong person, which is why the screen says so plainly and why the window is short. |
 
 **Threat model boundary:** this system protects against casual abuse and accidental data exposure. It is not designed to withstand a determined attacker. Scope the security work accordingly — the RLS policies matter far more than, say, elaborate bot detection.
 
@@ -3180,11 +3207,25 @@ One decision, and it earns a place here rather than in Stage 10 because it const
 
 12. **Membership status and what it gates** — ✅ **Official membership is dues-paid for the current term, and it gates nothing.** It is a directory column, a filter, and a line on the member's own `/lookup`; check-in, point accrual, and the leaderboard are untouched. Three alternatives were considered and all three were rejected on the same grounds — that they are hard to walk back. Gating the **leaderboard** would make the public board reveal who has paid, and §9 #1 above establishes that a public board is the one privacy choice this project cannot undo once a search engine has cached it. Gating **check-in** would contradict §4.2's rule that nothing resolving to a known member is dropped on the floor, turning an unpaid member away at the door with no record they attended. Gating **point accrual** would need retroactive backfill the moment somebody paid late, which is real complexity bought for a policy nobody has asked for. The reporting-only choice costs nothing and is reversible: adding a gate later is application logic over a column that already exists, and needs no migration. **Revisit if dues ever decide something material** — an officer-eligibility rule, a funded trip — which is the same trigger the four Stage 5 decisions above share, and for the same reason: these are all social until they are not.
 
+### Resolved at migration 24 (2026-08-10)
+
+One decision, and it earns a place here on exactly the bar #12 set: it changes the **security model**, not just what a screen does.
+
+13. **How officers are added, and who may add them** — ✅ **By an expiring, single-use invite link, and any officer may issue one.** Two halves.
+
+    **The mechanism.** Until now the only path was `scripts/create-officer.mjs`, which needs a checkout, Node, and the **production service role key** in the operator's environment. §2.3 says officers turn over every year, so the status quo made routine turnover either a job for one technical person or a reason to spread the service key around — and the second is far worse than anything below. The invite flow replaces it for everyday use; the script stays as the bootstrap path on a fresh project and the recovery path when nobody can sign in. 🔓 **This knowingly creates the privilege-escalation path §6's risk register said did not exist**, and that row has been rewritten rather than left to quietly go stale. What contains it: the email and role are **pinned by the inviter** and read off the stored row rather than the redeemer's form; the link lasts **72 hours**; it is **single-use**, enforced by a conditional `UPDATE` rather than a read-then-check, so two people opening one link cannot both get in; only the token's **SHA-256** is stored, so nothing that can read the table holds a credential; and every step writes an `admin_audit` row. **Nothing is emailed** — there is no SMTP on this project (the built-in sender is capped at 2/hour and is not for production), which is what makes Supabase's own `inviteUserByEmail` unusable, and it has the side benefit of adding no service to hand over at turnover.
+
+    **The authority.** Any officer may invite, and may remove anyone's access. This follows #6, #9 and #10 rather than departing from them — *the audit log is the control, not a role gate* — but it is the first time that principle has been applied to something that grants **privilege** rather than edits data, which is why it is written down instead of inferred from the code. The argument that decided it is #6's: a gate funnels every change through one person, and in a student org that means the new treasurer waits on whoever is busiest, while the failure it guards against is visible in `admin_audit` either way. Nothing in this codebase branches on `admin_profiles.role`, and `app/actions/invites.ts` carries a test asserting it does not become the first thing that does.
+
+    ⚠️ **The one refusal is self-revocation**, and it is not politeness — it is what makes locking the whole team out unreachable from the UI. Every revocation must be performed by a *different* officer, so the last officer standing has nobody left who can remove them. Without it, two officers can revoke each other and the survivor can revoke themselves, leaving an org whose only way back in is the service key and a checkout.
+
+    **Revisit if `admin` ever means something.** The role column exists and is set, and this decision is what keeps it decorative. The moment an `admin` can do something an `officer` cannot, this and the four Stage 5 decisions above should be re-read together — same trigger, same reason: these are all social until they are not.
+
 ---
 
 ### Still open
 
-**None.** All twelve are resolved. Anything new belongs in §7 Stage 10 as backlog rather than being appended here — this section is the record of what was decided, not a running inbox. #12 was added deliberately, under its own heading, because Stage 6.5 raised a genuine schema-and-security decision; that is the bar, and "we should note this somewhere" is not it.
+**None.** All thirteen are resolved. Anything new belongs in §7 Stage 10 as backlog rather than being appended here — this section is the record of what was decided, not a running inbox. #12 and #13 were added deliberately, under their own headings, because each raised a genuine schema-and-security decision; that is the bar, and "we should note this somewhere" is not it.
 
 ---
 
@@ -3198,6 +3239,13 @@ One decision, and it earns a place here rather than in Stage 10 because it const
     /attend/page.tsx
     /leaderboard/page.tsx    Stage 7
     /lookup/page.tsx         Stage 7
+    /officer-invite/[token]/page.tsx
+                             migration 24 — redeem an officer invitation.
+                             Unauthenticated and OUTSIDE /admin on purpose:
+                             proxy.ts redirects every session-less /admin path
+                             to the login page, so it would be unreachable in
+                             there. force-dynamic, robots noindex, and a failed
+                             read THROWS rather than rendering "invalid"
   /admin
     /login/page.tsx          outside the (shell) group — see the note below
     /(shell)                 authed chrome; route groups don't appear in URLs
@@ -3220,9 +3268,27 @@ One decision, and it earns a place here rather than in Stage 10 because it const
                              component holds the CSV text between the preview
                              step and the commit step, so nothing is staged
                              server-side
+      /officers/...          migration 24 — officer turnover. Current officers,
+                             outstanding invitations, and accounts that exist
+                             without access. Replaces create-officer.mjs for
+                             everyday use
   /actions
     attendance.ts            submitCheckin ONLY — see note below. The one
                              unauthenticated WRITE path
+    officer-invite.ts        acceptInvite ONLY (migration 24) — the THIRD
+                             unauthenticated endpoint and by far the most
+                             consequential: it creates an officer. Same
+                             single-export shape and the same §6 reason. The
+                             token is the whole of the caller's authority; the
+                             role and the email come off the stored invite row,
+                             never off the form
+    invites.ts               migration 24, officer-facing — createInvite (returns
+                             the one-time link), revokeInvite,
+                             revokeOfficerAccess, restoreOfficerAccess. Kept
+                             apart from officer-invite.ts so the unauthenticated
+                             endpoint stays a one-file answer. Refuses
+                             self-revocation, which is what makes team-wide
+                             lockout unreachable from the UI
     lookup.ts                lookupMember ONLY (Stage 7 phase 2) — the one
                              unauthenticated READ path, held to the same
                              single-export shape for the same §6 reason. It
@@ -3288,6 +3354,27 @@ One decision, and it earns a place here rather than in Stage 10 because it const
                              imported by checkin.ts, which a Client Component
                              imports
   auth.ts                    getOfficer / requireOfficer
+  officer-invites.ts         the invite core (migration 24). Pure, same
+                             contract as events.ts and dues.ts. Mints the
+                             token, HASHES it (only the digest is ever stored,
+                             so no reader of officer_invites holds a
+                             credential), and owns inviteState — the ONE
+                             definition of liveness, so the redemption page,
+                             the redemption action and the officers screen
+                             cannot disagree about whether a link still works.
+                             ⚠️ Imports node:crypto, so like request-ip.ts it
+                             must never be imported by a Client Component
+  officer-roster.ts          who can sign in, and who merely has an account
+                             (migration 24). 🪤 Spans TWO stores PostgREST
+                             cannot join: admin_profiles in `public`, and the
+                             email / last sign-in in auth.users, reachable only
+                             through the GoTrue admin API — the same seam
+                             admin-profiles.ts sits on from the other side.
+                             Every function returns a DISCRIMINATED result: an
+                             empty roster rendered for a failed read says
+                             "nobody is an officer", and a failed lookup read
+                             as "no account" would issue an invite that can
+                             never be redeemed
   event-options.ts           all-status event list, shared by queue filter,
                              resolution form, manual entry
   member-options.ts          bounded active-roster scan, shared by the

@@ -22,6 +22,10 @@ const NAV = [
   // /admin/dues/* path — which is what we want here, unlike the members/fields
   // case where a second entry would have lit two.
   { href: "/admin/dues", label: "Dues", ready: true },
+  // Officer turnover (migration 24). Its own entry rather than a link from
+  // somewhere: "who can get into this system" is not a sub-question of any
+  // other screen, and an officer looking for it will look in the nav.
+  { href: "/admin/officers", label: "Officers", ready: true },
   { href: "/admin/audit", label: "Audit", ready: false },
 ] as const;
 

@@ -53,6 +53,13 @@ type Client = SupabaseClient<Database>;
  * next person adds to only one side of it. It is NOT filed under `attendance`
  * or `point_adjustment`: those name a specific row, and a receipt spanning N
  * rows filed against one of them reads as an action taken on that row.
+ *
+ * `officer` and `officer_invite` (migration 24) are TWO types for the same
+ * reason `member` and `member_field` are: they name rows in different tables.
+ * `officer`'s entity_id is an `admin_profiles.user_id`, `officer_invite`'s is an
+ * `officer_invites.id`. Collapsing them would make entity_id sometimes a person
+ * and sometimes a link, and "everything that happened to this officer" would
+ * come back with rows about an invite.
  */
 export type AuditEntityType =
   | "archive"
@@ -62,6 +69,8 @@ export type AuditEntityType =
   | "member"
   | "member_field"
   | "member_preset"
+  | "officer"
+  | "officer_invite"
   | "point_adjustment"
   | "roster";
 
@@ -158,7 +167,29 @@ export type AuditAction =
   // audit row naming a row that no longer exists.
   | "preset.created"
   | "preset.updated"
-  | "preset.deleted";
+  | "preset.deleted"
+  // Migration 24 — officer turnover. Two entity types, so two families.
+  //
+  // The invite's own history: issued, withdrawn, redeemed. `invite.accepted` is
+  // the one verb in this file written by someone who is not yet an officer when
+  // the action starts — the actor is the account the redemption just created,
+  // which exists by the time the row is written.
+  | "invite.created"
+  | "invite.revoked"
+  | "invite.accepted"
+  // The officer's own history. `granted` and `restored` are deliberately
+  // different verbs for the same end state, because the provenance differs and
+  // that is the whole question an auditor asks: granted means someone redeemed
+  // an invite, restored means an officer re-enabled an account that had been
+  // revoked, with no link and no new credential involved.
+  //
+  // There is no officer.deleted. Revoking removes the admin_profiles row and
+  // keeps the auth user, because admin_audit.actor_id references it with no
+  // cascade — deleting an officer who has ever acted would either fail or erase
+  // who did what (scripts/create-officer.mjs:130-134).
+  | "officer.access_granted"
+  | "officer.access_revoked"
+  | "officer.access_restored";
 
 export type AuditEntry = {
   entityType: AuditEntityType;
