@@ -13,8 +13,12 @@ import {
 // <form action>, so it works before hydration.
 //
 // ⚠️ This file must not import lib/officer-invites.ts. That module pulls in
-// node:crypto and is server-only; the minimum length below is duplicated as a
-// literal in the copy on purpose, and the schema is what enforces it.
+// node:crypto and is server-only.
+//
+// 📌 The fields carry no help text and no `minLength`, deliberately (requested
+// 2026-08-10). Validation lives entirely in the schema, so the only length rule
+// is the server's — there is no client-side floor here to drift away from it,
+// which is the one good side effect of stripping the copy.
 
 const INITIAL: AcceptInviteState = { status: "idle" };
 
@@ -27,13 +31,11 @@ const buttonClass =
 export function InviteForm({
   token,
   email,
-  role,
   suggestedName,
 }: {
   token: string;
   /** Null for an OPEN invite — the recipient supplies their own address. */
   email: string | null;
-  role: string;
   suggestedName: string;
 }) {
   const [state, formAction, pending] = useActionState(acceptInvite, INITIAL);
@@ -137,13 +139,7 @@ export function InviteForm({
                 state.status === "invalid" ? state.submitted.email : ""
               }
               className={`mt-1 ${inputClass}`}
-              aria-describedby="email-help"
             />
-            <p id="email-help" className="mt-1 text-xs text-foreground/60">
-              Use the address you actually read — it&apos;s how you&apos;ll sign
-              in as a {role === "admin" ? "MISA admin" : "MISA officer"}, and it
-              can&apos;t be changed here afterwards.
-            </p>
             <FieldError messages={fieldErrors.email} />
           </>
         ) : (
@@ -153,10 +149,6 @@ export function InviteForm({
                 pinned by whoever sent the invitation, and the account created is
                 that address no matter what reaches the server. */}
             <p className="mt-1 text-base">{email}</p>
-            <p className="mt-1 text-xs text-foreground/60">
-              Set by the officer who invited you. You&apos;ll sign in with this
-              as a {role === "admin" ? "MISA admin" : "MISA officer"}.
-            </p>
           </>
         )}
       </div>
@@ -184,12 +176,7 @@ export function InviteForm({
               : suggestedName
           }
           className={`mt-1 ${inputClass}`}
-          aria-describedby="displayName-help"
         />
-        <p id="displayName-help" className="mt-1 text-xs text-foreground/60">
-          Shown next to anything you do in the admin area, so other officers can
-          tell who did what.
-        </p>
         <FieldError messages={fieldErrors.displayName} />
       </div>
 
@@ -209,16 +196,9 @@ export function InviteForm({
           name="password"
           type="password"
           required
-          minLength={12}
           autoComplete="new-password"
           className={`mt-1 ${inputClass}`}
-          aria-describedby="password-help"
         />
-        <p id="password-help" className="mt-1 text-xs text-foreground/60">
-          At least 12 characters. There is no self-serve password reset yet, so
-          put it in your password manager — an officer can reset it for you if it
-          goes missing.
-        </p>
         <FieldError messages={fieldErrors.password} />
       </div>
 
@@ -234,7 +214,6 @@ export function InviteForm({
           name="confirmPassword"
           type="password"
           required
-          minLength={12}
           autoComplete="new-password"
           className={`mt-1 ${inputClass}`}
         />
