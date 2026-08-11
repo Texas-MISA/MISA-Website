@@ -73,8 +73,19 @@ export type InviteCreateState =
    * the property that makes the stored row safe to read; the cost is that an
    * officer who loses the link must issue a new invite, which is the correct
    * trade and is said plainly on screen.
+   *
+   * 🔓 `email` is null for an OPEN invite (migration 25) — no address was
+   * pinned, so the link works for whoever opens it and they choose the mailbox.
+   * The screen branches on this and says so in as many words, because an open
+   * link is a bearer credential and the officer needs to know that *before*
+   * deciding how to send it.
    */
-  | { status: "created"; url: string; email: string; expiresAt: string };
+  | {
+      status: "created";
+      url: string;
+      email: string | null;
+      expiresAt: string;
+    };
 
 /**
  * Issue an invite and return its one-time link.
@@ -128,19 +139,27 @@ export async function createInvite(
     //
     // `error` is its own branch: treating a failed lookup as "no account"
     // would issue an invite that can never be redeemed.
-    const existing = await findAccountByEmail(db, fields.email);
-    if (existing.status === "error") return { status: "error" };
-    if (existing.status === "found") {
-      const { data: profile } = await db
-        .from("admin_profiles")
-        .select("user_id")
-        .eq("user_id", existing.account.id)
-        .maybeSingle();
-      return {
-        status: "already_registered",
-        email: fields.email,
-        hasAccess: Boolean(profile),
-      };
+    //
+    // 🔓 Skipped entirely for an OPEN invite, because there is no address to
+    // check yet. The check does not disappear — it MOVES to redemption, where
+    // the address finally exists (see acceptInvite). That is the one place it
+    // can be done for an open link, and it is why acceptInvite runs it even for
+    // pinned invites that were already checked here.
+    if (fields.email !== null) {
+      const existing = await findAccountByEmail(db, fields.email);
+      if (existing.status === "error") return { status: "error" };
+      if (existing.status === "found") {
+        const { data: profile } = await db
+          .from("admin_profiles")
+          .select("user_id")
+          .eq("user_id", existing.account.id)
+          .maybeSingle();
+        return {
+          status: "already_registered",
+          email: fields.email,
+          hasAccess: Boolean(profile),
+        };
+      }
     }
 
     const now = new Date();
@@ -151,17 +170,28 @@ export async function createInvite(
     // partial unique index would be worse than nothing. Re-inviting therefore
     // always means "the newest link is the one that works", with no way to end
     // up with two valid links whose recipients race.
-    const { data: superseded, error: supersedeError } = await db
-      .from("officer_invites")
-      .update({ revoked_at: now.toISOString(), revoked_by: officer.userId })
-      .eq("email", fields.email)
-      .is("accepted_at", null)
-      .is("revoked_at", null)
-      .select("id");
+    //
+    // ⚠️ Open invites are NOT superseded and do not supersede anything, which is
+    // correct rather than an omission: an open invite is not "for" an address,
+    // so there is nothing to be the newest link *for*. Two open invites are two
+    // independent links, and revoking one must not revoke the other. Issuing a
+    // pinned invite likewise leaves any open link alone — it was never a
+    // competing invite for that person.
+    let superseded: { id: string }[] = [];
+    if (fields.email !== null) {
+      const { data, error: supersedeError } = await db
+        .from("officer_invites")
+        .update({ revoked_at: now.toISOString(), revoked_by: officer.userId })
+        .eq("email", fields.email)
+        .is("accepted_at", null)
+        .is("revoked_at", null)
+        .select("id");
 
-    if (supersedeError) {
-      console.error("invite supersede failed:", supersedeError.message);
-      return { status: "error" };
+      if (supersedeError) {
+        console.error("invite supersede failed:", supersedeError.message);
+        return { status: "error" };
+      }
+      superseded = data ?? [];
     }
 
     const token = mintInviteToken();
@@ -186,7 +216,7 @@ export async function createInvite(
       return { status: "error" };
     }
 
-    for (const row of superseded ?? []) {
+    for (const row of superseded) {
       await writeAudit(db, {
         entityType: "officer_invite",
         entityId: row.id,
@@ -205,7 +235,12 @@ export async function createInvite(
       // is rendered on screen, and a digest there would be a needless second
       // copy of the one secret this table exists to protect.
       after: invite,
-      note: `${invite.email} as ${invite.role}`,
+      // 🔓 An open invite says so in the log rather than leaving the note
+      // half-empty. "who was this link for?" has no answer at this point, and
+      // the honest record of that is the phrase, not a blank.
+      note: invite.email
+        ? `${invite.email} as ${invite.role}`
+        : `anyone with the link, as ${invite.role}`,
     });
 
     revalidatePath(OFFICERS);
@@ -231,7 +266,8 @@ export type InviteRevokeState =
   | { status: "error" }
   /** Already revoked, or redeemed, between the render and the click. */
   | { status: "already_gone" }
-  | { status: "done"; email: string };
+  /** Null when an OPEN invite was withdrawn — it never named a recipient. */
+  | { status: "done"; email: string | null };
 
 /** Withdraw a pending invite. The link stops working immediately. */
 export async function revokeInvite(
@@ -274,7 +310,11 @@ export async function revokeInvite(
       actorId: officer.userId,
       action: "invite.revoked",
       after,
-      note: after.email,
+      // 🔓 An open invite has no recipient to name, and a null note would read
+      // as missing data rather than as the fact that there was never an address.
+      // Say what it was instead — this is the log entry somebody reads when
+      // asking why a link stopped working.
+      note: after.email ?? "an open invite (no address)",
     });
 
     revalidatePath(OFFICERS);

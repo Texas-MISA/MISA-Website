@@ -31,7 +31,8 @@ export function InviteForm({
   suggestedName,
 }: {
   token: string;
-  email: string;
+  /** Null for an OPEN invite — the recipient supplies their own address. */
+  email: string | null;
   role: string;
   suggestedName: string;
 }) {
@@ -113,18 +114,51 @@ export function InviteForm({
       </div>
 
       <div>
-        <span className="block text-sm font-medium tracking-wide">
+        <label
+          htmlFor={email === null ? "email" : undefined}
+          className="block text-sm font-medium tracking-wide"
+        >
           Your email
-        </span>
-        {/* 🔓 Text, not an input, and not a disabled input either — there is
-            nothing to submit and nothing to tamper with. The address was pinned
-            by whoever sent the invitation, and the account created is that
-            address no matter what reaches the server. */}
-        <p className="mt-1 text-base">{email}</p>
-        <p className="mt-1 text-xs text-foreground/60">
-          Set by the officer who invited you. You&apos;ll sign in with this as a{" "}
-          {role === "admin" ? "MISA admin" : "MISA officer"}.
-        </p>
+        </label>
+        {email === null ? (
+          <>
+            {/* 🔓 An OPEN invite (migration 25): the officer did not pin an
+                address, so whoever holds this link chooses one. A real input,
+                and the server validates it and refuses an address that already
+                has an account. */}
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              maxLength={254}
+              autoComplete="email"
+              defaultValue={
+                state.status === "invalid" ? state.submitted.email : ""
+              }
+              className={`mt-1 ${inputClass}`}
+              aria-describedby="email-help"
+            />
+            <p id="email-help" className="mt-1 text-xs text-foreground/60">
+              Use the address you actually read — it&apos;s how you&apos;ll sign
+              in as a {role === "admin" ? "MISA admin" : "MISA officer"}, and it
+              can&apos;t be changed here afterwards.
+            </p>
+            <FieldError messages={fieldErrors.email} />
+          </>
+        ) : (
+          <>
+            {/* 🔓 Text, not an input, and not a disabled input either — there is
+                nothing to submit and nothing to tamper with. The address was
+                pinned by whoever sent the invitation, and the account created is
+                that address no matter what reaches the server. */}
+            <p className="mt-1 text-base">{email}</p>
+            <p className="mt-1 text-xs text-foreground/60">
+              Set by the officer who invited you. You&apos;ll sign in with this
+              as a {role === "admin" ? "MISA admin" : "MISA officer"}.
+            </p>
+          </>
+        )}
       </div>
 
       <div>

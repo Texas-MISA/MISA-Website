@@ -128,7 +128,17 @@ export async function findAccountByEmail(
 
 export type InviteRow = {
   id: string;
-  email: string;
+  /**
+   * 🔓 Null means an OPEN invite (migration 25) — redeemable by whoever holds
+   * the link, with the address chosen at redemption. Screens must say so in
+   * words rather than rendering an empty cell, because "no address" and "an
+   * address that failed to load" look identical otherwise, and the difference
+   * is whether the link is a bearer credential.
+   *
+   * After redemption it names whoever actually used it, written back by
+   * acceptInvite.
+   */
+  email: string | null;
   role: string;
   display_name: string | null;
   expires_at: string;

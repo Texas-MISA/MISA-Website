@@ -153,13 +153,24 @@ export default async function OfficersPage() {
                 className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
               >
                 <div>
-                  <p className="font-medium">{invite.email}</p>
+                  {/* 🔓 An open invite says what it is, in words. Rendering a
+                      blank cell would make "anyone with this link can use it"
+                      indistinguishable from a value that failed to load — and
+                      that is exactly the difference an officer needs to see
+                      before deciding how to send it. */}
+                  <p className="font-medium">
+                    {invite.email ?? "Anyone with the link"}
+                  </p>
                   <p className="text-xs text-foreground/60">
                     {invite.role === "admin" ? "Admin" : "Officer"} · expires{" "}
                     {describeExpiry(invite.expires_at, now)}
+                    {invite.email ? null : " · anyone who opens it can use it"}
                   </p>
                 </div>
-                <RevokeInviteButton id={invite.id} email={invite.email} />
+                <RevokeInviteButton
+                  id={invite.id}
+                  email={invite.email ?? "anyone with the link"}
+                />
               </li>
             ))}
           </ul>
@@ -180,7 +191,12 @@ export default async function OfficersPage() {
           <ul className="mt-4 divide-y divide-black/10 border border-black/15">
             {inactive.slice(0, 15).map((invite) => (
               <li key={invite.id} className="px-4 py-3">
-                <p className="text-sm">{invite.email}</p>
+                {/* Once redeemed, an open invite's row names whoever used it —
+                    acceptInvite writes the address back. Still null here means
+                    it expired or was withdrawn before anyone did. */}
+                <p className="text-sm">
+                  {invite.email ?? "Anyone with the link"}
+                </p>
                 <p className="text-xs text-foreground/60">
                   {describeInviteOutcome(invite, now)}
                 </p>
