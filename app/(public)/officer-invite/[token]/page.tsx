@@ -97,15 +97,10 @@ export default async function OfficerInvitePage({
         <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
           Set up your officer account
         </h1>
-        <p className="mt-3 text-foreground/70">
-          You&apos;ve been invited to help run MISA. Pick a password and
-          you&apos;re in — this link works once.
-        </p>
 
         <InviteForm
           token={token}
           email={invite.email}
-          role={invite.role}
           // The inviter's suggestion, which the recipient may correct. Always a
           // string: a nullish defaultValue after a non-nullish one makes React
           // drop the value attribute, and the post-action reset then clears the

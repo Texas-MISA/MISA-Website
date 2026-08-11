@@ -51,14 +51,31 @@ export const INVITE_TTL_HOURS = 72;
 export const INVITE_RATE_LIMIT_MAX = 10;
 
 /**
- * Minimum password length, matching scripts/create-officer.mjs:186.
+ * Minimum password length for a redeemed invite.
  *
- * ⚠️ config.toml sets `minimum_password_length = 6`, so GoTrue itself would
- * accept less. This is the real floor for both officer-creation paths, and the
- * two must not drift — an invite flow that accepts a weaker password than the
- * CLI would make the easier path the less safe one.
+ * ⚠️ **Lowered from 12 to 6 on 2026-08-10, on request.** This is now a mirror of
+ * GoTrue's own `minimum_password_length` rather than a policy of our own, and
+ * that is the reason it is not simply removed:
+ *
+ * GoTrue rejects anything shorter, and `createUser` runs **after** the invite
+ * has been claimed — so a 4-character password would burn a single-use link,
+ * grant nothing, and leave the recipient stuck with a dead invite and an error
+ * they cannot act on. Validating at the platform's floor keeps that rejection
+ * where every other input rejection happens: before the claim, next to the
+ * field, with the link still usable.
+ *
+ * 📌 Consequence to know: `scripts/create-officer.mjs:186` still enforces 12,
+ * so the two officer-creation paths no longer agree. The CLI is the deliberate
+ * path taken by whoever holds the service key; this is the self-service one. If
+ * that asymmetry is ever unwanted, change the script rather than reintroducing a
+ * floor here that GoTrue does not share.
+ *
+ * ⚠️ Raising GoTrue's own setting means editing `config.toml` (needs a full
+ * `stop` + `start`, since `db reset` does not re-read it) **and** the remote
+ * dashboard by hand — the second lives outside this repo, so it does not survive
+ * the §2.3 "create project → link → db push" path.
  */
-export const MIN_OFFICER_PASSWORD = 12;
+export const MIN_OFFICER_PASSWORD = 6;
 
 /** base64url of 32 random bytes is always 43 characters, no padding. */
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
