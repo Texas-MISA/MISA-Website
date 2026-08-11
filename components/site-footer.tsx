@@ -42,6 +42,28 @@ export function SiteFooter() {
         >
           {CONTACT_EMAIL}
         </a>
+
+        {/* Officer sign-in, in the footer rather than the nav for two reasons.
+            The first is the documented one: the header's wordmark is absolutely
+            centred so the side groups cannot shift it, which means a group that
+            grows underneath it loses an item behind the logo silently — six
+            already collided at 1024 once, and adding a ninth link means
+            re-measuring at 1280 and wide. The second is that this is not a
+            member destination; it is where an officer goes, and the footer is
+            where everyone looks for it.
+
+            → /admin/login, NOT /admin. Both arrive in the same place — proxy.ts
+            bounces a session-less /admin to the login page — but going straight
+            there skips a redirect, and it is honest about the destination. An
+            officer who already has a session is sent on to the dashboard by the
+            same proxy, so this one href is right whether or not you are signed
+            in. */}
+        <Link
+          href="/admin/login"
+          className="text-xs text-foreground/60 underline underline-offset-4 hover:text-foreground"
+        >
+          Officer sign-in
+        </Link>
       </div>
     </footer>
   );
