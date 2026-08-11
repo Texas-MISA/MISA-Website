@@ -1,9 +1,28 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.56
+**Version:** 1.57
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
 
+> **v1.57: the invited address becomes OPTIONAL (migration 25), and the
+> redemption page loses its copy.** Requested 2026-08-10, shipped the same day.
+> An officer no longer has to type an email when creating an invite: leave it
+> blank and the link works for whoever opens it. 🔓 **That genuinely weakens
+> §9 #13's containment and both places are amended rather than left to go
+> stale** — an open invite is a **bearer credential**, redeemable by anyone it
+> reaches into any mailbox they control, and the row does not record who it was
+> meant for. It exists because pinned-only had a real failure mode: an officer
+> often does not know which mailbox somebody actually reads, and a wrong guess
+> produced a link that simply did not work with no way to self-correct. **The
+> role stays pinned in both cases**, which is what makes it survivable — an open
+> invite lets the holder choose *who they are*, never *what they may do*.
+> The redemption page was also stripped to its heading, labels and fields, and
+> the password floor dropped from 12 to **6** — a mirror of GoTrue's own minimum
+> rather than a policy, because `createUser` runs *after* the claim and a
+> shorter password would burn a single-use link while granting nothing.
+> ⚠️ `scripts/create-officer.mjs` still enforces 12, so the two
+> officer-creation paths deliberately no longer agree.
+>
 > **v1.56: officer invite links (migration 24), and the §6 row they invalidate.**
 > Officers are added by an expiring, single-use link instead of a CLI run that
 > needs the production service role key — §2.3 says they turn over every year,
@@ -12,7 +31,9 @@
 > privilege-escalation path §6's risk register said did not exist**, so that row
 > is rewritten rather than left to go quietly stale, and §9 gains **#13** for the
 > decision. What contains it: the email and role are pinned by the inviter and
-> read off the stored row rather than the redeemer's form, the link lasts 72
+> read off the stored row rather than the redeemer's form (⚠️ **the email half of
+> that sentence was superseded by v1.57 above** — migration 25 made the address
+> optional; the role half still holds), the link lasts 72
 > hours, it is single-use via a conditional `UPDATE` rather than a
 > read-then-check, and **only the token's SHA-256 is stored** — so nothing that
 > can read `officer_invites` holds a credential. Any officer may invite (§9 #6's
@@ -2563,12 +2584,16 @@ $$;
 /leaderboard           Public standings
 /lookup                Member self-service attendance history
 /officer-invite/[token]
-                       Redeem an officer invitation — set a password against an
-                       email the inviter pinned. Unauthenticated, and outside
-                       /admin deliberately: proxy.ts bounces every /admin path
-                       without a session to the login page, so an invite page
-                       under there would be unreachable by the only people who
-                       ever open it                             (migration 24)
+                       Redeem an officer invitation — set a password, against
+                       the address the inviter pinned, or one the recipient
+                       supplies if the invite is OPEN (migration 25).
+                       Unauthenticated, and outside /admin deliberately:
+                       proxy.ts bounces every /admin path without a session to
+                       the login page, so an invite page under there would be
+                       unreachable by the only people who ever open it.
+                       ⚠️ Heading, labels and fields only — no help text and no
+                       client-side length rule, so validation is entirely
+                       server-side              (migrations 24 and 25)
 /admin/login           Officer sign-in
 /admin                 Dashboard — recent check-ins, pending review count
 /admin/events          Schedule list — filter by term, status, category
@@ -3215,7 +3240,7 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
 
     ⚠️ **Amended by migration 25 (2026-08-10): the pinned address is now OPTIONAL.** The five containment properties below were written when it was mandatory, and one of them has genuinely weakened — that is recorded here rather than left for a reader to discover from the code. An invite with **no** address is an **open invite**: whoever holds the link supplies their own mailbox, which makes the link a **bearer credential**, redeemable by anyone it reaches into any account they control, with no record of who it was meant for. The reason for allowing it is not convenience for its own sake — an officer frequently does not know which mailbox somebody actually reads, and under the pinned-only rule guessing wrong produced a link that simply did not work, with no way for the recipient to self-correct. 🔓 **The role stays pinned in both cases**, which is the property that makes the looser address rule survivable: an open invite lets the holder choose *who they are*, never *what they may do*. Everything else — 72 hours, single use, instant revocation, the audit trail, the stored digest — is unchanged. A domain restriction is the obvious next mitigation and is deliberately not added, since officers legitimately use personal mailboxes.
 
-    **The mechanism.** Until now the only path was `scripts/create-officer.mjs`, which needs a checkout, Node, and the **production service role key** in the operator's environment. §2.3 says officers turn over every year, so the status quo made routine turnover either a job for one technical person or a reason to spread the service key around — and the second is far worse than anything below. The invite flow replaces it for everyday use; the script stays as the bootstrap path on a fresh project and the recovery path when nobody can sign in. 🔓 **This knowingly creates the privilege-escalation path §6's risk register said did not exist**, and that row has been rewritten rather than left to quietly go stale. What contains it: the email and role are **pinned by the inviter** and read off the stored row rather than the redeemer's form; the link lasts **72 hours**; it is **single-use**, enforced by a conditional `UPDATE` rather than a read-then-check, so two people opening one link cannot both get in; only the token's **SHA-256** is stored, so nothing that can read the table holds a credential; and every step writes an `admin_audit` row. **Nothing is emailed** — there is no SMTP on this project (the built-in sender is capped at 2/hour and is not for production), which is what makes Supabase's own `inviteUserByEmail` unusable, and it has the side benefit of adding no service to hand over at turnover.
+    **The mechanism.** Until now the only path was `scripts/create-officer.mjs`, which needs a checkout, Node, and the **production service role key** in the operator's environment. §2.3 says officers turn over every year, so the status quo made routine turnover either a job for one technical person or a reason to spread the service key around — and the second is far worse than anything below. The invite flow replaces it for everyday use; the script stays as the bootstrap path on a fresh project and the recovery path when nobody can sign in. 🔓 **This knowingly creates the privilege-escalation path §6's risk register said did not exist**, and that row has been rewritten rather than left to quietly go stale. What contains it: the **role** is always **pinned by the inviter** and read off the stored row rather than the redeemer's form, and the **email** is too *when one was supplied* (⚠️ optional since migration 25 — see the amendment above); the link lasts **72 hours**; it is **single-use**, enforced by a conditional `UPDATE` rather than a read-then-check, so two people opening one link cannot both get in; only the token's **SHA-256** is stored, so nothing that can read the table holds a credential; and every step writes an `admin_audit` row. **Nothing is emailed** — there is no SMTP on this project (the built-in sender is capped at 2/hour and is not for production), which is what makes Supabase's own `inviteUserByEmail` unusable, and it has the side benefit of adding no service to hand over at turnover.
 
     **The authority.** Any officer may invite, and may remove anyone's access. This follows #6, #9 and #10 rather than departing from them — *the audit log is the control, not a role gate* — but it is the first time that principle has been applied to something that grants **privilege** rather than edits data, which is why it is written down instead of inferred from the code. The argument that decided it is #6's: a gate funnels every change through one person, and in a student org that means the new treasurer waits on whoever is busiest, while the failure it guards against is visible in `admin_audit` either way. Nothing in this codebase branches on `admin_profiles.role`, and `app/actions/invites.ts` carries a test asserting it does not become the first thing that does.
 
@@ -3282,8 +3307,16 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              consequential: it creates an officer. Same
                              single-export shape and the same §6 reason. The
                              token is the whole of the caller's authority; the
-                             role and the email come off the stored invite row,
-                             never off the form
+                             ROLE always comes off the stored invite row, never
+                             off the form, and so does the EMAIL whenever the
+                             invite pinned one. ⚠️ Migration 25 made the address
+                             optional, and the two paths are kept structurally
+                             apart rather than merged behind a `??`:
+                             inviteAcceptSchema still has no email key at all,
+                             so the pinned branch has no parsed address in scope
+                             to reach for, and openInviteEmailSchema is a
+                             separate schema parsed only when the row pinned
+                             nothing
     invites.ts               migration 24, officer-facing — createInvite (returns
                              the one-time link), revokeInvite,
                              revokeOfficerAccess, restoreOfficerAccess. Kept
