@@ -2,8 +2,8 @@
 -- dev project with scripts/seed-remote.sh.
 --
 -- DESTRUCTIVE: wipes members, events, attendance, point_adjustments,
--- dues_payments, member_field_definitions, member_filter_presets and
--- admin_audit before inserting. The guard below refuses to run if auth.users
+-- dues_payments, member_field_definitions, member_filter_presets,
+-- officer_invites and admin_audit before inserting. The guard below refuses to run if auth.users
 -- contains any account other than the seed officer, which is the signal that
 -- you are pointed at something real.
 --
@@ -59,6 +59,20 @@ delete from events;
 -- `created_by` references auth.users with no cascade, so a preset saved by the
 -- seed officer would block that delete and abort the re-seed — the same shape
 -- as the dues_payments note above, and the same failure.
+--
+-- ⚠️ officer_invites, added with migration 24, belongs here for BOTH reasons
+-- the comment above gives — and the second one is the sharp end.
+--
+-- `created_by` (and `revoked_by`) reference auth.users with no cascade, exactly
+-- like member_filter_presets, so an invite issued by the seed officer would
+-- block the delete at the end of this block and abort the whole re-seed.
+--
+-- And leaving it out would be the invisible kind of drift: an invite is a live
+-- credential until it expires, so a re-seed that wiped every member while
+-- quietly leaving a working invite behind is the worst version of "the wipe
+-- list is incomplete". The seed ships zero invites, and the assert block below
+-- is what turns that from a claim into a check.
+delete from officer_invites;
 delete from member_filter_presets;
 delete from member_field_definitions;
 delete from members;
@@ -479,7 +493,7 @@ do $$
 declare
   n_members int; n_events int; n_present int; n_pending int; n_rejected int;
   n_adjust int; n_audit int; n_board int; n_fields int; n_presets int;
-  n_manual int;
+  n_manual int; n_invites int;
 begin
   select count(*) into n_members from members;
   select count(*) into n_events  from events;
@@ -505,6 +519,11 @@ begin
   -- absorbed it. The rejected row failed loudly; this one just stopped
   -- existing. 📌 An unasserted fixture is an optional fixture.
   select count(*) into n_manual from attendance where source = 'admin_manual';
+  -- Added 2026-08-10 with migration 24. The seed ships no invites, so this is
+  -- purely a wipe check — and it is the one table where a surviving row is a
+  -- LIVE CREDENTIAL rather than stale data, which is why it is asserted rather
+  -- than assumed.
+  select count(*) into n_invites from officer_invites;
 
   if n_members <> 32 then raise exception 'seed: expected 32 members, got %', n_members; end if;
   if n_events  <> 15 then raise exception 'seed: expected 15 events, got %', n_events; end if;
@@ -517,4 +536,5 @@ begin
   if n_fields  <> 1 then raise exception 'seed: expected 1 custom field definition (shirt_size), got % — 0 means the insert was lost, more than 1 means the wipe is not clearing member_field_definitions', n_fields; end if;
   if n_presets <> 0 then raise exception 'seed: expected 0 saved views, got %', n_presets; end if;
   if n_manual  <> 1 then raise exception 'seed: expected 1 admin_manual attendance row (Zane Okonkwo at the Awards Banquet), got %', n_manual; end if;
+  if n_invites <> 0 then raise exception 'seed: expected 0 officer invites, got % — the wipe is not clearing officer_invites, and a surviving invite is a live credential', n_invites; end if;
 end $$;
