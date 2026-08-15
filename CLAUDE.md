@@ -249,7 +249,9 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         layout.tsx holds the shared header/footer and mounts
                         RevealObserver once; _components/ holds page-private
                         pieces (leading underscore = not a route) — the home
-                        page's upcoming-events.tsx and gallery-marquee.tsx, and
+                        page's gallery-marquee.tsx and upcoming-events.tsx
+                        (KEPT BUT UNMOUNTED; remounting it also restores the
+                        page's force-dynamic), and
                         /gallery's gallery-grid.tsx, the one client component
                         the five designed pages need (filter chips + load more).
                         📌 /contact is ROUTED BUT UNLINKED from the desktop nav:

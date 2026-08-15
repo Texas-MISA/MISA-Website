@@ -6,6 +6,18 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — Upcoming events off the home page, mission centred (2026-08-14, doc v1.61)
+
+Requested directly — "remove the upcoming events tab (it may be added back later) and have the mission statement be centered". One file, no migration.
+
+📌 **`_components/upcoming-events.tsx` is kept and unmounted**, not deleted — only the `<UpcomingEvents />` call and its import are gone. Unlinking is enough here: an unrendered Server Component has no URL of its own, unlike the `public/photos/` case.
+
+🪤 **`export const dynamic = "force-dynamic"` went with it**, because the events read was the whole reason for it, and `/` now prerenders static. **Remounting the section must restore the directive** or the page will serve a deploy-time snapshot of the schedule and look fine doing it. The comment left in its place says so.
+
+The mission was the left half of a two-column grid; it is now a centred `max-w-[68ch]` column. Lint and build clean.
+
+---
+
 ## Done — Home page marquee made genuinely seamless (2026-08-14, doc v1.60)
 
 Reported as "it stops or moves left to right interchangeably, and has a noticeable end". Three symptoms, two causes, no migration.

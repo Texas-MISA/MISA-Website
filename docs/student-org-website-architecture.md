@@ -1,8 +1,31 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.60
+**Version:** 1.61
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.61: the home page's upcoming-events section is unmounted, and the
+> mission is centred.** Requested 2026-08-14. One file, no schema, no data, no
+> route change.
+>
+> 📌 **The component is kept, not deleted** —
+> `app/(public)/_components/upcoming-events.tsx` still compiles and still
+> carries the empty-vs-error distinction Stage 8 gave it; only the `<UpcomingEvents />`
+> call and its import are gone. It may come back. The mission, which shared a
+> two-column grid with it, now sits alone in a centred `max-w-[68ch]` column.
+>
+> 🪤 **Removing the only queried section changes the page's render mode.** The
+> home page's `export const dynamic = "force-dynamic"` existed *because* of that
+> read (`createClient()` touches `cookies()`), so it went with it and `/` is now
+> prerendered static — confirmed in the build output. **Remounting the section
+> without restoring the directive would serve a schedule frozen at deploy
+> time**, which fails silently the same way a cached `/leaderboard` would. The
+> comment where the directive used to be says so.
+>
+> This supersedes v1.17's "the live upcoming-events section stays on the home
+> page and remains the Stage 2 exit criterion" — the criterion was met and the
+> section shipped; this is a later editorial call about the page, not a
+> retraction of the capability.
 
 > **v1.60: the home page marquee was never seamless.** Reported and fixed
 > 2026-08-14. The navy gallery band's two tracks showed a hard end and a snap
@@ -3384,9 +3407,11 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              chips and Load more are presentational in the
                              prototype and need real behaviour, over the static
                              manifest in lib/site.ts. The home page's
-                             _components hold upcoming-events.tsx (the live
-                             schedule — the only queried section on a designed
-                             page) and gallery-marquee.tsx
+                             _components hold gallery-marquee.tsx and
+                             upcoming-events.tsx — the latter KEPT BUT
+                             UNMOUNTED since v1.61, so no designed page queries
+                             the database. Remounting it restores
+                             `export const dynamic = "force-dynamic"` too
     /attend/page.tsx
     /leaderboard/page.tsx    Stage 7
     /lookup/page.tsx         Stage 7

@@ -9,15 +9,15 @@ import { revealDelay } from "@/components/ui/reveal";
 import { MISSION, PROJECTS, PROJECTS_SUMMARY, TAGLINE } from "@/lib/site";
 
 import { GalleryMarquee } from "./_components/gallery-marquee";
-import { UpcomingEvents } from "./_components/upcoming-events";
 
 // The home page, per the design handoff's section order.
 //
-// The events read touches cookies() via createClient(), which forces
-// request-time rendering; declaring it keeps the intent explicit rather than
-// incidental. A build-time snapshot would show a stale schedule until the next
-// deploy.
-export const dynamic = "force-dynamic";
+// Every section now renders from lib/site.ts constants, so there is nothing
+// request-time left to force. `_components/upcoming-events.tsx` is kept but
+// unmounted; putting it back means restoring `export const dynamic =
+// "force-dynamic"` alongside it, because its read touches cookies() via
+// createClient() and a build-time snapshot would show a stale schedule until
+// the next deploy.
 
 export default function HomePage() {
   return (
@@ -34,15 +34,14 @@ export default function HomePage() {
         tagline={TAGLINE}
       />
 
-      {/* Mission + the live schedule, two equal columns */}
-      <section className="grid gap-14 px-5 py-14 sm:px-14 sm:py-16 lg:grid-cols-2">
-        <div data-reveal="up">
+      {/* Mission, centred — the schedule column that sat beside it is out */}
+      <section className="px-5 py-14 sm:px-14 sm:py-16">
+        <div data-reveal="up" className="mx-auto max-w-[68ch] text-center">
           <h2 className="mb-4 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] text-misa-blue sm:text-[42px]">
             Our Mission
           </h2>
-          <p className="leading-[1.65] text-misa-body">{MISSION}</p>
+          <p className="leading-[1.65] text-misa-body text-pretty">{MISSION}</p>
         </div>
-        <UpcomingEvents />
       </section>
 
       <GalleryMarquee />
