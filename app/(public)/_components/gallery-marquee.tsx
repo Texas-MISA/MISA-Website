@@ -124,15 +124,20 @@ function Track({
 
 export function GalleryMarquee() {
   return (
-    // 📌 The band carries almost no vertical padding of its own, deliberately.
-    // It used to carry py-12/pb-14 because it was a full-bleed navy field and
-    // that padding was the field's inset. On white there is no field, so that
-    // padding stacked on top of the neighbours' — 112px of dead air above the
-    // tiles and 108px below — and read as a gap rather than as rhythm. The
-    // spacing now comes from the sections either side (the mission's sm:py-16
-    // below it, Activities' pt-13 above), which is what every other seam on
-    // this page does.
-    <section className="pb-2 sm:pb-3">
+    // 📌 The padding here is asymmetric because of what sits either side.
+    //
+    // It used to be py-12/pb-14, which was the NAVY FIELD'S INSET — once the
+    // field went (2026-08-15) that padding just stacked on the neighbours' and
+    // left 112px of dead air above the tiles and 108px below. So the rule now
+    // is that the neighbours own the rhythm.
+    //
+    // The band moved above the mission later the same day, and the hero is the
+    // one neighbour that donates nothing: its pb-28 is consumed by the chevron
+    // notch cut out of it, so the next section starts at the notch's tip. Hence
+    // pt-14/sm:pt-16 here — the exact padding the mission used to carry when it
+    // held this slot — against a bottom that stays minimal because the mission
+    // below brings its own pt-16.
+    <section className="pt-14 pb-2 sm:pt-16 sm:pb-3">
       <div className="mb-[22px] flex justify-end px-5 sm:px-14">
         <Link
           href="/gallery"

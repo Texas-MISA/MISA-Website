@@ -1,8 +1,26 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.64
+**Version:** 1.65
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.65: the home page's gallery band and mission swapped places.**
+> Requested 2026-08-15. Two files. The band now opens the page under the hero,
+> the mission follows it.
+>
+> 🪤 **The padding had to move with them, and the hero is why.** Under the rule
+> from v1.62 the neighbours own the rhythm — but the hero donates nothing: its
+> `pb-28` is consumed by the chevron notch clipped out of it, so the next
+> section starts at the notch's tip. The band therefore takes `pt-14 sm:pt-16`,
+> which is exactly the padding the mission carried when it held that slot, and
+> the mission drops to `pb-5 sm:pb-6` because Activities below it still brings
+> `pt-13`. **Measured after: 64px from the hero to the eyebrow link, 76px from
+> the tiles to the mission heading, 76px from the mission paragraph to the
+> Activities heading.**
+>
+> 📌 **This is the second deliberate departure from the handoff's home page**,
+> after v1.62's navy. The prototype opens with the mission. Recorded in
+> `page.tsx` rather than left for someone to "fix" back.
 
 > **v1.64: manual dues entry is planned, not built.** Requested 2026-08-15.
 > **Docs only — no code, no migration.** The plan lives in

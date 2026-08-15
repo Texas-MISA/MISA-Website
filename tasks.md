@@ -6,6 +6,16 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — Gallery band and mission swapped on the home page (2026-08-15, doc v1.65)
+
+Requested directly. Two files. The band opens the page under the hero; the mission follows it.
+
+🪤 **The padding moved with them, because the hero donates none.** Its `pb-28` is consumed by the chevron notch, so the next section starts at the notch's tip. The band takes `pt-14 sm:pt-16` — the mission's old padding for that slot — and the mission drops to `pb-5 sm:pb-6` since Activities still brings `pt-13`. Measured: **64px hero → link, 76px tiles → mission heading, 76px mission → Activities heading.**
+
+📌 Moving the JSX alone would have jammed the tiles under the chevron and left 108px below the mission — v1.62's defect arriving from the other side. Second deliberate departure from the handoff's home page, noted in `page.tsx`.
+
+---
+
 ## Done — /about's history row starts level (2026-08-15, doc v1.63)
 
 Reported with a screenshot: the portrait began ~66px below the first text card beside it. One file.

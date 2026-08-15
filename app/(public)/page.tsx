@@ -10,7 +10,11 @@ import { MISSION, PROJECTS, PROJECTS_SUMMARY, TAGLINE } from "@/lib/site";
 
 import { GalleryMarquee } from "./_components/gallery-marquee";
 
-// The home page, per the design handoff's section order.
+// The home page. The handoff's section order, with one deliberate departure:
+// the gallery band and the mission SWAPPED on 2026-08-15, by request, so the
+// band now opens the page under the hero. Padding moved with them — see the
+// header of gallery-marquee.tsx, where the reasoning lives, since the hero is
+// the one neighbour that donates no spacing of its own.
 //
 // Every section now renders from lib/site.ts constants, so there is nothing
 // request-time left to force. `_components/upcoming-events.tsx` is kept but
@@ -34,8 +38,13 @@ export default function HomePage() {
         tagline={TAGLINE}
       />
 
-      {/* Mission, centred — the schedule column that sat beside it is out */}
-      <section className="px-5 py-14 sm:px-14 sm:py-16">
+      <GalleryMarquee />
+
+      {/* Mission, centred. It sits BELOW the gallery band since 2026-08-15;
+          the two swapped places, which is why the band carries the top padding
+          that used to be this section's and this one carries only enough at the
+          bottom to clear the Activities heading. */}
+      <section className="px-5 pt-14 pb-5 sm:px-14 sm:pt-16 sm:pb-6">
         <div data-reveal="up" className="mx-auto max-w-[68ch] text-center">
           <h2 className="mb-4 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] text-misa-blue sm:text-[42px]">
             Our Mission
@@ -43,8 +52,6 @@ export default function HomePage() {
           <p className="leading-[1.65] text-misa-body text-pretty">{MISSION}</p>
         </div>
       </section>
-
-      <GalleryMarquee />
 
       <section className="px-5 pt-13 sm:px-14">
         <h2
