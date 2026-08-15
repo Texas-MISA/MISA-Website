@@ -3,16 +3,26 @@ import Link from "next/link";
 import { LINK_EYEBROW } from "@/components/ui/button";
 import { Hatch } from "@/components/ui/hatch";
 
-// The navy gallery band on the home page: two marquee tracks, the top one
-// scrolling left and the bottom one scrolling right.
+// The gallery band on the home page: two marquee tracks, the top one scrolling
+// left and the bottom one scrolling right.
+//
+// 📌 The band sits on WHITE. It was a full-bleed navy field in the handoff and
+// for the first day of this component's life; the navy was dropped by request
+// on 2026-08-15. Everything that only made sense against navy went with it, per
+// the "never mixed" rule on Hatch: the tiles are the light tone with the
+// standard hairline frame, the "See all photos" link is navy, and `.on-navy`
+// (which flips the focus ring to white) is gone because the default navy ring
+// is now the correct one. Restoring the navy means changing all four together.
 //
 // 🪤 A MARQUEE NEEDS ENOUGH COPIES TO COVER THE VIEWPORT, and "duplicate the
 // group twice and translate -50%" only does that when ONE GROUP IS WIDER THAN
 // THE SCREEN. That was assumed here and never checked, and neither group is:
 // measured on production at a 1646px viewport, the top track's group is 1360px
 // and the bottom's 1272px. At the end of a cycle the track had translated a
-// full group width, so its right edge sat at 1360px — 286px of bare navy, then
-// a snap back. The bottom track's hole opened at the START of its cycle
+// full group width, so its right edge sat at 1360px — 286px of bare ground
+// (navy at the time), then a snap back. The gap is a function of the geometry
+// and does not care what colour is behind it, so the measurements below still
+// hold on white. The bottom track's hole opened at the START of its cycle
 // instead (it runs in reverse), so the two rows broke at opposite moments and
 // read as though they were changing direction rather than counter-scrolling.
 //
@@ -101,8 +111,7 @@ function Track({
               <Hatch
                 key={i}
                 caption={caption}
-                tone="navy"
-                className="shrink-0 border border-white/28"
+                className="shrink-0 border border-misa-border"
                 style={{ width: tile.w, height: tile.h }}
               />
             ))}
@@ -115,9 +124,12 @@ function Track({
 
 export function GalleryMarquee() {
   return (
-    <section className="on-navy bg-misa-blue py-12 sm:pb-14">
+    <section className="py-12 sm:pb-14">
       <div className="mb-[22px] flex justify-end px-5 sm:px-14">
-        <Link href="/gallery" className={`${LINK_EYEBROW} text-white hover:text-white/70`}>
+        <Link
+          href="/gallery"
+          className={`${LINK_EYEBROW} text-misa-blue hover:text-misa-blue-dark`}
+        >
           See all photos →
         </Link>
       </div>

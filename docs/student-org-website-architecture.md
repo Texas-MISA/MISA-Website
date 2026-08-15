@@ -1,8 +1,34 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.61
+**Version:** 1.62
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.62: the home page's gallery band lost its navy ground.** Requested
+> 2026-08-15. One component file plus the notes; no schema, no route, no change
+> to the marquee geometry.
+>
+> 📌 **A background is four things, not one, and the never-mixed rule on `Hatch`
+> is what says so.** Removing `on-navy bg-misa-blue` from the section is the
+> visible edit; the other three follow from it or the band is left half-dressed
+> — the tiles move from the **navy** hatch tone to the **light** one, their
+> `border-white/28` frames become `misa-border` hairlines, and the "See all
+> photos" link goes from white to `misa-blue`. `.on-navy` comes off too: it
+> exists only to flip the focus ring to white, which is wrong on a white ground.
+> The component header names all four so restoring the navy is a single
+> reversible decision rather than a hunt.
+>
+> **The marquee's geometry is untouched and the v1.60 measurements still stand.**
+> The wrap defect was a function of group width against viewport width; nothing
+> about it depended on what colour was behind the tiles. The prose in v1.60 and
+> in `docs/invariants.md` said "bare navy" where it meant "bare ground", and
+> now says so.
+>
+> ⚠️ **The home page now runs white from the hero's chevron to the projects
+> band** — mission, gallery, Activities. That is the requested outcome and the
+> band still reads as its own section (the tile rows and the eyebrow link carry
+> it), but the handoff used the navy as the page's mid-point contrast, so this
+> is a deliberate divergence from the prototype rather than an oversight.
 
 > **v1.61: the home page's upcoming-events section is unmounted, and the
 > mission is centred.** Requested 2026-08-14. One file, no schema, no data, no

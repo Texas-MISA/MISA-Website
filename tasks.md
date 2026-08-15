@@ -6,6 +6,18 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — Navy ground removed from the home-page gallery band (2026-08-15, doc v1.62)
+
+Requested directly. One component file, no migration, and the marquee geometry is untouched.
+
+📌 **A background is a four-part edit here.** `Hatch`'s never-mixed rule means dropping `on-navy bg-misa-blue` also moves the tiles to the **light** tone, their `border-white/28` frames to `misa-border` hairlines, and the "See all photos" link from white to navy — plus `.on-navy` comes off, since its only job is a white focus ring. The component header lists all four so the navy can be restored as one decision.
+
+⚠️ **The page now runs white from the hero chevron to the projects band.** Requested outcome, but the handoff used this navy as the mid-page contrast — a deliberate divergence, recorded rather than assumed.
+
+Verified in a browser on the production build: section background computes transparent, tiles are `hatch-light` + `border-misa-border`, `.on-navy` down to the hero and the projects band. Lint and build clean.
+
+---
+
 ## Done — Upcoming events off the home page, mission centred (2026-08-14, doc v1.61)
 
 Requested directly — "remove the upcoming events tab (it may be added back later) and have the mission statement be centered". One file, no migration.
