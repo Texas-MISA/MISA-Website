@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=Barlow+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+body{margin:0;background:#fff;color:#1d1f20;font-family:Barlow,system-ui,sans-serif}
+a{color:#16305c}a:hover{color:#0d1d38}
+@keyframes mq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+</style></helmet>
+
+<header style="position:relative;display:flex;align-items:center;justify-content:space-between;gap:24px;padding:0 32px;height:60px;background:#fff;border-bottom:1px solid rgba(29,31,32,.16)">
+<nav style="display:flex;gap:22px;font:500 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#1d1f20"><span style="color:#6f7275">About</span><span style="color:#6f7275">Projects</span><span style="border-bottom:1px solid #16305c;padding-bottom:2px">Gallery</span><span style="color:#6f7275">Officers</span><span style="color:#6f7275">Admin</span></nav>
+<div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;line-height:1;color:#16305c"><span style="position:relative;font:600 24px/1 Barlow,sans-serif;letter-spacing:-.02em"><span style="position:absolute;left:1.72em;top:-.3em;display:flex;flex-direction:column;align-items:center"><span style="width:.16em;height:.16em;border-radius:50%;background:#16305c"></span><span style="width:.05em;height:.14em;background:#16305c"></span></span>misa</span><span style="margin-top:3px;font:500 8px/1 Barlow,sans-serif;letter-spacing:.42em;text-indent:.42em">TEXAS</span></div>
+<div style="display:flex;align-items:center;gap:18px;font:500 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#6f7275"><span>Leaderboard</span><span>My Attendance</span><span style="display:inline-flex;align-items:center;padding:8px 16px;background:#16305c;color:#fff;font-weight:600">Check In</span></div>
+</header>
+
+<section style="position:relative;background:#16305c;color:#fff;padding:72px 56px 108px;clip-path:polygon(0 0,100% 0,100% calc(100% - 48px),50% 100%,0 calc(100% - 48px))">
+<div style="position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);background-size:60px 60px"></div>
+<div style="position:relative;max-width:900px;margin:0 auto;text-align:center">
+<h1 style="margin:0;font:600 72px/.96 'Barlow Condensed',sans-serif;letter-spacing:-.02em">Gallery</h1>
+<p style="margin:18px 0 0;font:400 20px/1.5 Barlow,sans-serif;color:rgba(255,255,255,.8)">Socials, workshops, banquets and everything in between.</p>
+</div>
+</section>
+
+<section style="padding:40px 56px 24px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap">
+<ul style="display:flex;flex-wrap:wrap;gap:10px;margin:0;padding:0;list-style:none">
+<li style="padding:9px 18px;background:#16305c;color:#fff;font:600 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase">All</li>
+<li style="padding:9px 18px;border:1px solid rgba(29,31,32,.25);font:600 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#4a4d50" style-hover="border-color:#16305c;color:#16305c">Socials</li>
+<li style="padding:9px 18px;border:1px solid rgba(29,31,32,.25);font:600 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#4a4d50" style-hover="border-color:#16305c;color:#16305c">Workshops</li>
+<li style="padding:9px 18px;border:1px solid rgba(29,31,32,.25);font:600 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#4a4d50" style-hover="border-color:#16305c;color:#16305c">Professional</li>
+<li style="padding:9px 18px;border:1px solid rgba(29,31,32,.25);font:600 13px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#4a4d50" style-hover="border-color:#16305c;color:#16305c">Banquet</li>
+</ul>
+<span style="font:500 12px/1.2 Barlow,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6f7275">Fall 2025 — 24 photos</span>
+</section>
+
+<section style="padding:0 56px 24px">
+<figure data-reveal="1" style="position:relative;margin:0;opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.3,1)">
+<div style="position:relative;overflow:hidden;border:1px solid rgba(29,31,32,.2);height:420px"><img src="uploads/IMG_4166_Original.jpg" alt="MISA banquet" style="width:100%;height:100%;object-fit:cover;object-position:center 42%"></div>
+<figcaption style="margin-top:10px;font:500 12px/1.2 Barlow,sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#6f7275">End-of-year banquet · Spring 2025</figcaption>
+</figure>
+</section>
+
+<section data-reveal="1" style="padding:24px 56px 64px;columns:4;column-gap:16px;opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.3,1)">
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-026.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+<div style="break-inside:avoid;margin-bottom:16px;height:210px;border:1px solid rgba(29,31,32,.2);background:repeating-linear-gradient(45deg,#f2f2f3,#f2f2f3 7px,#e7e7ea 7px,#e7e7ea 14px);display:flex;align-items:center;justify-content:center"><span style="font:400 11px/1 ui-monospace,Menlo,monospace;color:#6f7275">social event photo</span></div>
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-081.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+
+<div style="break-inside:avoid;margin-bottom:16px;height:260px;border:1px solid rgba(29,31,32,.2);background:repeating-linear-gradient(45deg,#f2f2f3,#f2f2f3 7px,#e7e7ea 7px,#e7e7ea 14px);display:flex;align-items:center;justify-content:center"><span style="font:400 11px/1 ui-monospace,Menlo,monospace;color:#6f7275">workshop photo</span></div>
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-085.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-090.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-095.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+<div style="break-inside:avoid;margin-bottom:16px;height:190px;border:1px solid rgba(29,31,32,.2);background:repeating-linear-gradient(45deg,#f2f2f3,#f2f2f3 7px,#e7e7ea 7px,#e7e7ea 14px);display:flex;align-items:center;justify-content:center"><span style="font:400 11px/1 ui-monospace,Menlo,monospace;color:#6f7275">service day photo</span></div>
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-099.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-115.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+<div style="break-inside:avoid;margin-bottom:16px;height:230px;border:1px solid rgba(29,31,32,.2);background:repeating-linear-gradient(45deg,#f2f2f3,#f2f2f3 7px,#e7e7ea 7px,#e7e7ea 14px);display:flex;align-items:center;justify-content:center"><span style="font:400 11px/1 ui-monospace,Menlo,monospace;color:#6f7275">general meeting photo</span></div>
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-130.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+<div style="break-inside:avoid;margin-bottom:16px;overflow:hidden;border:1px solid rgba(29,31,32,.2)"><img src="uploads/9-21-25_MISAPhotos_MakennaMorgan-150.jpg" alt="" style="width:100%;display:block;transition:transform .5s cubic-bezier(.2,.7,.3,1)" style-hover="transform:scale(1.04)"></div>
+<div style="break-inside:avoid;margin-bottom:16px;height:200px;border:1px solid rgba(29,31,32,.2);background:repeating-linear-gradient(45deg,#f2f2f3,#f2f2f3 7px,#e7e7ea 7px,#e7e7ea 14px);display:flex;align-items:center;justify-content:center"><span style="font:400 11px/1 ui-monospace,Menlo,monospace;color:#6f7275">IM sports photo</span></div>
+</section>
+
+<section style="padding:0 56px 64px;display:flex;justify-content:center">
+<span style="display:inline-flex;align-items:center;padding:14px 30px;border:1px solid #16305c;color:#16305c;font:600 15px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase" style-hover="background:#16305c;color:#fff">Load more photos</span>
+</section>
+
+<section style="padding:56px;background:#16305c;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:48px">
+<div><h2 style="margin:0 0 10px;font:600 42px/1 'Barlow Condensed',sans-serif;letter-spacing:-.02em">Tagged us?</h2><p style="margin:0;max-width:52ch;font:400 16px/1.65 Barlow,sans-serif;color:rgba(255,255,255,.8)">We repost member photos on Instagram. Tag @texasmisa and your shot may end up here.</p></div>
+<span style="display:inline-flex;align-items:center;padding:14px 30px;background:#fff;color:#16305c;font:600 15px/1 'Barlow Condensed',sans-serif;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap">@texasmisa</span>
+</section>
+
+<footer style="padding:44px 56px;border-top:1px solid rgba(29,31,32,.16);display:flex;align-items:center;justify-content:space-between"><div style="display:flex;gap:22px;font:400 13px/1 Barlow,sans-serif;color:#16305c"><span>About</span><span>LinkedIn</span><span>LinkTree</span><span>Instagram</span><span>Slack</span></div><div style="font:400 13px/1 Barlow,sans-serif;color:#6f7275">txmisa@gmail.com</div></footer>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  componentDidMount() {
+    const show = (el, instant) => {
+      el.dataset.revealed = "1";
+      if (instant) el.style.transition = "none";
+      el.style.opacity = "1";
+      el.style.transform = "none";
+    };
+    const forceAll = () => document.querySelectorAll('[data-reveal]').forEach((el) => show(el, true));
+    // Some rendering contexts freeze rAF, scroll events and CSS transitions. If a
+    // frame never arrives, show everything outright rather than leaving a blank page.
+    let framed = false;
+    try { requestAnimationFrame(() => { framed = true; }); } catch (e) {}
+    setTimeout(() => { if (!framed) forceAll(); }, 250);
+    const check = () => {
+      const vh = window.innerHeight || 800;
+      document.querySelectorAll('[data-reveal]:not([data-revealed])').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.top < vh * 0.94 && r.bottom > -40) show(el);
+      });
+    };
+    let last = 0;
+    this._onScroll = () => {
+      const now = Date.now();
+      if (now - last < 80) return;
+      last = now;
+      check();
+    };
+    window.addEventListener('scroll', this._onScroll, true);
+    window.addEventListener('resize', this._onScroll);
+    check();
+    this._t = [200, 600, 1400, 2600].map((ms) => setTimeout(check, ms));
+  }
+  componentWillUnmount() {
+    window.removeEventListener('scroll', this._onScroll, true);
+    window.removeEventListener('resize', this._onScroll);
+    (this._t || []).forEach(clearTimeout);
+  }
+}
+</script>
+</body>
+</html>

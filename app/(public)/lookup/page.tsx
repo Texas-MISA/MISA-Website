@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PageHero } from "@/components/ui/chevron-section";
+
 import { LookupForm } from "./_components/lookup-form";
 
 // Member self-service (§7 Stage 7 phase 2). Two fields, no account — the
@@ -26,31 +28,32 @@ export const metadata: Metadata = {
 
 export default function LookupPage() {
   return (
-    <section className="px-6 py-16 sm:py-20">
-      <div className="mx-auto max-w-3xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
-          My Attendance
-        </h1>
-        <p className="mt-3 text-foreground/70">
-          Enter your UT EID and the email we have on file, and you&apos;ll see
-          where you stand this term — which events you attended, which you
-          missed, anything still waiting on an officer, and whether your dues
-          are paid.
-        </p>
-        <p className="mt-2 text-sm text-foreground/60">
-          Both have to match the same member, which is why this shows more than{" "}
-          <Link
-            href="/leaderboard"
-            className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
-          >
-            the leaderboard
-          </Link>{" "}
-          does.
-        </p>
-        <div className="mt-8">
-          <LookupForm />
+    <>
+      <PageHero
+        title="My Attendance"
+        subhead="Enter your UT EID and the email we have on file, and you'll see where you stand this term."
+      />
+      <section className="px-5 py-14 sm:px-14">
+        <div className="mx-auto max-w-3xl">
+          <p className="leading-[1.65] text-misa-body">
+            You&apos;ll see which events you attended, which you missed, anything still
+            waiting on an officer, and whether your dues are paid.
+          </p>
+          <p className="mt-2 text-sm text-misa-muted">
+            Both have to match the same member, which is why this shows more than{" "}
+            <Link
+              href="/leaderboard"
+              className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+            >
+              the leaderboard
+            </Link>{" "}
+            does.
+          </p>
+          <div className="mt-8">
+            <LookupForm />
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

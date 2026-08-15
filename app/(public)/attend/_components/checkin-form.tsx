@@ -12,6 +12,7 @@ import {
 // constant the server decides with — a hardcoded "48 hours" would start
 // lying the moment ORPHAN_WINDOW_HOURS changed. lib/checkin.ts is free of
 // next/* and server-only imports, so a Client Component can import it.
+import { BUTTON_OUTLINE_NAVY, BUTTON_SOLID_NAVY } from "@/components/ui/button";
 import { ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 
 // Client Component for useActionState only — the form posts to the Server
@@ -23,13 +24,12 @@ import { ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 const INITIAL: CheckinState = { status: "idle" };
 
 const inputClass =
-  "border border-black/70 bg-misa-panel px-3 py-3 text-base w-full";
+  "w-full border border-misa-border bg-white px-3 py-3 text-base focus:border-misa-blue";
 
-const buttonClass =
-  "rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60";
+const buttonClass = `${BUTTON_SOLID_NAVY} disabled:opacity-60`;
 
 const bannerClass =
-  "border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm";
+  "border-l-2 border-misa-blue bg-misa-panel px-4 py-3 text-sm text-misa-body";
 
 const EMPTY: SubmittedValues = {
   fullName: "",
@@ -204,7 +204,7 @@ function CheckinFields({
         />
         <span>
           This is my first MISA event
-          <span className="mt-0.5 block text-xs text-foreground/70">
+          <span className="mt-0.5 block text-xs text-misa-muted">
             Tick this and we&apos;ll show you your details before adding you.
           </span>
         </span>
@@ -254,10 +254,12 @@ function ReviewPanel({
     <form action={action} className="flex flex-col gap-5">
       <div
         role="status"
-        className="border-l-4 border-misa-blue bg-misa-panel px-6 py-6"
+        className="border-l-2 border-misa-blue bg-misa-panel px-6 py-6"
       >
-        <h2 className="font-display text-xl font-bold">Check your details</h2>
-        <p className="mt-2 leading-6 text-foreground/85">
+        <h2 className="font-display text-[26px] leading-[1.08] font-semibold">
+          Check your details
+        </h2>
+        <p className="mt-2 leading-[1.65] text-misa-body">
           {existing
             ? "We already have you on file, so confirming will use your existing record rather than adding you twice."
             : "You'll be added to the roster with exactly these details, so give them a quick look."}
@@ -300,7 +302,7 @@ function ReviewPanel({
           name="step"
           value="edit"
           disabled={pending}
-          className="rounded-full border border-black/70 px-10 py-3 text-sm font-medium tracking-wider transition hover:bg-misa-panel disabled:opacity-60"
+          className={`${BUTTON_OUTLINE_NAVY} disabled:opacity-60`}
         >
           GO BACK
         </button>
@@ -312,7 +314,7 @@ function ReviewPanel({
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex flex-wrap gap-x-2">
-      <dt className="text-foreground/70">{label}:</dt>
+      <dt className="text-misa-muted">{label}:</dt>
       <dd className="font-medium">{value}</dd>
     </div>
   );
@@ -350,15 +352,15 @@ function ResultPanel({
   return (
     <div
       role="status"
-      className="border-l-4 border-misa-blue bg-misa-panel px-6 py-6"
+      className="border-l-2 border-misa-blue bg-misa-panel px-6 py-6"
     >
-      <h2 className="font-display text-xl font-bold">{heading}</h2>
-      <p className="mt-2 leading-6 text-foreground/85">{children}</p>
+      <h2 className="font-display text-[26px] leading-[1.08] font-semibold">{heading}</h2>
+      <p className="mt-2 leading-[1.65] text-misa-body">{children}</p>
       {/* Stage 7 phase 2. On every terminal outcome, including `pending` and
           `duplicate` — those are the two where someone most wants to see for
           themselves that the system has them, rather than take a sentence's
           word for it. */}
-      <p className="mt-4 text-sm text-foreground/70">
+      <p className="mt-4 text-sm text-misa-muted">
         <Link
           href="/lookup"
           className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"

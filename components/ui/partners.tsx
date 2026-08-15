@@ -1,30 +1,42 @@
+import Image from "next/image";
+
 import { PARTNERS } from "@/lib/site";
 
-// The original site runs these as a logo carousel. Rendered here as a static
-// wordmark strip: no trademarked logo files in a public repo, and a carousel
-// of four items was mostly empty placeholder slides anyway
-// (docs/existing-site-inventory.md).
-export function Partners({ heading }: { heading: string }) {
+// The partner plate, shared by the home and About pages. Four cells with a
+// 1px grid gap over a hairline background, so the shared hairline reads as a
+// rule. Logos are full colour, never greyscaled.
+export function Partners({
+  /** `panel` on the home page, `white` on About. */
+  ground = "panel",
+}: {
+  ground?: "panel" | "white";
+}) {
   return (
-    <section className="bg-misa-panel px-6 py-20">
-      <div className="mx-auto max-w-5xl">
-        <h2 className="text-center font-display text-3xl font-extrabold sm:text-4xl">
-          {heading}
-        </h2>
-        <ul className="mt-12 flex flex-wrap items-center justify-center gap-x-14 gap-y-8">
-          {PARTNERS.map((partner) => (
-            <li
-              key={partner}
-              className="font-display text-2xl font-bold text-foreground/55 sm:text-3xl"
-            >
-              {partner}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-10 text-center text-xs text-foreground/50">
-          Partner logos to be added.
-        </p>
-      </div>
+    <section
+      className={`border-t border-misa-hairline px-5 py-20 sm:px-14 sm:pt-20 sm:pb-22 ${
+        ground === "panel" ? "bg-misa-panel" : "bg-white"
+      }`}
+    >
+      <h2 className="mb-11 text-center font-display text-[30px] leading-none font-semibold tracking-[-0.02em] text-misa-blue sm:text-[42px]">
+        Our Amazing Partners
+      </h2>
+      <ul className="grid grid-cols-2 gap-px border border-misa-hairline bg-misa-hairline sm:grid-cols-4">
+        {PARTNERS.map((partner) => (
+          <li
+            key={partner.name}
+            className="flex items-center justify-center bg-white px-7 py-10"
+          >
+            <Image
+              src={partner.logo}
+              alt={partner.name}
+              width={1000}
+              height={1000}
+              sizes="(max-width: 640px) 40vw, 20vw"
+              className="h-21 w-auto object-contain"
+            />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

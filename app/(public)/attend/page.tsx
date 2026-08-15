@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { PageHero } from "@/components/ui/chevron-section";
+
 import { CheckinForm } from "./_components/checkin-form";
 
 // Public check-in (§7 Stage 3). Three fields, no account, phone-first —
@@ -13,18 +15,16 @@ export const metadata: Metadata = {
 
 export default function AttendPage() {
   return (
-    <section className="px-6 py-16 sm:py-20">
-      <div className="mx-auto max-w-xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
-          Event Check-In
-        </h1>
-        <p className="mt-3 text-foreground/70">
-          At a MISA event? Enter your details and you&apos;re done.
-        </p>
-        <div className="mt-8">
+    <>
+      <PageHero
+        title="Event Check-In"
+        subhead="At a MISA event? Enter your details and you're done."
+      />
+      <section className="px-5 py-14 sm:px-14">
+        <div className="mx-auto max-w-xl">
           <CheckinForm />
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

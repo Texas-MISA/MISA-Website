@@ -1,19 +1,21 @@
 import type { Metadata } from "next";
-import { Poppins, Roboto_Slab } from "next/font/google";
+import { Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
-// Approximations of the existing txmisa.org type pairing (see
-// docs/existing-site-inventory.md): heavy slab serif display + geometric sans.
-const poppins = Poppins({
-  variable: "--font-poppins",
+// The design handoff's type pairing: Barlow Condensed for headings, Barlow for
+// body. Italic 400 is loaded for the homepage tagline, which is the only
+// italic on the site.
+const barlow = Barlow({
+  variable: "--font-barlow",
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
 });
 
-const robotoSlab = Roboto_Slab({
-  variable: "--font-roboto-slab",
+const barlowCondensed = Barlow_Condensed({
+  variable: "--font-barlow-condensed",
   subsets: ["latin"],
-  weight: ["500", "700", "800"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -33,8 +35,26 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${poppins.variable} ${robotoSlab.variable} h-full antialiased`}
+      className={`${barlow.variable} ${barlowCondensed.variable} h-full antialiased`}
+      // The inline script below sets a class on this element before React
+      // hydrates, so the DOM and the RSC payload disagree by design.
+      suppressHydrationWarning
     >
+      <head>
+        {/* 🪤 This one line is what makes the scroll reveal safe without
+            JavaScript. globals.css hides `[data-reveal]` only under `html.js`,
+            so a visitor with JS off never has anything hidden from them — and
+            because the script runs synchronously during HTML parsing (the
+            pattern in Next's "preventing flash before hydration" guide), the
+            hidden state is in place before the first paint rather than after
+            it, which is what would otherwise show the content and then blank
+            it. Do not move this to a Client Component effect. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `document.documentElement.classList.add("js")`,
+          }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

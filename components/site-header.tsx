@@ -4,86 +4,97 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { InstagramIcon, LinkedInIcon, LinkIcon } from "@/components/ui/icons";
+import { BUTTON_SOLID_NAVY_SM } from "@/components/ui/button";
 import { Wordmark } from "@/components/ui/wordmark";
-import { SOCIAL_LINKS } from "@/lib/site";
 
-// Client Component only because the active link is underlined by pathname and
-// the mobile menu toggles — the pages themselves stay server-rendered.
+// Client Component only because the active link is derived from the pathname
+// and the mobile menu toggles — the pages themselves stay server-rendered.
 
-// 🪤 The nav is SPLIT across the wordmark, and it is not a styling preference.
+// 🪤 The wordmark is ABSOLUTELY CENTRED and wins the z-order, so a nav group
+// that grows underneath it loses an item behind the logo silently rather than
+// breaking the layout.
 //
-// The wordmark is absolutely centred (see below) so the two side groups cannot
-// shift it off-centre, which means neither group may grow into the middle —
-// nothing stops them, they just overlap, and the wordmark wins the z-order so
-// the nav item is what disappears. Measured at a 1646px viewport: the six
-// original items cleared the wordmark by 61px, and adding Leaderboard and
-// My Attendance to the same row overflowed it by 199px, hiding "Leaderboard"
-// behind the logo. Tightening the gap does not recover 199px; only fewer items
-// on one side does.
+// The Stage 2 header carried eight links plus four social icons and had to be
+// split across the wordmark to fit; measured then, six items on one side
+// cleared it by 61px and eight overflowed by 199px. The redesign takes the
+// pressure off from the other end: the socials move to the footer and Contact
+// leaves the nav, so the left group is five short uppercase items and the
+// right is two links and a button.
 //
-// So the split is by audience, which is also how it reads: what the org is on
-// the left, what's yours on the right beside the socials.
-//
-// ⚠️ Adding an item to either group means re-measuring at the xl breakpoint
-// (1280) as well as at a wide viewport — the left group is the tight one there.
+// ⚠️ That headroom is spent, not infinite. Adding an item to either group
+// means re-measuring at the xl breakpoint (1280) as well as at a wide
+// viewport, where the left group is the tight one.
 
 /** Public pages, left of the wordmark. */
 const SITE_NAV = [
-  { href: "/about", label: "About Us" },
+  { href: "/about", label: "About" },
+  { href: "/projects", label: "Projects" },
   { href: "/gallery", label: "Gallery" },
   { href: "/officers", label: "Officers" },
-  { href: "/projects", label: "Projects" },
-  { href: "/contact", label: "Contact Us" },
-  { href: "/attend", label: "Check In" },
+  // 📌 Officer sign-in, in the nav as of the design overhaul. It goes to
+  // /admin/login rather than /admin: both arrive in the same place, since
+  // proxy.ts bounces a session-less /admin to the login page, but this skips a
+  // redirect and is honest about the destination. An officer who already has a
+  // session is sent on to the dashboard by the same proxy, so the one href is
+  // right whether or not you are signed in.
+  { href: "/admin/login", label: "Admin" },
 ] as const;
 
 /**
- * Member-facing pages, right of the wordmark (Stage 7).
+ * Member-facing pages, right of the wordmark.
  *
- * Both carry `robots: { index: false, follow: false }` (§9 #1), so linking them
- * from the nav makes them crawlable but not indexable — which is exactly what
- * that meta tag is for. They belong in the nav rather than behind a link
- * somebody has to be told about: a member who cannot find them asks an officer,
- * and ending that is the whole point of the stage.
+ * Both carry `robots: { index: false, follow: false }` (§9 #1), so linking
+ * them from the nav makes them crawlable but not indexable — which is exactly
+ * what that meta tag is for. They belong in the nav rather than behind a link
+ * somebody has to be told about: a member who cannot find them asks an
+ * officer, and ending that is the whole point of Stage 7.
  */
 const MEMBER_NAV = [
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/lookup", label: "My Attendance" },
 ] as const;
 
-/** One list for the mobile panel, which stacks and has no wordmark to clear. */
-const NAV = [...SITE_NAV, ...MEMBER_NAV];
-
-const SOCIALS = [
-  { href: SOCIAL_LINKS.instagram, label: "Instagram", Icon: InstagramIcon },
-  { href: SOCIAL_LINKS.linktree, label: "Linktree", Icon: LinkIcon },
-  { href: SOCIAL_LINKS.linkedin, label: "LinkedIn", Icon: LinkedInIcon },
-  { href: SOCIAL_LINKS.slack, label: "Slack", Icon: LinkIcon },
+/**
+ * One list for the mobile panel, which stacks and has no wordmark to clear —
+ * so it can carry Contact, which the desktop nav has no room for.
+ */
+const MOBILE_NAV = [
+  ...SITE_NAV.slice(0, 4),
+  { href: "/contact", label: "Contact" },
+  ...MEMBER_NAV,
+  { href: "/attend", label: "Check In" },
+  { href: "/admin/login", label: "Admin" },
 ] as const;
+
+const NAV_ITEM =
+  "font-display text-[13px] leading-none font-medium tracking-[0.06em] uppercase transition";
 
 export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  // The home page deliberately has no active item.
+  const isActive = (href: string) => pathname === href;
+
   return (
-    <header className="sticky top-0 z-50 border-b-2 border-black bg-misa-blue">
-      <div className="relative mx-auto flex h-20 max-w-7xl items-center justify-between px-4 sm:px-6">
-        {/* Desktop nav, left. xl rather than lg: at 1024 even the six original
-            items ran into the centred wordmark, which predates Stage 7 — the
-            two new links only made an existing collision obvious. Below this
-            width everything is in the mobile panel, where it stacks. */}
+    <header className="sticky top-0 z-50 border-b border-misa-hairline bg-white">
+      <div className="relative flex h-15 items-center justify-between gap-6 px-5 sm:px-8">
+        {/* Desktop nav, left. xl rather than lg: below that width the centred
+            wordmark and the two groups cannot coexist, so everything is in the
+            sheet, where it stacks. */}
         <nav aria-label="Main" className="hidden xl:block">
-          <ul className="flex items-center gap-8">
+          <ul className="flex items-center gap-[22px]">
             {SITE_NAV.map((item) => {
-              const active = pathname === item.href;
+              const active = isActive(item.href);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={`text-sm text-black/90 transition hover:text-black ${
-                      active ? "underline decoration-1 underline-offset-4" : ""
+                    className={`${NAV_ITEM} ${
+                      active
+                        ? "border-b border-misa-blue pb-0.5 text-foreground"
+                        : "text-misa-muted hover:text-foreground"
                     }`}
                   >
                     {item.label}
@@ -100,14 +111,14 @@ export function SiteHeader() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls="mobile-nav"
-          className="xl:hidden -ml-1 flex h-10 w-10 items-center justify-center rounded text-black"
+          className="-ml-1 flex h-10 w-10 items-center justify-center text-foreground xl:hidden"
         >
           <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
           <svg
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="1.5"
             strokeLinecap="round"
             className="h-6 w-6"
             aria-hidden="true"
@@ -120,29 +131,31 @@ export function SiteHeader() {
           </svg>
         </button>
 
-        {/* Centred wordmark, absolutely positioned so the nav and socials
-            don't shift it off-centre. */}
+        {/* Centred wordmark, absolutely positioned so neither side group can
+            shift it off-centre. */}
         <Link
           href="/"
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-misa-blue"
         >
           <Wordmark />
           <span className="sr-only">Home</span>
         </Link>
 
-        {/* Member nav + socials, right */}
-        <div className="flex items-center gap-6">
+        {/* Member nav + the check-in call to action, right */}
+        <div className="flex items-center gap-[18px]">
           <nav aria-label="Member" className="hidden xl:block">
-            <ul className="flex items-center gap-8">
+            <ul className="flex items-center gap-[18px]">
               {MEMBER_NAV.map((item) => {
-                const active = pathname === item.href;
+                const active = isActive(item.href);
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
                       aria-current={active ? "page" : undefined}
-                      className={`text-sm whitespace-nowrap text-black/90 transition hover:text-black ${
-                        active ? "underline decoration-1 underline-offset-4" : ""
+                      className={`${NAV_ITEM} whitespace-nowrap ${
+                        active
+                          ? "border-b border-misa-blue pb-0.5 text-foreground"
+                          : "text-misa-muted hover:text-foreground"
                       }`}
                     >
                       {item.label}
@@ -153,21 +166,9 @@ export function SiteHeader() {
             </ul>
           </nav>
 
-          <ul className="flex items-center gap-4 sm:gap-6">
-            {SOCIALS.map(({ href, label, Icon }) => (
-              <li key={label}>
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-black/85 transition hover:text-black"
-                >
-                  <Icon />
-                  <span className="sr-only">{label}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
+          <Link href="/attend" className={BUTTON_SOLID_NAVY_SM}>
+            Check In
+          </Link>
         </div>
       </div>
 
@@ -176,19 +177,19 @@ export function SiteHeader() {
         <nav
           id="mobile-nav"
           aria-label="Main"
-          className="border-t border-black/20 bg-misa-blue xl:hidden"
+          className="border-t border-misa-hairline bg-white xl:hidden"
         >
-          <ul className="mx-auto max-w-7xl px-4 py-2 sm:px-6">
-            {NAV.map((item) => {
-              const active = pathname === item.href;
+          <ul className="px-5 py-2 sm:px-8">
+            {MOBILE_NAV.map((item) => {
+              const active = isActive(item.href);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     onClick={() => setOpen(false)}
                     aria-current={active ? "page" : undefined}
-                    className={`block py-3 text-black/90 ${
-                      active ? "underline decoration-1 underline-offset-4" : ""
+                    className={`block py-3 ${NAV_ITEM} ${
+                      active ? "text-misa-blue" : "text-foreground"
                     }`}
                   >
                     {item.label}

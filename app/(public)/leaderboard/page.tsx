@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { PageHero } from "@/components/ui/chevron-section";
 import { createClient } from "@/lib/supabase/server";
 
 import type { Database } from "@/lib/types/database";
@@ -139,43 +140,37 @@ export default async function LeaderboardPage() {
   const term = result.kind === "ok" ? (result.rows[0]?.term ?? null) : null;
 
   return (
-    <section className="px-6 py-16 sm:py-20">
+    <>
+      {/* The active term, prominently (§7 Stage 7). An officer can pin the
+          board on a finished term over a break, so a stale term has to be
+          readable on the page rather than assumed to be today's. */}
+      <PageHero
+        title="Leaderboard"
+        subhead={
+          term
+            ? `Standings for ${term}. Attendance and bonus points, added together.`
+            : "Current-term standings for MISA members."
+        }
+      />
+      <section className="px-5 py-14 sm:px-14">
       <div className="mx-auto max-w-3xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
-          Leaderboard
-        </h1>
-
-        {/* The active term, prominently (§7 Stage 7). An officer can pin the
-            board on a finished term over a break, so a stale term has to be
-            readable on the page rather than assumed to be today's. */}
-        <p className="mt-3 text-foreground/70">
-          {term ? (
-            <>
-              Standings for <span className="font-semibold">{term}</span>.
-              Attendance and bonus points, added together.
-            </>
-          ) : (
-            <>Current-term standings for MISA members.</>
-          )}
-        </p>
-
-        <div className="mt-10">
+        <div>
           {result.kind === "error" ? (
-            <p className="text-foreground/70">
+            <p className="text-misa-muted">
               The leaderboard couldn&apos;t be loaded right now — check back
               soon.
             </p>
           ) : rows.length === 0 ? (
             // Genuinely reachable, not defensive padding: §4.4 notes the board
             // is empty in early August before the term's first meeting.
-            <p className="text-foreground/70">
+            <p className="text-misa-muted">
               No standings yet{term ? ` for ${term}` : ""} — points appear here
               once the term&apos;s first event has been held.
             </p>
           ) : (
             <div>
               {allZero && (
-                <p className="mb-6 border-l-4 border-misa-blue bg-misa-panel px-5 py-4 text-sm text-foreground/80">
+                <p className="mb-6 border-l-2 border-misa-blue bg-misa-panel px-5 py-4 text-sm text-misa-body">
                   No points have been recorded
                   {term ? ` for ${term}` : " this term"} yet — everyone starts
                   level. Totals appear here after the term&apos;s first event.
@@ -188,7 +183,7 @@ export default async function LeaderboardPage() {
                   total points
                 </caption>
                 <thead>
-                  <tr className="border-b-2 border-black">
+                  <tr className="border-b border-misa-border">
                     <th
                       scope="col"
                       className="w-16 py-2 pr-3 text-sm font-semibold"
@@ -208,8 +203,8 @@ export default async function LeaderboardPage() {
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="border-b border-black/10">
-                      <td className="py-2 pr-3 text-sm tabular-nums text-foreground/70">
+                    <tr key={row.id} className="border-b border-misa-hairline">
+                      <td className="py-2 pr-3 text-sm tabular-nums text-misa-muted">
                         {row.rank}
                       </td>
                       <td className="py-2 pr-3">{row.fullName}</td>
@@ -229,7 +224,7 @@ export default async function LeaderboardPage() {
             member which of their points were attendance and which were granted.
             /lookup is where that breakdown lives — link it, or the answer is
             "ask an officer", which is what this stage exists to end. */}
-        <p className="mt-8 text-sm text-foreground/70">
+        <p className="mt-8 text-sm text-misa-muted">
           Want your own breakdown — which events you attended, what&apos;s still
           pending, and why your total is what it is?{" "}
           <Link
@@ -241,6 +236,7 @@ export default async function LeaderboardPage() {
           .
         </p>
       </div>
-    </section>
+      </section>
+    </>
   );
 }

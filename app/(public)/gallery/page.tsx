@@ -1,50 +1,70 @@
 import type { Metadata } from "next";
 
-// Recreation of txmisa.org/gallery (docs/existing-site-inventory.md). The
-// original is a masonry grid of event photos and no text at all. Real photos
-// aren't in the repo, so this renders the grid shape with placeholder tiles —
-// drop images into public/gallery/ and map over them here.
+import { BUTTON_SOLID_WHITE } from "@/components/ui/button";
+import { PageHero } from "@/components/ui/chevron-section";
+import { PhotoFrame } from "@/components/ui/photo-frame";
+import {
+  GALLERY_FEATURE,
+  INSTAGRAM_HANDLE,
+  INSTAGRAM_PROMPT,
+  photo,
+  SOCIAL_LINKS,
+} from "@/lib/site";
+
+import { GalleryGrid } from "./_components/gallery-grid";
 
 export const metadata: Metadata = {
   title: "Gallery",
-  description: "Photos from MISA events.",
+  description: "Socials, workshops, banquets and everything in between.",
 };
-
-// Varied spans reproduce the original's mixed-aspect masonry feel.
-const TILES = [
-  "sm:col-span-2 aspect-3/2",
-  "aspect-square",
-  "aspect-square",
-  "sm:col-span-2 aspect-3/2",
-  "aspect-square",
-  "aspect-square",
-  "aspect-square",
-  "sm:col-span-2 aspect-3/2",
-  "aspect-square",
-  "aspect-square",
-  "aspect-square",
-  "sm:col-span-2 aspect-3/2",
-];
 
 export default function GalleryPage() {
   return (
-    <section className="px-6 py-16">
-      <div className="mx-auto max-w-6xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">Gallery</h1>
-        <p className="mt-3 text-sm text-foreground/60">
-          Event photos to be added.
-        </p>
-        <ul className="mt-10 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {TILES.map((tile, i) => (
-            <li
-              key={i}
-              className={`flex items-center justify-center bg-misa-panel text-xs text-foreground/35 ${tile}`}
-            >
-              Photo
-            </li>
-          ))}
-        </ul>
-      </div>
-    </section>
+    <>
+      <PageHero
+        title="Gallery"
+        subhead="Socials, workshops, banquets and everything in between."
+      />
+
+      {/* The filter bar, the feature shot and the masonry are one unit: the
+          bar sits above the feature in the handoff's order, and the bar has to
+          live with the grid it filters. The figure is passed through so it
+          stays server-rendered. */}
+      <GalleryGrid
+        feature={
+          <section className="px-5 pb-6 sm:px-14">
+            <figure data-reveal="up">
+              <PhotoFrame
+                photo={photo(GALLERY_FEATURE.id)}
+                className="h-70 sm:h-105"
+                position="center 42%"
+                sizes="100vw"
+                priority
+              />
+              <figcaption className="mt-2.5 text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-muted">
+                {GALLERY_FEATURE.caption}
+              </figcaption>
+            </figure>
+          </section>
+        }
+      />
+
+      <section className="on-navy flex flex-wrap items-center justify-between gap-12 bg-misa-blue px-5 py-14 text-white sm:px-14">
+        <div>
+          <h2 className="mb-2.5 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] sm:text-[42px]">
+            Tagged us?
+          </h2>
+          <p className="max-w-[52ch] leading-[1.65] text-white/80">{INSTAGRAM_PROMPT}</p>
+        </div>
+        <a
+          href={SOCIAL_LINKS.instagram}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${BUTTON_SOLID_WHITE} whitespace-nowrap`}
+        >
+          {INSTAGRAM_HANDLE}
+        </a>
+      </section>
+    </>
   );
 }

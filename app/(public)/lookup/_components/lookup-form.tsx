@@ -7,6 +7,7 @@ import {
   type LookupState,
   type SubmittedValues,
 } from "@/app/actions/lookup";
+import { BUTTON_SOLID_NAVY } from "@/components/ui/button";
 import type { LookupProfile } from "@/lib/lookup";
 import type { TermEventState } from "@/lib/members";
 
@@ -25,13 +26,13 @@ import type { TermEventState } from "@/lib/members";
 const INITIAL: LookupState = { status: "idle" };
 
 const inputClass =
-  "border border-black/70 bg-misa-panel px-3 py-3 text-base w-full";
+  "w-full border border-misa-border bg-white px-3 py-3 text-base focus:border-misa-blue";
 
 const buttonClass =
-  "rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60";
+  `${BUTTON_SOLID_NAVY} disabled:opacity-60`;
 
 const bannerClass =
-  "border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm";
+  "border-l-2 border-misa-blue bg-misa-panel px-4 py-3 text-sm text-misa-body";
 
 const EMPTY: SubmittedValues = { eid: "", email: "" };
 
@@ -145,7 +146,7 @@ function LookupFields({
           className={inputClass}
           aria-invalid={fieldErrors?.email ? true : undefined}
         />
-        <p className="mt-1 text-xs text-foreground/70">
+        <p className="mt-1 text-xs text-misa-muted">
           The email we have on file for you. Both fields have to match the same
           member.
         </p>
@@ -189,8 +190,8 @@ function Result({
   return (
     <div className="flex flex-col gap-10">
       <section>
-        <h2 className="font-display text-2xl font-bold">{profile.fullName}</h2>
-        <p className="mt-1 text-sm text-foreground/70">
+        <h2 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em]">{profile.fullName}</h2>
+        <p className="mt-1 text-sm text-misa-muted">
           Everything below is scoped to <strong>{term}</strong>, denominators
           included. A grant from a past term counts for nothing here.
         </p>
@@ -216,13 +217,13 @@ function Result({
 
       {profile.pending.length > 0 && (
         <section>
-          <h3 className="font-display text-lg font-bold">
+          <h3 className="font-display text-[22px] leading-[1.05] font-semibold">
             Waiting on an officer
           </h3>
           {/* The reassurance this page exists for. Someone who checked in late,
               or when no window was open, needs to see their form arrived —
               otherwise they assume it vanished and check in again. */}
-          <p className="mt-2 text-sm text-foreground/70">
+          <p className="mt-2 text-sm text-misa-muted">
             We have {profile.pending.length} check-in
             {profile.pending.length === 1 ? "" : "s"} from you that
             {profile.pending.length === 1 ? " hasn't" : " haven't"} been
@@ -242,7 +243,7 @@ function Result({
                   // An orphan: received inside the grace window with no event
                   // open. It must be visible — silence here is the failure §4.2
                   // exists to prevent.
-                  <span className="text-foreground/70">
+                  <span className="text-misa-muted">
                     {" "}
                     — not yet matched to an event
                   </span>
@@ -254,8 +255,8 @@ function Result({
       )}
 
       <section>
-        <h3 className="font-display text-lg font-bold">Events this term</h3>
-        <p className="mt-2 text-sm text-foreground/70">
+        <h3 className="font-display text-[22px] leading-[1.05] font-semibold">Events this term</h3>
+        <p className="mt-2 text-sm text-misa-muted">
           Published events only — a cancelled event credits nobody, and{" "}
           <span className="font-medium">
             an event that hasn&apos;t happened yet is upcoming, not a miss
@@ -272,7 +273,7 @@ function Result({
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[32rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b-2 border-black text-left">
+                <tr className="border-b border-misa-border text-left">
                   <th className="py-2 pr-4 font-medium">Event</th>
                   <th className="py-2 pr-4 font-medium">When</th>
                   <th className="py-2 pr-4 font-medium">Points</th>
@@ -281,7 +282,7 @@ function Result({
               </thead>
               <tbody>
                 {profile.events.map((event) => (
-                  <tr key={event.id} className="border-b border-black/15">
+                  <tr key={event.id} className="border-b border-misa-hairline">
                     <td className="py-2 pr-4">{event.title}</td>
                     <td className="py-2 pr-4 whitespace-nowrap">
                       {event.when}
@@ -300,10 +301,10 @@ function Result({
 
       {profile.adjustments.length > 0 && (
         <section>
-          <h3 className="font-display text-lg font-bold">
+          <h3 className="font-display text-[22px] leading-[1.05] font-semibold">
             Points granted separately
           </h3>
-          <p className="mt-2 text-sm text-foreground/70">
+          <p className="mt-2 text-sm text-misa-muted">
             Points an officer added or removed by hand, with the reason they
             gave. These are the difference between your attendance points and
             your total.
@@ -311,7 +312,7 @@ function Result({
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[32rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b-2 border-black text-left">
+                <tr className="border-b border-misa-border text-left">
                   <th className="py-2 pr-4 font-medium">When</th>
                   <th className="py-2 pr-4 font-medium">Points</th>
                   <th className="py-2 pr-4 font-medium">Category</th>
@@ -320,7 +321,7 @@ function Result({
               </thead>
               <tbody>
                 {profile.adjustments.map((row) => (
-                  <tr key={row.id} className="border-b border-black/15">
+                  <tr key={row.id} className="border-b border-misa-hairline">
                     <td className="py-2 pr-4 whitespace-nowrap">
                       {row.awarded}
                     </td>
@@ -338,11 +339,11 @@ function Result({
       )}
 
       <section>
-        <h3 className="font-display text-lg font-bold">Membership dues</h3>
+        <h3 className="font-display text-[22px] leading-[1.05] font-semibold">Membership dues</h3>
         {/* 🔓 The one surface in the whole system that shows dues status to an
             unauthenticated caller, and it is allowed here only because the gate
             is EID AND matching email (§6). It must never reach /leaderboard. */}
-        <p className="mt-2 text-sm text-foreground/70">
+        <p className="mt-2 text-sm text-misa-muted">
           {profile.duesPaidCurrentTerm ? (
             <>
               You&apos;re an <strong>official member for {term}</strong>.
@@ -388,20 +389,20 @@ function Result({
 function AttendanceMark({ state }: { state: TermEventState }) {
   if (state === "attended") {
     return (
-      <span className="border border-black/30 bg-misa-panel px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+      <span className="border border-misa-border bg-misa-panel px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
         attended
       </span>
     );
   }
   if (state === "missed") {
     return (
-      <span className="border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider text-foreground/60 uppercase">
+      <span className="border border-misa-border px-2 py-0.5 text-[0.7rem] tracking-wider text-misa-muted uppercase">
         missed
       </span>
     );
   }
   return (
-    <span className="text-[0.7rem] tracking-wider text-foreground/50 uppercase">
+    <span className="text-[0.7rem] tracking-wider text-misa-muted uppercase">
       upcoming
     </span>
   );
@@ -420,19 +421,19 @@ function Stat({
 }) {
   return (
     <div>
-      <dt className="text-xs tracking-wider text-foreground/60 uppercase">
+      <dt className="text-xs tracking-wider text-misa-muted uppercase">
         {label}
       </dt>
       <dd
         className={
           emphasis
-            ? "font-display text-3xl font-extrabold tabular-nums"
-            : "font-display text-2xl font-bold tabular-nums"
+            ? "font-display text-[34px] leading-none font-semibold tabular-nums text-misa-blue"
+            : "font-display text-[26px] leading-none font-semibold tabular-nums text-misa-blue"
         }
       >
         {value}
       </dd>
-      {note && <p className="text-xs text-foreground/60">{note}</p>}
+      {note && <p className="text-xs text-misa-muted">{note}</p>}
     </div>
   );
 }

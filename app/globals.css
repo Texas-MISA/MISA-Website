@@ -1,13 +1,34 @@
 @import "tailwindcss";
 
-/* Brand tokens approximating txmisa.org (docs/existing-site-inventory.md).
-   The existing site is light-only, so no dark scheme for now. */
+/* Brand tokens from the design handoff
+   (docs/Texas MISA website UI mockups/design_handoff_misa_website/README.md).
+   Navy/white institutional identity: no radii anywhere, no shadows except a
+   1px hairline border, no gradients except the placeholder hatch and the hero
+   grid overlay. The site is light-only, so no dark scheme.
+
+   📌 The token NAMES are unchanged from the Stage 2 palette on purpose. The
+   values moved from periwinkle to navy, but ~410 `misa-blue` / `misa-panel` /
+   `font-display` usages across the admin area keep working, and the admin
+   inherits the new identity without a screen-by-screen rewrite. Renaming would
+   have been churn in every file for no behavioural difference. */
 :root {
   --background: #ffffff;
-  --foreground: #1c1c1c;
-  --misa-blue: #7286ab;
-  --misa-blue-dark: #5c6f93;
-  --misa-panel: #f4f4f2;
+  --foreground: #1d1f20; /* ink — body headings */
+
+  --misa-blue: #16305c; /* navy — hero fields, bands, primary buttons, eyebrows */
+  --misa-blue-dark: #0d1d38; /* the hover/pressed end of the navy ramp */
+  --misa-panel: #f2f2f3; /* alternating section ground, chip fills */
+
+  --misa-body: #3a3d40; /* long-form paragraphs */
+  --misa-secondary: #4a4d50; /* card body copy */
+  --misa-muted: #6f7275; /* meta labels, placeholder captions */
+
+  --misa-hairline: rgba(29, 31, 32, 0.16); /* section rules, grid gaps */
+  --misa-border: rgba(29, 31, 32, 0.2); /* card and image frames */
+
+  /* Placeholder hatch: light on white grounds, navy on navy ones. */
+  --misa-hatch-a: #2c4b7c;
+  --misa-hatch-b: #26436f;
 }
 
 @theme inline {
@@ -16,33 +37,205 @@
   --color-misa-blue: var(--misa-blue);
   --color-misa-blue-dark: var(--misa-blue-dark);
   --color-misa-panel: var(--misa-panel);
-  --font-sans: var(--font-poppins);
-  --font-display: var(--font-roboto-slab);
+  --color-misa-body: var(--misa-body);
+  --color-misa-secondary: var(--misa-secondary);
+  --color-misa-muted: var(--misa-muted);
+  --color-misa-hairline: var(--misa-hairline);
+  --color-misa-border: var(--misa-border);
+  --font-sans: var(--font-barlow);
+  --font-display: var(--font-barlow-condensed);
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-poppins), Arial, Helvetica, sans-serif;
-}
-
-/* "TEXAS MISA" scrolling band on the home page. The track holds two copies
-   of the same content, so a -50% translate loops seamlessly. */
-@keyframes marquee {
-  from {
-    transform: translateX(0);
+/* 🪤 Everything below is INSIDE a cascade layer, and that is load-bearing
+   rather than tidiness. Tailwind v4's `@import "tailwindcss"` emits its
+   utilities into `@layer utilities`, and an UNLAYERED rule beats every layered
+   one no matter how specific — so a bare `a { color: … }` written outside a
+   layer silently overrode `text-white` on every link, which is how the
+   header's Check In button rendered as navy text on a navy fill. Element
+   defaults belong in `base`; decorative classes in `components`. Both lose to
+   a utility, which is what a default is supposed to do. */
+@layer base {
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-barlow), system-ui, sans-serif;
   }
-  to {
-    transform: translateX(-50%);
+
+  /* The prototypes define `a` and `a:hover` globally and nothing else — no
+     hover on nav items or buttons, and no focus state at all. The handoff
+     says to add them, so the ramp is defined once here. */
+  a {
+    color: var(--misa-blue);
+  }
+
+  a:hover {
+    color: var(--misa-blue-dark);
+  }
+
+  /* Every interactive element gets a visible focus ring. On navy grounds the
+     navy ring is invisible, so sections with a navy background carry
+     `.on-navy` and flip it to white. */
+  :focus-visible {
+    outline: 2px solid var(--misa-blue);
+    outline-offset: 2px;
+  }
+
+  .on-navy :focus-visible,
+  .on-navy:focus-visible {
+    outline-color: #ffffff;
   }
 }
 
-.animate-marquee {
-  animation: marquee 30s linear infinite;
-}
+@layer components {
+  /* ── Shared shapes ──────────────────────────────────────────────────────── */
 
-@media (prefers-reduced-motion: reduce) {
-  .animate-marquee {
-    animation: none;
+  /* The chevron notch cut from the bottom edge of every hero. Carried over from
+     the current live site; the handoff says to preserve it. */
+  .chevron-notch {
+    clip-path: polygon(
+      0 0,
+      100% 0,
+      100% calc(100% - 48px),
+      50% 100%,
+      0 calc(100% - 48px)
+    );
+  }
+
+  /* The 60×60 grid the heroes lay over the navy field. */
+  .hero-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* Placeholder hatch — 45°, 7px stripes. Two grounds, never mixed: a light
+     box on white, a navy box on navy. */
+  .hatch-light {
+    background: repeating-linear-gradient(
+      45deg,
+      #f2f2f3,
+      #f2f2f3 7px,
+      #e7e7ea 7px,
+      #e7e7ea 14px
+    );
+  }
+
+  .hatch-navy {
+    background: repeating-linear-gradient(
+      45deg,
+      var(--misa-hatch-a),
+      var(--misa-hatch-a) 7px,
+      var(--misa-hatch-b) 7px,
+      var(--misa-hatch-b) 14px
+    );
+  }
+
+  /* Duotone treatment for brand imagery. Officer headshots and the About
+     mission cluster are deliberately NOT duotoned — they stay full colour.
+     The overlay needs a positioned parent. */
+  .duotone {
+    filter: grayscale(1) contrast(1.05);
+  }
+
+  .duotone-frame::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: var(--misa-blue);
+    mix-blend-mode: color;
+    pointer-events: none;
+  }
+
+  /* ── Homepage gallery marquees ──────────────────────────────────────────── */
+
+  /* Each track holds its tile group duplicated EXACTLY TWICE, and each group
+     carries a trailing padding equal to the flex gap — that is what makes the
+     -50% translate land seamlessly. Change one without the other and the loop
+     visibly jumps. */
+  @keyframes mq {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes mqr {
+    from {
+      transform: translateX(-50%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  .marquee-left {
+    animation: mq 38s linear infinite;
+  }
+
+  .marquee-right {
+    animation: mqr 46s linear infinite;
+  }
+
+  .marquee-left:hover,
+  .marquee-right:hover {
+    animation-play-state: paused;
+  }
+
+  /* ── Scroll reveal ──────────────────────────────────────────────────────── */
+
+  /* 🪤 The hidden start state is scoped to `html.js`, and that scoping is the
+     whole trick. `app/layout.tsx` adds the class from an inline script, so with
+     JavaScript disabled nothing is ever hidden and the page reads normally —
+     whereas an unscoped `opacity:0` would leave a JS-less visitor with a blank
+     page, which is exactly what the prototypes' 250ms rAF-probe fallback was
+     working around. The observer lives in components/ui/reveal-observer.tsx. */
+  html.js [data-reveal] {
+    opacity: 0;
+    transition:
+      opacity 0.7s ease var(--reveal-delay, 0s),
+      transform 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) var(--reveal-delay, 0s);
+  }
+
+  html.js [data-reveal="up"] {
+    transform: translateY(18px);
+  }
+
+  /* The alternating activity and case-study rows slide in from their own side,
+     over .8s rather than .7s. */
+  html.js [data-reveal="left"],
+  html.js [data-reveal="right"] {
+    transition:
+      opacity 0.8s ease var(--reveal-delay, 0s),
+      transform 0.8s cubic-bezier(0.2, 0.7, 0.3, 1) var(--reveal-delay, 0s);
+  }
+
+  html.js [data-reveal="left"] {
+    transform: translateX(-24px);
+  }
+
+  html.js [data-reveal="right"] {
+    transform: translateX(24px);
+  }
+
+  html.js [data-reveal][data-revealed] {
+    opacity: 1;
+    transform: none;
+  }
+
+  /* The prototypes do not honour this query and the handoff says they should. */
+  @media (prefers-reduced-motion: reduce) {
+    html.js [data-reveal] {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+
+    .marquee-left,
+    .marquee-right {
+      animation: none;
+    }
   }
 }

@@ -7,6 +7,7 @@ import {
   acceptInvite,
   type AcceptInviteState,
 } from "@/app/actions/officer-invite";
+import { BUTTON_SOLID_NAVY } from "@/components/ui/button";
 
 // Client Component for useActionState only, the same shape as
 // app/(public)/lookup/_components/lookup-form.tsx. The form posts via
@@ -23,10 +24,10 @@ import {
 const INITIAL: AcceptInviteState = { status: "idle" };
 
 const inputClass =
-  "border border-black/70 bg-misa-panel px-3 py-3 text-base w-full";
+  "w-full border border-misa-border bg-white px-3 py-3 text-base focus:border-misa-blue";
 
 const buttonClass =
-  "rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60";
+  `${BUTTON_SOLID_NAVY} disabled:opacity-60`;
 
 export function InviteForm({
   token,

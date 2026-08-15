@@ -1,5 +1,30 @@
 # Existing site inventory — txmisa.org
 
+> ⚠️ **SUPERSEDED AS A DESIGN REFERENCE, 2026-08-14 (doc v1.58).** The public
+> pages now follow the design handoff in
+> `docs/Texas MISA website UI mockups/design_handoff_misa_website/`, which
+> replaces the Squarespace look wholesale: navy `#16305c` on white instead of
+> periwinkle `#7286AB`, Barlow + Barlow Condensed instead of Poppins/Roboto
+> Slab, square corners, hairline borders, real photography and real partner
+> logos. **This file remains the record of what the ORIGINAL site said and
+> did** — the copy inventory below is still where the wording came from, and
+> the handoff names this repo as the source of truth for wording — but the
+> design language section describes a site that no longer exists.
+>
+> **What is still a placeholder after the overhaul:**
+> - Activity and project images — hatched boxes with mono captions, which the
+>   handoff intends as placeholders rather than gaps.
+> - Officer headshots — the bundle ships them, but its README flags the
+>   photo-to-name pairing as never supplied. See `lib/officers.ts`.
+> - The real MISA logo. The handoff's README names `misa.zip - 1.png` but it
+>   is **not in the bundle**, so the header wordmark is still drawn in CSS.
+> - The contact form backend. `/contact` still renders a disabled form, and
+>   the page is no longer linked from the desktop nav.
+>
+> **What is no longer a placeholder:** event photography (13 images in
+> `public/photos/`) and the four partner logos (`public/partners/`), both
+> committed from the handoff bundle.
+
 Surveyed 2026-07-30 from https://www.txmisa.org/ (Squarespace). This records
 what the current site contains and how it looks, as the reference for the
 recreated pages in this repo. The recreation is deliberately faithful-but-

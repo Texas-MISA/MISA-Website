@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { BUTTON_SOLID_NAVY } from "@/components/ui/button";
+import { PageHero } from "@/components/ui/chevron-section";
 import {
   CONTACT_EMAIL,
   CORPORATE_EMAIL,
@@ -32,19 +34,19 @@ const CONTACTS = [
 
 export default function ContactPage() {
   return (
-    <section className="px-6 py-20">
-      <div className="mx-auto max-w-6xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-5xl">Contact Us!</h1>
-        <p className="mt-4 max-w-2xl text-foreground/80">
-          If you have any questions or comments, please don&apos;t hesitate to reach out
-          via the contacts below.
-        </p>
-
-        <div className="mt-14 grid grid-cols-1 gap-12 lg:grid-cols-2">
+    <>
+      <PageHero
+        title="Contact Us"
+        subhead="If you have any questions or comments, please don't hesitate to reach out."
+      />
+      <section className="px-5 py-14 sm:px-14">
+        <div className="grid grid-cols-1 gap-12 lg:grid-cols-2">
           <ul className="flex flex-col gap-8">
             {CONTACTS.map((contact) => (
               <li key={contact.label}>
-                <p className="font-display font-bold">{contact.label}</p>
+                <p className="text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-muted">
+                  {contact.label}
+                </p>
                 <a
                   href={contact.href}
                   target={contact.href.startsWith("http") ? "_blank" : undefined}
@@ -67,7 +69,7 @@ export default function ContactPage() {
                     type="text"
                     name="firstName"
                     autoComplete="given-name"
-                    className="border border-black/70 bg-misa-panel px-3 py-2 disabled:opacity-60"
+                    className="border border-misa-border bg-white px-3 py-2 disabled:opacity-60"
                   />
                 </label>
                 <label className="flex flex-col gap-1 text-sm">
@@ -76,7 +78,7 @@ export default function ContactPage() {
                     type="text"
                     name="lastName"
                     autoComplete="family-name"
-                    className="border border-black/70 bg-misa-panel px-3 py-2 disabled:opacity-60"
+                    className="border border-misa-border bg-white px-3 py-2 disabled:opacity-60"
                   />
                 </label>
               </div>
@@ -86,7 +88,7 @@ export default function ContactPage() {
                   type="email"
                   name="email"
                   autoComplete="email"
-                  className="border border-black/70 bg-misa-panel px-3 py-2 disabled:opacity-60"
+                  className="border border-misa-border bg-white px-3 py-2 disabled:opacity-60"
                 />
               </label>
               <label className="flex flex-col gap-1 text-sm">
@@ -94,17 +96,17 @@ export default function ContactPage() {
                 <textarea
                   name="message"
                   rows={5}
-                  className="border border-black/70 bg-misa-panel px-3 py-2 disabled:opacity-60"
+                  className="border border-misa-border bg-white px-3 py-2 disabled:opacity-60"
                 />
               </label>
               <button
                 type="submit"
-                className="w-fit rounded-full bg-misa-blue px-10 py-3 text-xs font-medium tracking-wider text-white disabled:opacity-60"
+                className={`w-fit ${BUTTON_SOLID_NAVY} disabled:opacity-60`}
               >
                 SEND
               </button>
             </fieldset>
-            <p className="mt-4 text-xs text-foreground/60">
+            <p className="mt-4 text-xs text-misa-muted">
               This form isn&apos;t connected yet — please email{" "}
               <a
                 href={`mailto:${CONTACT_EMAIL}`}
@@ -116,7 +118,7 @@ export default function ContactPage() {
             </p>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }

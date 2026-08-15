@@ -22,13 +22,13 @@ export default async function AdminLoginPage({
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-misa-panel px-6 py-16">
-      <div className="w-full max-w-sm border-2 border-black bg-background">
-        {/* Wordmark renders white-on-blue, matching the site header. */}
-        <div className="flex justify-center border-b-2 border-black bg-misa-blue py-6">
+      <div className="w-full max-w-sm border border-misa-border bg-background">
+        {/* Wordmark draws in currentColor, so it comes out white on navy. */}
+        <div className="flex justify-center bg-misa-blue py-6 text-white">
           <Wordmark />
         </div>
         <div className="px-6 py-8">
-          <h1 className="text-center font-display text-2xl font-extrabold">
+          <h1 className="text-center font-display text-3xl font-semibold tracking-[-0.02em]">
             Officer Sign-In
           </h1>
           <p className="mt-2 text-center text-sm text-foreground/70">

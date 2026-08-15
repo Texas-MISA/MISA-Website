@@ -1,8 +1,47 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.57
+**Version:** 1.58
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.58: the public UI overhaul.** Requested 2026-08-14, shipped the same day.
+> Five high-fidelity prototypes plus a token/type/spacing spec arrived as
+> `docs/Texas MISA website UI mockups/design_handoff_misa_website/`, and the
+> public site was rebuilt against them: navy `#16305c` on white, Barlow +
+> Barlow Condensed, square corners everywhere, hairline borders, the chevron
+> hero preserved, real event photography and partner logos in `public/`.
+> **Nothing below §5 changed** — no schema, no Server Action, no RLS, no
+> invariant under Security, Check-in, Officer actions or Dues. Three decisions
+> are worth the doc:
+>
+> 📌 **Officer sign-in moved from the footer to the nav** as the "Admin" item,
+> which reverses a documented invariant rather than drifting from it. The
+> footer link existed because the header had no room — eight links plus four
+> social icons around an absolutely centred wordmark, measured overflowing by
+> 199px. The redesign spends the room the other way: socials move to the
+> footer, Contact leaves the nav, and the left group is five short uppercase
+> items. Re-measured after the change: **285px clearance at 1280, 460px at
+> 1646.** The 🪤 still stands — the wordmark wins the z-order, so an
+> overflowing item disappears silently rather than wrapping.
+>
+> ⚠️ **`/contact` is routed but unlinked.** The handoff has no Contact page and
+> no Contact nav item; the About FAQ band and the footer address are what it
+> puts in their place. The route and its (still disconnected) form stay, and
+> the mobile sheet still carries it — that panel stacks and has no wordmark to
+> clear. §5 keeps its row.
+>
+> ⚠️ **Officer headshots are placeholders on purpose.** The bundle ships
+> headshots, and its own README says the photo-to-name pairing "was never
+> supplied". A real student's face under another real student's name is a
+> worse failure than a framed hatched box, so `Officer.photo` is optional and
+> unset; filling it in switches the card. Same reasoning retires the mono
+> "pairing to be confirmed" note the prototype carries.
+>
+> 🪤 Two implementation traps are now invariants in CLAUDE.md, both found by
+> breaking: **unlayered global CSS beats every Tailwind v4 utility** (a bare
+> `a { color }` rendered the Check In button navy-on-navy), and **the scroll
+> reveal's hidden state must be scoped to a class an inline script sets**, or
+> a visitor with JavaScript disabled gets a blank page.
 
 > **v1.57: the invited address becomes OPTIONAL (migration 25), and the
 > redemption page loses its copy.** Requested 2026-08-10, shipped the same day.
@@ -2580,6 +2619,11 @@ $$;
 /officers              Officer roster with LinkedIn links          (static)
 /projects              Past and current client projects            (static)
 /contact               Contact details and form                    (static)
+                       ⚠️ ROUTED BUT UNLINKED from the desktop nav since the
+                       v1.58 UI overhaul — the design handoff has no Contact
+                       page and no Contact nav item, and puts the About FAQ
+                       band and the footer address in its place. Still in the
+                       mobile sheet, which stacks and has no wordmark to clear
 /attend                Public check-in form
 /leaderboard           Public standings
 /lookup                Member self-service attendance history
@@ -3263,6 +3307,16 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
   /(public)
     page.tsx                 landing
     /about, /gallery, /officers, /projects, /contact
+                             The five designed pages (landing, about, projects,
+                             gallery, officers) follow the v1.58 handoff section
+                             by section. /gallery/_components/gallery-grid.tsx
+                             is the one client component among them: the filter
+                             chips and Load more are presentational in the
+                             prototype and need real behaviour, over the static
+                             manifest in lib/site.ts. The home page's
+                             _components hold upcoming-events.tsx (the live
+                             schedule — the only queried section on a designed
+                             page) and gallery-marquee.tsx
     /attend/page.tsx
     /leaderboard/page.tsx    Stage 7
     /lookup/page.tsx         Stage 7
@@ -3416,7 +3470,23 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              resolution form, manual entry, grant picker
   admin-profiles.ts          fetchOfficerNames — actor_id FKs auth.users,
                              which has no PostgREST path to admin_profiles
-  site.ts / officers.ts      org copy and the officer roster
+  site.ts / officers.ts      ALL public copy and content constants, plus the
+                             officer roster. site.ts grew with the v1.58 UI
+                             overhaul: ACTIVITIES (was PILLARS), HISTORY_CARDS
+                             and HISTORY_STATS, FAQ (moved out of the About
+                             page), PROJECTS / PROJECT_STATS / PROJECTS_INTRO,
+                             PARTNERS with logo paths, and the PHOTOS manifest
+                             with the GALLERY_* display lists. The prototypes
+                             hardcode all of this because they are prototypes;
+                             here it stays in one module so a page renders
+                             content it does not own. photo(id) THROWS on an
+                             unknown id rather than returning undefined —
+                             a silently absent image is the same affirmative-
+                             looking absence §8's hardening went after.
+                             ⚠️ PHOTOS[].category is a PROVISIONAL guess: the
+                             shoot dates are known but the events were never
+                             labelled, and the gallery filter sorts on it.
+                             Officer.photo is optional and deliberately UNSET
   ledger-filters.ts          the points-ledger and attendance-queue filter
                              cores (Stage 8 phase 2). Pure, typed structurally
                              like filters.ts. ONE module for two screens
@@ -3515,10 +3585,31 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
   /migrations                versioned SQL
   seed.sql
 /components
-  /ui                        shared primitives
-  ...
+  site-header.tsx            the 5-item nav (About · Projects · Gallery ·
+                             Officers · Admin), the absolutely centred wordmark,
+                             and the navy Check In button. Client only for the
+                             active-link pathname and the mobile sheet
+  site-footer.tsx            socials row + the org address. NO officer sign-in
+                             link since v1.58 — it is the nav's Admin item
+  /ui                        shared primitives — chevron-section.tsx (PageHero:
+                             navy field, 60×60 grid overlay, chevron notch),
+                             partners.tsx, kpi-plate.tsx, hatch.tsx (the
+                             labelled placeholder box), photo-frame.tsx,
+                             officer-card.tsx, activities.tsx, wordmark.tsx,
+                             button.tsx (class strings — every call site is
+                             already an <a>, a <Link> or a <button>, so a
+                             component per element type would buy nothing),
+                             reveal.tsx (server-safe helper) and
+                             reveal-observer.tsx (the client IntersectionObserver,
+                             mounted ONCE in the public layout so the animated
+                             sections stay Server Components)
+/public
+  /photos, /partners         the design handoff's event photography and partner
+                             logos. Rendered through next/image
 proxy.ts                     admin route protection (Next 16 rename of middleware.ts)
 ```
+
+**`PhotoFrame` renders with next/image's `fill`, and that is a layout fix rather than a preference.** The handoff calls it out on the About page: with an intrinsically sized `<img>`, the history portrait's frame grows to the photo's natural height and leaves a large void beside the column next to it. `fill` absolutely positions the image inside the frame, so the frame's own `flex:1; min-height` decides the height. `PhotoBlock` is the deliberate opposite, for the gallery masonry, where varied intrinsic heights are the point.
 
 **Why officer attendance mutations live apart from `app/actions/attendance.ts`** (v1.20): that module holds `submitCheckin`, the single unauthenticated write path in the whole system and what §6 calls the main attack surface. Every export of a `"use server"` module is a publicly callable endpoint, so keeping it a one-export file makes "what can an anonymous user POST to" a one-file answer — and removes the chance of someone adding an unguarded export next to a guarded one. Officer mutations go in `attendance-review.ts`, where every export opens with `getOfficer()`.
 

@@ -18,10 +18,10 @@ export default function PublicNotFound() {
   return (
     <section className="px-6 py-16 sm:py-20">
       <div className="mx-auto max-w-2xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[34px] leading-[1.02] font-semibold tracking-[-0.02em] sm:text-[42px]">
           Page not found
         </h1>
-        <p className="mt-4 text-foreground/80">
+        <p className="mt-4 text-misa-body">
           That address doesn&apos;t exist. It may have moved, or the link that
           sent you here may be out of date.
         </p>
@@ -37,7 +37,7 @@ export default function PublicNotFound() {
             <Link
               key={href}
               href={href}
-              className="border-2 border-black px-3 py-1 text-xs font-semibold tracking-wider uppercase transition hover:bg-misa-panel"
+              className="border border-misa-border px-3 py-1 text-xs font-semibold tracking-wider uppercase transition hover:bg-misa-panel"
             >
               {label}
             </Link>

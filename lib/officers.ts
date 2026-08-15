@@ -1,12 +1,20 @@
 // Officer roster carried over from txmisa.org/officers
 // (docs/existing-site-inventory.md). LinkedIn URLs cleaned of tracking
-// parameters. Photos deliberately not copied — cards render initials until
-// real headshots are added to public/.
+// parameters.
+//
+// ⚠️ `photo` is deliberately unset on every officer. The design handoff ships
+// headshots, but its own README flags the photo-to-name pairing as arbitrary —
+// "the correct mapping was never supplied" — and putting a real student's face
+// against another real student's name is a worse failure than showing no face
+// at all. Cards render the framed placeholder tile until an officer confirms
+// the mapping; fill this field in and the card switches automatically.
 
 export type Officer = {
   name: string;
   role: string;
   linkedin: string;
+  /** Path under `public/`, once the pairing is confirmed. */
+  photo?: string;
 };
 
 export const OFFICERS: Officer[] = [
@@ -77,11 +85,7 @@ export const OFFICERS: Officer[] = [
   },
 ];
 
-export function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .map((part) => part[0] ?? "")
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-}
+// `initials()` lived here until the UI overhaul, for the Stage 2 card that
+// drew a circle of initials where a headshot would go. The redesigned card
+// shows a framed hatched placeholder instead — a labelled empty slot, which is
+// what the design handoff asks for — so nothing called it any more.

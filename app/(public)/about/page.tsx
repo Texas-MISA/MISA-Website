@@ -1,115 +1,165 @@
 import type { Metadata } from "next";
 
-import { ChevronHero } from "@/components/ui/chevron-section";
+import { BUTTON_SOLID_WHITE } from "@/components/ui/button";
+import { PageHero } from "@/components/ui/chevron-section";
+import { KpiPlate } from "@/components/ui/kpi-plate";
 import { Partners } from "@/components/ui/partners";
-import { Pillars } from "@/components/ui/pillars";
-import { MISSION } from "@/lib/site";
-
-// Recreation of txmisa.org/about-us-1 (docs/existing-site-inventory.md).
+import { PhotoFrame } from "@/components/ui/photo-frame";
+import { revealDelay } from "@/components/ui/reveal";
+import {
+  CONTACT_EMAIL,
+  FAQ,
+  HISTORY_CARDS,
+  HISTORY_STATS,
+  MISSION,
+  photo,
+} from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "About Us",
   description: "Connecting technology with business.",
 };
 
-const HISTORY = [
-  "The Management Information Systems Association is a professional, academic, philanthropic and social organization. MISA unites a diverse community of individuals who have a passion for combining technology with business and often pursue careers in Information Technology. Each semester MISA holds various activities that are designed to expose students to professional opportunities, expand their technological skills, and meet other like-minded individuals.",
-  "Originally founded in 1982, MISA was re-established in 2009 and has experienced rapid growth. In the past two years alone, MISA membership grew by 250% and attracted various majors from MIS, Computer Science, Engineering, and Natural Sciences.",
-];
-
-const FAQ = [
-  {
-    q: "WHAT IS MISA?",
-    a: "MISA is the premier IT organization within McCombs, which functions to build a community that is interested in technology and business. In addition to connecting students - mainly MIS majors - the organization also works to connect companies with students regarding post-graduate opportunities.",
-  },
-  {
-    q: "WHY SHOULD I BE A PART OF MISA?",
-    a: "Joining MISA is a great way to meet people that have similar interests as you and participate in a variety of activities. As a well-rounded organization, MISA hosts socials, academic workshops, service days, and professional networking events. Regardless of whether you want to learn about different career opportunities, go out and give back to the community, or hang out with a group of fun-loving individuals - we guarantee that MISA has something to offer.",
-  },
-  {
-    q: "WHAT IS THE DRESS CODE FOR MEETINGS?",
-    a: "There is none! Like every major technology organization out there, we care more about what you do than what you wear. As such, unless it's an off-campus dinner where business casual is recommended, you are welcome to wear what you would like.",
-  },
-  {
-    q: "WHAT CAN I EXPECT AT A MISA EVENT?",
-    a: "That depends on the event. At General Meetings, you can expect a company presentation along with a fun activity with food. At socials, you can expect a variety of games (video games, board games, or card games) to be played. Service events usually entail cleaning up a creek around Austin, so be ready to get your hands dirty. Workshops are similar to class lectures in that you are taught a hard skill over the course of the event and are given hands-on experience with technology.",
-  },
-  {
-    q: "HOW DO I KNOW IF MISA IS RIGHT FOR ME?",
-    a: "You are free to contact any of our officers via email, Instagram, slack, or in person if you have any questions about MISA. But, of course, the best way for you to see if we are right for you is to attend a meeting! Membership is not required for you to attend any of our meetings, so you are welcome to come and see if MISA would be worthwhile for you.",
-  },
-  {
-    q: "WHAT KINDS OF PROJECTS HAS MISA WORKED ON IN THE PAST?",
-    a: "In Spring 2024, MISA introduced student driven projects. In these, student teams collaborated on real-world consulting projects with major organizations including PepsiCo, CapMetro, and several local Austin businesses. These projects allowed members to apply their technical, analytical, and business skills to address real client challenges. Through these experiences, students gained hands-on exposure to consulting, project management, and cross-functional teamwork, preparing them for careers at the intersection of technology and business strategy.",
-  },
-  {
-    q: "WHO CAN BECOME A MISA MEMBER?",
-    a: "Anyone! We accept all majors & years! In order to be a member, the only requirement is being a UT student and paying dues. We welcome anyone to be a member, but having an interest in technology is recommended.",
-  },
-];
+/** The full-bleed 1:1 band, four across with no gap. */
+const BAND = ["fall-01", "fall-02", "fall-04", "fall-09"] as const;
 
 export default function AboutPage() {
   return (
     <>
-      <ChevronHero>
-        <div className="text-center">
-          <h1 className="font-display text-4xl font-extrabold sm:text-6xl">
-            About Us
-          </h1>
-          <p className="mt-4 text-lg text-foreground/80">
-            Connecting technology with business.
-          </p>
-        </div>
-      </ChevronHero>
+      <PageHero title="About Us" subhead="Connecting technology with business." />
 
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-6xl">
-          <Pillars />
-        </div>
-      </section>
-
-      <section className="px-6 pb-20">
-        <div className="mx-auto max-w-3xl text-center">
-          <h2 className="font-display text-3xl font-extrabold text-misa-blue sm:text-4xl">
-            Mission
+      {/* Mission card beside the photo cluster. ⚠️ These photos are NOT
+          duotoned — this cluster and the officer headshots are the two
+          full-colour exceptions in the design. */}
+      <section className="grid items-stretch gap-12 px-5 pt-14 pb-16 sm:px-14 lg:grid-cols-[1.05fr_0.95fr]">
+        <div
+          data-reveal="up"
+          className="flex flex-col justify-center border border-misa-border px-10 pt-10 pb-11"
+        >
+          <h2 className="mb-4.5 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] text-misa-blue sm:text-[42px]">
+            Our Mission
           </h2>
-          <p className="mt-6 font-medium leading-7">{MISSION}</p>
+          <p className="text-[17px] leading-[1.7] text-misa-body">{MISSION}</p>
         </div>
-      </section>
 
-      <section className="px-6 pb-20">
-        <div className="mx-auto max-w-3xl">
-          <h2 className="text-center font-display text-3xl font-extrabold sm:text-4xl">
-            History of MISA
-          </h2>
-          <div className="mt-6 flex flex-col gap-4">
-            {HISTORY.map((paragraph) => (
-              <p key={paragraph.slice(0, 40)} className="leading-7 text-foreground/85">
-                {paragraph}
-              </p>
-            ))}
+        <div data-reveal="up" style={revealDelay(0.1)} className="flex flex-col gap-4">
+          <PhotoFrame
+            photo={photo("banquet")}
+            className="min-h-55 flex-[1.4]"
+            position="center 40%"
+            sizes="(max-width: 1024px) 100vw, 45vw"
+            priority
+          />
+          <div className="grid flex-1 grid-cols-2 gap-4">
+            <PhotoFrame
+              photo={photo("fall-05")}
+              className="min-h-35"
+              sizes="(max-width: 1024px) 50vw, 22vw"
+            />
+            <PhotoFrame
+              photo={photo("fall-07")}
+              className="min-h-35"
+              sizes="(max-width: 1024px) 50vw, 22vw"
+            />
           </div>
         </div>
       </section>
 
-      <Partners heading="Our Amazing Partners!" />
+      {/* History */}
+      <section className="px-5 pb-16 sm:px-14">
+        <div
+          data-reveal="up"
+          className="grid items-stretch gap-12 border-t border-misa-hairline pt-11 lg:grid-cols-[0.85fr_1.15fr]"
+        >
+          <div className="flex flex-col">
+            <h2 className="mb-6 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] sm:text-[42px]">
+              History of MISA
+            </h2>
+            {/* 🪤 PhotoFrame renders the image with next/image's `fill`, which
+                absolutely positions it. That is load-bearing here: with an
+                intrinsically sized image the frame grows to the photo's own
+                height and leaves a large void beside the column on the right. */}
+            <PhotoFrame
+              photo={photo("fall-10")}
+              className="min-h-85 flex-1"
+              position="center 25%"
+              duotone
+              sizes="(max-width: 1024px) 100vw, 35vw"
+            />
+          </div>
 
-      <section className="px-6 py-20">
-        <div className="mx-auto max-w-4xl">
-          <h2 className="font-display text-3xl font-extrabold sm:text-4xl">
-            Frequently Asked Questions
-          </h2>
-          {/* Plain Q&A list, not an accordion — matches the original. */}
-          <dl className="mt-10 flex flex-col gap-8">
-            {FAQ.map((item) => (
-              <div key={item.q}>
-                <dt className="text-sm font-semibold tracking-wide">{item.q}</dt>
-                <dd className="mt-2 leading-7 text-foreground/80">{item.a}</dd>
+          <div className="flex flex-col gap-4.5">
+            {HISTORY_CARDS.map((card) => (
+              <div key={card.eyebrow} className="border border-misa-border px-7 py-6.5">
+                <p className="text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-blue">
+                  {card.eyebrow}
+                </p>
+                <p className="mt-3 leading-[1.7] text-misa-body">{card.body}</p>
               </div>
             ))}
-          </dl>
+            <KpiPlate stats={HISTORY_STATS} />
+          </div>
         </div>
       </section>
+
+      {/* Full-bleed duotone band */}
+      <section className="grid grid-cols-2 sm:grid-cols-4" aria-hidden="true">
+        {BAND.map((id) => (
+          <PhotoFrame
+            key={id}
+            photo={photo(id)}
+            className="aspect-square"
+            duotone
+            border="none"
+            sizes="(max-width: 640px) 50vw, 25vw"
+          />
+        ))}
+      </section>
+
+      {/* FAQ */}
+      <section className="border-t border-misa-hairline bg-misa-panel px-5 py-16 sm:px-14 sm:pb-18">
+        <h2
+          data-reveal="up"
+          className="mb-8 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] sm:text-[42px]"
+        >
+          Frequently Asked Questions
+        </h2>
+        <dl className="grid gap-5 lg:grid-cols-2">
+          {FAQ.map((item, i) => (
+            <div
+              key={item.q}
+              data-reveal="up"
+              // The <dl> fills left-to-right, so every second card is the
+              // right-hand one of its row and trails it slightly.
+              style={revealDelay(i % 2 === 1 ? 0.05 : 0)}
+              className="border border-misa-border bg-white px-7 pt-6.5 pb-7"
+            >
+              <dt className="mb-3 border-b border-misa-hairline pb-3 font-display text-[26px] leading-[1.08] font-semibold tracking-[-0.01em] text-misa-blue">
+                {item.q}
+              </dt>
+              <dd className="text-[15px] leading-[1.65] text-misa-secondary">{item.a}</dd>
+            </div>
+          ))}
+        </dl>
+
+        {/* The band that closes the list. The handoff puts it inside the <dl>
+            spanning both columns; it sits just after instead, because a <div>
+            in a <dl> may only hold a dt/dd pair and this holds neither. Same
+            position on screen — the 20px gap becomes the same top margin. */}
+        <div
+          data-reveal="up"
+          className="on-navy mt-5 flex flex-wrap items-center justify-between gap-6 bg-misa-blue px-7 py-6.5 text-white"
+        >
+          <p className="leading-[1.6] text-white/85">
+            Still have a question? Email us — we answer every one.
+          </p>
+          <a href={`mailto:${CONTACT_EMAIL}`} className={BUTTON_SOLID_WHITE}>
+            {CONTACT_EMAIL}
+          </a>
+        </div>
+      </section>
+
+      <Partners ground="white" />
     </>
   );
 }

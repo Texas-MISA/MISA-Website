@@ -6,6 +6,40 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — Public UI overhaul (2026-08-14, doc v1.58)
+
+**No migration. No Server Action, RLS or schema change.** The public pages were rebuilt against the design handoff in `docs/Texas MISA website UI mockups/design_handoff_misa_website/` — five prototypes plus a token/type/spacing spec. Navy `#16305c` on white, Barlow + Barlow Condensed, square corners, hairline borders, the chevron hero preserved, real photography and partner logos committed to `public/`.
+
+Decisions confirmed with the officer before starting, and each one diverges from something:
+
+- **Follow the mockup nav exactly** — `Admin` is a header nav item now (→ `/admin/login`) and the footer sign-in link is gone. 🔓 **This reverses a documented invariant**, so it is rewritten in `CLAUDE.md` and argued in doc v1.58 rather than left to go stale. The footer link existed because the header had no room; the redesign frees it by moving the socials down and dropping Contact from the nav. **Re-measured: 285px clearance at 1280, 460px at 1646.**
+- ⚠️ **`/contact` stays a route but leaves the desktop nav.** The handoff has no Contact page. The mobile sheet still carries it.
+- ⚠️ **Officer headshots stay placeholders.** The bundle ships them; its README says the pairing was never supplied. `Officer.photo` is optional and unset.
+- **The design language extends to the pages the handoff never drew** — `/attend`, `/lookup`, `/leaderboard`, `/contact`, `/officer-invite`, plus the public error and not-found boundaries. Logic untouched: `/leaderboard` keeps `force-dynamic` and its noindex, `/lookup` keeps its noindex, the invite page keeps no help text and no client-side length rule. `/admin` inherits the new tokens only.
+
+Two traps found by breaking, both now invariants:
+
+- 🪤 **Unlayered global CSS beats every Tailwind v4 utility.** A bare `a { color }` overrode `text-white` and rendered the header's Check In button navy-on-navy — a solid rectangle with nothing in it. Element defaults belong in `@layer base`, decorative classes in `@layer components`.
+- 🪤 **`revealDelay()` cannot be exported from a `"use client"` module** — `/about` failed to prerender with "Attempted to call revealDelay() from the server". The helper is `components/ui/reveal.tsx` (server-safe) and the observer is `reveal-observer.tsx`, mounted once in the public layout; that split is what keeps every animated section a Server Component.
+
+**Verified:** `npm run lint` and `npm run build` clean, `tests/docs.test.ts` green, all ten public routes 200, and a browser pass over the five designed pages plus `/attend`, `/leaderboard` and `/admin/login` against the remote.
+
+**Still open:** the real MISA logo (`misa.zip - 1.png`) is named in the handoff README but **not in the bundle**, so the wordmark is still CSS. Activity and project photography are still hatched placeholders. `PHOTOS[].category` in `lib/site.ts` is a provisional guess and the gallery filter sorts on it. Mobile breakpoints are reasoned rather than measured — the prototypes are desktop-only with no breakpoints authored, and the browser tool could not resize the window; **check a real phone before launch.**
+
+---
+
+## Done — Documentation reorganisation (2026-08-14)
+
+`CLAUDE.md` was 169 KB and most of it was history, so an agent paid for the whole build log on every session before reading a line of code. It is now the working brief — current state, the invariants in short form, the traps — at 46 KB, and the material it carried moved out **verbatim**:
+
+- [`docs/build-log.md`](docs/build-log.md) — the stage-by-stage record that was `## Repository status`.
+- [`docs/invariants.md`](docs/invariants.md) — the long form of every invariant, with the measurement or failure behind it. **The short form in `CLAUDE.md` is the rule; that file is why.** Keep them in step; if they ever disagree, fix the disagreement rather than picking a side.
+- [`docs/operations.md`](docs/operations.md) — the dev-server, Supabase CLI and test-suite traps in full.
+
+⚠️ **`tests/docs.test.ts` constrains what may be trimmed from `CLAUDE.md` and it was re-run against the rewrite.** The `## Layout` block must still name every `lib/*.ts` and `app/actions/*.ts` module, and both `## Layout` and `## Working agreements` must remain as headings in that order — `section()` throws on a missing one. Layout annotations were cut to a line each; §10 keeps the full reasoning, which is the split the test already assumes.
+
+---
+
 ## Done — Officer invite links (2026-08-10, migration 24, doc v1.56)
 
 Officers are added from `/admin/officers` by an expiring link instead of a `scripts/create-officer.mjs` run needing the production service role key. The script stays: it is the bootstrap path on a fresh project and the recovery path when nobody can sign in. **Nothing is emailed** — there is no SMTP, which is also what makes Supabase's own `inviteUserByEmail` unusable; the officer copies the link and sends it themselves.

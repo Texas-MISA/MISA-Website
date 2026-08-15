@@ -1,33 +1,34 @@
-import Link from "next/link";
-
 import { createClient } from "@/lib/supabase/server";
 
 import type { Database } from "@/lib/types/database";
 
-// Live schedule section. Not part of the original txmisa.org — this is the
-// Stage 2 exit criterion and the reason this app exists (docs §7, Stage 2).
+// Live schedule column. Not part of the original txmisa.org and not part of
+// the design handoff's static prototype either — this is the Stage 2 exit
+// criterion and the reason this app exists (docs §7, Stage 2). The handoff's
+// three hardcoded rows are the shape; these are the real ones.
 
 type EventRow = Pick<
   Database["public"]["Tables"]["events"]["Row"],
-  "id" | "title" | "description" | "location" | "starts_at" | "ends_at" | "category"
+  "id" | "title" | "location" | "starts_at" | "ends_at"
 >;
 
 // All times are wall-clock Central, matching term_of()'s America/Chicago
 // anchor (§4.7) — the server runs in UTC, so never format without a zone.
+// Formatting stays in this Server Component: Intl in a Client Component
+// produces a hydration diff between two strings that look identical.
 const CENTRAL = "America/Chicago";
 
-function formatEventTime(startsAt: string, endsAt: string): string {
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: CENTRAL,
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-  // formatRange collapses the shared date: "Tue, Sep 1, 6:00 – 7:00 PM".
-  return fmt.formatRange(new Date(startsAt), new Date(endsAt));
-}
+const DATE = new Intl.DateTimeFormat("en-US", {
+  timeZone: CENTRAL,
+  month: "short",
+  day: "2-digit",
+});
+
+const TIME = new Intl.DateTimeFormat("en-US", {
+  timeZone: CENTRAL,
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 async function fetchUpcomingEvents(): Promise<
   { kind: "ok"; events: EventRow[] } | { kind: "error" }
@@ -37,15 +38,16 @@ async function fetchUpcomingEvents(): Promise<
   // filter stays explicit so the query states its own intent.
   const { data, error } = await supabase
     .from("events")
-    .select("id, title, description, location, starts_at, ends_at, category")
+    .select("id, title, location, starts_at, ends_at")
     .eq("status", "published")
     .gt("starts_at", new Date().toISOString())
     .order("starts_at", { ascending: true })
     .limit(10);
 
   if (error) {
-    // A broken schedule read shouldn't take down the landing page; log for the
-    // function logs and render the fallback.
+    // 🔓 A failed read must never render as an affirmative absence. Log for
+    // the function logs and return the error case, so the section says
+    // something went wrong rather than "no events are scheduled".
     console.error("upcoming events query failed:", error.message);
     return { kind: "error" };
   }
@@ -56,56 +58,45 @@ export async function UpcomingEvents() {
   const result = await fetchUpcomingEvents();
 
   return (
-    <section className="bg-white px-6 py-20">
-      <div className="mx-auto max-w-3xl">
-        <h2 className="text-center font-display text-3xl font-extrabold sm:text-4xl">
-          Upcoming Events
-        </h2>
-        <p className="mt-3 text-center text-sm text-foreground/70">
-          At an event right now?{" "}
-          <Link
-            href="/attend"
-            className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
-          >
-            Check in here
-          </Link>
-          .
-        </p>
+    <div data-reveal="up" style={{ "--reveal-delay": "0.1s" } as React.CSSProperties}>
+      <h2 className="mb-4 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] text-misa-blue sm:text-[42px]">
+        Upcoming Events
+      </h2>
 
-        <div className="mt-10">
-          {result.kind === "error" ? (
-            <p className="text-center text-foreground/70">
-              The schedule couldn&apos;t be loaded right now — check back soon.
-            </p>
-          ) : result.events.length === 0 ? (
-            <p className="text-center text-foreground/70">
-              No upcoming events are scheduled yet — check back soon.
-            </p>
-          ) : (
-            <ul className="flex flex-col gap-4">
-              {result.events.map((event) => (
-                <li
-                  key={event.id}
-                  className="border-l-4 border-misa-blue bg-misa-panel px-5 py-4"
-                >
-                  <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between">
-                    <h3 className="font-display text-lg font-bold">{event.title}</h3>
-                    <p className="text-sm text-foreground/70">
-                      {formatEventTime(event.starts_at, event.ends_at)} CT
-                    </p>
-                  </div>
-                  {event.location && (
-                    <p className="mt-1 text-sm text-foreground/70">{event.location}</p>
-                  )}
-                  {event.description && (
-                    <p className="mt-2 text-sm text-foreground/80">{event.description}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </section>
+      {result.kind === "error" ? (
+        <p className="text-misa-secondary">
+          The schedule couldn&apos;t be loaded right now — check back soon.
+        </p>
+      ) : result.events.length === 0 ? (
+        <p className="text-misa-secondary">
+          No upcoming events are scheduled yet — check back soon.
+        </p>
+      ) : (
+        <ul className="border-t border-misa-border">
+          {result.events.map((event) => {
+            const startsAt = new Date(event.starts_at);
+            return (
+              <li
+                key={event.id}
+                className="grid grid-cols-[92px_1fr] items-baseline gap-4 border-b border-misa-border py-3.5"
+              >
+                <span className="text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-blue">
+                  {DATE.format(startsAt)}
+                </span>
+                <span>
+                  <span className="block font-display text-[21px] leading-[1.1] font-semibold">
+                    {event.title}
+                  </span>
+                  <span className="text-[13px] leading-normal text-misa-muted">
+                    {event.location ? `${event.location} · ` : ""}
+                    {TIME.format(startsAt)}
+                  </span>
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

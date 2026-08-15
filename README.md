@@ -69,7 +69,10 @@ docs/             architecture, decisions, and the site inventory
 ## Documentation
 
 - **[`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md)** — the source of truth. Schema, staged build plan, and the reasoning behind every decision that was hard to make. Start here.
-- **[`CLAUDE.md`](CLAUDE.md)** — invariants and traps. Read before changing anything; several entries record a bug that cost hours and would otherwise be reintroduced.
+- **[`CLAUDE.md`](CLAUDE.md)** — the working brief: current state, the invariants in short form, and the traps. Read before changing anything; several entries record a bug that cost hours and would otherwise be reintroduced.
+- **[`docs/invariants.md`](docs/invariants.md)** — the same invariants at length, each with the measurement or failure behind it. Read the entry here before deciding a rule no longer applies.
+- **[`docs/build-log.md`](docs/build-log.md)** — the stage-by-stage record of what shipped, what broke, and what each walkthrough found.
+- **[`docs/operations.md`](docs/operations.md)** — dev-server, Supabase CLI and test-suite traps, in full.
 - **[`tasks.md`](tasks.md)** — short-horizon checklist and the current handoff state.
 - **[`docs/attend-confirmation-flow.md`](docs/attend-confirmation-flow.md)** — the `/attend` first-time confirmation spec.
 - **[`docs/dues-and-membership.md`](docs/dues-and-membership.md)** — how dues are reconciled from Venmo statements, and why membership status is calculated rather than ticked.

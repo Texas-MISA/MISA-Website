@@ -94,7 +94,7 @@ export default async function OfficerInvitePage({
   return (
     <section className="px-6 py-16 sm:py-20">
       <div className="mx-auto max-w-xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[34px] leading-[1.02] font-semibold tracking-[-0.02em] sm:text-[42px]">
           Set up your officer account
         </h1>
 
@@ -125,14 +125,14 @@ function Unusable({
   return (
     <section className="px-6 py-16 sm:py-20">
       <div className="mx-auto max-w-xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[34px] leading-[1.02] font-semibold tracking-[-0.02em] sm:text-[42px]">
           This invitation can&apos;t be used
         </h1>
         <p className="mt-4 border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm">
           {message}
         </p>
         {showSignIn ? (
-          <p className="mt-6 text-sm text-foreground/70">
+          <p className="mt-6 text-sm text-misa-muted">
             <Link
               href="/admin/login"
               className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
