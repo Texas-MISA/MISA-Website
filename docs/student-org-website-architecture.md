@@ -1,8 +1,46 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.59
+**Version:** 1.60
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.60: the home page marquee was never seamless.** Reported and fixed
+> 2026-08-14. The navy gallery band's two tracks showed a hard end and a snap
+> once per cycle, and the rows looked like they were changing direction. **No
+> schema, no data, no route** — two files.
+>
+> 🪤 **The cause is a recipe that is only conditionally correct.** "Duplicate
+> the tile group exactly twice and translate -50%" is the standard CSS marquee
+> and it is seamless **only when one group is wider than the viewport** — a
+> precondition nothing in the code states. Neither track met it: measured on
+> production at a 1646px viewport, the groups are **1360px** and **1272px**, so
+> each cycle ended with **286px** and **374px** of bare navy before snapping.
+> The lower track runs in reverse, so its hole opened at the start of its cycle
+> while the upper track's opened at the end — the two rows broke at opposite
+> moments, which is why it was reported as the rows interchanging direction.
+> The directions themselves are the handoff's spec and were never wrong.
+>
+> **The geometry is now derived rather than assumed.** `GAP` and `TILE` are
+> constants; `groupWidth`, the number of copies
+> (`ceil(MAX_VIEWPORT / groupWidth) + 1`), and the translate distance all come
+> from them. The distance reaches CSS as an exact pixel value in
+> `--marquee-shift` rather than a percentage, because **a percentage is
+> implicitly a function of the copy count** — that coupling is what made the
+> original break silently. One `marquee-scroll` keyframe block now serves both
+> tracks, the lower one via `animation-direction: reverse`.
+>
+> ⚠️ **`MAX_VIEWPORT` (4000px) is a ceiling, not a margin** — beyond it the gap
+> returns — and is documented at its definition alongside the formula.
+>
+> 📌 **The hover pause is gone.** The handoff only suggested it, and a
+> full-width track freezes under any resting mouse, which reads as breakage.
+> `prefers-reduced-motion` still stops both tracks.
+>
+> 🪤 **The generalisable lesson is about how it was verified, not what broke.**
+> The original was signed off by watching it, and a 38-second loop hides a
+> defect that appears for two seconds at the wrap. The check that finds it is
+> numeric: pause the animation across a full cycle and assert the track's right
+> edge never falls left of the viewport's.
 
 > **v1.59: the photography comes back out.** Requested 2026-08-14, hours after
 > v1.58 shipped it. Every image slot on every public page now renders a hatched

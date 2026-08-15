@@ -6,6 +6,20 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — Home page marquee made genuinely seamless (2026-08-14, doc v1.60)
+
+Reported as "it stops or moves left to right interchangeably, and has a noticeable end". Three symptoms, two causes, no migration.
+
+🪤 **"Duplicate the group twice and translate -50%" is seamless only when one group is wider than the viewport** — a precondition the code never stated. Measured at 1646px: groups of **1360px** and **1272px**, so each cycle ended **286px** and **374px** short and snapped. The lower track runs in reverse, so its hole opened at the *start* of its cycle and the upper track's at the *end* — that mismatch is what read as the rows changing direction. The opposed directions are the handoff's spec and were confirmed with the officer as correct before anything was touched.
+
+**Separately, the hover pause is gone.** Full-width tracks froze under any resting mouse. `prefers-reduced-motion` still stops both.
+
+**Now derived, not assumed:** `GAP` and `TILE` are constants; `groupWidth`, copies (`ceil(MAX_VIEWPORT / groupWidth) + 1`) and the translate distance all come from them, and the distance reaches CSS as an exact pixel value (`--marquee-shift`) rather than a percentage — a percentage is implicitly a function of the copy count. ⚠️ `MAX_VIEWPORT` (4000px) is a ceiling, not a margin.
+
+🪤 **The lesson is the verification.** The original shipped after being watched; a 38s loop hides a two-second defect. Pause the animation across a full cycle and assert the right edge never falls left of the viewport — 40 steps, both tracks now pass with 2468px and 3442px of surplus. ⚠️ Real-time motion is **not** confirmable in the automation browser (the tab suspends frames), so that half rests on the bug report.
+
+---
+
 ## Done — All photography removed from the frontend (2026-08-14, doc v1.59)
 
 Requested hours after the UI overhaul shipped it. Every image slot on every public page is now a hatched placeholder captioned with the shot that belongs there. The layout is untouched — same frames, aspect ratios and tile counts — so real photography later is a swap, not a re-layout.

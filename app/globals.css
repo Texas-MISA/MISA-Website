@@ -142,40 +142,38 @@
 
   /* ── Homepage gallery marquees ──────────────────────────────────────────── */
 
-  /* Each track holds its tile group duplicated EXACTLY TWICE, and each group
-     carries a trailing padding equal to the flex gap — that is what makes the
-     -50% translate land seamlessly. Change one without the other and the loop
-     visibly jumps. */
-  @keyframes mq {
+  /* 🪤 The track translates by EXACTLY ONE GROUP WIDTH, in pixels, which the
+     component measures and passes down as `--marquee-shift`. It used to be a
+     -50% that assumed exactly two copies — and two copies only covers the
+     screen when one group is wider than it, which neither of these is. The
+     result was a hard end and a snap; the header of
+     app/(public)/_components/gallery-marquee.tsx carries the measurements.
+
+     A pixel shift decouples the distance from the copy count, so the component
+     is free to render as many copies as the viewport needs. */
+  @keyframes marquee-scroll {
     from {
       transform: translateX(0);
     }
     to {
-      transform: translateX(-50%);
+      transform: translateX(calc(var(--marquee-shift) * -1));
     }
   }
 
-  @keyframes mqr {
-    from {
-      transform: translateX(-50%);
-    }
-    to {
-      transform: translateX(0);
-    }
-  }
-
+  /* One keyframe block, two speeds. `reverse` is what sends the lower track
+     rightward — the handoff's opposed directions, without a second almost
+     identical @keyframes to keep in step with the first. */
   .marquee-left {
-    animation: mq 38s linear infinite;
+    animation: marquee-scroll 38s linear infinite;
   }
 
   .marquee-right {
-    animation: mqr 46s linear infinite;
+    animation: marquee-scroll 46s linear infinite reverse;
   }
 
-  .marquee-left:hover,
-  .marquee-right:hover {
-    animation-play-state: paused;
-  }
+  /* 📌 No pause on hover. The handoff only suggested one, and the tracks span
+     the full width — so a mouse resting anywhere over the band froze a row,
+     which reads as the animation being broken rather than as a feature. */
 
   /* ── Scroll reveal ──────────────────────────────────────────────────────── */
 
