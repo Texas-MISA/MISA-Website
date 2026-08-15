@@ -6,6 +6,16 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — /about's history row starts level (2026-08-15, doc v1.63)
+
+Reported with a screenshot: the portrait began ~66px below the first text card beside it. One file.
+
+📌 **A heading inside a grid column offsets that column and nothing else.** "History of MISA" was the left column's first child, so it pushed the portrait down while the right column started at the row top. It is now a sibling above the grid — visually identical, both columns level. Measured: tops 982/982, bottoms 1490/1490.
+
+⚠️ **Structural, not a hand-tuned `lg:mt-[66px]`** — the heading changes size at `sm` and wraps on narrow screens, so an offset is right at exactly one width. `flex-1` came off the portrait with the move; `items-stretch` already does that job for a grid child.
+
+---
+
 ## Done — Navy ground removed from the home-page gallery band (2026-08-15, doc v1.62)
 
 Requested directly. One component file, no migration, and the marquee geometry is untouched.

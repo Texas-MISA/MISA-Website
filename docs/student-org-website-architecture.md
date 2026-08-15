@@ -1,8 +1,25 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.62
+**Version:** 1.63
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.63: /about's history row starts level.** Requested 2026-08-15 with a
+> screenshot. One file.
+>
+> 📌 **A heading inside a grid column offsets that column, and only that
+> column.** "History of MISA" lived in the left column above the portrait, so
+> the portrait began ~66px below the first card beside it. The heading is now a
+> sibling *above* the grid — visually identical, since it is left-aligned and
+> the portrait still sits directly under it, but both columns now begin on the
+> same line. **Measured: image top 982, card top 982, and both columns end at
+> 1490** (the portrait stretches to the row).
+>
+> ⚠️ **The fix is structural rather than a hand-tuned offset**, deliberately: an
+> `lg:mt-[66px]` on the right column would be correct at exactly one heading
+> size, and the heading changes size at `sm` and wraps on narrow screens.
+> `flex-1` came off the portrait with the move — it was carrying the fill inside
+> the old flex column, and as a direct grid item `items-stretch` does that job.
 
 > **v1.62: the home page's gallery band lost its navy ground.** Requested
 > 2026-08-15. One component file plus the notes; no schema, no route, no change

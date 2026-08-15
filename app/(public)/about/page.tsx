@@ -60,34 +60,40 @@ export default function AboutPage() {
 
       {/* History */}
       <section className="px-5 pb-16 sm:px-14">
-        <div
-          data-reveal="up"
-          className="grid items-stretch gap-12 border-t border-misa-hairline pt-11 lg:grid-cols-[0.85fr_1.15fr]"
-        >
-          <div className="flex flex-col">
-            <h2 className="mb-6 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] sm:text-[42px]">
-              History of MISA
-            </h2>
+        <div data-reveal="up" className="border-t border-misa-hairline pt-11">
+          {/* 📌 The heading sits ABOVE the grid, not inside the left column.
+              It reads as the left column's heading either way because it is
+              left-aligned and the portrait is directly under it — but inside
+              the column it also pushed the portrait down by its own height,
+              so the first card on the right started ~66px higher than the
+              image beside it. Out here both columns begin on the same line,
+              and they stay aligned when the heading wraps or changes size at
+              the sm breakpoint, which a hand-tuned offset would not. */}
+          <h2 className="mb-6 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] sm:text-[42px]">
+            History of MISA
+          </h2>
+
+          <div className="grid items-stretch gap-12 lg:grid-cols-[0.85fr_1.15fr]">
             {/* 🪤 When a photo lands here it must be sized with next/image's
                 `fill`. With an intrinsically sized image the frame grows to
                 the photo's own height and leaves a large void beside the
                 column on the right — the handoff hit this in its prototype. */}
             <Hatch
               caption="chapter portrait"
-              className="min-h-85 flex-1 border border-misa-border"
+              className="min-h-85 border border-misa-border"
             />
-          </div>
 
-          <div className="flex flex-col gap-4.5">
-            {HISTORY_CARDS.map((card) => (
-              <div key={card.eyebrow} className="border border-misa-border px-7 py-6.5">
-                <p className="text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-blue">
-                  {card.eyebrow}
-                </p>
-                <p className="mt-3 leading-[1.7] text-misa-body">{card.body}</p>
-              </div>
-            ))}
-            <KpiPlate stats={HISTORY_STATS} />
+            <div className="flex flex-col gap-4.5">
+              {HISTORY_CARDS.map((card) => (
+                <div key={card.eyebrow} className="border border-misa-border px-7 py-6.5">
+                  <p className="text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-blue">
+                    {card.eyebrow}
+                  </p>
+                  <p className="mt-3 leading-[1.7] text-misa-body">{card.body}</p>
+                </div>
+              ))}
+              <KpiPlate stats={HISTORY_STATS} />
+            </div>
           </div>
         </div>
       </section>
