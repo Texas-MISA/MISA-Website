@@ -1,8 +1,30 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.63
+**Version:** 1.64
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.64: manual dues entry is planned, not built.** Requested 2026-08-15.
+> **Docs only — no code, no migration.** The plan lives in
+> `docs/dues-and-membership.md` (*Planned — manual dues entry*); §5 lists
+> `/admin/dues/new` as NOT BUILT and `tasks.md` carries it with a trigger.
+>
+> 🔓 **The design constraint is that it records a PAYMENT, not a status.** A
+> `dues_payments` row keeps `member_directory.dues_paid_current_term` deriving
+> exactly as it does now and inherits the edit, void and audit paths untouched.
+> The "Paid dues" toggle is the version that must not be built, and migration 19
+> §6 already makes it unbuildable by reserving `dues`, `dues_paid` and
+> `dues_paid_current_term` as custom-field keys — §4.5's argument stands.
+>
+> ⚠️ **Four columns currently refuse a manual row, and one of them is a
+> boundary rather than an obstacle.** `venmo_txn_id` (NOT NULL, uniquely
+> indexed), `import_batch_id` (NOT NULL) and the `imported_*` naming all relax
+> or get re-documented. `amount_cents > 0` does **not**: a comped membership is
+> `0`, which is a receipt for money that never arrived, and that is a separate
+> decision rather than a side effect of this one. 🪤 The unique index must
+> become **partial** (`where venmo_txn_id is not null`) rather than dropped — it
+> spans voided rows on purpose, and a synthesised `manual:<uuid>` id would make
+> every reader of that column wrong about what it holds.
 
 > **v1.63: /about's history row starts level.** Requested 2026-08-15 with a
 > screenshot. One file.
@@ -2824,6 +2846,12 @@ $$;
 /admin/dues/[id]       Payment detail — reassign the member, correct the term
                        or the term count, void it with a reason, and its
                        history                       (Stage 6.5 phase 3)
+/admin/dues/new        Record a payment that did not arrive through Venmo — cash,
+                       Zelle, a transfer to the wrong account. It writes a
+                       dues_payments ROW, not a flag: dues status stays derived,
+                       so this inherits the existing edit and void paths
+                       unchanged. Plan in docs/dues-and-membership.md
+                                                                   (NOT BUILT)
 /admin/attendance      Review queue — all submissions, filterable by status
 /admin/attendance/new  Officer manual entry — the recovery path for a member the
                        check-in form refused                    (Stage 5 phase 3)

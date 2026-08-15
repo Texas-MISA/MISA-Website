@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | [`docs/build-log.md`](docs/build-log.md) | Stage-by-stage history — what shipped each phase, what broke, what the walkthroughs found. Read it when you need to know *why* something is the way it is. |
 | [`docs/invariants.md`](docs/invariants.md) | The long form of the Invariants below, with the measurements and failures behind each rule. **The short form here is the rule; that file is the evidence.** |
 | [`docs/operations.md`](docs/operations.md) | Dev-server, Supabase CLI and test-suite traps in full. |
-| [`docs/dues-and-membership.md`](docs/dues-and-membership.md) | Stage 6.5 spec, including the real Venmo CSV format. |
+| [`docs/dues-and-membership.md`](docs/dues-and-membership.md) | Stage 6.5 spec, including the real Venmo CSV format — and the plan for **manual dues entry**, which is written down but NOT BUILT. |
 | [`docs/attend-confirmation-flow.md`](docs/attend-confirmation-flow.md) | `/attend`'s first-time confirmation and the accepted membership-oracle tradeoff. |
 | [`docs/existing-site-inventory.md`](docs/existing-site-inventory.md) | What was reproduced from the old Squarespace site and what is a placeholder. |
 
@@ -188,7 +188,7 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 
 ### Dues and terms
 
-- **Dues status is calculated, never ticked.** "Official member" means a non-voided `dues_payments` row whose `covered_terms` includes `current_term()`, surfaced as `member_directory.dues_paid_current_term`. It gates nothing (§9 #12). ⚠️ `dues`, `dues_paid` and `dues_paid_current_term` are **reserved custom-field keys**, and archiving a definition does not free its key.
+- **Dues status is calculated, never ticked.** "Official member" means a non-voided `dues_payments` row whose `covered_terms` includes `current_term()`, surfaced as `member_directory.dues_paid_current_term`. It gates nothing (§9 #12). ⚠️ `dues`, `dues_paid` and `dues_paid_current_term` are **reserved custom-field keys**, and archiving a definition does not free its key. 📋 The planned manual-entry path (`/admin/dues/new`, **NOT BUILT** — plan in `docs/dues-and-membership.md`) does not weaken any of this: it records a **payment row**, so the derivation is untouched and edit, void and audit come for free.
 - 🔓 **The dedupe key is Venmo's transaction ID; a content fingerprint is not an acceptable substitute** — two members can send $30 in the same minute with the note "dues". The unique index **spans voided rows**, so re-importing never resurrects a voided payment.
 - **Nothing that arrived as money is dropped on the floor.** An odd amount, an unreadable note, no note — the row is stored and queued. **A payment note never creates a member**, and matching is exact-match only. The review axis is a **nullable `terms_covered`**, so an undecided row covers nothing: the failure direction is under-reporting, which the queue makes visible.
 - **`dues_payments.member_id` is `on delete restrict`**, diverging from `point_adjustments`' cascade on purpose — the row records that money arrived.

@@ -1,5 +1,11 @@
 # Dues & membership status — Venmo reconciliation
 
+📋 **One planned addition, not built:** a way to record a payment that did not
+arrive through Venmo — cash, Zelle, a wrong account. The plan is the *Planned —
+manual dues entry* section below; the short version is that it records a
+**payment row**, never a status flag, and needs one migration to relax four
+columns that assumed Venmo was the only source.
+
 **Status:** ✅ **COMPLETE — all 4 phases.** Phases 1–3 on 2026-08-06 (migration
 19, `lib/dues.ts`, `lib/roster-index.ts`, `app/actions/dues.ts`,
 `/admin/dues/import`, the ledger at `/admin/dues` and the editor at
@@ -359,6 +365,91 @@ column renders **Paid / Not Paid**.
 The detail page reads that member's `dues_payments` rows directly and shows
 what they are paid through — ordered by `termsFrom` semantics, never by a
 string compare.
+
+## 📋 Planned — manual dues entry (NOT BUILT, requested 2026-08-15)
+
+A way for an officer to mark a member as having paid when the money did not come
+through the Venmo statement: cash at a meeting, Zelle, a transfer to the wrong
+account, a payment Venmo exported after the officer had already reconciled that
+month.
+
+**The whole plan turns on one sentence: this records a PAYMENT, not a status.**
+It writes a `dues_payments` row, so `member_directory.dues_paid_current_term`
+keeps deriving the answer exactly as it does today and the manual row inherits
+the edit path (`savePayment`), the void path (`voidPayment`), the audit trail
+and the term arithmetic without any of them being touched. **What must not be
+built is the obvious version** — a "Paid dues" toggle on the member page.
+Migration 19 §6 reserves `dues`, `dues_paid` and `dues_paid_current_term` as
+custom-field keys precisely to make that unbuildable, and §4.5's argument is
+unchanged: two answers to one question with nothing to say which is right.
+
+### The schema does not accept a manual row yet — four columns say so
+
+Every one of these is a NOT NULL or a CHECK written when Venmo was the only
+source, so this needs **one migration** (next unclaimed number; local and remote
+are at 25):
+
+1. **`venmo_txn_id text not null`, uniquely indexed.** A cash payment has no
+   transaction id. Make the column **nullable**, make the unique index
+   **partial** (`where venmo_txn_id is not null`) — which keeps the property
+   that matters, that it still **spans voided rows** — and add a `source` column
+   (`'venmo_import' | 'manual'`, default `'venmo_import'`) with a CHECK that a
+   `venmo_import` row must carry an id. ⚠️ Do **not** synthesise a fake id like
+   `manual:<uuid>`: it makes every reader of that column wrong about what it
+   means, and the import's dedupe is the one thing in this schema that must stay
+   obviously correct.
+2. **`import_batch_id uuid not null`.** Nullable, covered by the same
+   source CHECK. Consequence to accept: bulk-void-by-batch stays an
+   import-only tool, which is right — there is no batch to undo.
+3. **`imported_by` / `imported_at`.** Keep the names, keep them NOT NULL, and
+   document that on a manual row they mean *who typed it and when*. A rename
+   churns every reader for a wording improvement.
+4. **`amount_cents integer check (amount_cents > 0)`.** Fine for cash. ⚠️ **A
+   comped or waived membership is deliberately OUT OF SCOPE**, because it is
+   `amount_cents = 0` and a receipt for money that never arrived is a different
+   concept from a payment — decide it separately rather than relaxing the check
+   as a side effect of this.
+
+### The rest is a straight copy of paths that already exist
+
+- **`app/actions/dues.ts` gains `createPayment`** — `getOfficer()` first,
+  returning `{status:"unauthorized"}` (never `requireOfficer()`, per the actions
+  invariant), one insert, one `admin_audit` row, `revalidatePath`. No CAS: an
+  insert has nothing to conflict with.
+- **`start_term` is set explicitly by the action and validated against
+  `startTermOptions(paidAt, …)`**, the same function `savePayment` already uses.
+  The column default is a fallback that asks `term_of(now())` and cannot see
+  `paid_at`; the manual form must not fall through to it. §4.7's May–July rule
+  applies unchanged, and the form should carry the same warning the import
+  preview does.
+- **`terms_covered` stays the review axis.** An officer typing a payment in
+  should normally decide 1 or 2 there and then, but leaving it null must remain
+  legal — the row then covers nothing and the member reads as Not Paid, which is
+  the correct failure direction and is already visible in the queue.
+- **`/admin/dues/new`**, modelled on `/admin/points/new`: member picker over
+  `fetchMemberOptions` (bounded by `MEMBER_SCAN_LIMIT`), amount, paid-at date,
+  start term, terms covered, and a free-text note for how it arrived. Entry
+  points from `/admin/dues` and from the member detail page's Dues section with
+  the member pre-filled. Unlike a grant, this is **one member per row** — a
+  payment is a receipt.
+- **`admin_audit`** already accepts `entity_type = 'dues_payment'` (migration
+  19 §4), so this needs no widening — only a new verb in the closed
+  `AuditAction` union in TypeScript.
+- **Tests**: extend `tests/dues-schema.test.ts` for the four relaxations above
+  (in particular: a manual row with a null `venmo_txn_id` inserts, two of them
+  coexist, and a `venmo_import` row without an id is rejected) and
+  `tests/dues-actions.test.ts` for `createPayment`. `seed.sql` stays at **0 dues
+  payments** — production is fabricated data and a fake receipt is worse than no
+  receipt.
+
+### The one question to settle before building
+
+**How is a manual payment distinguished on screen, and does it need to be?** The
+`source` column makes it possible; the argument for showing it is that "cash,
+recorded by Priya" and "Venmo txn 4429…" have very different evidentiary weight
+when a member disputes their status. The argument against is another column on a
+ledger that is already wide. Recommendation: show it on `/admin/dues/[id]` where
+there is room, not in the ledger.
 
 ## Consequences to accept, and say out loud
 
