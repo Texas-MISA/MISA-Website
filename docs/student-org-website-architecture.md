@@ -29,6 +29,16 @@
 > band still reads as its own section (the tile rows and the eyebrow link carry
 > it), but the handoff used the navy as the page's mid-point contrast, so this
 > is a deliberate divergence from the prototype rather than an oversight.
+>
+> 🪤 **A section's own padding changes meaning when its background goes.** The
+> band's `py-12 sm:pb-14` was the navy field's inset; with no field it simply
+> stacked on the neighbours' padding, leaving **112px of dead air above the
+> tiles and 108px below** — reported immediately as inconsistent with the rest
+> of the page, and correctly. It is now `pb-2 sm:pb-3` and the rhythm comes
+> from the sections either side, like every other seam here. **Measured after:
+> 81px above the tiles and 82px below**, against 46px from the mission
+> paragraph to the eyebrow link. Restoring the navy means restoring the inset
+> too — a full-bleed field with no padding would crop to the tiles.
 
 > **v1.61: the home page's upcoming-events section is unmounted, and the
 > mission is centred.** Requested 2026-08-14. One file, no schema, no data, no

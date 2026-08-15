@@ -14,6 +14,8 @@ Requested directly. One component file, no migration, and the marquee geometry i
 
 ⚠️ **The page now runs white from the hero chevron to the projects band.** Requested outcome, but the handoff used this navy as the mid-page contrast — a deliberate divergence, recorded rather than assumed.
 
+🪤 **The padding had to follow the background too** (caught by the officer straight after). `py-12 sm:pb-14` was the navy field's inset; with no field it stacked on the neighbours' and left 112px of dead air above the tiles and 108px below. Now `pb-2 sm:pb-3`, rhythm from the sections either side — measured at **81px above and 82px below**. Restoring the navy means restoring the inset.
+
 Verified in a browser on the production build: section background computes transparent, tiles are `hatch-light` + `border-misa-border`, `.on-navy` down to the hero and the projects band. Lint and build clean.
 
 ---

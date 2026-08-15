@@ -124,7 +124,15 @@ function Track({
 
 export function GalleryMarquee() {
   return (
-    <section className="py-12 sm:pb-14">
+    // 📌 The band carries almost no vertical padding of its own, deliberately.
+    // It used to carry py-12/pb-14 because it was a full-bleed navy field and
+    // that padding was the field's inset. On white there is no field, so that
+    // padding stacked on top of the neighbours' — 112px of dead air above the
+    // tiles and 108px below — and read as a gap rather than as rhythm. The
+    // spacing now comes from the sections either side (the mission's sm:py-16
+    // below it, Activities' pt-13 above), which is what every other seam on
+    // this page does.
+    <section className="pb-2 sm:pb-3">
       <div className="mb-[22px] flex justify-end px-5 sm:px-14">
         <Link
           href="/gallery"
