@@ -6,6 +6,22 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — All photography removed from the frontend (2026-08-14, doc v1.59)
+
+Requested hours after the UI overhaul shipped it. Every image slot on every public page is now a hatched placeholder captioned with the shot that belongs there. The layout is untouched — same frames, aspect ratios and tile counts — so real photography later is a swap, not a re-layout.
+
+🔓 **`public/photos/` was deleted rather than unlinked.** A file under `public/` is served at its own URL whether or not a page links it, so dropping the `<Image>` tags alone would have left thirteen photographs of identifiable students fetchable by anyone who had seen the old markup. The officer was given the choice and took deletion. ⚠️ The originals remain in the handoff bundle under `docs/`, which is also public — surfaced in the same question and accepted.
+
+**The four partner logos stayed** — the instruction was photography, confirmed rather than assumed.
+
+Removed with them, so nothing dangles: `PHOTOS` / `photo()` in `lib/site.ts`, `components/ui/photo-frame.tsx`, `Officer.photo`, and the duotone CSS. 🪤 The `fill` rule is kept as **guidance** in `lib/site.ts`'s header — the void-beside-the-column failure will be rediscovered the day photography returns otherwise.
+
+**Verified:** lint and build clean, all six public pages fetched and grepped (0 `/photos/` references, 4 partner-logo references), browser pass over home, About and gallery.
+
+**Still open, unchanged:** activity and project imagery, officer headshots (which carry a *second* blocker — the handoff's photo-to-name pairing was never supplied), the real MISA logo, and a mobile check on a real device.
+
+---
+
 ## Done — Public UI overhaul (2026-08-14, doc v1.58)
 
 **No migration. No Server Action, RLS or schema change.** The public pages were rebuilt against the design handoff in `docs/Texas MISA website UI mockups/design_handoff_misa_website/` — five prototypes plus a token/type/spacing spec. Navy `#16305c` on white, Barlow + Barlow Condensed, square corners, hairline borders, the chevron hero preserved, real photography and partner logos committed to `public/`.

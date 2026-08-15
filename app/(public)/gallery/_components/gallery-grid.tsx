@@ -4,15 +4,12 @@ import { useMemo, useState } from "react";
 
 import { BUTTON_OUTLINE_NAVY } from "@/components/ui/button";
 import { Hatch } from "@/components/ui/hatch";
-import { PhotoBlock } from "@/components/ui/photo-frame";
 import {
   GALLERY_FILTERS,
   GALLERY_ITEMS,
   GALLERY_PAGE_SIZE,
   GALLERY_TERM,
-  photo,
   type GalleryCategory,
-  type GalleryItem,
 } from "@/lib/site";
 
 // The masonry, its filter chips and its Load more button.
@@ -28,10 +25,6 @@ import {
 
 type Filter = "all" | GalleryCategory;
 
-function categoryOf(item: GalleryItem): GalleryCategory {
-  return item.kind === "photo" ? photo(item.id).category : item.category;
-}
-
 export function GalleryGrid({
   /** The feature figure, which the handoff puts between the bar and the grid.
       Passed in rather than rendered here so it stays server-rendered. */
@@ -46,7 +39,7 @@ export function GalleryGrid({
     () =>
       filter === "all"
         ? GALLERY_ITEMS
-        : GALLERY_ITEMS.filter((item) => categoryOf(item) === filter),
+        : GALLERY_ITEMS.filter((slot) => slot.category === filter),
     [filter]
   );
 
@@ -88,7 +81,7 @@ export function GalleryGrid({
           aria-live="polite"
         >
           {GALLERY_TERM} — {matching.length}{" "}
-          {matching.length === 1 ? "photo" : "photos"}
+          {matching.length === 1 ? "photo" : "photos"} to come
         </p>
       </section>
 
@@ -97,21 +90,15 @@ export function GalleryGrid({
       {/* CSS columns rather than a grid: the point of a masonry is that the
           items keep their own heights and the column flows around them. */}
       <section className="columns-2 gap-4 px-5 pt-6 pb-16 sm:px-14 lg:columns-4">
-        {visible.map((item, i) =>
-          item.kind === "photo" ? (
-            <div key={`${item.id}-${i}`} className="mb-4 break-inside-avoid">
-              <PhotoBlock photo={photo(item.id)} />
-            </div>
-          ) : (
-            <div key={`placeholder-${i}`} className="mb-4 break-inside-avoid">
-              <Hatch
-                caption={item.caption}
-                className="border border-misa-border"
-                style={{ height: item.height }}
-              />
-            </div>
-          )
-        )}
+        {visible.map((slot, i) => (
+          <div key={`${slot.caption}-${i}`} className="mb-4 break-inside-avoid">
+            <Hatch
+              caption={slot.caption}
+              className="border border-misa-border"
+              style={{ height: slot.height }}
+            />
+          </div>
+        ))}
       </section>
 
       {shown < matching.length && (

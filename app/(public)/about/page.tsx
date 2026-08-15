@@ -3,17 +3,10 @@ import type { Metadata } from "next";
 import { BUTTON_SOLID_WHITE } from "@/components/ui/button";
 import { PageHero } from "@/components/ui/chevron-section";
 import { KpiPlate } from "@/components/ui/kpi-plate";
+import { Hatch } from "@/components/ui/hatch";
 import { Partners } from "@/components/ui/partners";
-import { PhotoFrame } from "@/components/ui/photo-frame";
 import { revealDelay } from "@/components/ui/reveal";
-import {
-  CONTACT_EMAIL,
-  FAQ,
-  HISTORY_CARDS,
-  HISTORY_STATS,
-  MISSION,
-  photo,
-} from "@/lib/site";
+import { CONTACT_EMAIL, FAQ, HISTORY_CARDS, HISTORY_STATS, MISSION } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "About Us",
@@ -21,16 +14,21 @@ export const metadata: Metadata = {
 };
 
 /** The full-bleed 1:1 band, four across with no gap. */
-const BAND = ["fall-01", "fall-02", "fall-04", "fall-09"] as const;
+const BAND = [
+  "social event photo",
+  "workshop photo",
+  "service day photo",
+  "banquet photo",
+] as const;
 
 export default function AboutPage() {
   return (
     <>
       <PageHero title="About Us" subhead="Connecting technology with business." />
 
-      {/* Mission card beside the photo cluster. ⚠️ These photos are NOT
-          duotoned — this cluster and the officer headshots are the two
-          full-colour exceptions in the design. */}
+      {/* Mission card beside the photo cluster. ⚠️ When photography lands,
+          this cluster is NOT duotoned — it and the officer headshots are the
+          two full-colour exceptions in the design. */}
       <section className="grid items-stretch gap-12 px-5 pt-14 pb-16 sm:px-14 lg:grid-cols-[1.05fr_0.95fr]">
         <div
           data-reveal="up"
@@ -43,23 +41,18 @@ export default function AboutPage() {
         </div>
 
         <div data-reveal="up" style={revealDelay(0.1)} className="flex flex-col gap-4">
-          <PhotoFrame
-            photo={photo("banquet")}
-            className="min-h-55 flex-[1.4]"
-            position="center 40%"
-            sizes="(max-width: 1024px) 100vw, 45vw"
-            priority
+          <Hatch
+            caption="chapter photo"
+            className="min-h-55 flex-[1.4] border border-misa-border"
           />
           <div className="grid flex-1 grid-cols-2 gap-4">
-            <PhotoFrame
-              photo={photo("fall-05")}
-              className="min-h-35"
-              sizes="(max-width: 1024px) 50vw, 22vw"
+            <Hatch
+              caption="member photo"
+              className="min-h-35 border border-misa-border"
             />
-            <PhotoFrame
-              photo={photo("fall-07")}
-              className="min-h-35"
-              sizes="(max-width: 1024px) 50vw, 22vw"
+            <Hatch
+              caption="member photo"
+              className="min-h-35 border border-misa-border"
             />
           </div>
         </div>
@@ -75,16 +68,13 @@ export default function AboutPage() {
             <h2 className="mb-6 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] sm:text-[42px]">
               History of MISA
             </h2>
-            {/* 🪤 PhotoFrame renders the image with next/image's `fill`, which
-                absolutely positions it. That is load-bearing here: with an
-                intrinsically sized image the frame grows to the photo's own
-                height and leaves a large void beside the column on the right. */}
-            <PhotoFrame
-              photo={photo("fall-10")}
-              className="min-h-85 flex-1"
-              position="center 25%"
-              duotone
-              sizes="(max-width: 1024px) 100vw, 35vw"
+            {/* 🪤 When a photo lands here it must be sized with next/image's
+                `fill`. With an intrinsically sized image the frame grows to
+                the photo's own height and leaves a large void beside the
+                column on the right — the handoff hit this in its prototype. */}
+            <Hatch
+              caption="chapter portrait"
+              className="min-h-85 flex-1 border border-misa-border"
             />
           </div>
 
@@ -102,17 +92,10 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* Full-bleed duotone band */}
-      <section className="grid grid-cols-2 sm:grid-cols-4" aria-hidden="true">
-        {BAND.map((id) => (
-          <PhotoFrame
-            key={id}
-            photo={photo(id)}
-            className="aspect-square"
-            duotone
-            border="none"
-            sizes="(max-width: 640px) 50vw, 25vw"
-          />
+      {/* Full-bleed band — duotone photography in the design */}
+      <section className="grid grid-cols-2 sm:grid-cols-4">
+        {BAND.map((caption) => (
+          <Hatch key={caption} caption={caption} className="aspect-square" />
         ))}
       </section>
 

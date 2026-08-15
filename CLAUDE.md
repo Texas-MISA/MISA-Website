@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 What exists, in one pass:
 
-- **Public** — `app/(public)/` is the **design handoff** (`docs/Texas MISA website UI mockups/`), not the old Squarespace site: navy `#16305c` on white, Barlow + Barlow Condensed, square corners, hairline borders. Home, `/about`, `/projects`, `/gallery` and `/officers` follow the five prototypes; `/contact` survives as a route but leaves the desktop nav. `/attend` (the check-in form), `/leaderboard` (Stage 7 phase 1) and `/lookup` (phase 2, the member's own history behind an EID **and** email gate) are undesigned by the handoff and carry the same language. Copy lives in `lib/site.ts` and `lib/officers.ts` — edit those, never hardcode into pages.
+- **Public** — `app/(public)/` is the **design handoff** (`docs/Texas MISA website UI mockups/`), not the old Squarespace site: navy `#16305c` on white, Barlow + Barlow Condensed, square corners, hairline borders. Home, `/about`, `/projects`, `/gallery` and `/officers` follow the five prototypes, **with every image slot a labelled placeholder** — the site publishes no photography; `/contact` survives as a route but leaves the desktop nav. `/attend` (the check-in form), `/leaderboard` (Stage 7 phase 1) and `/lookup` (phase 2, the member's own history behind an EID **and** email gate) are undesigned by the handoff and carry the same language. Copy lives in `lib/site.ts` and `lib/officers.ts` — edit those, never hardcode into pages.
 - **Officers** — `/admin` covers events, the attendance queue and review, the points ledger, the member directory (custom fields, filters, presets, roster import, merge, CSV/xlsx export), dues, and `/admin/officers`.
 - **Officer turnover** — officers are added by an expiring single-use invite link from `/admin/officers` (migrations 24–25), not by running `scripts/create-officer.mjs` with the production service key. The script stays as the bootstrap and recovery path. Nothing is emailed; the officer copies the link and sends it themselves.
 - **Stage 8** hardened the boundary (migration 22 closed a live hole where any signed-up user could read every member's name, EID and email), added the attendance and adjustment archives (migration 23), and fixed the empty-vs-error conflation across `lib/` and every detail page.
@@ -233,9 +233,10 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - **The design handoff is the source of truth for the public UI** — `docs/Texas MISA website UI mockups/design_handoff_misa_website/`, five `.dc.html` prototypes plus a README carrying the full token, type and spacing spec. Recreate it in Tailwind and tokens; never port its inline styles.
 - 🪤 **Global CSS must live inside a Tailwind cascade layer.** v4's `@import "tailwindcss"` emits utilities into `@layer utilities`, and an **unlayered rule beats every layered one regardless of specificity** — a bare `a { color: … }` overrode `text-white` on every link and rendered the header's Check In button navy-on-navy. Element defaults go in `@layer base`, decorative classes in `@layer components`.
 - 🪤 **The scroll reveal's hidden state is scoped to `html.js`**, a class an inline script in `app/layout.tsx` sets during HTML parsing. Without the scoping a visitor with JavaScript off gets a blank page; without the inline script (an effect instead) the content paints and then blanks. `components/ui/reveal.tsx` is the **server-safe** half and must never gain `"use client"` — the observer is the separate `reveal-observer.tsx`, mounted once in the public layout so animated sections stay Server Components.
-- **Officer headshots stay placeholders until the pairing is confirmed.** The handoff ships headshots but its own README flags the photo-to-name mapping as arbitrary; a real face against another real student's name is worse than a framed placeholder. Set `photo` in `lib/officers.ts` per officer and the card switches itself.
-- **Every image slot the handoff marks as a hatched placeholder stays one.** A labelled box reads as a commission; an empty frame reads as a bug.
-- ⚠️ **`PHOTOS[].category` in `lib/site.ts` is a provisional guess.** The shoot dates are known, the events were never labelled, and the gallery filter sorts on it. Re-tag when an officer confirms; nothing else reads it.
+- 📌 **THE SITE PUBLISHES NO PHOTOGRAPHY.** Every image slot on every page — marquee tiles, the About cluster and photo band, the gallery feature and masonry, officer headshots — renders a hatched `<Hatch>` placeholder captioned with the shot that belongs there. The handoff specifies exactly this for the slots it had no photo for; it is applied to all of them. `public/photos/` was **deleted** rather than left unlinked, because a file under `public/` stays fetchable at its URL whether or not a page links it. **The four partner logos in `public/partners/` are the only images the site serves.** Restoring one means adding the file, the `src`, and swapping the `<Hatch>` for an `<Image>` — the treatment spec (duotone, and the two exemptions) lives in the handoff README, and `lib/site.ts`'s header carries the pointer.
+- ⚠️ **Officer headshots carry a SECOND, independent reason.** Even with photography restored, the handoff's own README flags its headshots' photo-to-name pairing as never supplied — a real face against another real student's name is worse than an empty labelled square. `Officer` has no `photo` field; adding one answers only half the question.
+- 🪤 **When photography returns, size framed slots with next/image's `fill`.** An intrinsically sized `<img>` makes the frame grow to the photo's own height, and the About history portrait then leaves a large void beside the column next to it — the handoff hit this in its own prototype. The gallery masonry is the one place that wants intrinsic heights.
+- ⚠️ **`GALLERY_ITEMS[].category` in `lib/site.ts` is a statement of intent, not a record.** The gallery filter sorts on it, and it describes shots that do not exist yet. Nothing else reads it.
 
 ## Layout
 
@@ -355,10 +356,10 @@ lib/
   validation.ts         zod schemas
   site.ts               ALL public copy and content constants: socials, emails,
                         mission, ACTIVITIES, HISTORY_*, FAQ, PROJECT*, PARTNERS
-                        (with logo paths), and the PHOTOS manifest + GALLERY_*
-                        display lists. photo(id) THROWS on an unknown id
-  officers.ts           officer roster; `photo` is optional and unset (see the
-                        headshot invariant)
+                        (with logo paths), and the GALLERY_* placeholder slots.
+                        Its header is where the no-photography decision and the
+                        restore path are written down
+  officers.ts           officer roster. No `photo` field, deliberately
 scripts/create-officer.mjs  officer bootstrap / password reset / revoke
 supabase/migrations/    versioned SQL
 supabase/seed.sql
@@ -367,15 +368,14 @@ components/             site-header.tsx (5-item nav incl. Admin, absolutely
                         (socials row + address; NO officer link — it is in the
                         nav now). ui/ holds primitives: chevron-section.tsx
                         (PageHero — navy field, grid overlay, chevron notch),
-                        partners.tsx, kpi-plate.tsx, hatch.tsx, photo-frame.tsx
-                        (PhotoFrame uses next/image `fill`, which is what keeps
-                        the About history portrait from sizing to its own
-                        height), officer-card.tsx, activities.tsx, button.tsx
-                        (class strings, not components), wordmark.tsx (draws in
+                        partners.tsx, kpi-plate.tsx, hatch.tsx (the labelled
+                        placeholder box — every image slot on the site is one),
+                        officer-card.tsx, activities.tsx, button.tsx (class
+                        strings, not components), wordmark.tsx (draws in
                         currentColor so it works on white AND navy), reveal.tsx
                         + reveal-observer.tsx
-public/                 photos/ (13 event photos) and partners/ (4 logos), both
-                        from the design handoff bundle
+public/                 partners/ (4 logos) and NOTHING ELSE. photos/ was
+                        deleted with the photography — see the invariant
 tests/                  Vitest — integration tests against the local stack
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()

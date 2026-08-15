@@ -2,12 +2,11 @@ import type { Metadata } from "next";
 
 import { BUTTON_SOLID_WHITE } from "@/components/ui/button";
 import { PageHero } from "@/components/ui/chevron-section";
-import { PhotoFrame } from "@/components/ui/photo-frame";
+import { Hatch } from "@/components/ui/hatch";
 import {
   GALLERY_FEATURE,
   INSTAGRAM_HANDLE,
   INSTAGRAM_PROMPT,
-  photo,
   SOCIAL_LINKS,
 } from "@/lib/site";
 
@@ -34,12 +33,9 @@ export default function GalleryPage() {
         feature={
           <section className="px-5 pb-6 sm:px-14">
             <figure data-reveal="up">
-              <PhotoFrame
-                photo={photo(GALLERY_FEATURE.id)}
-                className="h-70 sm:h-105"
-                position="center 42%"
-                sizes="100vw"
-                priority
+              <Hatch
+                caption={GALLERY_FEATURE.slot.caption}
+                className="h-70 border border-misa-border sm:h-105"
               />
               <figcaption className="mt-2.5 text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-muted">
                 {GALLERY_FEATURE.caption}

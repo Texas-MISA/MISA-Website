@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 import { Hatch } from "@/components/ui/hatch";
 
 import type { Officer } from "@/lib/officers";
@@ -10,30 +8,20 @@ import type { Officer } from "@/lib/officers";
 // The card is a flex column with the LinkedIn link at `margin-top: auto`, so
 // the links align across a row no matter how many lines a role title wraps to.
 //
-// ⚠️ Headshots are NOT duotoned; they stay full colour. The About mission
-// cluster is the other exception, and everything else brand-facing is duotoned.
+// The headshot is a placeholder like every other image slot on the site (see
+// the note at the top of lib/site.ts). Two separate reasons converge on the
+// same square here, and both would have to be answered before a face goes in:
+// the design handoff ships headshots but says the photo-to-name pairing "was
+// never supplied", and no photography is published at all. ⚠️ When one does
+// land, an officer headshot is NOT duotoned — it and the About mission cluster
+// are the two full-colour exceptions in the design.
 export function OfficerCard({ officer }: { officer: Officer }) {
   return (
-    <div className="group flex h-full flex-col">
-      {officer.photo ? (
-        <div className="relative aspect-square overflow-hidden border border-misa-border">
-          <Image
-            src={officer.photo}
-            alt={officer.name}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-            className="object-cover transition-transform duration-500 ease-[cubic-bezier(.2,.7,.3,1)] group-hover:scale-105"
-          />
-        </div>
-      ) : (
-        // See lib/officers.ts: the handoff's photo-to-name pairing was never
-        // confirmed, and a real face against the wrong real name is worse than
-        // no face at all.
-        <Hatch
-          caption="officer headshot"
-          className="aspect-square border border-misa-border"
-        />
-      )}
+    <div className="flex h-full flex-col">
+      <Hatch
+        caption="officer headshot"
+        className="aspect-square border border-misa-border"
+      />
 
       <h3 className="mt-3 mb-[3px] font-display text-[22px] leading-[1.05] font-semibold">
         {officer.name}

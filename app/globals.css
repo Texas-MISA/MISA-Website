@@ -131,21 +131,14 @@
     );
   }
 
-  /* Duotone treatment for brand imagery. Officer headshots and the About
-     mission cluster are deliberately NOT duotoned — they stay full colour.
-     The overlay needs a positioned parent. */
-  .duotone {
-    filter: grayscale(1) contrast(1.05);
-  }
-
-  .duotone-frame::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: var(--misa-blue);
-    mix-blend-mode: color;
-    pointer-events: none;
-  }
+  /* 📌 The duotone treatment used to live here and was removed with the
+     photography (2026-08-14) — no element applied it any more, and CSS that
+     styles nothing is the kind of thing that survives three refactors and then
+     misleads someone. The spec is where it belongs, in the design handoff's
+     README: `filter: grayscale(1) contrast(1.05)` on the image plus an
+     `::after` overlay of `background:#16305c; mix-blend-mode:color` filling
+     the frame, with officer headshots and the About mission cluster
+     deliberately exempt. Restore it alongside the first real photo. */
 
   /* ── Homepage gallery marquees ──────────────────────────────────────────── */
 

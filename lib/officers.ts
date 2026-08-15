@@ -2,19 +2,17 @@
 // (docs/existing-site-inventory.md). LinkedIn URLs cleaned of tracking
 // parameters.
 //
-// ⚠️ `photo` is deliberately unset on every officer. The design handoff ships
-// headshots, but its own README flags the photo-to-name pairing as arbitrary —
-// "the correct mapping was never supplied" — and putting a real student's face
-// against another real student's name is a worse failure than showing no face
-// at all. Cards render the framed placeholder tile until an officer confirms
-// the mapping; fill this field in and the card switches automatically.
+// ⚠️ There is no `photo` field, and adding one is a two-part decision rather
+// than a one-line change. The site publishes no photography at all (see the
+// note at the top of lib/site.ts), AND the design handoff's own README flags
+// its headshots' photo-to-name pairing as never supplied — a real student's
+// face under another real student's name is a worse failure than an empty
+// labelled square. Cards render the framed placeholder tile.
 
 export type Officer = {
   name: string;
   role: string;
   linkedin: string;
-  /** Path under `public/`, once the pairing is confirmed. */
-  photo?: string;
 };
 
 export const OFFICERS: Officer[] = [

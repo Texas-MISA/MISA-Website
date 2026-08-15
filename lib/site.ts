@@ -23,138 +23,38 @@ export const TAGLINE = "— Where Analytics, Innovation, and Leadership Converge
 export const MISSION =
   "MISA exists to bring together like-minded individuals who have a passion for technology and business. We equip our members with tools by going beyond the course curriculum and covering broader issues in IT. Our aim is to foster an environment that empowers students to succeed in the world outside the Forty Acres, both as professionals and as individuals.";
 
-// ── Photography ──────────────────────────────────────────────────────────────
+// ── Image slots ──────────────────────────────────────────────────────────────
 
-export type Photo = {
-  src: string;
-  /** Intrinsic pixel size — next/image needs it, and the masonry sizes on it. */
-  width: number;
-  height: number;
-  alt: string;
-  category: GalleryCategory;
-};
+// 📌 THERE IS NO PHOTOGRAPHY ON THIS SITE, and that is a decision rather than a
+// gap (2026-08-14). Every image slot on every page renders a hatched
+// placeholder naming the shot that belongs there — which is what the design
+// handoff already specifies for the slots it had no photo for, applied to all
+// of them. `public/photos/` was deleted with the change, so there is no file
+// to render and no unlinked-but-fetchable URL left behind either. The four
+// partner logos in `public/partners/` are the only images the site serves.
+//
+// Restoring a photo means: add the file, give the slot a `src`, and swap its
+// <Hatch> for an <Image>. The design handoff's README carries the treatment
+// spec — duotone is `filter: grayscale(1) contrast(1.05)` plus a navy
+// `mix-blend-mode: color` overlay, and officer headshots and the About mission
+// cluster are deliberately NOT duotoned.
+//
+// 🪤 When photography does return, size the framed slots with next/image's
+// `fill`. An intrinsically sized <img> makes the frame grow to the photo's own
+// height, and the About history portrait then leaves a large void beside the
+// column next to it — the handoff hit this in its own prototype and calls it
+// out. The gallery masonry is the one place that wants intrinsic heights.
 
 export type GalleryCategory = "socials" | "workshops" | "professional" | "banquet";
 
-/**
- * The photo manifest. One entry per file in `public/photos/`, shared by the
- * gallery, the About page clusters and the homepage marquees, so a photo is
- * described once no matter how many screens show it.
- *
- * ⚠️ The `category` values are PROVISIONAL. The shoot dates are known
- * (2025-09-21 for the `fall-*` series, the banquet for `banquet`) but the
- * events themselves were never labelled, so the gallery filter is sorting on
- * an educated guess. Re-tag these when an officer confirms what each photo is;
- * nothing else depends on the values.
- */
-export const PHOTOS = {
-  banquet: {
-    src: "/photos/banquet-2025.jpg",
-    width: 2209,
-    height: 1256,
-    alt: "MISA members at the end-of-year banquet",
-    category: "banquet",
-  },
-  "fall-01": {
-    src: "/photos/2025-09-21-026.jpg",
-    width: 555,
-    height: 766,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-02": {
-    src: "/photos/2025-09-21-081.jpg",
-    width: 1024,
-    height: 1318,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-03": {
-    src: "/photos/2025-09-21-085.jpg",
-    width: 858,
-    height: 1118,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-04": {
-    src: "/photos/2025-09-21-090.jpg",
-    width: 979,
-    height: 1312,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-05": {
-    src: "/photos/2025-09-21-095.jpg",
-    width: 1024,
-    height: 1315,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-06": {
-    src: "/photos/2025-09-21-099.jpg",
-    width: 1024,
-    height: 1310,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-07": {
-    src: "/photos/2025-09-21-115.jpg",
-    width: 2253,
-    height: 2718,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-08": {
-    src: "/photos/2025-09-21-120.jpg",
-    width: 966,
-    height: 1214,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-09": {
-    src: "/photos/2025-09-21-130.jpg",
-    width: 908,
-    height: 1165,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "fall-10": {
-    src: "/photos/2025-09-21-150.jpg",
-    width: 833,
-    height: 1041,
-    alt: "MISA members at a fall event",
-    category: "socials",
-  },
-  "event-01": {
-    src: "/photos/event-01.jpg",
-    width: 975,
-    height: 1192,
-    alt: "MISA members at an event",
-    category: "professional",
-  },
-  "event-02": {
-    src: "/photos/event-02.jpg",
-    width: 221,
-    height: 376,
-    alt: "MISA members at an event",
-    category: "professional",
-  },
-} as const satisfies Record<string, Photo>;
-
-export type PhotoId = keyof typeof PHOTOS;
-
-/**
- * Look a photo up by id.
- *
- * Throws rather than returning undefined: a missing id is a typo in a page,
- * and a silently absent image is exactly the kind of affirmative-looking
- * absence this codebase refuses elsewhere.
- */
-export function photo(id: PhotoId): Photo {
-  const found = PHOTOS[id];
-  if (!found) throw new Error(`unknown photo id: ${id}`);
-  return found;
-}
+/** One placeholder slot: what belongs there, and how tall it stands. */
+export type Slot = {
+  /** Mono caption naming the intended shot. */
+  caption: string;
+  /** Pixel height, for slots the layout does not size itself. */
+  height?: number;
+  category: GalleryCategory;
+};
 
 // ── Activities (home page) ───────────────────────────────────────────────────
 
@@ -294,8 +194,9 @@ export const WORK_WITH_MISA =
 
 export const GALLERY_TERM = "Fall 2025";
 
+/** The single large slot above the grid. */
 export const GALLERY_FEATURE = {
-  id: "banquet",
+  slot: { caption: "banquet photo", category: "banquet" } as Slot,
   caption: "End-of-year banquet · Spring 2025",
 } as const;
 
@@ -308,39 +209,32 @@ export const GALLERY_FILTERS = [
 ] as const;
 
 /**
- * The masonry, in display order. A slot is either a real photo or a hatched
- * placeholder naming the shot that belongs there — the handoff keeps both,
- * because an empty column reads as a bug where a labelled placeholder reads as
- * a commission.
+ * The masonry, in display order. Varied heights are the point — a masonry of
+ * uniform boxes is a grid, and the column flow is what the design is after.
+ *
+ * ⚠️ The `category` values are what the gallery filter sorts on, and they are
+ * a statement of intent rather than a record: these name shots that do not
+ * exist yet. Nothing else reads the field.
  */
-export type GalleryItem =
-  | { kind: "photo"; id: PhotoId }
-  | { kind: "placeholder"; caption: string; height: number; category: GalleryCategory };
-
-export const GALLERY_ITEMS: readonly GalleryItem[] = [
-  { kind: "photo", id: "fall-01" },
-  { kind: "placeholder", caption: "social event photo", height: 210, category: "socials" },
-  { kind: "photo", id: "fall-02" },
-  { kind: "placeholder", caption: "workshop photo", height: 260, category: "workshops" },
-  { kind: "photo", id: "fall-03" },
-  { kind: "photo", id: "fall-04" },
-  { kind: "photo", id: "fall-05" },
-  { kind: "placeholder", caption: "service day photo", height: 190, category: "socials" },
-  { kind: "photo", id: "fall-06" },
-  { kind: "photo", id: "fall-07" },
-  {
-    kind: "placeholder",
-    caption: "general meeting photo",
-    height: 230,
-    category: "professional",
-  },
-  { kind: "photo", id: "fall-09" },
-  { kind: "photo", id: "fall-10" },
-  { kind: "placeholder", caption: "IM sports photo", height: 200, category: "socials" },
-  { kind: "photo", id: "event-01" },
-  { kind: "placeholder", caption: "workshop photo", height: 240, category: "workshops" },
-  { kind: "photo", id: "event-02" },
-  { kind: "photo", id: "fall-08" },
+export const GALLERY_ITEMS: readonly Slot[] = [
+  { caption: "social event photo", height: 240, category: "socials" },
+  { caption: "social event photo", height: 210, category: "socials" },
+  { caption: "member photo", height: 300, category: "socials" },
+  { caption: "workshop photo", height: 260, category: "workshops" },
+  { caption: "workshop photo", height: 200, category: "workshops" },
+  { caption: "general meeting photo", height: 230, category: "professional" },
+  { caption: "networking night photo", height: 280, category: "professional" },
+  { caption: "service day photo", height: 190, category: "socials" },
+  { caption: "banquet photo", height: 250, category: "banquet" },
+  { caption: "banquet photo", height: 210, category: "banquet" },
+  { caption: "IM sports photo", height: 200, category: "socials" },
+  { caption: "workshop photo", height: 240, category: "workshops" },
+  { caption: "resume review photo", height: 220, category: "professional" },
+  { caption: "chapter photo", height: 320, category: "socials" },
+  { caption: "game night photo", height: 190, category: "socials" },
+  { caption: "company visit photo", height: 260, category: "professional" },
+  { caption: "banquet photo", height: 230, category: "banquet" },
+  { caption: "social event photo", height: 200, category: "socials" },
 ] as const;
 
 /** How many masonry items a page shows before "Load more". */

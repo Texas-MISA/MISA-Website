@@ -1,8 +1,40 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.58
+**Version:** 1.59
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.59: the photography comes back out.** Requested 2026-08-14, hours after
+> v1.58 shipped it. Every image slot on every public page now renders a hatched
+> placeholder captioned with the shot that belongs there — the marquee tiles,
+> the About mission cluster, history portrait and photo band, the gallery
+> feature shot and masonry, and the officer headshots that were already one.
+> The design is unchanged; the frames, aspect ratios and tile counts are still
+> the handoff's, so dropping real photos in later is a swap rather than a
+> re-layout.
+>
+> 🔓 **`public/photos/` was DELETED, not merely unlinked**, and the distinction
+> is the point. Anything under `public/` is served at its own URL whether or
+> not a page references it, so removing the `<Image>` tags alone would have
+> left thirteen photographs of identifiable students publicly fetchable by
+> anyone who had seen the old markup — "no page shows it" and "nobody can get
+> it" are different claims. The originals remain in the design handoff bundle
+> under `docs/`, which is also committed and public; that is a known and
+> accepted position, not an oversight.
+>
+> **The four partner logos are the only images the site now serves.** They were
+> explicitly kept: the officer's instruction was photography.
+>
+> What fell out of it, all deliberate: `lib/site.ts`'s `PHOTOS` manifest and
+> `photo()` helper are gone (a manifest of `src` values pointing at deleted
+> files is a trap, not a convenience) and `GALLERY_ITEMS` is a flat list of
+> placeholder slots; `components/ui/photo-frame.tsx` is deleted, having no
+> caller; `Officer` loses its `photo` field; and the duotone CSS classes are
+> removed, since CSS that styles nothing survives refactors and then misleads
+> someone. 🪤 **The `fill` rule survives as guidance rather than as code** —
+> it is recorded in `lib/site.ts`'s header and in the invariants, because the
+> void-beside-the-column failure it prevents will be rediscovered the day
+> photography returns otherwise.
 
 > **v1.58: the public UI overhaul.** Requested 2026-08-14, shipped the same day.
 > Five high-fidelity prototypes plus a token/type/spacing spec arrived as
@@ -3475,18 +3507,15 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              overhaul: ACTIVITIES (was PILLARS), HISTORY_CARDS
                              and HISTORY_STATS, FAQ (moved out of the About
                              page), PROJECTS / PROJECT_STATS / PROJECTS_INTRO,
-                             PARTNERS with logo paths, and the PHOTOS manifest
-                             with the GALLERY_* display lists. The prototypes
-                             hardcode all of this because they are prototypes;
-                             here it stays in one module so a page renders
-                             content it does not own. photo(id) THROWS on an
-                             unknown id rather than returning undefined —
-                             a silently absent image is the same affirmative-
-                             looking absence §8's hardening went after.
-                             ⚠️ PHOTOS[].category is a PROVISIONAL guess: the
-                             shoot dates are known but the events were never
-                             labelled, and the gallery filter sorts on it.
-                             Officer.photo is optional and deliberately UNSET
+                             PARTNERS with logo paths, and the GALLERY_*
+                             placeholder slots. The prototypes hardcode all of
+                             this because they are prototypes; here it stays in
+                             one module so a page renders content it does not
+                             own. 📌 site.ts's HEADER is where the v1.59
+                             no-photography decision, the restore path, and the
+                             `fill` warning are written down — start there
+                             before adding an image anywhere. Officer has no
+                             `photo` field, deliberately
   ledger-filters.ts          the points-ledger and attendance-queue filter
                              cores (Stage 8 phase 2). Pure, typed structurally
                              like filters.ts. ONE module for two screens
@@ -3594,7 +3623,8 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
   /ui                        shared primitives — chevron-section.tsx (PageHero:
                              navy field, 60×60 grid overlay, chevron notch),
                              partners.tsx, kpi-plate.tsx, hatch.tsx (the
-                             labelled placeholder box), photo-frame.tsx,
+                             labelled placeholder box, and since v1.59 what
+                             EVERY image slot on the site renders),
                              officer-card.tsx, activities.tsx, wordmark.tsx,
                              button.tsx (class strings — every call site is
                              already an <a>, a <Link> or a <button>, so a
@@ -3604,12 +3634,14 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              mounted ONCE in the public layout so the animated
                              sections stay Server Components)
 /public
-  /photos, /partners         the design handoff's event photography and partner
-                             logos. Rendered through next/image
+  /partners                  four partner logos, and the only images the site
+                             serves. /photos was deleted in v1.59 — see the
+                             entry, and note that unlinking would not have been
+                             the same thing as deleting
 proxy.ts                     admin route protection (Next 16 rename of middleware.ts)
 ```
 
-**`PhotoFrame` renders with next/image's `fill`, and that is a layout fix rather than a preference.** The handoff calls it out on the About page: with an intrinsically sized `<img>`, the history portrait's frame grows to the photo's natural height and leaves a large void beside the column next to it. `fill` absolutely positions the image inside the frame, so the frame's own `flex:1; min-height` decides the height. `PhotoBlock` is the deliberate opposite, for the gallery masonry, where varied intrinsic heights are the point.
+🪤 **When photography returns, framed slots must be sized with next/image's `fill`** — a layout fix rather than a preference, and one that was already paid for once. The handoff calls it out on the About page: with an intrinsically sized `<img>`, the history portrait's frame grows to the photo's natural height and leaves a large void beside the column next to it. `fill` absolutely positions the image inside the frame, so the frame's own `flex:1; min-height` decides. The gallery masonry is the single exception, where varied intrinsic heights are the point of the layout.
 
 **Why officer attendance mutations live apart from `app/actions/attendance.ts`** (v1.20): that module holds `submitCheckin`, the single unauthenticated write path in the whole system and what §6 calls the main attack surface. Every export of a `"use server"` module is a publicly callable endpoint, so keeping it a one-export file makes "what can an anonymous user POST to" a one-file answer — and removes the chance of someone adding an unguarded export next to a guarded one. Officer mutations go in `attendance-review.ts`, where every export opens with `getOfficer()`.
 

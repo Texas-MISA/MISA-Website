@@ -2,43 +2,43 @@ import Link from "next/link";
 
 import { LINK_EYEBROW } from "@/components/ui/button";
 import { Hatch } from "@/components/ui/hatch";
-import { PhotoFrame } from "@/components/ui/photo-frame";
-import { photo, type PhotoId } from "@/lib/site";
 
 // The navy gallery band on the home page: two marquee tracks, the top one
-// scrolling left and the taller-gapped bottom one scrolling right.
+// scrolling left and the bottom one scrolling right.
 //
 // 🪤 Each track holds its tile group DUPLICATED EXACTLY TWICE, and each group
 // carries a trailing padding equal to the flex gap. That is what makes the
 // -50% translate in `mq` / `mqr` land seamlessly; drop either and the loop
 // visibly jumps at the wrap. The animations themselves are in globals.css and
 // pause on hover and under prefers-reduced-motion.
+//
+// Every tile is a placeholder — see the note at the top of lib/site.ts. The
+// design intends duotoned photography here; the tile counts and sizes are the
+// handoff's, so dropping photos in later is a swap rather than a re-layout.
 
-type Tile = { kind: "photo"; id: PhotoId } | { kind: "placeholder" };
-
-const TRACK_ONE: Tile[] = [
-  { kind: "photo", id: "fall-10" },
-  { kind: "placeholder" },
-  { kind: "photo", id: "fall-02" },
-  { kind: "placeholder" },
-  { kind: "photo", id: "fall-08" },
+const TRACK_ONE = [
+  "social event photo",
+  "gallery photo",
+  "workshop photo",
+  "gallery photo",
+  "banquet photo",
 ];
 
-const TRACK_TWO: Tile[] = [
-  { kind: "placeholder" },
-  { kind: "photo", id: "fall-01" },
-  { kind: "placeholder" },
-  { kind: "photo", id: "event-01" },
-  { kind: "placeholder" },
-  { kind: "photo", id: "event-02" },
+const TRACK_TWO = [
+  "gallery photo",
+  "general meeting photo",
+  "gallery photo",
+  "service day photo",
+  "gallery photo",
+  "chapter photo",
 ];
 
 function Track({
-  tiles,
+  captions,
   size,
   direction,
 }: {
-  tiles: Tile[];
+  captions: string[];
   size: "lg" | "sm";
   direction: "left" | "right";
 }) {
@@ -58,25 +58,14 @@ function Track({
             // The second copy exists only to make the loop seamless.
             aria-hidden={copy === 1}
           >
-            {tiles.map((tile, i) =>
-              tile.kind === "photo" ? (
-                <PhotoFrame
-                  key={i}
-                  photo={photo(tile.id)}
-                  className={`shrink-0 ${box}`}
-                  duotone
-                  border="light"
-                  sizes="260px"
-                />
-              ) : (
-                <Hatch
-                  key={i}
-                  caption="gallery photo"
-                  tone="navy"
-                  className={`shrink-0 border border-white/28 ${box}`}
-                />
-              )
-            )}
+            {captions.map((caption, i) => (
+              <Hatch
+                key={i}
+                caption={caption}
+                tone="navy"
+                className={`shrink-0 border border-white/28 ${box}`}
+              />
+            ))}
           </div>
         ))}
       </div>
@@ -93,9 +82,9 @@ export function GalleryMarquee() {
         </Link>
       </div>
       <div className="pb-3">
-        <Track tiles={TRACK_ONE} size="lg" direction="left" />
+        <Track captions={TRACK_ONE} size="lg" direction="left" />
       </div>
-      <Track tiles={TRACK_TWO} size="sm" direction="right" />
+      <Track captions={TRACK_TWO} size="sm" direction="right" />
     </section>
   );
 }
