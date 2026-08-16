@@ -1,8 +1,32 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.65
+**Version:** 1.66
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
 **Last updated:** August 2026
+
+> **v1.66: four third-party UI design skills are installed, and the rule that
+> governs them is in `CLAUDE.md`.** Requested 2026-08-16, per
+> `docs/install-ui-skills.md`. No application code, no migration, no route.
+>
+> 📌 **No aesthetic skill is primary for the five designed public pages.** The
+> install doc's own precedence block says to pick one primary aesthetic skill
+> per project; that is written for a project without a design source of truth,
+> and this one has the handoff. The useful split here is **designed vs.
+> undesigned surfaces** — the handoff governs the five prototyped pages, and the
+> skills apply to `/admin`, `/attend`, `/leaderboard` and `/lookup`, which
+> §5 has always described as undesigned by the handoff.
+>
+> ⚠️ **The collision to expect is photography.** All four skills are built to
+> propose hero imagery, and this site publishes none. The invariant outranks
+> them, but the first `polish` run on a public page will suggest replacing the
+> `<Hatch>` placeholders — that is the rule working, not a defect to chase.
+>
+> 🪤 **The skills are gitignored, so the doc is the only reinstall path.**
+> `.claude/skills/`, `.claude/settings.local.json` and `skills-lock.json` are
+> all ignored; `docs/install-ui-skills.md` is committed precisely because
+> `CLAUDE.md` now points at it. Impeccable also installs a hook that runs a
+> local detector after every edit and at end of turn — context injection only,
+> it cannot block a turn or write a file.
 
 > **v1.65: the home page's gallery band and mission swapped places.**
 > Requested 2026-08-15. Two files. The band now opens the page under the hero,

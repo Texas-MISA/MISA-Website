@@ -61,3 +61,11 @@ dev.log
 # is what any parser or import work should be developed against.
 docs/VenmoStatement_*.csv
 !docs/VenmoStatement_August_2026.csv
+
+# UI design skills (docs/install-ui-skills.md, 2026-08-16). Vendored third-party
+# skill files — kept local rather than committed. Reinstall with the commands in
+# that doc; the precedence rule that governs them IS committed, in CLAUDE.md.
+# settings.local.json is machine-local regardless and carries Impeccable's hook.
+.claude/skills/
+.claude/settings.local.json
+skills-lock.json

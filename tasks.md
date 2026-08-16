@@ -6,6 +6,20 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — UI design skills installed (2026-08-16, doc v1.66)
+
+Requested by pointing at `docs/install-ui-skills.md` and saying to execute it. Tooling only — no application code, no migration, no route. Four skills in `.claude/skills/`: `emil-design-eng`, `design-taste-frontend`, `web-design-guidelines`, `impeccable`. One skill taken from each bundle, not all 10 / 13 / 9.
+
+📌 **The precedence rule is the deliverable, not the install.** It is in `CLAUDE.md` under *Design skill precedence*, and it splits on **designed vs. undesigned surfaces** rather than the install doc's "one primary aesthetic skill per project" — the handoff already governs the five prototyped public pages, so the skills lead only on `/admin`, `/attend`, `/leaderboard` and `/lookup`.
+
+⚠️ **Expect every one of them to propose photography.** The no-photography invariant outranks them; the `<Hatch>` placeholder is the answer, and the suggestion recurring is not a defect.
+
+🪤 **Impeccable's hook is live** — after every `Edit`/`Write` and at end of turn, context injection only, cannot block or write. Rollback is deleting `.claude/settings.local.json`.
+
+**Open:** `/impeccable init` has **not** been run — it needs a Claude Code restart (skills are scanned at session start) and an officer to answer its interview. It writes `PRODUCT.md` / `DESIGN.md` at the repo root, neither of which is currently gitignored; decide whether to commit them when they appear.
+
+---
+
 ## Done — Gallery band and mission swapped on the home page (2026-08-15, doc v1.65)
 
 Requested directly. Two files. The band opens the page under the hero; the mission follows it.
