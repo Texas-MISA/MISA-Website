@@ -45,7 +45,16 @@ invent CSS for things that have an official package."* v1 invented all of it.
 | The Annual Report direction | Locked, seed `5b321c13` | **Dropped with v1.** v2 takes its direction from the skill, not from a concept roll. |
 
 **Unchanged and non-negotiable:** the word content, verbatim, from `lib/site.ts`
-and `lib/officers.ts`; navy `#16305c` and white; no photography.
+and `lib/officers.ts`; the navy `#16305c` and white **colour scheme**; no
+photography.
+
+🔓 **"Colour scheme" is not "flat white ground."** Clarified with the officer on
+2026-08-17: the *palette* is locked, the *grounds* are not. Gradients, tinted
+fields, shapes, and drawn backgrounds are all in play as long as they are built
+from navy and white. This loosens `DESIGN.md`'s Two Grounds Rule, which reads
+"two grounds only … never a third, never a gradient" — that clause is retired for
+v2 and its replacement is argued at phase 5. A plain white page behind everything
+is a large part of why v1 read as bland.
 
 ---
 
@@ -179,6 +188,45 @@ must be overridden everywhere, and if it changes, it changes everywhere.
 
 ---
 
+## The plan stays open to new components
+
+📌 **This document is a direction, not a fixed component list.** The officer's
+standing instruction is that v2 should be able to absorb ideas like the one
+below as they arrive, rather than treating the plan as closed. New patterns are
+proposed, reviewed, and folded in.
+
+### Floating image cards (officer reference, 2026-08-17, not binding)
+
+A landing page the officer shared as *"a possible component, not a binding
+reference"*: captioned image cards scattered around the hero at slight
+rotations, each lifted off the page with a shadow, enlarging slightly on hover,
+over a background carrying a soft radial field rather than flat white.
+
+**Why it earns a place here rather than being a borrowed look:** this site has
+more image slots than content, and its central problem is that empty slots read
+as unfinished. A scattered arrangement of captioned frames turns "we have not
+photographed this yet" into a deliberate composition. It is also §10's
+vocabulary already: cards with a hover-scale, over a **Mesh/Radial Gradient
+Background**.
+
+What to take, and what not to:
+
+- **Take:** the floating, rotated, captioned frame; the slight hover scale; the
+  non-flat ground behind it; the idea that image slots can be the composition
+  rather than holes in it.
+- **Do not take the reference's skin.** It is rounded-corner, hard-shadowed, and
+  lime-accented. Radius is governed by the **Shape Consistency Lock** and the
+  accent is navy. ⚠️ `craft-floor` refuses hard offset shadows outside a world
+  that is genuinely neobrutalist, and §4.4 requires shadows **tinted to the
+  background hue** — so these lift on a navy-tinted, blurred shadow, not a black
+  block offset.
+- ⚠️ **A rotated card is a horizontal-overflow risk**, and v1 already shipped one
+  of those. Any rotation is measured at 390px before it lands.
+- **`emil-design-eng` owns the hover.** Whether it scales, how far, and on what
+  curve is its call, and `prefers-reduced-motion` disables it.
+
+---
+
 ## Open conflicts, for the officer
 
 Recorded rather than settled, because each trades a skill rule against a project
@@ -210,7 +258,18 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 | **2** | `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries |
 | **3** | `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched |
 | **4** | `/admin` under scanability rules, screen by screen, suite green between screens |
-| **5** | Replace `DESIGN.md` from the built result; clear the type-step ignore set in `.impeccable/config.json`; update `docs/invariants.md` for every invariant retired, each with its replacement argued; record in `build-log.md` and `tasks.md` |
+| **5** | Replace `DESIGN.md` from the built result; update `docs/invariants.md` for every invariant retired, each with its replacement argued; record in `build-log.md` and `tasks.md` |
+
+📌 **Do not pre-suppress detector findings.** v1 added ten `design-system-font-size`
+ignores to `.impeccable/config.json` as it went; that set died with the branch and
+must not be recreated up front. The type ramp is being re-authored, so every
+off-ramp size is a finding worth *seeing* during the rebuild. Suppress at phase 5,
+against the ramp that actually ships, or not at all.
+
+⚠️ There is **pre-existing drift on `main`** the detector will report from the
+first scan, and it is not v2's doing: `app/(public)/_components/upcoming-events.tsx:87`
+sets `text-[21px]`, which is off the documented ramp today. Leave findings like
+this standing until the section that owns them is rebuilt.
 
 ---
 
