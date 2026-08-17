@@ -1,10 +1,10 @@
 # Frontend redesign — plan
 
-**Status: NOT STARTED.** Written 2026-08-17, scope widened the same day.
-Nothing here is built.
+**Status: NOT STARTED.** Written 2026-08-17; scope widened and then narrowed with
+the officer the same day. Nothing here is built.
 
-A complete redesign of the public site: how it presents itself **and what it is
-made of**. New pages and features are in scope. The data layer is not.
+A complete redesign of the public site — its design **and** its information
+architecture. The data layer is untouched.
 
 ---
 
@@ -12,95 +12,112 @@ made of**. New pages and features are in scope. The data layer is not.
 
 The 2026-08-17 work (doc v1.67) was asked for as "a comprehensive rework… just
 visuals" and delivered **refinement**: one design system, applied consistently to
-every surface, with `/admin`'s three dialects collapsed into it. That was worth
-doing and is not being undone — `components/ui/` is a vocabulary rather than a
-look, so it can be re-skinned wholesale, which is what makes this job tractable.
+every surface, with `/admin`'s three dialects collapsed into it. That is not being
+undone — `components/ui/` is a vocabulary rather than a look, so it can be
+re-skinned wholesale, which is what makes this job tractable at all.
 
 But refinement preserves the incumbent design and a redesign replaces it. This is
 the second job. In `impeccable`'s vocabulary the last one was `polish`/`extract`;
 this one is **`new-work`**.
 
-🔓 **This requires amending `CLAUDE.md`'s *Design skill precedence* rule**, which
-currently puts `new-work.md` out of scope site-wide — written when `DESIGN.md`
-had just become the only complete record of the system. Amend it in the first
-commit, deliberately. `DESIGN.md` is **replaced** at the end of this work, not
-edited.
+🔓 **Amend `CLAUDE.md`'s *Design skill precedence* rule in the first commit.** It
+currently puts `new-work.md` out of scope site-wide — written when `DESIGN.md` had
+just become the only complete record of the system. Reverse it deliberately.
+`DESIGN.md` is **replaced** at the end of this work, not edited.
+
+---
+
+## Decisions taken (2026-08-17)
+
+| # | Question | Answer |
+|---|---|---|
+| 1 | Typography | **Keep Barlow + Barlow Condensed.** The pairing is an identity anchor alongside the navy. |
+| 2 | Register | **Keep it — institutional, unhurried, confident.** Continuity of tone, discontinuity of form. |
+| 3 | Chevron hero | **Open to replacement.** The direction phase proposes what opens a page; the chevron may survive, mutate or go. |
+| 4 | Absent imagery | **Rework the convention.** Keep the principle — absence stated honestly, every slot stays a slot — but the device itself is open. |
+| 5 | Navigation | **Direction phase decides**, as part of the stage-1 proposal. Hard constraint below. |
+| 6 | New pages | **Join / Get involved** and **Upcoming events**. Nothing else. |
+| 7 | The frozen four | **They inherit the new skin.** Behaviour and markup frozen; tokens and primitives updated. One website. |
+| 8 | `/contact` | **Leave as-is** — routed, reachable, absent from the desktop nav, present in the mobile sheet. |
+
+📌 **Considered and NOT selected**, recorded so they are not re-proposed each
+session: a *How points work* page, a *Partner with us / Sponsorship* page, a
+*Recruitment / Junior Directors* page, a *Teams / committees* page, and promoting
+the FAQ to its own page. All remain defensible; none is in this scope.
+
+---
+
+## What that leaves — the actual brief
+
+The palette is fixed. The type is fixed. The register is fixed. **So the design
+has to be carried by structure**, and that is a sharper brief than "redesign the
+site":
+
+- how a page opens, and whether every page opens the same way
+- the composition system — grid, asymmetry, containment, full-bleed
+- section rhythm and density
+- hierarchy: what is loud, what is quiet, and what carries a page with no images
+- the shape and weight of every component
+- how content is ordered and grouped, page by page
+- motion
+
+⚠️ **This rules out a whole class of candidate.** Directions that differ only in
+ornament — a new accent, a different font, a texture — will look nearly identical
+here, because the three levers they rely on are all locked. A candidate is only
+genuinely different if it *composes* differently. Say so during `new-work`, and
+reject candidates that pass the test only on colour or type.
+
+📌 The upside: this is a brief with a real constraint in it, which is a better
+starting point than a blank page. The current site is one answer to it — flat,
+generous, banded, centred. It is not the only one.
 
 ---
 
 ## The contract
 
-### Frozen — the database half
+### Frozen — behaviour
 
-**`/attend`, `/leaderboard`, `/lookup` and `/admin` keep their behaviour
-exactly.** No route, Server Action, query, migration, view or schema change
-anywhere in the application. Check-in resolution, the points ledger, dues,
-attendance review and officer invites are all untouched.
-
-⚠️ **One decision this raises.** If the marketing site takes a new identity and
-these four do not, the site splits visually in two — the exact defect v1.67 just
-spent 121 files closing. **Recommendation: freeze their function and markup, but
-let them inherit the new tokens and re-skinned primitives**, so they stay the
-same product. Confirm before stage 1 ships.
+**No route, Server Action, query, migration, view or schema change anywhere.**
+Check-in resolution, the points ledger, dues, attendance review and officer
+invites are untouched. `/attend`, `/leaderboard`, `/lookup` and `/admin` keep
+their behaviour and their markup exactly; per decision 7 they pick up the new
+tokens and re-skinned primitives and nothing else.
 
 ### In play
 
-- **The design** of the public site: layout paradigm, composition, rhythm,
-  hierarchy, type scale and possibly type family, the chevron hero, the marquee,
-  every component's shape, and motion.
-- **The information architecture.** Pages may be added, split, merged or
-  retired. The current five-page shape is not a given.
-- **The palette, mostly.** Navy `#16305c` and white stay the identity; the
-  graphite ramp and the three status inks stay. "Mostly" is the licence: a
-  redesign may re-*proportion* navy and may add at most one supporting value if
-  it argues for it in the new `DESIGN.md`.
-- **📌 No photography.** Non-negotiable — and see below, it is the brief rather
-  than a constraint on it.
+The design and the information architecture of the public marketing pages, plus
+the two new surfaces in decision 6.
 
 ### Fixed regardless
 
 - **Existing copy stays in `lib/site.ts` / `lib/officers.ts`** and is never
   hardcoded into a page. Existing strings may be re-*placed* in the IA, not
   rewritten.
+- **📌 No photography.** See below.
 - **The load-bearing traps**, which are engineering rather than taste: Tailwind
   cascade layers, `reveal.tsx` staying server-safe, the `html.js` scoping,
   `--marquee-shift` in pixels, `/leaderboard`'s `force-dynamic` + noindex,
   `/lookup`'s noindex. See `docs/invariants.md`.
 
-### Decisions the officer owns, before direction work starts
-
-1. **Do the fonts change?** "Keep the colour scheme" was said; the Barlow pair
-   was not mentioned. It is the single biggest lever available.
-2. **Does the chevron hero survive?** It predates the handoff, carries over from
-   the old live site, and opens all eight hero'd pages. Most recognisable
-   element; also the most limiting.
-3. **How far may the hatch convention move?**
-4. **Do the four frozen pages inherit the new skin?** (Recommendation above.)
-
 ---
 
-## 🔴 The rule that governs new pages
+## 🪤 The navigation constraint
 
-**No new page may invent a fact about the club.**
+Adding Join and Upcoming events takes the left group from five items to seven,
+against a right group of two links and a button. **Five is the measured
+ceiling today**, because the wordmark is absolutely centred and wins the z-order:
+a sixth item does not wrap or overflow, it *disappears behind the logo*, and
+nothing fails. Measured at 1280: 285px clearance left, 312px right.
 
-`PRODUCT.md` is explicit that testimonials, member counts, placement statistics,
-awards and press **do not exist and must not be fabricated**. The same applies to
-alumni outcomes, company partnerships beyond the four in `PARTNERS`, event
-schedules, and anything with a number in it.
+Per decision 5 the header is a stage-1 design problem rather than a stage-5
+fix-up. Two hard requirements on whatever is proposed:
 
-So the sequence for any new surface is:
-
-1. Propose it, with the evidence in existing content that implies it.
-2. **Get the real copy from an officer.**
-3. Build it.
-
-A new page with invented placeholder prose is worse than no page — it is a
-liability on a public site that corporate partners read. If the copy does not
-arrive, the page does not ship, and that is a normal outcome rather than a
-failure.
-
-⚠️ This is the single most likely way this work goes wrong. All four skills will
-happily generate plausible-sounding club copy.
+1. **The failure mode must stop being silent.** Whether that comes from moving
+   the wordmark off-centre, a different nav pattern, or a layout that cannot
+   overlap by construction, the outcome to reach is that nobody has to remember
+   to re-measure.
+2. **If the centred wordmark survives, re-measure at 1280 and at a wide viewport
+   in the same commit**, and record the numbers as the current ones are recorded.
 
 ---
 
@@ -114,48 +131,68 @@ That is not a gap to design around — it *is* the brief. Every one of these ski
 will propose hero imagery; the answer is no, every time, and a direction that
 merely rearranges hatched boxes has not engaged with the problem.
 
-The current answer ("The Drawing Set" — the hatch as poché, meaning *specified,
-not yet built*) is a good one and sets the bar. A replacement must be at least as
-honest and at least as deliberate. Worth exploring:
+Per decision 4 the device is open but the principle is not:
 
-- **Type as the image** — let typography carry the page and drop image slots
-  rather than filling them with anything.
-- **Structure as the image** — rules, plates, indices, contents pages; the site
-  as a document rather than a brochure.
-- **A different metaphor for absence** that is not hatching.
+- **Absence is stated, never disguised.** No stock imagery, no generated imagery,
+  no gradient standing in for a photo, no decorative shape pretending to be one.
+- **Every image slot stays a slot**, so photography arriving later is a swap —
+  add the file, give the slot a `src`, replace the placeholder element. That
+  property is why `public/photos/` can be restored without touching a page, and
+  it is not being given up.
+- The current answer ("The Drawing Set" — the hatch as poché, meaning
+  *specified, not yet built*) is a good one and sets the bar. A replacement must
+  be at least as honest and at least as deliberate.
 
-⚠️ Whatever wins must survive photography arriving later: every image slot stays
-a slot, so a real photo is a swap and not a re-layout. That property is why
-`public/photos/` can be restored without touching a page, and it should not be
-given up.
+🪤 When photography does return, framed slots must be sized with `next/image`'s
+`fill`; an intrinsically sized image makes the frame grow to the photo's height
+and leaves a void beside the shorter column. The gallery masonry is the one place
+that wants intrinsic heights. The duotone treatment spec lives only in the design
+handoff's README.
 
 ---
 
-## Candidate new surfaces
+## The two new pages
 
-Each is *inferred from existing content*, listed with what implies it. **None is
-approved; all need officer copy.** This is a menu for the IA phase, not a backlog.
+### Join / Get involved
 
-| Candidate | Inferred from | Notes |
-|---|---|---|
-| **Join / Get involved** | FAQ carries "who can become a member", dues, dress code; `/attend` and dues exist but nothing publicly explains membership | The strongest candidate. Currently the answer is scattered across an About accordion. |
-| **How points work** | The whole attendance/points/leaderboard system is built and publicly linked, and nothing explains it | Content-only; explains an existing system without touching it. Would make `/leaderboard` and `/lookup` legible. |
-| **Partner with us / Sponsorship** | Four `PARTNERS`, a dedicated `CORPORATE_EMAIL`, and `WORK_WITH_MISA` copy already aimed at companies | `PRODUCT.md` names corporate partners as a real readership. Currently a band on `/projects`. |
-| **Upcoming events** | `_components/upcoming-events.tsx` is **built and unmounted**; `events` table and `/admin/events` are live | 🪤 Remounting restores `export const dynamic = "force-dynamic"` — the read touches `cookies()`, and a build-time snapshot shows a stale schedule while looking fine. No new DB work; it is a component that already exists. |
-| **Recruitment / Junior Directors** | `/officers` copy already states applications reopen Fall 2026 | Seasonal. Needs a plan for the closed state, not just the open one. |
-| **Teams / committees** | `PROJECT_STATS` counts "3 Data teams / 3 Client teams" | Thin unless officers supply real structure. |
-| **FAQ as its own page** | Six entries currently living as a band on `/about` | An IA move rather than new content — no new copy needed. |
+**Needs real copy from an officer before it ships.** Membership, dues and what to
+expect are currently explained only inside an accordion on `/about`, even though
+`/attend` and the dues system are live. Existing material that can be re-placed
+here: the relevant `FAQ` entries and the dues wording. What must come from an
+officer: what actually happens when somebody turns up, and what membership costs
+and includes, stated plainly.
 
-📌 **Retiring is as legitimate as adding.** `/contact` is already routed but
-unlinked from the desktop nav; a redesign should decide whether it returns or
-goes.
+### Upcoming events
 
-🪤 **Any nav change re-opens the wordmark clearance measurement.** The header
-centres the wordmark absolutely and it wins the z-order, so an overflowing item
-*disappears silently* rather than wrapping. Five items fit today (measured: 285px
-clearance left at 1280, 312px right). More than five almost certainly means a
-different navigation pattern, not a tighter one — treat that as a design problem
-in stage 1, not a fix-up in stage 5.
+**Needs no new copy** — `app/(public)/_components/upcoming-events.tsx` is already
+built and unmounted, and the `events` table and `/admin/events` are live.
+
+🪤 **Remounting it must restore `export const dynamic = "force-dynamic"` on the
+page that renders it.** The read touches `cookies()` via `createClient()`, and a
+build-time snapshot serves a stale schedule *while looking completely fine* —
+which is why the directive was removed alongside the component and why the
+comment left in its place says so. Design the empty state deliberately: a term
+with no published events yet is a real and frequent state.
+
+---
+
+## 🔴 The rule that governs new content
+
+**No new page may invent a fact about the club.**
+
+`PRODUCT.md` is explicit that testimonials, member counts, placement statistics,
+awards and press **do not exist and must not be fabricated**. The same applies to
+alumni outcomes, partnerships beyond the four in `PARTNERS`, and anything with a
+number in it.
+
+So: propose, **get the real copy**, then build. A page with invented placeholder
+prose is worse than no page — it is a liability on a public site that corporate
+partners read. If the copy does not arrive, the page does not ship, and that is a
+normal outcome rather than a failure.
+
+⚠️ This is the single most likely way this work goes wrong. All four skills will
+happily generate plausible-sounding club copy to fill a layout. Of the two
+approved pages, only Join is exposed to it.
 
 ---
 
@@ -165,16 +202,20 @@ Per `docs/install-ui-skills.md` and the skills' own guidance.
 
 1. **`/impeccable init` is already done** — `PRODUCT.md` holds the audience, the
    voice and the refusals. Re-read it; do not re-run it.
-2. **IA first, then direction.** Decide what pages exist and what each is for
-   before choosing a visual world — a direction chosen against the wrong page set
-   has to be re-chosen.
-3. **`/impeccable shape`, then `new-work.md`:** derive candidate visual worlds
-   from the audience's culture (a UT business/tech student deciding whether to
-   walk into a room), roll `concept-seed.mjs`, fuse the challengers, write
-   verdicts, present candidates on the served decision page. **The officer picks
-   the direction — not the agent.**
-4. **Build the home page end to end and review it** before anything else. A
-   direction that works as a card can still fail at full height.
+2. **Settle the IA first**: the page set is decided (decision 6), so what remains
+   is what each page is *for* and what moves between them. Do this before
+   choosing a direction — a direction chosen against the wrong page set has to be
+   chosen twice.
+3. **`/impeccable shape`, then `new-work.md`**: derive candidate composition
+   systems for the audience `PRODUCT.md` names — a UT business/tech student
+   deciding whether to walk into a room, with corporate partners reading
+   `/projects` and `/about` over their shoulder. Roll `concept-seed.mjs`, fuse the
+   challengers, write verdicts, present candidates on the served decision page.
+   **The officer picks — not the agent.** Reject any candidate that differs only
+   in ornament, per the brief above.
+4. **Stage 1 builds the header and the home page end to end**, then stops for
+   review. A composition system that works as a card can still fail at full
+   height, and the nav is the riskiest single element.
 5. **`emil-design-eng` owns every motion decision**, as it does today.
 6. **`web-design-guidelines` before ship.** Accessibility findings override
    aesthetic preference on conflict.
@@ -182,27 +223,24 @@ Per `docs/install-ui-skills.md` and the skills' own guidance.
    `.impeccable/design.json`.
 
 📌 **Re-skin the shelf, don't abandon it.** `Section`, `Field`, `Table`,
-`Banner`, `Pill`, `Panel`, `Button`, `Heading` should survive with new skins. If
-the direction genuinely needs different primitives, replace them *there* rather
-than going back to per-page class strings — that regression is what v1.67 existed
-to undo.
+`Banner`, `Pill`, `Panel`, `Button`, `Heading` should survive with new skins —
+decision 7 depends on it, since it is how the frozen four inherit the redesign
+without their markup being touched. If the direction genuinely needs different
+primitives, replace them *there* rather than going back to per-page class
+strings; that regression is what v1.67 existed to undo.
 
 ---
 
-## Scope, in build order
+## Build order
 
 | Stage | Surface |
 |---|---|
-| 1 | **IA decision + direction + home page.** The proof. Nothing else starts until this is accepted. Includes the navigation pattern. |
-| 2 | `/about`, `/projects` — the content-heaviest pages, and where the KPI plate and FAQ patterns live |
-| 3 | `/gallery`, `/officers` — the most image-dependent, so the hardest test of the absent-imagery answer |
-| 4 | Approved **new** pages, in the order their copy arrives |
-| 5 | Header, footer, error and not-found boundaries; re-measure nav clearance |
-| 6 | The four frozen surfaces inherit tokens only — **if** decision 4 says so |
-
-**`/admin` is out of scope beyond inheriting tokens.** It was just converted,
-officers are not the audience, and `PRODUCT.md` names the prospective student as
-the tiebreaker.
+| 1 | **Direction + header/nav + home page.** The proof. Nothing else starts until this is accepted. |
+| 2 | `/about`, `/projects` — content-heaviest, and where the KPI plate and FAQ patterns live |
+| 3 | `/gallery`, `/officers` — most image-dependent, so the hardest test of decision 4 |
+| 4 | **Upcoming events** (no copy needed), then **Join** when its copy arrives |
+| 5 | Footer, `/contact`, and the public error and not-found boundaries |
+| 6 | The frozen four inherit tokens and primitives — no markup or behaviour changes |
 
 ---
 
@@ -217,15 +255,19 @@ already shipped once:
 - Every interactive element has a visible focus ring; white inside `.on-navy`.
 - Text ≥ 4.5:1 **on the ground it actually sits on** — measured per pairing, not
   per palette.
+- No nav item can overflow silently; if the wordmark stays centred, the
+  clearance numbers are re-measured and recorded.
 - The marquee, if it survives, verified numerically rather than by watching it.
 - Empty states and error states stay visually distinct.
-- Any new public route is added to §5's route table — `tests/docs.test.ts` fails
+- Both new routes are added to §5's route table — `tests/docs.test.ts` fails
   otherwise, by design.
 - `npm run lint`, `tsc --noEmit`, `npm run build` and the full suite clean.
 
 ## Documentation duties
 
-Replace `DESIGN.md`; amend the precedence rule in `CLAUDE.md`; add every new
-route to §5 and §10; update `docs/invariants.md` for any invariant the redesign
-genuinely retires; bump the architecture doc's version with the reasoning; record
-the outcome in `docs/build-log.md` and `tasks.md`.
+Replace `DESIGN.md`; amend the precedence rule in `CLAUDE.md`; add both new routes
+to §5 and §10; update `docs/invariants.md` for any invariant the redesign
+genuinely retires — the chevron hero and the hatch device are both candidates, and
+each needs its replacement argued rather than merely swapped; bump the
+architecture doc's version; record the outcome in `docs/build-log.md` and
+`tasks.md`.

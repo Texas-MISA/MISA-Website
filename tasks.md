@@ -8,19 +8,34 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ## 📋 Planned, NOT BUILT — complete redesign of the public frontend (written 2026-08-17)
 
-Plan in [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md). A redesign of the public site's **design and its information architecture** — new pages and features are in scope, inferred from the club's existing content.
+Plan in [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md). A redesign of the public site's **design and its information architecture**. **All eight open decisions were settled with the officer on 2026-08-17** — the plan is a brief now, not a menu.
 
-**Frozen: `/attend`, `/leaderboard`, `/lookup`, `/admin`, and the whole data layer.** No route, Server Action, query, migration, view or schema change. ⚠️ Open decision: whether those four inherit the new skin. Recommendation is yes — otherwise the site splits visually in two, which is the exact defect v1.67 spent 121 files closing.
+| | |
+|---|---|
+| Typography | **Keep** Barlow + Barlow Condensed |
+| Register | **Keep** — institutional, unhurried |
+| Chevron hero | **Open** to replacement |
+| Absent imagery | **Rework the device**, keep the principle |
+| Navigation | **Direction phase decides**, in stage 1 |
+| New pages | **Join / Get involved** and **Upcoming events**, nothing else |
+| Frozen four | **Inherit the new skin** (behaviour + markup frozen) |
+| `/contact` | **Leave as-is** — routed, unlinked from desktop nav |
 
-⚠️ **The v1.67 rework below was refinement, not this.** One consistent system — worth doing, and what makes this tractable, since `components/ui/` is a vocabulary that can be re-skinned. But refinement preserves the incumbent design and a redesign replaces it. This is the second job.
+📌 **Palette, type and register are all fixed, so the design must be carried by STRUCTURE** — how a page opens, the composition system, rhythm, hierarchy, component shape, motion. ⚠️ That rules out a whole class of candidate: directions differing only in ornament will look nearly identical here, because the three levers they rely on are locked. A candidate is only genuinely different if it *composes* differently.
 
-🔴 **The rule that governs new pages: no new page may invent a fact about the club.** `PRODUCT.md` says testimonials, member counts, placement stats, awards and press do not exist and must not be fabricated. A new surface is proposed with its evidence, then **waits for real copy from an officer**. If the copy does not arrive, the page does not ship — a normal outcome, not a failure. This is the likeliest way the work goes wrong; all four skills will happily generate plausible club prose.
+**Frozen: `/attend`, `/leaderboard`, `/lookup`, `/admin`, and the whole data layer.** No route, Server Action, query, migration, view or schema change. They inherit tokens and re-skinned primitives only — which is what the `components/ui/` shelf was for.
+
+⚠️ **The v1.67 rework below was refinement, not this.** One consistent system — worth doing, and what makes this tractable. But refinement preserves the incumbent design and a redesign replaces it. This is the second job.
+
+🔴 **No new page may invent a fact about the club.** `PRODUCT.md` says testimonials, member counts, placement stats, awards and press do not exist and must not be fabricated. Propose, **get real copy from an officer**, then build. If the copy does not arrive the page does not ship — a normal outcome. Of the two approved pages only **Join** is exposed to this; Upcoming events needs no new copy.
+
+🪤 **The nav goes from five items to seven, and five is the measured ceiling.** The wordmark is absolutely centred and wins the z-order, so a sixth item *disappears behind the logo* and nothing fails (measured at 1280: 285px left, 312px right). The header is therefore a stage-1 design problem, and the requirement is that **the failure mode stops being silent** — not that somebody remembers to re-measure.
+
+🪤 **Remounting `upcoming-events.tsx` must restore `export const dynamic = "force-dynamic"`.** The read touches `cookies()`, and a build-time snapshot serves a stale schedule while looking completely fine.
 
 🔓 **Needs `CLAUDE.md`'s *Design skill precedence* rule amended in its first commit** — that rule currently puts `impeccable`'s `new-work.md` path out of scope site-wide, and `new-work` is exactly the path this takes. `DESIGN.md` is replaced at the end, not edited.
 
-🪤 **Any nav change re-opens the wordmark clearance measurement.** Five items fit today (285px clearance left at 1280, 312px right); the wordmark is absolutely centred and wins the z-order, so an overflowing item *disappears silently*. More than five means a different navigation pattern, and that is a stage-1 design problem rather than a stage-5 fix-up.
-
-**Four decisions the officer owns before direction work starts:** whether the Barlow pair changes, whether the chevron hero survives, how far the hatch convention may move, and whether the frozen four inherit the new skin. 📌 The no-photography rule is not one of them — it is the brief, not a constraint on it.
+📌 **Considered and NOT selected**, so they are not re-proposed: a *How points work* page, *Partner with us / Sponsorship*, *Recruitment / Junior Directors*, *Teams / committees*, and promoting the FAQ to its own page.
 
 ---
 
