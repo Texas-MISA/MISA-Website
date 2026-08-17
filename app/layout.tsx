@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
 import "./globals.css";
 
@@ -25,10 +25,20 @@ export const metadata: Metadata = {
   },
   description:
     "Management Information Systems Association at The University of Texas at Austin — where analytics, innovation, and leadership converge.",
-  // Paper, matching the page ground rather than the navy hero. Mobile browsers
-  // tint their own chrome with this, and a navy bar above a white page reads as
-  // the header having come loose. There is one value because there is one
-  // scheme — see DESIGN.md, *Light only*.
+};
+
+// 🪤 **`themeColor` belongs in the `viewport` export, NOT in `metadata`** — and
+// putting it in the wrong one fails silently in the only way that matters: the
+// build prints "Unsupported metadata themeColor is configured in metadata
+// export" once per route, emits no `<meta name="theme-color">` at all, and
+// still succeeds. It shipped that way once. Confirm with
+// `curl … | grep theme-color`, not by reading the source.
+//
+// Paper, matching the page ground rather than the navy hero: mobile browsers
+// tint their own chrome with this, and a navy bar above a white page reads as
+// the header having come loose. One value, because there is one scheme — see
+// DESIGN.md, *Light only*.
+export const viewport: Viewport = {
   themeColor: "#ffffff",
 };
 
