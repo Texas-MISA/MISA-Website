@@ -1,5 +1,8 @@
 "use client";
 
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState, useState } from "react";
 
 import {
@@ -65,7 +68,7 @@ export function ReviewQueue({
     <form action={formAction}>
       <BulkResult state={state} />
 
-      <div className="mb-4 flex flex-wrap items-end gap-4 border border-black/20 bg-misa-panel px-4 py-3">
+      <div className="mb-4 flex flex-wrap items-end gap-4 border border-misa-border bg-misa-panel px-4 py-3">
         <p className="text-sm">
           <strong>{selected.size}</strong> selected
         </p>
@@ -75,7 +78,7 @@ export function ReviewQueue({
           <select
             name="eventId"
             defaultValue=""
-            className="border border-black/70 bg-white px-3 py-2 text-sm"
+            className={controlClass("sm")}
           >
             <option value="">Pick an event…</option>
             {events.map((event) => (
@@ -88,7 +91,7 @@ export function ReviewQueue({
         </label>
 
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="approve" value="yes" />
+          <input type="checkbox" name="approve" value="yes" className="size-4 shrink-0 accent-misa-blue" />
           {/* Opt-in, never the default: approving is a judgement that these
               people were there, and a checkbox that starts ticked makes it an
               accident. Rows with no member stay pending regardless. */}
@@ -98,7 +101,7 @@ export function ReviewQueue({
         <button
           type="submit"
           disabled={pending || selected.size === 0}
-          className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-40"
+          className={BUTTON_PRIMARY_SM}
           title={
             selected.size === 0 ? "Tick the rows you want to assign" : undefined
           }
@@ -136,7 +139,7 @@ function BulkResult({ state }: { state: BulkAssignState }) {
   return (
     <div
       role="status"
-      className="mb-4 border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+      className="mb-4 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
     >
       <p>
         Assigned {state.assigned} submission{state.assigned === 1 ? "" : "s"}
@@ -182,7 +185,7 @@ function Banner({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="status"
-      className="mb-4 border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
+      className="mb-4 border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm"
     >
       {children}
     </p>

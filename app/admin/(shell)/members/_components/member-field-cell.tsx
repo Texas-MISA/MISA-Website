@@ -1,5 +1,7 @@
 "use client";
 
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState, useEffect, useState } from "react";
 
 import {
@@ -88,7 +90,7 @@ export function MemberFieldCell({
           // screen exists to avoid.
           event.currentTarget.form?.requestSubmit();
         }}
-        className="border border-black/70 bg-white px-2 py-1 text-sm disabled:opacity-50"
+        className={controlClass("xs")}
       >
         <option value="">—</option>
         {options.map((option) => (
@@ -129,16 +131,16 @@ function Marker({
   pending: boolean;
 }) {
   if (pending) {
-    return <span className="text-xs text-foreground/50">saving…</span>;
+    return <span className="text-xs text-misa-muted">saving…</span>;
   }
 
   const message =
     state.status === "done"
-      ? { text: "saved", tone: "text-green-800" }
+      ? { text: "saved", tone: "text-misa-affirm" }
       : state.status === "conflict"
         ? {
             text: "changed elsewhere — reload",
-            tone: "text-amber-800",
+            tone: "text-misa-caution",
           }
         : state.status === "rejected"
           ? {
@@ -148,12 +150,12 @@ function Marker({
                   : state.reason === "archived"
                     ? "field archived — reload"
                     : "field deleted — reload",
-              tone: "text-amber-800",
+              tone: "text-misa-caution",
             }
           : state.status === "unauthorized"
-            ? { text: "signed out", tone: "text-amber-800" }
+            ? { text: "signed out", tone: "text-misa-caution" }
             : state.status === "invalid" || state.status === "error"
-              ? { text: "not saved", tone: "text-amber-800" }
+              ? { text: "not saved", tone: "text-misa-caution" }
               : null;
 
   if (!message) return null;

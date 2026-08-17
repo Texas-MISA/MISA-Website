@@ -1,5 +1,9 @@
 "use client";
 
+import { Banner } from "@/components/ui/banner";
+
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
+
 import { useActionState } from "react";
 
 import {
@@ -30,7 +34,7 @@ export function FieldArchive({
 
   return (
     <div>
-      <p className="max-w-2xl text-sm text-foreground/70">
+      <p className="max-w-2xl text-sm text-misa-secondary">
         {archived ? (
           <>
             This field is archived: it is offered nowhere, and its key stays
@@ -62,7 +66,7 @@ export function FieldArchive({
         <button
           type="submit"
           disabled={pending || state.status === "done"}
-          className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel disabled:opacity-40"
+          className={BUTTON_QUIET_SM}
         >
           {pending
             ? archived
@@ -75,11 +79,10 @@ export function FieldArchive({
       </form>
 
       {state.status !== "idle" && (
-        <p
+        <Banner
           role="status"
-          className={`mt-4 border-l-4 ${
-            state.status === "done" ? "border-green-800" : "border-amber-700"
-          } bg-misa-panel px-4 py-3 text-sm`}
+          className="mt-4"
+          tone={state.status === "done" ? "affirm" : "caution"}
         >
           {state.status === "done"
             ? state.archived
@@ -90,7 +93,7 @@ export function FieldArchive({
               : state.status === "unauthorized"
                 ? "Your session expired. Sign in again — nothing changed."
                 : "Something went wrong. Nothing changed."}
-        </p>
+        </Banner>
       )}
     </div>
   );

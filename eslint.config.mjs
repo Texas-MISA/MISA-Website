@@ -17,8 +17,13 @@ const eslintConfig = defineConfig([
     // vendored/minified code that is not ours:
     // - supabase/.temp/ holds the edge-runtime entrypoint written by `supabase start`
     // - .vercel/ holds output from `vercel pull` / `vercel build`
+    // - .claude/skills/ holds installed agent skills (see docs/install-ui-skills.md);
+    //   impeccable alone ships ~108 scripts, and they were contributing 152
+    //   warnings — enough to bury a real one from app/ or components/, which is
+    //   the only reason `npm run lint` is a useful gate.
     "supabase/.temp/**",
     ".vercel/**",
+    ".claude/skills/**",
   ]),
 ]);
 

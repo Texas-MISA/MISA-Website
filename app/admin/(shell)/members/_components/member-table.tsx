@@ -94,7 +94,7 @@ export function MemberTable({
        roster, and losing the column headers (and the sort controls with them)
        partway down is exactly what showing everything at once would otherwise
        cost. */
-    <div className="max-h-[70vh] overflow-auto border-2 border-black">
+    <div className="max-h-[70vh] overflow-auto border border-misa-border">
       <table className="w-full min-w-[40rem] border-collapse text-sm">
         <thead className="bg-misa-panel">
           {/* The border sits on the cells rather than the row: a sticky element
@@ -186,7 +186,7 @@ function SortHeader({
       }
       // sticky + a solid background, and the bottom border on the cell rather
       // than the row — see the note on the wrapper.
-      className={`sticky top-0 z-10 border-b-2 border-black bg-misa-panel px-3 py-2 text-xs font-semibold uppercase tracking-wider ${
+      className={`sticky top-0 z-10 border-b border-misa-border bg-misa-panel px-3 py-2 text-xs font-semibold uppercase tracking-wider ${
         align === "right" ? "text-right" : "text-left"
       }`}
     >

@@ -1,5 +1,7 @@
 "use client";
 
+import { controlClass } from "@/components/ui/field";
+
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { ATTENDANCE_STATUSES } from "@/lib/attendance";
@@ -15,8 +17,8 @@ import type { EventOption } from "@/lib/event-options";
 // whose diff looks like two identical strings. Server Components own date
 // formatting; this one just renders.
 
-const selectClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
-const inputClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
+const selectClass = controlClass("sm");
+const inputClass = controlClass("sm");
 
 export function AttendanceFilters({
   events,

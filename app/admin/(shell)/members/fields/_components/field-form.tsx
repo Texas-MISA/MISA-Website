@@ -1,5 +1,10 @@
 "use client";
 
+import { Banner } from "@/components/ui/banner";
+
+import { BUTTON_PRIMARY } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState } from "react";
 
 import {
@@ -22,7 +27,7 @@ import {
 const INITIAL: FieldFormState = { status: "idle" };
 
 const inputClass =
-  "border border-black/70 bg-misa-panel px-3 py-2 text-base w-full";
+  controlClass("md", "w-full");
 
 const EMPTY: SubmittedFieldValues = {
   key: "",
@@ -72,7 +77,7 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             placeholder="Dues paid"
             className={inputClass}
           />
-          <span className="text-xs text-foreground/60">
+          <span className="text-xs text-misa-muted">
             What officers see — the column header and the field name. Safe to
             change at any time.
           </span>
@@ -87,7 +92,7 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
               placeholder="dues_paid"
               className={inputClass}
             />
-            <span className="text-xs text-foreground/60">
+            <span className="text-xs text-misa-muted">
               Lowercase letters, numbers and underscores, starting with a
               letter. <span className="font-medium">This cannot be changed
               later</span> — every answer is stored under it, and renaming would
@@ -97,10 +102,10 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
         ) : (
           <div className="flex flex-col gap-1 text-sm">
             Key
-            <p className="border border-black/20 bg-black/[0.03] px-3 py-2 font-mono text-sm">
+            <p className="border border-misa-border bg-misa-panel px-3 py-2 font-mono text-sm">
               {current.key}
             </p>
-            <span className="text-xs text-foreground/60">
+            <span className="text-xs text-misa-muted">
               Fixed at creation. Every stored answer is filed under it, so
               renaming it would orphan them all — create a new field instead.
             </span>
@@ -115,7 +120,7 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             placeholder={"Paid\nUnpaid\nWaived"}
             className={inputClass}
           />
-          <span className="text-xs text-foreground/60">
+          <span className="text-xs text-misa-muted">
             Up to {MAX_FIELD_OPTIONS}, at most {MAX_OPTION_LENGTH} characters
             each, no two the same. Blank lines are ignored.{" "}
             <span className="font-medium">
@@ -135,7 +140,7 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             step={1}
             className={`${inputClass} max-w-[8rem]`}
           />
-          <span className="text-xs text-foreground/60">
+          <span className="text-xs text-misa-muted">
             Lower numbers come first. Ties fall back to the key, so the order is
             always stable.
           </span>
@@ -146,11 +151,11 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             type="checkbox"
             name="showInDirectory"
             defaultChecked={values.showInDirectory}
-            className="mt-1"
+            className="mt-1 size-4 shrink-0 accent-misa-blue"
           />
           <span>
             Show as a column in the directory
-            <span className="block text-xs text-foreground/60">
+            <span className="block text-xs text-misa-muted">
               Off keeps it on the member&apos;s own page only. Every field ever
               created would otherwise widen the table forever — and a field that
               is not a column cannot be sorted on either.
@@ -163,24 +168,24 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             type="checkbox"
             name="editableInline"
             defaultChecked={values.editableInline}
-            className="mt-1"
+            className="mt-1 size-4 shrink-0 accent-misa-blue"
           />
           <span>
             Editable straight from the directory table
-            <span className="block text-xs text-foreground/60">
+            <span className="block text-xs text-misa-muted">
               Off means it can still be set, just from the member&apos;s page
               rather than in the list.
             </span>
           </span>
         </label>
 
-        <Banner state={state} />
+        <StatusBanner state={state} />
 
         <div>
           <button
             type="submit"
             disabled={pending}
-            className="rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
+            className={BUTTON_PRIMARY}
           >
             {pending
               ? "SAVING…"
@@ -194,7 +199,7 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
   );
 }
 
-function Banner({ state }: { state: FieldFormState }) {
+function StatusBanner({ state }: { state: FieldFormState }) {
   if (state.status === "idle" || state.status === "invalid") return null;
 
   const message =
@@ -208,13 +213,10 @@ function Banner({ state }: { state: FieldFormState }) {
           ? "Your session expired. Sign in again — nothing was saved."
           : "Something went wrong. Nothing was saved.";
 
-  const tone =
-    state.status === "saved" ? "border-green-800" : "border-amber-700";
-
   return (
-    <p role="status" className={`border-l-4 ${tone} bg-misa-panel px-4 py-3 text-sm`}>
+    <Banner tone={state.status === "saved" ? "affirm" : "caution"} role="status">
       {message}
-    </p>
+    </Banner>
   );
 }
 
@@ -232,7 +234,7 @@ function Field({
       {label}
       {children}
       {error && (
-        <span role="alert" className="text-xs text-red-700">
+        <span role="alert" className="text-xs text-misa-critical">
           {error[0]}
         </span>
       )}

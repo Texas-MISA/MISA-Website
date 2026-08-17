@@ -95,30 +95,30 @@ export function EventSuggestions({
       {suggestions.map((suggestion, index) => (
         <li
           key={suggestion.eventId}
-          className="border border-black/20 bg-misa-panel px-4 py-3"
+          className="border border-misa-border bg-misa-panel px-4 py-3"
         >
           <p className="text-sm">
             {index === 0 && (
-              <span className="mr-2 border border-black/30 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider">
+              <span className="mr-2 border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
                 closest
               </span>
             )}
             <strong>{suggestion.title}</strong>
             {suggestion.status !== "published" && (
-              <span className="ml-2 text-xs text-foreground/60">
+              <span className="ml-2 text-xs text-misa-muted">
                 {suggestion.status}
               </span>
             )}
           </p>
-          <p className="mt-1 text-sm text-foreground/80">
+          <p className="mt-1 text-sm text-misa-body">
             {/* Window-relative first: that is what refused the check-in. The
                 event-relative number is what nearby_events ranked on. */}
             {suggestion.headline}{" "}
-            <span className="text-foreground/60">
+            <span className="text-misa-muted">
               ({suggestion.eventRelative})
             </span>
           </p>
-          <p className="mt-1 text-xs text-foreground/60">{suggestion.range}</p>
+          <p className="mt-1 text-xs text-misa-muted">{suggestion.range}</p>
         </li>
       ))}
     </ol>
@@ -159,28 +159,28 @@ export function MemberSuggestions({
         return (
           <li
             key={suggestion.member.id}
-            className="border border-black/20 bg-misa-panel px-4 py-3"
+            className="border border-misa-border bg-misa-panel px-4 py-3"
           >
             <p className="text-sm">
               <strong>{suggestion.member.fullName}</strong>
               {!suggestion.member.active && (
-                <span className="ml-2 text-xs text-foreground/60">inactive</span>
+                <span className="ml-2 text-xs text-misa-muted">inactive</span>
               )}
             </p>
             <p className="mt-1 font-mono text-xs">
-              <span className="text-foreground/60">submitted</span>{" "}
+              <span className="text-misa-muted">submitted</span>{" "}
               {submittedEid}
               {" · "}
-              <span className="text-foreground/60">roster</span>{" "}
+              <span className="text-misa-muted">roster</span>{" "}
               <NearMiss
                 value={suggestion.member.eid}
                 at={diff.firstDifferenceAt}
               />
             </p>
-            <p className="mt-1 text-xs text-foreground/70">
+            <p className="mt-1 text-xs text-misa-secondary">
               {suggestion.member.email}
             </p>
-            <p className="mt-1 text-xs text-foreground/60">
+            <p className="mt-1 text-xs text-misa-muted">
               {suggestion.reasons
                 .map(describeMatchReason)
                 .filter(Boolean)
@@ -200,7 +200,7 @@ function NearMiss({ value, at }: { value: string; at: number | null }) {
   return (
     <>
       {value.slice(0, at)}
-      <mark className="bg-amber-200 px-0.5">{value[at]}</mark>
+      <mark className="bg-misa-caution-wash px-0.5">{value[at]}</mark>
       {value.slice(at + 1)}
     </>
   );

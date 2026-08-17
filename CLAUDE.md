@@ -230,7 +230,9 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 
 ### Design and content
 
-- **The design handoff is the source of truth for the public UI** — `docs/Texas MISA website UI mockups/design_handoff_misa_website/`, five `.dc.html` prototypes plus a README carrying the full token, type and spacing spec. Recreate it in Tailwind and tokens; never port its inline styles.
+- 📌 **`DESIGN.md` is the source of truth for the design, site-wide** (2026-08-17). It carries the tokens, the type ramp, the spacing scale, the status palette, the five reveal variants, the named rules and the Do/Don't list, and it is the only document that covers `/admin` and the member-facing pages. 🔓 **The design handoff (`docs/Texas MISA website UI mockups/design_handoff_misa_website/`) was the source of truth until this date and is now historical reference** — it is desktop-only with no breakpoints authored, defines no focus, hover, empty or error states, and draws five of the site's twenty-odd screens. The identity it set is unchanged and is recorded in `DESIGN.md`; its README remains the only home of the duotone image-treatment spec. Never port its inline styles.
+- **Every shared UI primitive lives in `components/ui/`, and reaching for a class string instead is how the last drift happened.** `button.tsx` (`buttonClass` + named constants), `field.tsx` (`Field`/`Input`/`Select`/`Textarea`/`controlClass`/`CHECKBOX`), `table.tsx`, `panel.tsx`, `banner.tsx`, `pill.tsx`, `chip.tsx`, `section.tsx`, `heading.tsx`, `empty-state.tsx`, `page-header.tsx`. Before the 2026-08-17 rework `/admin` imported exactly two things from `components/ui/`, and had accumulated three button dialects, eleven copies of an input class and nine copies of the same local `Field`.
+- 🪤 **`<Section>` owns ground, gutter and vertical rhythm together, and that is what makes the Two Grounds Rule structural rather than remembered.** `ground="navy"` applies the fill, `.on-navy` (the white focus ring) and the section's own padding in one place — the 2026-08-15 gallery-band failure, where a ground was removed and its 112px inset was left behind, is no longer reachable from a page file.
 - 🪤 **Global CSS must live inside a Tailwind cascade layer.** v4's `@import "tailwindcss"` emits utilities into `@layer utilities`, and an **unlayered rule beats every layered one regardless of specificity** — a bare `a { color: … }` overrode `text-white` on every link and rendered the header's Check In button navy-on-navy. Element defaults go in `@layer base`, decorative classes in `@layer components`.
 - 🪤 **The scroll reveal's hidden state is scoped to `html.js`**, a class an inline script in `app/layout.tsx` sets during HTML parsing. Without the scoping a visitor with JavaScript off gets a blank page; without the inline script (an effect instead) the content paints and then blanks. `components/ui/reveal.tsx` is the **server-safe** half and must never gain `"use client"` — the observer is the separate `reveal-observer.tsx`, mounted once in the public layout so animated sections stay Server Components.
 - 📌 **THE SITE PUBLISHES NO PHOTOGRAPHY.** Every image slot on every page — marquee tiles, the About cluster and photo band, the gallery feature and masonry, officer headshots — renders a hatched `<Hatch>` placeholder captioned with the shot that belongs there. The handoff specifies exactly this for the slots it had no photo for; it is applied to all of them. `public/photos/` was **deleted** rather than left unlinked, because a file under `public/` stays fetchable at its URL whether or not a page links it. **The four partner logos in `public/partners/` are the only images the site serves.** Restoring one means adding the file, the `src`, and swapping the `<Hatch>` for an `<Image>` — the treatment spec (duotone, and the two exemptions) lives in the handoff README, and `lib/site.ts`'s header carries the pointer.
@@ -244,8 +246,9 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 Four design skills live in `.claude/skills/` (installed 2026-08-16 per `docs/install-ui-skills.md`). They arrive with opinions about typography, colour, spacing and motion, and they will contradict each other and this file.
 
 - **The Invariants above outrank all four, without exception.** In particular: THE SITE PUBLISHES NO PHOTOGRAPHY — every one of these skills will propose hero imagery, and every such proposal is refused, not negotiated (the `<Hatch>` placeholder is the answer); global CSS stays inside a Tailwind cascade layer; and the nav cannot grow without re-measuring the wordmark clearance.
-- **Generating public UI (`app/(public)/`'s five designed pages):** the design handoff is the source of truth and no aesthetic skill is primary. Use them to execute it more carefully, never to redirect it. `impeccable`'s "redesign replaces" mode is out of scope for these pages.
-- **Generating undesigned surfaces:** `/admin`, `/attend`, `/leaderboard` and `/lookup` have no handoff prototype. One primary skill there — `impeccable` in its Operate mode for `/admin`, `design-taste-frontend` for the member-facing three — and it still inherits the handoff's tokens: navy `#16305c` on white, Barlow + Barlow Condensed, square corners, hairline borders.
+- 📌 **`DESIGN.md` is the design source of truth for the WHOLE site** (since the 2026-08-17 rework), and it is committed. The handoff is historical reference — desktop-only, no breakpoints, no interaction states, and no coverage of `/admin`, `/attend`, `/leaderboard` or `/lookup`, which is most of the application. `DESIGN.md`'s *Relationship to the design handoff* section records what changed and what did not; the identity itself is unchanged. 🔓 **This reverses the previous rule**, which made the handoff primary for the five designed pages.
+- **No aesthetic skill is primary anywhere.** They execute `DESIGN.md`; they never redirect it. `impeccable`'s **"redesign replaces" / `new-work.md` path is out of scope for the entire site** — it would discard `DESIGN.md`, which is now the only complete record of the system. `shape`, `layout`, `typeset`, `polish`, `harden`, `extract`, `audit` and `critique` are in scope; `/impeccable operate` still governs `/admin`, where scanability outranks expression.
+- ⚠️ **The skill conflicts are settled in `DESIGN.md`; don't relitigate them each turn.** Refused there, with reasons: dark mode, real imagery, the eyebrow ban, mono-as-costume, the 65–75ch measure, one-marquee-per-page, the em-dash ban, "no oversized H1". Adopted from the skills: no coloured border-left above 1px, entrance variety instead of one universal reveal, themed browser surfaces, and emil's easing and durations.
 - **Animation and motion:** `emil-design-eng` always wins, including over `impeccable animate`, on easing, duration, and whether to animate at all. The existing scroll reveal is the house pattern and its `html.js` scoping is an invariant.
 - **Pre-ship review:** run `web-design-guidelines`. Its accessibility and interaction findings override aesthetic preference on conflict. ⚠️ It fetches the current guidelines over the network at review time rather than shipping a static copy.
 - **`impeccable`'s hook** runs a local detector after every Edit/Write and a full pass at end of turn (`.claude/settings.local.json`, machine-local and gitignored). It only injects context — it cannot block a turn or edit a file.
@@ -381,14 +384,35 @@ supabase/seed.sql
 components/             site-header.tsx (5-item nav incl. Admin, absolutely
                         centred wordmark, navy Check In), site-footer.tsx
                         (socials row + address; NO officer link — it is in the
-                        nav now). ui/ holds primitives: chevron-section.tsx
-                        (PageHero — navy field, grid overlay, chevron notch),
-                        partners.tsx, kpi-plate.tsx, hatch.tsx (the labelled
-                        placeholder box — every image slot on the site is one),
-                        officer-card.tsx, activities.tsx, button.tsx (class
-                        strings, not components), wordmark.tsx (draws in
-                        currentColor so it works on white AND navy), reveal.tsx
-                        + reveal-observer.tsx
+                        nav now). ui/ holds every shared primitive, and BOTH
+                        halves of the app use it — /admin used to import two
+                        things from here, which is the whole story of its drift:
+                          layout    section.tsx (ground + gutter + rhythm in one
+                                    place, so the Two Grounds Rule is structural),
+                                    panel.tsx, page-header.tsx
+                          type      heading.tsx (Headline/Title/Eyebrow/Lead —
+                                    ground-aware via an .on-navy variant, not a
+                                    prop), chevron-section.tsx (PageHero — navy
+                                    field, grid overlay, chevron notch)
+                          controls  button.tsx (buttonClass + named constants —
+                                    class strings, not components, because every
+                                    call site is already an <a>, a <Link> or a
+                                    <button>), field.tsx (Field/Input/Select/
+                                    Textarea/controlClass/CHECKBOX — deliberately
+                                    thin; see the invariant), chip.tsx
+                          feedback  banner.tsx (Banner + ReadError — ONE status
+                                    language for the whole app), pill.tsx,
+                                    empty-state.tsx (never a <Hatch>)
+                          data      table.tsx (Table/THead/Tr/Th/Td, with the row
+                                    hover none of the eight admin tables had)
+                          content   partners.tsx, kpi-plate.tsx, activities.tsx,
+                                    officer-card.tsx, hatch.tsx (the labelled
+                                    placeholder box — every image slot is one),
+                                    wordmark.tsx (draws in currentColor so it
+                                    works on white AND navy; its exclamation dot
+                                    is the one rounded thing in the codebase)
+                          motion    reveal.tsx (server-safe revealDelay) +
+                                    reveal-observer.tsx (the client observer)
 public/                 partners/ (4 logos) and NOTHING ELSE. photos/ was
                         deleted with the photography — see the invariant
 tests/                  Vitest — integration tests against the local stack

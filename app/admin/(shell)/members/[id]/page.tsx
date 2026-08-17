@@ -249,19 +249,19 @@ export default async function MemberDetailPage({
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           {member.full_name}
         </h1>
         <div className="flex items-center gap-2">
           {member.active === false && (
-            <span className="border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+            <span className="border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
               inactive
             </span>
           )}
           {member.source === "self_checkin" && (
             <span
               title="Created by the check-in form rather than an officer"
-              className="border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase"
+              className="border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase"
             >
               self-registered
             </span>
@@ -276,7 +276,7 @@ export default async function MemberDetailPage({
       </p>
 
       <section className="mt-10 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">Who this is</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Who this is</h2>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="EID">{member.eid}</Row>
           <Row label="Email">
@@ -302,17 +302,17 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
           {term ? `This term — ${term}` : "This term"}
         </h2>
-        <p className="mt-2 text-sm text-foreground/70">
+        <p className="mt-2 text-sm text-misa-secondary">
           Every figure below is scoped to the current term, denominators
           included. A grant made in a past term counts for nothing here.
         </p>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Events attended">
             {member.events_attended ?? 0}
-            <span className="text-foreground/50">
+            <span className="text-misa-muted">
               {" "}
               of {member.events_possible ?? 0} completed
             </span>
@@ -320,7 +320,7 @@ export default async function MemberDetailPage({
           <Row label="Attendance rate">
             {formatAttendanceRate(member.attendance_rate)}
             {member.attendance_rate === null && (
-              <span className="ml-2 text-xs text-foreground/60">
+              <span className="ml-2 text-xs text-misa-muted">
                 no events have finished in this term yet
               </span>
             )}
@@ -334,11 +334,11 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">All-time</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">All-time</h2>
         {/* These two are the only columns in member_directory that are NOT
             term-scoped, and sitting beside term-scoped figures in a table is
             what made that ambiguous. Here they are labelled and set apart. */}
-        <p className="mt-2 text-sm text-foreground/70">
+        <p className="mt-2 text-sm text-misa-secondary">
           Not scoped to a term. A submission from last term still needs an
           officer, and &ldquo;when did we last see this person&rdquo; is an
           all-time question.
@@ -348,13 +348,13 @@ export default async function MemberDetailPage({
             {member.last_seen_at ? (
               `${formatInstant(member.last_seen_at)} CT`
             ) : (
-              <span className="text-foreground/50">never</span>
+              <span className="text-misa-muted">never</span>
             )}
           </Row>
           <Row label="Pending">
             {member.pending_count ?? 0}
             {(member.pending_count ?? 0) > 0 && (
-              <span className="text-foreground/60">
+              <span className="text-misa-muted">
                 {" "}
                 submission{member.pending_count === 1 ? "" : "s"} awaiting review
               </span>
@@ -379,7 +379,7 @@ export default async function MemberDetailPage({
                 >
                   Submitted {formatInstant(row.submitted_at)} CT
                 </Link>
-                <span className="text-foreground/60">
+                <span className="text-misa-muted">
                   {" "}
                   as {row.submitted_name} / {row.submitted_eid}
                   {row.event_id ? "" : " — no event matched"}
@@ -391,10 +391,10 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-xl font-bold">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
           {term ? `Events this term — ${term}` : "Events this term"}
         </h2>
-        <p className="mt-2 max-w-3xl text-sm text-foreground/70">
+        <p className="mt-2 max-w-3xl text-sm text-misa-secondary">
           Published events only; a cancelled event credits nobody.{" "}
           <span className="font-medium">
             An event that has not happened yet is upcoming, not a miss
@@ -420,7 +420,7 @@ export default async function MemberDetailPage({
         )}
 
         {termEvents && !termEvents.error && termEvents.data.length === 0 && (
-          <p className="mt-4 border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+          <p className="mt-4 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             No published events in this term yet.
           </p>
         )}
@@ -429,17 +429,17 @@ export default async function MemberDetailPage({
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[40rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b-2 border-black text-left">
-                  <th className="py-2 pr-4 font-medium">Event</th>
-                  <th className="py-2 pr-4 font-medium">When</th>
-                  <th className="py-2 pr-4 font-medium">Category</th>
-                  <th className="py-2 pr-4 font-medium">Points</th>
-                  <th className="py-2 font-medium">This member</th>
+                <tr className="border-b border-misa-border text-left">
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">When</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Category</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Points</th>
+                  <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">This member</th>
                 </tr>
               </thead>
               <tbody>
                 {termEvents.data.map((event) => (
-                  <tr key={event.id} className="border-b border-black/15">
+                  <tr key={event.id} className="border-b border-misa-hairline transition-colors duration-150 hover:bg-misa-panel/70">
                     <td className="py-2 pr-4">
                       <Link
                         href={`/admin/events/${event.id}`}
@@ -469,24 +469,24 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-xl font-bold">Point adjustments</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Point adjustments</h2>
         {adjustmentsFailed ? (
           <ReadError what="this member's point adjustments" className="mt-4 max-w-3xl" />
         ) : adjustmentRows.length === 0 ? (
-          <p className="mt-4 max-w-3xl border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+          <p className="mt-4 max-w-3xl border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             No adjustments have been granted to this member.
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[48rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b-2 border-black text-left">
-                  <th className="py-2 pr-4 font-medium">Awarded</th>
-                  <th className="py-2 pr-4 font-medium">Points</th>
-                  <th className="py-2 pr-4 font-medium">Category</th>
-                  <th className="py-2 pr-4 font-medium">Reason</th>
-                  <th className="py-2 pr-4 font-medium">Term</th>
-                  <th className="py-2 font-medium">Officer</th>
+                <tr className="border-b border-misa-border text-left">
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Awarded</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Points</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Category</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Reason</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Term</th>
+                  <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Officer</th>
                 </tr>
               </thead>
               <tbody>
@@ -495,8 +495,8 @@ export default async function MemberDetailPage({
                   return (
                     <tr
                       key={row.id}
-                      className={`border-b border-black/15 align-top ${
-                        voided ? "text-foreground/50" : ""
+                      className={`border-b border-misa-hairline align-top ${
+                        voided ? "text-misa-muted" : ""
                       }`}
                     >
                       <td className="py-2 pr-4 whitespace-nowrap">
@@ -515,7 +515,7 @@ export default async function MemberDetailPage({
                           {signedPoints(row.points)}
                         </span>
                         {voided && (
-                          <span className="ml-2 border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+                          <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
                             voided
                           </span>
                         )}
@@ -540,14 +540,14 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-xl font-bold">Dues</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Dues</h2>
 
         {/* The status comes from the view's own boolean rather than being
             re-derived from the payments below, so this page and the directory
             cannot end up saying different things about the same member. What is
             derived here is "paid through", which the view deliberately does not
             carry — see paidThroughTerm. */}
-        <p className="mt-3 max-w-3xl text-sm text-foreground/70">
+        <p className="mt-3 max-w-3xl text-sm text-misa-secondary">
           Calculated from payments, never ticked by hand.{" "}
           {member.dues_paid_current_term ? (
             <span className="font-medium">
@@ -576,19 +576,19 @@ export default async function MemberDetailPage({
         {paymentsFailed ? (
           <ReadError what="this member's payments" className="mt-4 max-w-3xl" />
         ) : paymentRows.length === 0 ? (
-          <p className="mt-4 max-w-3xl border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+          <p className="mt-4 max-w-3xl border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             No payments have been credited to this member.
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full min-w-[48rem] border-collapse text-sm">
               <thead>
-                <tr className="border-b-2 border-black text-left">
-                  <th className="py-2 pr-4 font-medium">Paid</th>
-                  <th className="py-2 pr-4 font-medium">Amount</th>
-                  <th className="py-2 pr-4 font-medium">Covers</th>
-                  <th className="py-2 pr-4 font-medium">Payer</th>
-                  <th className="py-2 font-medium">Note</th>
+                <tr className="border-b border-misa-border text-left">
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Paid</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Amount</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Covers</th>
+                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Payer</th>
+                  <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Note</th>
                 </tr>
               </thead>
               <tbody>
@@ -597,8 +597,8 @@ export default async function MemberDetailPage({
                   return (
                     <tr
                       key={row.id}
-                      className={`border-b border-black/15 align-top ${
-                        voided ? "text-foreground/50" : ""
+                      className={`border-b border-misa-hairline align-top ${
+                        voided ? "text-misa-muted" : ""
                       }`}
                     >
                       <td className="py-2 pr-4 whitespace-nowrap">
@@ -614,7 +614,7 @@ export default async function MemberDetailPage({
                           {formatCents(row.amount_cents)}
                         </span>
                         {voided && (
-                          <span className="ml-2 border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+                          <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
                             voided
                           </span>
                         )}
@@ -627,19 +627,19 @@ export default async function MemberDetailPage({
                         {row.covered_terms && row.covered_terms.length > 0 ? (
                           row.covered_terms.join(", ")
                         ) : (
-                          <span className="text-foreground/50">
+                          <span className="text-misa-muted">
                             nothing yet — from {row.start_term}
                           </span>
                         )}
                       </td>
                       <td className="py-2 pr-4">
                         {row.payer_name ?? (
-                          <span className="text-foreground/50">—</span>
+                          <span className="text-misa-muted">—</span>
                         )}
                       </td>
                       <td className="py-2 max-w-[18rem] break-words">
                         {row.note ?? (
-                          <span className="text-foreground/50">—</span>
+                          <span className="text-misa-muted">—</span>
                         )}
                       </td>
                     </tr>
@@ -681,7 +681,7 @@ export default async function MemberDetailPage({
       />
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">History</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
         <div className="mt-4">
           {/* `id` from the route rather than member.id: every column of the
               view is nullable in the generated types, and this one is the
@@ -697,20 +697,20 @@ export default async function MemberDetailPage({
 function AttendanceMark({ state }: { state: TermEventState }) {
   if (state === "attended") {
     return (
-      <span className="border border-black/30 bg-misa-panel px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+      <span className="border border-misa-border bg-misa-panel px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
         attended
       </span>
     );
   }
   if (state === "missed") {
     return (
-      <span className="border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider text-foreground/60 uppercase">
+      <span className="border border-misa-border px-2 py-0.5 text-[0.7rem] tracking-wider text-misa-muted uppercase">
         missed
       </span>
     );
   }
   return (
-    <span className="text-[0.7rem] tracking-wider text-foreground/50 uppercase">
+    <span className="text-[0.7rem] tracking-wider text-misa-muted uppercase">
       upcoming
     </span>
   );
@@ -725,7 +725,7 @@ function Row({
 }) {
   return (
     <>
-      <dt className="text-sm text-foreground/60">{label}</dt>
+      <dt className="text-sm text-misa-muted">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </>
   );

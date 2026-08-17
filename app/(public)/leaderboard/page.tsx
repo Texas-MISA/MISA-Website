@@ -1,7 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Banner, ReadError } from "@/components/ui/banner";
 import { PageHero } from "@/components/ui/chevron-section";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Section } from "@/components/ui/section";
+import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
 
 import type { Database } from "@/lib/types/database";
@@ -152,73 +156,62 @@ export default async function LeaderboardPage() {
             : "Current-term standings for MISA members."
         }
       />
-      <section className="px-5 py-14 sm:px-14">
-      <div className="mx-auto max-w-3xl">
-        <div>
-          {result.kind === "error" ? (
-            <p className="text-misa-muted">
-              The leaderboard couldn&apos;t be loaded right now — check back
-              soon.
-            </p>
-          ) : rows.length === 0 ? (
-            // Genuinely reachable, not defensive padding: §4.4 notes the board
-            // is empty in early August before the term's first meeting.
-            <p className="text-misa-muted">
-              No standings yet{term ? ` for ${term}` : ""} — points appear here
-              once the term&apos;s first event has been held.
-            </p>
-          ) : (
-            <div>
-              {allZero && (
-                <p className="mb-6 border-l-2 border-misa-blue bg-misa-panel px-5 py-4 text-sm text-misa-body">
-                  No points have been recorded
-                  {term ? ` for ${term}` : " this term"} yet — everyone starts
-                  level. Totals appear here after the term&apos;s first event.
-                </p>
-              )}
-              <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-left">
-                <caption className="sr-only">
-                  MISA member standings{term ? ` for ${term}` : ""}, ranked by
-                  total points
-                </caption>
-                <thead>
-                  <tr className="border-b border-misa-border">
-                    <th
-                      scope="col"
-                      className="w-16 py-2 pr-3 text-sm font-semibold"
-                    >
-                      #
-                    </th>
-                    <th scope="col" className="py-2 pr-3 text-sm font-semibold">
-                      Member
-                    </th>
-                    <th
-                      scope="col"
-                      className="py-2 pl-3 text-right text-sm font-semibold"
-                    >
-                      Points
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id} className="border-b border-misa-hairline">
-                      <td className="py-2 pr-3 text-sm tabular-nums text-misa-muted">
-                        {row.rank}
-                      </td>
-                      <td className="py-2 pr-3">{row.fullName}</td>
-                      <td className="py-2 pl-3 text-right tabular-nums font-semibold">
-                        {row.totalPoints}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              </div>
-            </div>
-          )}
-        </div>
+      <Section pad="md" width="narrow">
+        {/* 🔓 The three outcomes below are rendered as three DIFFERENT things,
+            and that is the empty-vs-error invariant showing up in the layout
+            rather than only in the types. Both used to be a muted `<p>`: a
+            failed read and a term with no points looked identical on screen, so
+            a broken query would quietly have told every visitor that nobody has
+            any points. `ReadError` says the read failed; `EmptyState` says the
+            board is genuinely empty. */}
+        {result.kind === "error" ? (
+          <ReadError what="the leaderboard" />
+        ) : rows.length === 0 ? (
+          // Genuinely reachable, not defensive padding: §4.4 notes the board
+          // is empty in early August before the term's first meeting.
+          <EmptyState title={`No standings yet${term ? ` for ${term}` : ""}`}>
+            Points appear here once the term&apos;s first event has been held.
+          </EmptyState>
+        ) : (
+          <div data-reveal="fade">
+            {allZero && (
+              <Banner className="mb-6">
+                No points have been recorded
+                {term ? ` for ${term}` : " this term"} yet — everyone starts
+                level. Totals appear here after the term&apos;s first event.
+              </Banner>
+            )}
+            <Table>
+              <caption className="sr-only">
+                MISA member standings{term ? ` for ${term}` : ""}, ranked by
+                total points
+              </caption>
+              <THead>
+                <tr>
+                  <Th className="w-16">#</Th>
+                  <Th>Member</Th>
+                  <Th numeric>Points</Th>
+                </tr>
+              </THead>
+              <tbody>
+                {rows.map((row) => (
+                  <Tr key={row.id}>
+                    {/* The rank is set in the display face rather than in body
+                        text at 60% opacity. It is the column the page is sorted
+                        by, and it was the quietest thing on the row. */}
+                    <Td className="font-display text-[18px] font-semibold text-misa-blue tabular-nums">
+                      {row.rank}
+                    </Td>
+                    <Td>{row.fullName}</Td>
+                    <Td numeric className="font-semibold">
+                      {row.totalPoints}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        )}
 
         {/* The board is a bare total by design (§9 #11), so it cannot tell a
             member which of their points were attendance and which were granted.
@@ -229,14 +222,13 @@ export default async function LeaderboardPage() {
           pending, and why your total is what it is?{" "}
           <Link
             href="/lookup"
-            className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+            className="text-misa-blue underline hover:text-misa-blue-dark"
           >
             Look up your attendance
           </Link>
           .
         </p>
-      </div>
-      </section>
+      </Section>
     </>
   );
 }

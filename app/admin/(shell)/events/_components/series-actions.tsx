@@ -9,6 +9,7 @@ import {
   type SeriesPublishState,
 } from "@/app/actions/events";
 import { formatEventRange } from "@/lib/events";
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
 
 // Publish or cancel a whole series (§7 Stage 4).
 //
@@ -20,7 +21,7 @@ const PUBLISH_INITIAL: SeriesPublishState = { status: "idle" };
 const STATUS_INITIAL: EventActionState = { status: "idle" };
 
 const buttonClass =
-  "rounded-full border border-black/50 px-5 py-2 text-xs font-medium tracking-wider transition hover:bg-black/5 disabled:opacity-60";
+  BUTTON_QUIET_SM;
 
 export function SeriesActions({
   seriesId,
@@ -39,8 +40,8 @@ export function SeriesActions({
   );
 
   return (
-    <div className="border-l-4 border-misa-blue bg-misa-panel px-4 py-4">
-      <h2 className="font-display text-lg font-bold">This series</h2>
+    <div className="border border-misa-blue/35 bg-misa-panel px-4 py-4">
+      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">This series</h2>
 
       {publishState.status === "conflicts" && (
         <div role="alert" className="mt-3 text-sm">
@@ -133,7 +134,7 @@ export function SeriesActions({
           <button
             type="submit"
             disabled={statusPending}
-            className={`${buttonClass} border-red-800/50 text-red-900`}
+            className={`${buttonClass} border-misa-critical/50 text-misa-critical`}
           >
             CANCEL WHOLE SERIES
           </button>

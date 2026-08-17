@@ -33,14 +33,14 @@ export default function AdminLoading() {
     <div className="animate-pulse" aria-hidden="true">
       {/* Sized to the heading every admin page opens with, so the swap does not
           shift the page under the officer's cursor. */}
-      <div className="h-9 w-64 bg-black/10" />
-      <div className="mt-4 h-4 w-full max-w-2xl bg-black/5" />
-      <div className="mt-2 h-4 w-3/4 max-w-xl bg-black/5" />
+      <div className="h-9 w-64 bg-misa-hairline" />
+      <div className="mt-4 h-4 w-full max-w-2xl bg-misa-panel" />
+      <div className="mt-2 h-4 w-3/4 max-w-xl bg-misa-panel" />
 
       <div className="mt-10 space-y-2">
-        <div className="h-10 w-full bg-black/10" />
+        <div className="h-10 w-full bg-misa-hairline" />
         {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-9 w-full bg-black/5" />
+          <div key={i} className="h-9 w-full bg-misa-panel" />
         ))}
       </div>
 

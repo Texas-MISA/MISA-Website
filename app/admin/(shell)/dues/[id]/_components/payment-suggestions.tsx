@@ -26,7 +26,7 @@ export function PaymentSuggestions({
   }
   if (suggestions.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         Nothing on the roster looks like a close enough match to suggest. Read
         the note and the payer&apos;s name above and pick by hand below, or leave
         it queued — a weak guess here credits the wrong person&apos;s dues, and
@@ -40,19 +40,19 @@ export function PaymentSuggestions({
       {suggestions.map((suggestion) => (
         <li
           key={suggestion.member.id}
-          className="border border-black/20 bg-misa-panel px-4 py-3"
+          className="border border-misa-border bg-misa-panel px-4 py-3"
         >
           <p className="text-sm">
             <strong>{suggestion.member.fullName}</strong>
             {!suggestion.member.active && (
-              <span className="ml-2 text-xs text-foreground/60">inactive</span>
+              <span className="ml-2 text-xs text-misa-muted">inactive</span>
             )}
           </p>
           <p className="mt-1 font-mono text-xs">{suggestion.member.eid}</p>
-          <p className="mt-1 text-xs text-foreground/70">
+          <p className="mt-1 text-xs text-misa-secondary">
             {suggestion.member.email}
           </p>
-          <p className="mt-1 text-xs text-foreground/60">
+          <p className="mt-1 text-xs text-misa-muted">
             {suggestion.reasons
               .map(describeMatchReason)
               .filter(Boolean)

@@ -136,7 +136,7 @@ export async function AuditTrail({
 
   if (result.kind === "error") {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         Couldn&apos;t load the history for this record.
       </p>
     );
@@ -144,7 +144,7 @@ export async function AuditTrail({
 
   if (result.rows.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         No officer has changed this record yet. Check-ins submitted through the
         public form write no audit row — there is no acting officer to record.
       </p>
@@ -154,16 +154,16 @@ export async function AuditTrail({
   return (
     <ol className="flex flex-col gap-4">
       {result.rows.map((row) => (
-        <li key={row.id} className="border-l-4 border-black/20 pl-4">
+        <li key={row.id} className="border-l border-misa-border pl-4">
           <p className="text-sm">
             <strong>{formatAuditAction(row.action)}</strong>{" "}
-            <span className="text-foreground/70">
+            <span className="text-misa-secondary">
               by {describeOfficer(result.names, row.actor_id)} on{" "}
               {formatInstant(row.acted_at)} CT
             </span>
           </p>
           {row.note && (
-            <p className="mt-1 text-sm text-foreground/80">{row.note}</p>
+            <p className="mt-1 text-sm text-misa-body">{row.note}</p>
           )}
           <Diff before={row.before} after={row.after} />
         </li>
@@ -195,9 +195,9 @@ function Diff({ before, after }: { before: Json | null; after: Json | null }) {
     <dl className="mt-2 flex flex-col gap-0.5 text-xs">
       {keys.map((key) => (
         <div key={key} className="flex flex-wrap gap-x-2">
-          <dt className="font-mono text-foreground/60">{key}</dt>
+          <dt className="font-mono text-misa-muted">{key}</dt>
           <dd className="font-mono">
-            <span className="text-foreground/60 line-through">
+            <span className="text-misa-muted line-through">
               {render(from?.[key])}
             </span>{" "}
             → <span>{render(to?.[key])}</span>

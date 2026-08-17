@@ -1,5 +1,7 @@
 "use client";
 
+import { controlClass } from "@/components/ui/field";
+
 import { useMemo, useState } from "react";
 
 import type { MemberOption } from "@/lib/member-options";
@@ -73,14 +75,14 @@ export function MemberPicker({
   return (
     <div className="flex flex-col gap-2 text-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <span className="text-foreground/60">Members</span>
-        <span className="text-xs text-foreground/60">
+        <span className="text-misa-muted">Members</span>
+        <span className="text-xs text-misa-muted">
           {selected.size} of {MAX_GRANT_MEMBERS} selected
         </span>
       </div>
 
       {picked.length > 0 && (
-        <div className="border border-black/20 bg-misa-panel px-3 py-2">
+        <div className="border border-misa-border bg-misa-panel px-3 py-2">
           <ul className="flex flex-col gap-1">
             {picked.map((member) => (
               <li key={member.id} className="flex items-center gap-2">
@@ -121,12 +123,12 @@ export function MemberPicker({
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Filter by name or EID"
         aria-label="Filter members"
-        className="w-full border border-black/70 bg-white px-3 py-2 text-sm"
+        className={controlClass("sm", "w-full")}
       />
 
-      <ul className="max-h-64 overflow-y-auto border border-black/20">
+      <ul className="max-h-64 overflow-y-auto border border-misa-border">
         {available.length === 0 ? (
-          <li className="px-3 py-2 text-foreground/60">
+          <li className="px-3 py-2 text-misa-muted">
             {members.length === 0
               ? "No active members on the roster."
               : needle === ""
@@ -135,7 +137,7 @@ export function MemberPicker({
           </li>
         ) : (
           available.map((member) => (
-            <li key={member.id} className="border-b border-black/10 last:border-0">
+            <li key={member.id} className="border-b border-misa-hairline last:border-0">
               <label className="flex items-center gap-2 px-3 py-1.5">
                 <input
                   type="checkbox"
@@ -143,7 +145,7 @@ export function MemberPicker({
                   disabled={atCap}
                   onChange={() => onToggle(member.id)}
                 />
-                <span className={atCap ? "text-foreground/50" : ""}>
+                <span className={atCap ? "text-misa-muted" : ""}>
                   {member.label}
                 </span>
               </label>
@@ -153,13 +155,13 @@ export function MemberPicker({
       </ul>
 
       {atCap && (
-        <p className="text-xs text-foreground/60">
+        <p className="text-xs text-misa-muted">
           That is the most one grant can cover. Grant the rest separately.
         </p>
       )}
 
       {error && error.length > 0 && (
-        <span className="text-xs text-amber-800">{error[0]}</span>
+        <span className="text-xs text-misa-caution">{error[0]}</span>
       )}
     </div>
   );

@@ -54,7 +54,7 @@ export default async function NewAttendancePage({
           className="mb-6"
         />
       )}
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
         Add a check-in
       </h1>
 
@@ -64,7 +64,7 @@ export default async function NewAttendancePage({
         </Link>
       </p>
 
-      <p className="mt-6 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
         For someone who attended but never submitted the form. This is recorded
         as present immediately, so it needs both an event and a member, and it
         stays marked as entered by an officer.

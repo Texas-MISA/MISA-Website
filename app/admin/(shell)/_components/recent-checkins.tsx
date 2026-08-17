@@ -43,14 +43,14 @@ export async function RecentCheckins() {
 
   if (result.kind === "error") {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         Couldn&apos;t load recent check-ins.
       </p>
     );
   }
   if (result.rows.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         No check-ins yet.
       </p>
     );
@@ -60,24 +60,24 @@ export async function RecentCheckins() {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[36rem] border-collapse text-sm">
         <thead>
-          <tr className="border-b-2 border-black text-left">
-            <th className="py-2 pr-4 font-medium">Name</th>
-            <th className="py-2 pr-4 font-medium">EID</th>
-            <th className="py-2 pr-4 font-medium">Event</th>
-            <th className="py-2 pr-4 font-medium">Submitted</th>
-            <th className="py-2 font-medium">Status</th>
+          <tr className="border-b border-misa-border text-left">
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Name</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">EID</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Submitted</th>
+            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Status</th>
           </tr>
         </thead>
         <tbody>
           {result.rows.map((row) => (
-            <tr key={row.id} className="border-b border-black/15">
+            <tr key={row.id} className="border-b border-misa-hairline transition-colors duration-150 hover:bg-misa-panel/70">
               <td className="py-2 pr-4">{row.submitted_name}</td>
               <td className="py-2 pr-4 font-mono text-xs">
                 {row.submitted_eid}
               </td>
               <td className="py-2 pr-4">
                 {row.events?.title ?? (
-                  <span className="text-foreground/50">unmatched</span>
+                  <span className="text-misa-muted">unmatched</span>
                 )}
               </td>
               <td className="py-2 pr-4 whitespace-nowrap">

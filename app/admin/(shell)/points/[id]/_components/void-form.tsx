@@ -1,5 +1,10 @@
 "use client";
 
+import { Banner } from "@/components/ui/banner";
+
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState } from "react";
 
 import { voidAdjustment, type VoidState } from "@/app/actions/points";
@@ -25,22 +30,22 @@ export function VoidForm({ id }: { id: string }) {
     <form action={formAction} className="max-w-xl">
       <input type="hidden" name="id" value={id} />
 
-      <Banner state={state} />
+      <StatusBanner state={state} />
 
       <label className="flex flex-col gap-1 text-sm">
-        <span className="text-foreground/60">Why is this being voided?</span>
+        <span className="text-misa-muted">Why is this being voided?</span>
         <textarea
           name="voidReason"
           defaultValue={value}
           rows={3}
-          className="w-full border border-black/70 bg-white px-3 py-2 text-sm"
+          className={controlClass("sm", "w-full")}
         />
         {error && error.length > 0 && (
-          <span className="text-xs text-amber-800">{error[0]}</span>
+          <span className="text-xs text-misa-caution">{error[0]}</span>
         )}
       </label>
 
-      <p className="mt-3 text-sm text-foreground/70">
+      <p className="mt-3 text-sm text-misa-secondary">
         Voiding stops these points counting immediately. It is not a delete —
         the row stays in the ledger, struck through, with this reason and your
         name against it — and it cannot be undone. To correct an amount, void
@@ -50,7 +55,7 @@ export function VoidForm({ id }: { id: string }) {
       <button
         type="submit"
         disabled={pending || state.status === "done"}
-        className="mt-4 rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel disabled:opacity-40"
+        className={`mt-4 ${BUTTON_QUIET_SM}`}
       >
         {pending ? "VOIDING…" : "VOID THIS ADJUSTMENT"}
       </button>
@@ -58,7 +63,7 @@ export function VoidForm({ id }: { id: string }) {
   );
 }
 
-function Banner({ state }: { state: VoidState }) {
+function StatusBanner({ state }: { state: VoidState }) {
   if (state.status === "idle" || state.status === "invalid") return null;
 
   const message =
@@ -71,15 +76,12 @@ function Banner({ state }: { state: VoidState }) {
           : "Something went wrong and nothing was voided. Try again.";
 
   return (
-    <p
+    <Banner
+      tone={state.status === "done" ? "affirm" : "caution"}
       role="status"
-      className={`mb-4 border-l-4 px-4 py-3 text-sm ${
-        state.status === "done"
-          ? "border-misa-blue bg-misa-panel"
-          : "border-amber-700 bg-misa-panel"
-      }`}
+      className="mb-4"
     >
       {message}
-    </p>
+    </Banner>
   );
 }

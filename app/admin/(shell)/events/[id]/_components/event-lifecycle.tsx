@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
 
 import {
   deleteEvent,
@@ -17,7 +18,7 @@ import {
 const INITIAL: EventActionState = { status: "idle" };
 
 const buttonClass =
-  "rounded-full border border-black/50 px-5 py-2 text-xs font-medium tracking-wider transition hover:bg-black/5 disabled:opacity-60";
+  BUTTON_QUIET_SM;
 
 export function EventLifecycle({
   eventId,
@@ -46,7 +47,7 @@ export function EventLifecycle({
       {statusState.status === "overlap" && (
         <p
           role="alert"
-          className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
         >
           Can&apos;t publish: another published event&apos;s check-in window
           overlaps this one. Only one event can be open for check-in at a time.
@@ -56,7 +57,7 @@ export function EventLifecycle({
       {(statusState.status === "error" || deleteState.status === "error") && (
         <p
           role="alert"
-          className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
         >
           That didn&apos;t work — please try again.
         </p>
@@ -64,7 +65,7 @@ export function EventLifecycle({
       {deleteState.status === "blocked" && (
         <p
           role="alert"
-          className="border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm"
         >
           This event has {deleteState.attendanceCount} recorded check-
           {deleteState.attendanceCount === 1 ? "in" : "ins"}, so it can&apos;t
@@ -124,14 +125,14 @@ export function EventLifecycle({
                 ? "Events with recorded check-ins can't be deleted — cancel instead"
                 : undefined
             }
-            className={`${buttonClass} border-red-800/50 text-red-900`}
+            className={`${buttonClass} border-misa-critical/50 text-misa-critical`}
           >
             DELETE
           </button>
         </form>
       </div>
 
-      <p className="text-xs text-foreground/60">
+      <p className="text-xs text-misa-muted">
         Cancelling keeps the event and its attendance history but removes it
         from the public schedule and from point totals. Deleting is only
         possible while an event has no check-ins.

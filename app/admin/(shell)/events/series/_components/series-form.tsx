@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useActionState } from "react";
 
 import { createSeries, type SeriesFormState } from "@/app/actions/events";
+import { BUTTON_PRIMARY, BUTTON_PRIMARY_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
 import {
   EVENT_CATEGORIES,
   formatCategory,
@@ -17,7 +19,7 @@ import {
 const INITIAL: SeriesFormState = { status: "idle" };
 
 const inputClass =
-  "border border-black/70 bg-misa-panel px-3 py-2 text-base w-full";
+  controlClass("md", "w-full");
 
 const WEEKDAYS = [
   { value: 1, label: "Mon" },
@@ -39,18 +41,18 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
     return (
       <div
         role="status"
-        className="border-l-4 border-green-800 bg-misa-panel px-6 py-6"
+        className="border border-misa-affirm/45 bg-misa-affirm-wash px-6 py-6"
       >
-        <h2 className="font-display text-xl font-bold">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
           {state.count} draft {state.count === 1 ? "event" : "events"} created
         </h2>
-        <p className="mt-2 leading-6 text-foreground/85">
+        <p className="mt-2 leading-6 text-misa-body">
           They share one series and none of them are public yet. Review the
           schedule, then publish the whole series at once.
         </p>
         <Link
           href={`/admin/events?series=${state.seriesId}&term=all`}
-          className="mt-4 inline-block rounded-full bg-misa-blue px-8 py-2.5 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
+          className={`mt-4 ${BUTTON_PRIMARY_SM}`}
         >
           REVIEW THE SERIES
         </Link>
@@ -63,7 +65,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
       {(state.status === "error" || state.status === "unauthorized") && (
         <p
           role="alert"
-          className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
         >
           {state.status === "unauthorized"
             ? "Your session expired — sign in again and resubmit."
@@ -89,10 +91,10 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
         <input type="text" name="location" className={inputClass} />
       </Field>
 
-      <fieldset className="border border-black/20 px-4 py-4">
+      <fieldset className="border border-misa-border px-4 py-4">
         <legend className="px-2 text-sm font-medium">Repeats on</legend>
         {fieldErrors?.weekdays && (
-          <span role="alert" className="text-xs text-red-700">
+          <span role="alert" className="text-xs text-misa-critical">
             {fieldErrors.weekdays[0]}
           </span>
         )}
@@ -101,6 +103,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
             <label key={day.value} className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
+                className="size-4 shrink-0 accent-misa-blue"
                 name="weekdays"
                 value={day.value}
                 defaultChecked={day.value === 2}
@@ -152,7 +155,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
         </Field>
       </div>
 
-      <fieldset className="border border-black/20 px-4 py-4">
+      <fieldset className="border border-misa-border px-4 py-4">
         <legend className="px-2 text-sm font-medium">Check-in window</legend>
         <div className="mt-2 grid gap-6 sm:grid-cols-2">
           <Field label="Opens early (minutes)">
@@ -210,7 +213,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
           else, and publishing is a separate, deliberate step. */}
       <input type="hidden" name="status" value="draft" />
 
-      <p className="text-xs text-foreground/60">
+      <p className="text-xs text-misa-muted">
         At most {MAX_SERIES_EVENTS} events per series.
       </p>
 
@@ -218,7 +221,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
         <button
           type="submit"
           disabled={pending}
-          className="w-fit rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
+          className={`w-fit ${BUTTON_PRIMARY}`}
         >
           {pending ? "CREATING…" : "CREATE SERIES"}
         </button>
@@ -247,7 +250,7 @@ function Field({
       {label}
       {children}
       {error && (
-        <span role="alert" className="text-xs text-red-700">
+        <span role="alert" className="text-xs text-misa-critical">
           {error[0]}
         </span>
       )}

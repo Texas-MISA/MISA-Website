@@ -25,6 +25,11 @@ export const metadata: Metadata = {
   },
   description:
     "Management Information Systems Association at The University of Texas at Austin — where analytics, innovation, and leadership converge.",
+  // Paper, matching the page ground rather than the navy hero. Mobile browsers
+  // tint their own chrome with this, and a navy bar above a white page reads as
+  // the header having come loose. There is one value because there is one
+  // scheme — see DESIGN.md, *Light only*.
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({

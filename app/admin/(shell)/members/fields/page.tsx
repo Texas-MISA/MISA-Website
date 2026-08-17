@@ -1,3 +1,4 @@
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -30,12 +31,12 @@ export default async function MemberFieldsPage() {
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Custom fields
         </h1>
         <Link
           href="/admin/members/fields/new"
-          className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
+          className={BUTTON_PRIMARY_SM}
         >
           NEW FIELD
         </Link>
@@ -47,17 +48,17 @@ export default async function MemberFieldsPage() {
         </Link>
       </p>
 
-      <p className="mt-6 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
         Dropdowns officers can set on any member — t-shirt size, committee,
         major. Fields marked as directory columns appear in the roster table and
         can be sorted on; the rest live on each member&apos;s own page.
       </p>
 
       <section className="mt-10">
-        <h2 className="font-display text-xl font-bold">Live</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Live</h2>
         <div className="mt-4">
           {live.length === 0 ? (
-            <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+            <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
               No custom fields yet. The directory shows its four built-in
               columns until you add one.
             </p>
@@ -69,8 +70,8 @@ export default async function MemberFieldsPage() {
 
       {archived.length > 0 && (
         <section className="mt-12">
-          <h2 className="font-display text-xl font-bold">Archived</h2>
-          <p className="mt-2 max-w-2xl text-sm text-foreground/70">
+          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Archived</h2>
+          <p className="mt-2 max-w-2xl text-sm text-misa-secondary">
             No longer offered anywhere.{" "}
             <span className="font-medium">
               Members keep every answer given under these
@@ -93,17 +94,17 @@ function FieldTable({ rows }: { rows: FieldDefinition[] }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[48rem] border-collapse text-sm">
         <thead>
-          <tr className="border-b-2 border-black text-left">
-            <th className="py-2 pr-4 font-medium">Label</th>
-            <th className="py-2 pr-4 font-medium">Key</th>
-            <th className="py-2 pr-4 font-medium">Options</th>
-            <th className="py-2 pr-4 font-medium">Where</th>
-            <th className="py-2 pr-4 font-medium">Order</th>
+          <tr className="border-b border-misa-border text-left">
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Label</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Key</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Options</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Where</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Order</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b border-black/15 align-top">
+            <tr key={row.id} className="border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70">
               <td className="py-2 pr-4">
                 <Link
                   href={`/admin/members/fields/${row.id}`}

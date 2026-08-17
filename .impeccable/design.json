@@ -1,0 +1,581 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-17T00:00:00.000Z",
+  "title": "Design System: Texas MISA",
+  "extensions": {
+    "colorMeta": {
+      "drafting-navy": {
+        "role": "primary",
+        "displayName": "Drafting Navy",
+        "canonical": "#16305c",
+        "tonalRamp": [
+          "oklch(15% 0.055 262)",
+          "oklch(22% 0.070 262)",
+          "oklch(31% 0.082 262)",
+          "oklch(42% 0.088 262)",
+          "oklch(54% 0.086 262)",
+          "oklch(67% 0.070 262)",
+          "oklch(81% 0.044 262)",
+          "oklch(95% 0.014 262)"
+        ]
+      },
+      "pressed-navy": {
+        "role": "primary",
+        "displayName": "Pressed Navy",
+        "canonical": "#0d1d38",
+        "tonalRamp": [
+          "oklch(15% 0.050 265)",
+          "oklch(21% 0.058 265)",
+          "oklch(30% 0.066 265)",
+          "oklch(41% 0.072 265)",
+          "oklch(53% 0.070 265)",
+          "oklch(66% 0.057 265)",
+          "oklch(80% 0.036 265)",
+          "oklch(95% 0.012 265)"
+        ]
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#1d1f20",
+        "tonalRamp": [
+          "oklch(15% 0.003 240)",
+          "oklch(24% 0.003 240)",
+          "oklch(33% 0.003 240)",
+          "oklch(44% 0.003 240)",
+          "oklch(56% 0.003 240)",
+          "oklch(69% 0.003 240)",
+          "oklch(82% 0.003 240)",
+          "oklch(95% 0.002 240)"
+        ]
+      },
+      "body-graphite": {
+        "role": "neutral",
+        "displayName": "Body Graphite",
+        "canonical": "#3a3d40",
+        "tonalRamp": [
+          "oklch(15% 0.004 240)",
+          "oklch(24% 0.004 240)",
+          "oklch(34% 0.004 240)",
+          "oklch(45% 0.004 240)",
+          "oklch(57% 0.004 240)",
+          "oklch(70% 0.004 240)",
+          "oklch(83% 0.003 240)",
+          "oklch(95% 0.002 240)"
+        ]
+      },
+      "secondary-graphite": {
+        "role": "neutral",
+        "displayName": "Secondary Graphite",
+        "canonical": "#4a4d50",
+        "tonalRamp": [
+          "oklch(15% 0.004 240)",
+          "oklch(25% 0.004 240)",
+          "oklch(35% 0.005 240)",
+          "oklch(46% 0.005 240)",
+          "oklch(58% 0.005 240)",
+          "oklch(71% 0.004 240)",
+          "oklch(83% 0.003 240)",
+          "oklch(95% 0.002 240)"
+        ]
+      },
+      "annotation-grey": {
+        "role": "neutral",
+        "displayName": "Annotation Grey",
+        "canonical": "#6f7275",
+        "tonalRamp": [
+          "oklch(16% 0.004 240)",
+          "oklch(26% 0.004 240)",
+          "oklch(37% 0.005 240)",
+          "oklch(48% 0.005 240)",
+          "oklch(60% 0.005 240)",
+          "oklch(72% 0.004 240)",
+          "oklch(84% 0.003 240)",
+          "oklch(95% 0.002 240)"
+        ]
+      },
+      "vellum": {
+        "role": "neutral",
+        "displayName": "Vellum",
+        "canonical": "#f2f2f3",
+        "tonalRamp": [
+          "oklch(16% 0.002 270)",
+          "oklch(26% 0.002 270)",
+          "oklch(37% 0.002 270)",
+          "oklch(49% 0.002 270)",
+          "oklch(61% 0.002 270)",
+          "oklch(74% 0.002 270)",
+          "oklch(87% 0.002 270)",
+          "oklch(96% 0.002 270)"
+        ]
+      },
+      "vellum-shade": {
+        "role": "neutral",
+        "displayName": "Vellum Shade",
+        "canonical": "#e7e7ea",
+        "tonalRamp": [
+          "oklch(16% 0.004 270)",
+          "oklch(26% 0.004 270)",
+          "oklch(37% 0.004 270)",
+          "oklch(49% 0.004 270)",
+          "oklch(61% 0.004 270)",
+          "oklch(74% 0.004 270)",
+          "oklch(87% 0.004 270)",
+          "oklch(93% 0.004 270)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(74% 0 0)",
+          "oklch(87% 0 0)",
+          "oklch(100% 0 0)"
+        ]
+      },
+      "hairline": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(29, 31, 32, 0.16)",
+        "tonalRamp": [
+          "rgba(29,31,32,0.04)",
+          "rgba(29,31,32,0.08)",
+          "rgba(29,31,32,0.12)",
+          "rgba(29,31,32,0.16)",
+          "rgba(29,31,32,0.2)",
+          "rgba(29,31,32,0.3)",
+          "rgba(29,31,32,0.5)",
+          "rgba(29,31,32,0.8)"
+        ]
+      },
+      "frame": {
+        "role": "neutral",
+        "displayName": "Frame",
+        "canonical": "rgba(29, 31, 32, 0.2)",
+        "tonalRamp": [
+          "rgba(29,31,32,0.04)",
+          "rgba(29,31,32,0.08)",
+          "rgba(29,31,32,0.12)",
+          "rgba(29,31,32,0.16)",
+          "rgba(29,31,32,0.2)",
+          "rgba(29,31,32,0.3)",
+          "rgba(29,31,32,0.5)",
+          "rgba(29,31,32,0.8)"
+        ]
+      },
+      "poche-light": {
+        "role": "tertiary",
+        "displayName": "Poché Light",
+        "canonical": "#2c4b7c",
+        "tonalRamp": [
+          "oklch(16% 0.055 262)",
+          "oklch(24% 0.070 262)",
+          "oklch(34% 0.082 262)",
+          "oklch(43% 0.085 262)",
+          "oklch(55% 0.082 262)",
+          "oklch(68% 0.066 262)",
+          "oklch(82% 0.040 262)",
+          "oklch(95% 0.013 262)"
+        ]
+      },
+      "poche-dark": {
+        "role": "tertiary",
+        "displayName": "Poché Dark",
+        "canonical": "#26436f",
+        "tonalRamp": [
+          "oklch(15% 0.055 262)",
+          "oklch(23% 0.070 262)",
+          "oklch(32% 0.080 262)",
+          "oklch(42% 0.084 262)",
+          "oklch(54% 0.081 262)",
+          "oklch(67% 0.065 262)",
+          "oklch(81% 0.040 262)",
+          "oklch(95% 0.013 262)"
+        ]
+      },
+      "caution": {
+        "role": "custom",
+        "displayName": "Caution",
+        "canonical": "#8a5a12",
+        "tonalRamp": []
+      },
+      "caution-wash": {
+        "role": "custom",
+        "displayName": "Caution Wash",
+        "canonical": "#faf4e8",
+        "tonalRamp": []
+      },
+      "critical": {
+        "role": "custom",
+        "displayName": "Critical",
+        "canonical": "#8f2323",
+        "tonalRamp": []
+      },
+      "critical-wash": {
+        "role": "custom",
+        "displayName": "Critical Wash",
+        "canonical": "#fbf0ef",
+        "tonalRamp": []
+      },
+      "affirm": {
+        "role": "custom",
+        "displayName": "Affirm",
+        "canonical": "#1f5c34",
+        "tonalRamp": []
+      },
+      "affirm-wash": {
+        "role": "custom",
+        "displayName": "Affirm Wash",
+        "canonical": "#eff5f0",
+        "tonalRamp": []
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The hero h1 on all five designed pages. One per page, never elsewhere. Steps 72 → 56 → 44px down the breakpoints."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Section headings — \"Our Mission\", \"Activities\", \"Our Amazing Partners\". Navy on white, white on navy. Steps to 30px on phones."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Activity and case-study row titles in the alternating two-column layouts."
+      },
+      "card-title": {
+        "displayName": "Card Title",
+        "purpose": "Project cards and FAQ questions. A 22px/1.05 step carries officer names and event rows."
+      },
+      "body-large": {
+        "displayName": "Body Large",
+        "purpose": "Page intros and hero subheads. Capped at 74ch."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Every paragraph. 1.65 line-height, or 1.7 inside a card. Capped at 46ch in activity rows, 48ch in case studies."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase eyebrows, meta rows and KPI labels. An 11px/.12em step carries officer roles and semester tags."
+      },
+      "button": {
+        "displayName": "Button",
+        "purpose": "All button and eyebrow-link labels. Always uppercase; 13px in the compact header variant."
+      },
+      "nav": {
+        "displayName": "Nav",
+        "purpose": "Header and mobile-sheet nav items. Always uppercase."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "The mono text inside a hatched placeholder box naming the shot that belongs there. Used nowhere else in the system."
+      },
+      "headline-sm": {
+        "displayName": "Headline (phone)",
+        "purpose": "The 30px step a section heading takes on phones. Documented in prose before 2026-08-17 but absent from the machine-readable ramp, so the detector flagged every correct use of it."
+      },
+      "card-title-sm": {
+        "displayName": "Card Title (small)",
+        "purpose": "The 22px/1.05 step carrying officer names, event rows and admin section headings."
+      }
+    },
+    "shadows": [],
+    "motion": [
+      {
+        "name": "ease-reveal",
+        "value": "cubic-bezier(0.2, 0.7, 0.3, 1)",
+        "purpose": "Transform easing for every scroll-reveal entrance. The house curve; opacity runs on plain ease alongside it."
+      },
+      {
+        "name": "ease-out-quint",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "emil-design-eng entering/exiting curve. Additive, and deliberately NOT named --ease-out, which is one of Tailwind's own theme keys."
+      },
+      {
+        "name": "ease-in-out-quint",
+        "value": "cubic-bezier(0.77, 0, 0.175, 1)",
+        "purpose": "emil-design-eng moving/morphing curve. There is no ease-IN curve in the system on purpose."
+      },
+      {
+        "name": "duration-press",
+        "value": "140ms",
+        "purpose": "Active feedback on a control. The press is an ink change, never a transform."
+      },
+      {
+        "name": "duration-hover",
+        "value": "150ms",
+        "purpose": "Every hover in the system is a colour swap on this duration."
+      },
+      {
+        "name": "duration-pop",
+        "value": "200ms",
+        "purpose": "Tooltips and inline status markers."
+      },
+      {
+        "name": "duration-overlay",
+        "value": "260ms",
+        "purpose": "Disclosure panels and expanding filter groups."
+      },
+      {
+        "name": "reveal-rise",
+        "value": "translateY(32px) over 0.9s",
+        "purpose": "A section's LEAD element. At most one per section: this is the authored moment."
+      },
+      {
+        "name": "reveal-up",
+        "value": "translateY(18px) over 0.7s",
+        "purpose": "Ordinary blocks following a lead. Short travel, gets out of the way."
+      },
+      {
+        "name": "reveal-lateral",
+        "value": "translateX(24px) over 0.8s",
+        "purpose": "The alternating two-column rows, entering from their own side. md-and-up ONLY: at 390px a 24px offset against the 20px gutter pushed the document 4px past the viewport."
+      },
+      {
+        "name": "reveal-fade",
+        "value": "opacity over 0.6s",
+        "purpose": "Dense content: tables, standings, card grids. A row that slides is a row the reader has to wait for."
+      },
+      {
+        "name": "reveal-wipe",
+        "value": "clip-path inset(0 100% 0 0) over 0.8s",
+        "purpose": "Hairline rules and plates, drawn on rather than moved in."
+      },
+      {
+        "name": "stagger-step",
+        "value": "0.04s-0.06s",
+        "purpose": "Delay increment between siblings in a revealed group, set via --reveal-delay."
+      },
+      {
+        "name": "marquee-left",
+        "value": "38s linear infinite",
+        "purpose": "Upper home-page gallery track. Translates by exactly one group width in pixels (--marquee-shift), never a percentage."
+      },
+      {
+        "name": "marquee-right",
+        "value": "46s linear infinite reverse",
+        "purpose": "Lower home-page gallery track, opposed direction from the same keyframe block."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      },
+      {
+        "name": "xl",
+        "value": "1280px"
+      }
+    ],
+    "maintenance": "Hand-updated 2026-08-17 alongside the site-wide rework, NOT regenerated: /impeccable document rebuilds DESIGN.md from code and would discard the reasoning added there by hand. Token data, motion and the narrative rules below are in sync with DESIGN.md; the `components` array still carries the pre-rework demos and is the one part known to be behind."
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The primary action on a white ground. Stamped, not raised — hover darkens the ink, nothing moves.",
+      "html": "<button class=\"ds-btn-primary\">Propose a project</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #16305c; color: #fff; padding: 14px 24px; border: none; border-radius: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-btn-primary:hover { background: #0d1d38; } .ds-btn-primary:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline-navy",
+      "description": "Secondary action on a white ground. The outline is not tinted on hover — it is completed, filling navy.",
+      "html": "<button class=\"ds-btn-outline\">Load more photos</button>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: transparent; color: #16305c; padding: 14px 30px; border: 1px solid #16305c; border-radius: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-btn-outline:hover { background: #16305c; color: #fff; } .ds-btn-outline:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Button on Navy",
+      "kind": "button",
+      "refersTo": "button-on-navy",
+      "description": "Primary action inside a navy band. White fill, navy label; the focus ring flips to white with the ground.",
+      "html": "<div class=\"ds-navy-band\"><button class=\"ds-btn-on-navy\">Email an officer</button></div>",
+      "css": ".ds-navy-band { background: #16305c; padding: 32px; } .ds-btn-on-navy { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #fff; color: #16305c; padding: 14px 30px; border: none; border-radius: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms; } .ds-btn-on-navy:hover { background: rgba(255,255,255,0.85); } .ds-btn-on-navy:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "The gallery's filter chips. Selected is a solid navy stamp; unselected turns border and text navy on hover.",
+      "html": "<div class=\"ds-chip-row\"><button class=\"ds-chip ds-chip--active\">All</button><button class=\"ds-chip\">Socials</button><button class=\"ds-chip\">Workshops</button></div>",
+      "css": ".ds-chip-row { display: flex; gap: 10px; } .ds-chip { background: transparent; color: #4a4d50; padding: 9px 18px; border: 1px solid rgba(29,31,32,0.2); border-radius: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 13px; font-weight: 600; line-height: 1; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: border-color 150ms, color 150ms; } .ds-chip:hover { border-color: #16305c; color: #16305c; } .ds-chip--active { background: #16305c; color: #fff; border-color: #16305c; } .ds-chip--active:hover { color: #fff; } .ds-chip:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The framed white rectangle used for FAQ entries, history notes and project cards. One hairline border, no shadow, square corners.",
+      "html": "<div class=\"ds-card\"><p class=\"ds-card__eyebrow\">Growth</p><h3 class=\"ds-card__title\">Who can become a MISA member?</h3><p class=\"ds-card__body\">Anyone! We accept all majors &amp; years. The only requirement is being a UT student and paying dues.</p></div>",
+      "css": ".ds-card { background: #fff; border: 1px solid rgba(29,31,32,0.2); border-radius: 0; padding: 26px 28px; max-width: 420px; } .ds-card__eyebrow { margin: 0 0 10px; font-family: Barlow, system-ui, sans-serif; font-size: 12px; font-weight: 500; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: #16305c; } .ds-card__title { margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(29,31,32,0.16); font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 26px; font-weight: 600; line-height: 1.08; letter-spacing: -0.01em; color: #16305c; } .ds-card__body { margin: 0; font-family: Barlow, system-ui, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.65; color: #4a4d50; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Form field, currently admin-only. Vellum interior, square, with the global navy focus ring. Shown at the Frame border weight this system specifies rather than the heavier weight currently shipped.",
+      "html": "<label class=\"ds-field\">Email<input class=\"ds-input\" type=\"email\" placeholder=\"you@utexas.edu\" /></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; font-family: Barlow, system-ui, sans-serif; font-size: 14px; color: #1d1f20; max-width: 320px; } .ds-input { width: 100%; background: #f2f2f3; color: #1d1f20; border: 1px solid rgba(29,31,32,0.2); border-radius: 0; padding: 12px; font-family: Barlow, system-ui, sans-serif; font-size: 16px; } .ds-input::placeholder { color: #6f7275; } .ds-input:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Header Nav",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "The 60px sticky header row. Inactive items are Annotation Grey and darken on hover; the active item is Graphite with a navy underline.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav__item ds-nav__item--active\" href=\"#\" aria-current=\"page\">About</a><a class=\"ds-nav__item\" href=\"#\">Projects</a><a class=\"ds-nav__item\" href=\"#\">Gallery</a><a class=\"ds-nav__item\" href=\"#\">Officers</a><a class=\"ds-nav__item\" href=\"#\">Admin</a></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 22px; height: 60px; padding: 0 32px; background: #fff; border-bottom: 1px solid rgba(29,31,32,0.16); } .ds-nav__item { font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 13px; font-weight: 500; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; color: #6f7275; text-decoration: none; transition: color 150ms; } .ds-nav__item:hover { color: #1d1f20; } .ds-nav__item--active { color: #1d1f20; border-bottom: 1px solid #16305c; padding-bottom: 2px; } .ds-nav__item:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+    },
+    {
+      "name": "Hatch Placeholder",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The system's signature component. A 45° 7px poché fill in a framed rectangle, captioned in mono with the shot that belongs there. Light tone on white grounds, navy tone on navy — never mixed.",
+      "html": "<div class=\"ds-hatch-row\"><div class=\"ds-hatch ds-hatch--light\"><span class=\"ds-hatch__caption\">social event photo</span></div><div class=\"ds-hatch-navy-ground\"><div class=\"ds-hatch ds-hatch--navy\"><span class=\"ds-hatch__caption ds-hatch__caption--navy\">banquet photo</span></div></div></div>",
+      "css": ".ds-hatch-row { display: flex; gap: 16px; align-items: flex-start; } .ds-hatch { display: flex; align-items: center; justify-content: center; width: 260px; height: 162px; border-radius: 0; } .ds-hatch--light { background: repeating-linear-gradient(45deg, #f2f2f3, #f2f2f3 7px, #e7e7ea 7px, #e7e7ea 14px); border: 1px solid rgba(29,31,32,0.2); } .ds-hatch-navy-ground { background: #16305c; padding: 16px; } .ds-hatch--navy { background: repeating-linear-gradient(45deg, #2c4b7c, #2c4b7c 7px, #26436f 7px, #26436f 14px); border: 1px solid rgba(255,255,255,0.28); } .ds-hatch__caption { font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 1; color: #6f7275; } .ds-hatch__caption--navy { color: rgba(255,255,255,0.65); }"
+    },
+    {
+      "name": "KPI Plate",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The numeral/label plate on About and Projects. A 1px-gap grid over a hairline background with white cells, so one shared rule reads between them instead of two adjacent borders.",
+      "html": "<dl class=\"ds-plate\"><div class=\"ds-plate__cell\"><dd class=\"ds-plate__value\">1982</dd><dt class=\"ds-plate__label\">Founded</dt></div><div class=\"ds-plate__cell\"><dd class=\"ds-plate__value\">2009</dd><dt class=\"ds-plate__label\">Re-established</dt></div><div class=\"ds-plate__cell\"><dd class=\"ds-plate__value\">250%</dd><dt class=\"ds-plate__label\">Membership growth</dt></div></dl>",
+      "css": ".ds-plate { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; background: rgba(29,31,32,0.16); border: 1px solid rgba(29,31,32,0.16); } .ds-plate__cell { display: flex; flex-direction: column; background: #fff; padding: 20px 24px; } .ds-plate__value { margin: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 34px; font-weight: 600; line-height: 1; color: #16305c; } .ds-plate__label { margin: 4px 0 0; font-family: Barlow, system-ui, sans-serif; font-size: 12px; font-weight: 500; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7275; }"
+    },
+    {
+      "name": "Page Hero",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "The hero every page opens with: a navy field under a 60×60 graph-paper grid, with the chevron notch clipped from its bottom edge. Both decorations are CSS, so they scale with the viewport.",
+      "html": "<section class=\"ds-hero\"><div class=\"ds-hero__grid\" aria-hidden=\"true\"></div><div class=\"ds-hero__inner\"><h1 class=\"ds-hero__title\">Client &amp; Data Projects</h1><p class=\"ds-hero__sub\">Turning classroom knowledge into real-world impact.</p></div></section>",
+      "css": ".ds-hero { position: relative; background: #16305c; color: #fff; padding: 72px 56px 108px; text-align: center; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 48px), 50% 100%, 0 calc(100% - 48px)); } .ds-hero__grid { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px); background-size: 60px 60px; } .ds-hero__inner { position: relative; max-width: 900px; margin: 0 auto; } .ds-hero__title { margin: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 72px; font-weight: 600; line-height: 0.96; letter-spacing: -0.02em; } .ds-hero__sub { margin: 18px 0 0; font-family: Barlow, system-ui, sans-serif; font-size: 20px; font-weight: 400; line-height: 1.5; color: rgba(255,255,255,0.8); }"
+    },
+    {
+      "name": "Wordmark",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Drawn in CSS rather than shipped as an asset, in currentColor so the one component works navy on white and white on navy. The exclamation glyph overlays the second stem of \"misa\".",
+      "html": "<a class=\"ds-wordmark\" href=\"#\"><span class=\"ds-wordmark__misa\">misa<span class=\"ds-wordmark__bang\" aria-hidden=\"true\"><span class=\"ds-wordmark__dot\"></span><span class=\"ds-wordmark__bar\"></span></span></span><span class=\"ds-wordmark__texas\">TEXAS</span></a>",
+      "css": ".ds-wordmark { display: inline-flex; flex-direction: column; align-items: center; color: #16305c; text-decoration: none; } .ds-wordmark__misa { position: relative; font-family: Barlow, system-ui, sans-serif; font-size: 24px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; } .ds-wordmark__bang { position: absolute; left: 1.72em; top: -0.3em; display: flex; flex-direction: column; align-items: center; } .ds-wordmark__dot { width: 0.16em; height: 0.16em; border-radius: 50%; background: currentColor; } .ds-wordmark__bar { margin-top: 0.03em; width: 0.05em; height: 0.14em; background: currentColor; } .ds-wordmark__texas { margin-top: 2px; font-family: Barlow, system-ui, sans-serif; font-size: 8px; font-weight: 500; letter-spacing: 0.42em; text-indent: 0.42em; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Drawing Set",
+    "overview": "This is a set of construction documents, not a brochure. Every decorative element in the system is borrowed from architectural drafting and does a drafting job: the 60×60px grid laid over each navy hero is graph paper showing through; the 45° 7px stripe fill is poché, the convention for marking a volume that exists in the plan but has not been built; the mono captions under and inside those volumes are drawing annotations; the 1px hairlines are rule weights, not decoration. Corners are square because a drawing has none.\n\nThat metaphor is not applied to the system after the fact — it is the honest description of what the system already had to become. The organization publishes no photography, so eighteen gallery slots, four activity rows, three project cards, thirteen officer headshots and the About cluster all render as hatched boxes captioned with the shot that belongs there. A system that treated those as missing assets would read as broken. A drawing set treats them as specified-but-unbuilt, which is exactly true, and the caption is the specification. The hatch is not a missing photograph; it is the drawing of one.\n\nThe register that follows is institutional and unhurried: navy on white, condensed uppercase for anything structural, Barlow at 1.65 line-height for anything that has to be read at length, and hairlines instead of shadows to separate one thing from the next. Density is generous rather than tight — a 56px page gutter and 64–80px section padding — because the pages are read once, by a student deciding whether to show up, and comprehension outranks information density everywhere except /admin.",
+    "keyCharacteristics": [
+      "Square corners everywhere — no radius token exists above 0.",
+      "Two grounds only: white and navy #16305c. Never a third, never a gradient.",
+      "Hairline rules carry every separation; the system is flat at rest.",
+      "Barlow Condensed for structure, Barlow for reading. Nothing else.",
+      "Hatched, captioned placeholders wherever a photograph would go.",
+      "Motion is entrance-only: reveal on scroll, two marquee tracks, no hover lift."
+    ],
+    "rules": [
+      {
+        "name": "The Two Grounds Rule",
+        "body": "A surface is either white or Drafting Navy, and everything on it moves together: on navy, the hatch is Poché, borders are rgba(255,255,255,.28–.45), paragraphs are rgba(255,255,255,.8), eyebrows are rgba(255,255,255,.6–.7), and the section carries .on-navy so the focus ring flips to white. Change the ground and you change all five — including the section's own padding, since a navy band's inset was sized to a field that is no longer there. Mixing a light hatch onto a navy ground, or a navy hatch onto white, is always a bug.",
+        "section": "colors"
+      },
+      {
+        "name": "The Rare Navy Rule",
+        "body": "Navy is a ground or an accent, never a texture. On a white page it appears in headings, eyebrows, links, KPI numerals and buttons — and nowhere else. Its scarcity on the page is what makes a full-bleed navy band land when one arrives.",
+        "section": "colors"
+      },
+      {
+        "name": "The Poché Rule",
+        "body": "The hatch means specified, not yet built. It is reserved for image slots awaiting real photography and must never be used as decoration, as a texture behind live content, or as an empty state for data.",
+        "section": "colors"
+      },
+      {
+        "name": "The Two-Width Rule",
+        "body": "Barlow Condensed is for structure — headings, buttons, nav, chips, KPI numerals, officer names. Barlow is for reading — every paragraph, every label, every meta line. A condensed paragraph or a non-condensed button is always wrong, and no third family is ever introduced.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono-Means-Placeholder Rule",
+        "body": "On the PUBLIC pages, monospace appears in exactly one context: the caption naming a shot that does not exist. The scoping matters, and it was wrong when this rule was first written — /admin has set EIDs and error digests in monospace since Stage 4. It is kept there on a functional argument rather than an aesthetic one: an EID is transcribed by hand off a phone screen, and a monospace face is what separates l from 1 and 0 from O. The two uses never meet, because /admin renders no Hatch and the public pages render no identifiers. Monospace for prose, or for a heading, remains wrong everywhere.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tight-Top Rule",
+        "body": "Negative tracking (-.01em to -.02em) belongs to large condensed type only; positive tracking (.06em to .14em) belongs to small uppercase type only. Nothing in between is tracked at all.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline Grid Rule",
+        "body": "A plate is a grid with gap: 1px over a Hairline background, with white cells. The background shows through the gaps, so one shared rule reads between cells instead of two adjacent borders. Never build a plate by giving each cell its own border.",
+        "section": "layout"
+      },
+      {
+        "name": "The Section Owns Its Padding Rule",
+        "body": "Space between sections comes from the sections themselves, never from a margin between them — which is why removing a band's navy ground also means resizing its padding. A ground change without a padding change leaves the inset that belonged to a field that is gone.",
+        "section": "layout"
+      },
+      {
+        "name": "The Wordmark Clearance Rule",
+        "body": "The header wordmark is absolutely centered and wins the z-order, so an overflowing nav item disappears behind it silently instead of breaking the layout. Measured at 1280: 285px clearance left of the wordmark, 312px right. Adding a nav item requires re-measuring both, at 1280 and at a wide viewport.",
+        "section": "layout"
+      },
+      {
+        "name": "The Square Corner Rule",
+        "body": "No radius, anywhere, on any element — buttons, cards, inputs, chips, images, avatars. The drift this rule used to record is CORRECTED as of 2026-08-17: /admin's 37 rounded-full pills, its border-black/70 fields and the Stage-6 border-2 border-black dialect all resolve to components/ui now. One deliberate exemption, and it is not a corner: wordmark.tsx draws the dot of its exclamation glyph with rounded-full, which is a full stop rather than a rounded corner. It is the only rounded-* left in the codebase and should stay the only one.",
+        "section": "shapes"
+      },
+      {
+        "name": "The Status Ink Rule",
+        "body": "Feedback uses Caution, Critical or Affirm and their washes — never a raw Tailwind colour scale, and never navy. The tone lives in the 1px rule and the tinted ground; the text stays Body Graphite, because setting a whole message in the status colour reads acceptably for one line and badly for four, and several of these panels carry a paragraph, an amount and a link. These are not a second accent: the Rare Navy Rule is about expression, and these are feedback.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Shelf Rule",
+        "body": "Every shared primitive lives in components/ui/ and both halves of the application use it. Before 2026-08-17 /admin imported two things from there, and what grew in the gap was three button dialects, nine verbatim copies of one Field component, eleven declarations of an input class carrying four distinct values, four status-pill implementations, and 26 raw copies of a notice literal whose component already existed. A class string has no home; a component does.",
+        "section": "layout"
+      },
+      {
+        "name": "The Reveal-Is-Server-Markup Rule",
+        "body": "data-reveal belongs only on markup present in the server response. The observer scans once per pathname, so a node mounted by a state change is never observed — and the hidden start state is unconditional, so its opacity:0 becomes permanent. The gallery's Load-more tiles and /attend's terminal result panel are the two places this would have shipped a blank screen.",
+        "section": "layout"
+      },
+      {
+        "name": "The Light-Only Rule",
+        "body": "There is no dark mode, and adding one requires arguing it into DESIGN.md first. The Two Grounds Rule is load-bearing: every hatch tone, border opacity, text opacity and focus-ring flip is defined against white or navy, and navy stops reading as an accent the moment the page around it is dark. The north star is ink on paper, and a drawing set is not lit from behind. design-taste-frontend calls dark mode mandatory and will raise it again; it is refused, not overlooked.",
+        "section": "colors"
+      }
+    ],
+    "dos": [
+      "Do keep every corner square (0 radius) on every element, including in /admin, where the pill buttons are recorded drift rather than a second skin.",
+      "Do move the whole set together when a section changes ground: hatch tone, border color, text opacities, the .on-navy focus flip, and the padding.",
+      "Do build plates as gap: 1px grids over a Hairline background with white cells, so one shared rule reads between them.",
+      "Do put every global CSS rule inside a Tailwind cascade layer — base for element defaults, components for decorative classes. An unlayered rule beats every layered utility regardless of specificity, which is how a bare a { color } once rendered navy text on a navy button.",
+      "Do give every interactive element a visible :focus-visible ring (2px navy, 2px offset; white inside .on-navy). The prototypes define none — this system adds them.",
+      "Do cap prose by role: 46ch in activity rows, 48ch in case studies, 74ch in page intros.",
+      "Do re-measure wordmark clearance at 1280 and at a wide viewport before adding a nav item.",
+      "Do state a translate distance in pixels when a track's copy count can change; a percentage silently couples the distance to the number of copies.",
+      "Do reach for components/ui/ before writing a class string. Button, field, table, panel, banner, pill, chip, section and heading all exist; the reason /admin drifted for four stages is that they did not.",
+      "Do measure horizontal overflow at 390px after changing any reveal offset or page gutter: documentElement.scrollWidth minus clientWidth must be 0."
+    ],
+    "donts": [
+      "Don't add photography, stock imagery, or generated imagery to any image slot. The site publishes none — every slot is a captioned <Hatch>, and public/photos/ was deleted rather than unlinked. Restoring a photo is a deliberate three-part change (add the file, give the slot a src, swap the <Hatch> for an <Image> sized with fill), never a design proposal.",
+      "Don't use the hatch as texture, decoration, or a data empty state. It means specified, not yet built, and nothing else.",
+      "Don't mix hatch tones against their ground — light hatch on navy, or navy hatch on white, is always wrong.",
+      "Don't introduce a third font family, set a paragraph in Barlow Condensed, or set a button in Barlow.",
+      "Don't introduce a second accent color, a gradient, or a tint of navy other than Pressed Navy for hover. Poché belongs to the hatch alone.",
+      "Don't animate on hover with a lift, a scale on a control, or a shadow. Hover is an ink change; motion is entrance-only.",
+      "Don't use monospace for anything but a placeholder caption.",
+      "Don't reach for raw Tailwind colour scales (red-700, amber-700, green-800). If it is feedback it is Caution / Critical / Affirm; otherwise it is on the navy-and-graphite ramp.",
+      "Don't add a one-off box-shadow. If a surface genuinely needs depth, define the vocabulary in DESIGN.md first.",
+      "Don't add a dark mode without arguing it into the Light only section of DESIGN.md first."
+    ]
+  }
+}

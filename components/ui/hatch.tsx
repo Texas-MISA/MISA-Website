@@ -12,17 +12,26 @@ export function Hatch({
   className = "",
   /** For the masonry, whose placeholder heights vary per slot. */
   style,
+  /**
+   * A hatch is often the thing a section reveals — the About history portrait
+   * and the full-bleed band both enter as one. Declared explicitly rather than
+   * spreading `...rest`, so this stays a closed component: the caption is not
+   * optional and there is no way to hand it arbitrary DOM.
+   */
+  "data-reveal": dataReveal,
 }: {
   caption: string;
   tone?: "light" | "navy";
   className?: string;
   style?: React.CSSProperties;
+  "data-reveal"?: string;
 }) {
   const navy = tone === "navy";
 
   return (
     <div
       style={style}
+      data-reveal={dataReveal}
       className={`flex items-center justify-center ${
         navy ? "hatch-navy" : "hatch-light"
       } ${className}`}

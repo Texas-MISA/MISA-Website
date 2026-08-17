@@ -23,15 +23,15 @@ import Link from "next/link";
 export default function AdminNotFound() {
   return (
     <div className="max-w-2xl">
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
         Not found
       </h1>
-      <p className="mt-4 text-foreground/80">
+      <p className="mt-4 text-misa-body">
         That record doesn&apos;t exist. It may have been deleted, or merged into
         another one — a merged member&apos;s link stops working, and the merge is
         recorded against the member that survived.
       </p>
-      <p className="mt-3 text-sm text-foreground/70">
+      <p className="mt-3 text-sm text-misa-secondary">
         If you followed a link from inside the admin section and expected
         something to be here, that is worth mentioning to another officer: it
         means a page is pointing at a record that is gone.
@@ -49,7 +49,7 @@ export default function AdminNotFound() {
           <Link
             key={href}
             href={href}
-            className="border-2 border-black px-3 py-1 text-xs font-semibold tracking-wider uppercase transition hover:bg-misa-panel"
+            className="border border-misa-border px-3 py-1 text-xs font-semibold tracking-wider uppercase transition hover:bg-misa-panel"
           >
             {label}
           </Link>

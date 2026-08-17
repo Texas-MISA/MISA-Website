@@ -25,7 +25,7 @@ export type EventListRow = {
 export function EventTable({ rows }: { rows: EventListRow[] }) {
   if (rows.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         No events match these filters.
       </p>
     );
@@ -40,20 +40,20 @@ export function EventTable({ rows }: { rows: EventListRow[] }) {
     <div className="overflow-x-auto">
       <table className="w-full min-w-[52rem] border-collapse text-sm">
         <thead>
-          <tr className="border-b-2 border-black text-left">
-            <th className="py-2 pr-4 font-medium">Event</th>
-            <th className="py-2 pr-4 font-medium">When (CT)</th>
-            <th className="py-2 pr-4 font-medium">Category</th>
-            <th className="py-2 pr-4 font-medium">Points</th>
-            <th className="py-2 pr-4 font-medium">Check-ins</th>
-            <th className="py-2 font-medium">Status</th>
+          <tr className="border-b border-misa-border text-left">
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">When (CT)</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Category</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Points</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Check-ins</th>
+            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Status</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => {
             const position = seriesPosition.get(row.id);
             return (
-              <tr key={row.id} className="border-b border-black/15 align-top">
+              <tr key={row.id} className="border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70">
                 <td className="py-2 pr-4">
                   <Link
                     href={`/admin/events/${row.id}`}
@@ -62,12 +62,12 @@ export function EventTable({ rows }: { rows: EventListRow[] }) {
                     {row.title}
                   </Link>
                   {position && (
-                    <span className="ml-2 text-xs text-foreground/60">
+                    <span className="ml-2 text-xs text-misa-muted">
                       {position}
                     </span>
                   )}
                   {row.location && (
-                    <div className="text-xs text-foreground/60">
+                    <div className="text-xs text-misa-muted">
                       {row.location}
                     </div>
                   )}
@@ -93,14 +93,14 @@ export function EventTable({ rows }: { rows: EventListRow[] }) {
 export function EventStatusPill({ status }: { status: string }) {
   const tone =
     status === "published"
-      ? "border-green-800/40 text-green-900"
+      ? "border-misa-affirm/45 text-misa-affirm"
       : status === "draft"
-        ? "border-black/40 text-foreground/70"
-        : "border-red-800/40 text-red-900";
+        ? "border-misa-border text-misa-secondary"
+        : "border-misa-critical/40 text-misa-critical";
 
   return (
     <span
-      className={`border px-2 py-0.5 text-[0.7rem] uppercase tracking-wider ${tone}`}
+      className={`border px-2 py-0.5 text-[11px] uppercase tracking-[0.12em] ${tone}`}
     >
       {status}
     </span>

@@ -1,5 +1,8 @@
 "use client";
 
+import { BUTTON_OUTLINE, BUTTON_PRIMARY } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import Link from "next/link";
 import { useActionState } from "react";
 
@@ -19,7 +22,7 @@ import {
 const INITIAL: EventFormState = { status: "idle" };
 
 const inputClass =
-  "border border-black/70 bg-misa-panel px-3 py-2 text-base w-full";
+  controlClass("md", "w-full");
 
 export type EventFormValues = {
   id?: string;
@@ -96,7 +99,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
       {state.status === "saved" && (
         <p
           role="status"
-          className="border-l-4 border-green-800 bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-affirm/45 bg-misa-affirm-wash px-4 py-3 text-sm"
         >
           Saved.
         </p>
@@ -165,9 +168,9 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
         </Field>
       </div>
 
-      <fieldset className="border border-black/20 px-4 py-4">
+      <fieldset className="border border-misa-border px-4 py-4">
         <legend className="px-2 text-sm font-medium">Check-in window</legend>
-        <p className="text-sm text-foreground/70">
+        <p className="text-sm text-misa-secondary">
           How long before and after the event members can check in. Leave both
           at 0 to use the event times exactly.
         </p>
@@ -256,7 +259,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
               name="status"
               value="draft"
               disabled={pending}
-              className="w-fit rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
+              className={`w-fit ${BUTTON_PRIMARY}`}
             >
               {pending ? "SAVING…" : "SAVE AS DRAFT"}
             </button>
@@ -265,7 +268,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
               name="status"
               value="published"
               disabled={pending}
-              className="w-fit rounded-full border border-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-misa-blue transition hover:bg-misa-blue hover:text-white disabled:opacity-60"
+              className={`w-fit ${BUTTON_OUTLINE}`}
             >
               {pending ? "SAVING…" : "PUBLISH NOW"}
             </button>
@@ -274,7 +277,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
           <button
             type="submit"
             disabled={pending}
-            className="w-fit rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
+            className={`w-fit ${BUTTON_PRIMARY}`}
           >
             {pending
               ? "SAVING…"
@@ -292,7 +295,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
       </div>
 
       {isCreate && (
-        <p className="-mt-2 text-xs text-foreground/60">
+        <p className="-mt-2 text-xs text-misa-muted">
           A draft is visible only to officers. Publishing puts the event on the
           public schedule straight away and opens its check-in window at the
           time set above.
@@ -319,9 +322,9 @@ function ImpactWarnings({
   return (
     <div
       role="alert"
-      className="border-l-4 border-amber-700 bg-misa-panel px-4 py-4"
+      className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-4"
     >
-      <h2 className="font-display text-lg font-bold">
+      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">
         Check this before saving
       </h2>
       <ul className="mt-3 flex flex-col gap-3 text-sm">
@@ -330,7 +333,7 @@ function ImpactWarnings({
         ))}
       </ul>
       <input type="hidden" name="confirm" value={token} />
-      <p className="mt-4 text-xs text-foreground/70">
+      <p className="mt-4 text-xs text-misa-secondary">
         Nothing has been saved yet. Submit again to apply these changes.
       </p>
     </div>
@@ -399,7 +402,7 @@ function Alert({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+      className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
     >
       {children}
     </p>
@@ -420,7 +423,7 @@ function Field({
       {label}
       {children}
       {error && (
-        <span role="alert" className="text-xs text-red-700">
+        <span role="alert" className="text-xs text-misa-critical">
           {error[0]}
         </span>
       )}

@@ -1,5 +1,8 @@
 "use client";
 
+import { controlClass } from "@/components/ui/field";
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
+
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
@@ -70,7 +73,7 @@ export function PresetRow({
   if (deleteState.status === "done") return null;
 
   return (
-    <li className="border-2 border-black px-4 py-3">
+    <li className="border border-misa-border px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
           {renaming ? (
@@ -96,12 +99,12 @@ export function PresetRow({
                     ? saveState.values.name
                     : name
                 }
-                className="border border-black/70 bg-misa-panel px-2 py-1 text-sm"
+                className={controlClass("xs")}
               />
               <button
                 type="submit"
                 disabled={saving}
-                className="border-2 border-black bg-black px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white disabled:opacity-40"
+                className={BUTTON_PRIMARY_SM}
               >
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -116,13 +119,13 @@ export function PresetRow({
           ) : (
             <Link
               href={`/admin/members?${query}`}
-              className="font-display text-lg font-bold text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+              className="font-display text-[18px] leading-[1.1] font-semibold text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
             >
               {name}
             </Link>
           )}
 
-          <p className="mt-1 text-sm text-foreground/70">{summary}</p>
+          <p className="mt-1 text-sm text-misa-secondary">{summary}</p>
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
@@ -143,7 +146,7 @@ export function PresetRow({
               <button
                 type="submit"
                 disabled={deleting}
-                className="border-2 border-black bg-black px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white disabled:opacity-40"
+                className={BUTTON_PRIMARY_SM}
               >
                 {deleting ? "Deleting…" : "Delete"}
               </button>

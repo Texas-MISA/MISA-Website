@@ -38,7 +38,7 @@ export function DuesTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         No payments match these filters.
       </p>
     );
@@ -48,22 +48,22 @@ export function DuesTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[64rem] border-collapse text-sm">
         <thead>
-          <tr className="border-b-2 border-black text-left">
-            <th className="py-2 pr-4 font-medium">Paid</th>
-            <th className="py-2 pr-4 font-medium">Payer</th>
-            <th className="py-2 pr-4 font-medium">Member</th>
-            <th className="py-2 pr-4 font-medium">Amount</th>
-            <th className="py-2 pr-4 font-medium">Covers</th>
-            <th className="py-2 pr-4 font-medium">Note</th>
-            <th className="py-2 font-medium">Needs review</th>
+          <tr className="border-b border-misa-border text-left">
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Paid</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Payer</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Member</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Amount</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Covers</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Note</th>
+            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Needs review</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={`border-b border-black/15 align-top ${
-                row.voided ? "text-foreground/50" : ""
+              className={`border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70 ${
+                row.voided ? "text-misa-muted" : ""
               }`}
             >
               <td className="py-2 pr-4 whitespace-nowrap">
@@ -75,7 +75,7 @@ export function DuesTable({
                 </Link>
               </td>
               <td className="py-2 pr-4">
-                {row.payerName ?? <span className="text-foreground/50">—</span>}
+                {row.payerName ?? <span className="text-misa-muted">—</span>}
               </td>
               <td className="py-2 pr-4">
                 {row.memberId && row.memberName ? (
@@ -89,10 +89,10 @@ export function DuesTable({
                     {row.memberName}
                   </Link>
                 ) : (
-                  <span className="text-foreground/50">nobody yet</span>
+                  <span className="text-misa-muted">nobody yet</span>
                 )}
                 {row.memberId && !row.memberActive && (
-                  <span className="ml-2 text-xs text-foreground/50">
+                  <span className="ml-2 text-xs text-misa-muted">
                     inactive
                   </span>
                 )}
@@ -102,7 +102,7 @@ export function DuesTable({
                   {row.amountLabel}
                 </span>
                 {row.voided && (
-                  <span className="ml-2 border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+                  <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
                     voided
                   </span>
                 )}
@@ -116,13 +116,13 @@ export function DuesTable({
                 {row.coveredTerms && row.coveredTerms.length > 0 ? (
                   row.coveredTerms.join(", ")
                 ) : (
-                  <span className="text-foreground/50">
+                  <span className="text-misa-muted">
                     nothing yet — from {row.startTerm}
                   </span>
                 )}
               </td>
               <td className="py-2 pr-4 max-w-[18rem] break-words">
-                {row.note ?? <span className="text-foreground/50">—</span>}
+                {row.note ?? <span className="text-misa-muted">—</span>}
               </td>
               <td className="py-2 whitespace-nowrap">
                 <ReviewFlags row={row} />
@@ -145,20 +145,20 @@ export function DuesTable({
  * next move anyway.
  */
 function ReviewFlags({ row }: { row: DuesLedgerRow }) {
-  if (row.voided) return <span className="text-foreground/50">—</span>;
+  if (row.voided) return <span className="text-misa-muted">—</span>;
   if (!row.noMember && !row.undecidedAmount) {
-    return <span className="text-foreground/50">—</span>;
+    return <span className="text-misa-muted">—</span>;
   }
 
   return (
     <span className="flex flex-col gap-1">
       {row.noMember && (
-        <span className="border border-amber-700 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+        <span className="border border-misa-caution px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
           no member
         </span>
       )}
       {row.undecidedAmount && (
-        <span className="border border-amber-700 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+        <span className="border border-misa-caution px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
           amount undecided
         </span>
       )}

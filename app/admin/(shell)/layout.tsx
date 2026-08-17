@@ -25,11 +25,16 @@ export default async function AdminShellLayout({
 
   return (
     <div className="flex min-h-screen flex-col">
+      {/* Nine nav items plus a sign-out sit before the content here — more
+          than the public header, and officers work this screen all semester. */}
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
       <AdminNav
         displayName={officer.displayName ?? officer.email}
         role={officer.role}
       />
-      <main className="flex-1 px-6 py-10">
+      <main id="main" className="flex-1 px-6 py-10">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
     </div>

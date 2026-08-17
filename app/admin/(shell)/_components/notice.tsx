@@ -1,28 +1,31 @@
-// The left-rule panel this app renders every empty, error and warning state in.
+// The admin's name for `components/ui/banner.tsx`.
 //
-// 🔓 Extracted in Stage 8 phase 3, and NOT as tidying. Until now "no data" and
-// "the read failed" rendered with the *identical* blue rule, so the whole
-// empty-vs-error correction this phase makes to the logic would have been
-// invisible on screen. A distinct `error` tone is what makes the fix legible.
+// 📌 The panel itself moved into the shared vocabulary — /admin and the public
+// pages had been drawing the same idea at two different rule weights. This file
+// stays because twelve admin files import `Notice` / `ReadError` by name and
+// those names read correctly at the point of use; it is an alias now, not a
+// definition.
 //
-// ⚠️ The literal this replaces appears at ~57 call sites across 40 files.
-// Phase 3 deliberately migrated only the states it created or touched — a
-// sweeping find-and-replace across 40 working files is churn with regression
-// risk and no user-visible benefit. The remainder is a tidy-up with no trigger;
-// use this component for anything new.
+// ⚠️ **The tone names differ from the shared component's on purpose.** `warning`
+// / `error` / `success` describe what happened; `caution` / `critical` /
+// `affirm` describe how loudly to say it. Both vocabularies are right for their
+// side of the boundary, and the mapping is here so neither has to bend.
 
-const TONES = {
+import { Banner, ReadError as SharedReadError } from "@/components/ui/banner";
+import type { BannerTone } from "@/components/ui/banner";
+
+const TONE_MAP = {
   /** Neutral: an empty list, an explanation, a "nothing to do here". */
-  info: "border-misa-blue",
+  info: "info",
   /** Something needs an officer's attention, but nothing is broken. */
-  warning: "border-amber-700",
+  warning: "caution",
   /** 🔓 A READ FAILED. Never reuse `info` for this — that is the whole point. */
-  error: "border-red-800",
+  error: "critical",
   /** An action succeeded. */
-  success: "border-green-800",
-} as const;
+  success: "affirm",
+} as const satisfies Record<string, BannerTone>;
 
-export type NoticeTone = keyof typeof TONES;
+export type NoticeTone = keyof typeof TONE_MAP;
 
 export function Notice({
   tone = "info",
@@ -41,35 +44,17 @@ export function Notice({
   children: React.ReactNode;
 }) {
   return (
-    <p
-      role={role}
-      className={`border-l-4 bg-misa-panel px-4 py-3 text-sm ${TONES[tone]} ${className}`}
-    >
+    <Banner tone={TONE_MAP[tone]} className={className} role={role}>
       {children}
-    </p>
+    </Banner>
   );
 }
 
 /**
  * The standard "we could not read this" message.
  *
- * A component rather than a string so the wording stays consistent across ~20
- * new call sites, and so the distinction from an empty state is structural: you
- * cannot render this by accident when you meant "nothing here".
- *
- * `what` completes the sentence — "Couldn't load {what}."
+ * A component rather than a string so the wording stays consistent, and so the
+ * distinction from an empty state is structural: you cannot render this by
+ * accident when you meant "nothing here".
  */
-export function ReadError({
-  what,
-  className = "",
-}: {
-  what: string;
-  className?: string;
-}) {
-  return (
-    <Notice tone="error" className={className}>
-      Couldn&apos;t load {what}. This isn&apos;t a statement about the data — the
-      read failed. Try again, and tell an officer if it keeps happening.
-    </Notice>
-  );
-}
+export const ReadError = SharedReadError;

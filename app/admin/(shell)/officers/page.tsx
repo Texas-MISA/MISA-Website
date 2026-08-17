@@ -67,8 +67,10 @@ export default async function OfficersPage() {
   return (
     <div className="space-y-12">
       <header>
-        <h1 className="font-display text-3xl font-extrabold">Officers</h1>
-        <p className="mt-2 max-w-2xl text-sm text-foreground/70">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
+          Officers
+        </h1>
+        <p className="mt-2 max-w-2xl text-sm text-misa-secondary">
           Invite someone by sending them a link, or take access away when
           somebody leaves. Removing access keeps their account and everything
           they did — the audit trail still names them.
@@ -76,14 +78,14 @@ export default async function OfficersPage() {
       </header>
 
       <section aria-labelledby="invite-heading">
-        <h2 id="invite-heading" className="font-display text-xl font-bold">
+        <h2 id="invite-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
           Invite an officer
         </h2>
         <InviteCreateForm />
       </section>
 
       <section aria-labelledby="current-heading">
-        <h2 id="current-heading" className="font-display text-xl font-bold">
+        <h2 id="current-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
           Current officers
         </h2>
 
@@ -94,7 +96,7 @@ export default async function OfficersPage() {
           // — but an empty list is not an error and must not render as one.
           <Notice className="mt-4">No officers have access yet.</Notice>
         ) : (
-          <ul className="mt-4 divide-y divide-black/10 border border-black/15">
+          <ul className="mt-4 divide-y divide-misa-hairline border border-misa-hairline">
             {roster.officers.map((entry) => (
               <li
                 key={entry.id}
@@ -104,13 +106,13 @@ export default async function OfficersPage() {
                   <p className="font-medium">
                     {entry.displayName ?? entry.email}
                     {entry.id === officer.userId ? (
-                      <span className="ml-2 text-xs text-foreground/60">
+                      <span className="ml-2 text-xs text-misa-muted">
                         (you)
                       </span>
                     ) : null}
                   </p>
-                  <p className="text-sm text-foreground/70">{entry.email}</p>
-                  <p className="text-xs text-foreground/60">
+                  <p className="text-sm text-misa-secondary">{entry.email}</p>
+                  <p className="text-xs text-misa-muted">
                     {entry.role === "admin" ? "Admin" : "Officer"} · last signed
                     in{" "}
                     {entry.lastSignInAt
@@ -119,7 +121,7 @@ export default async function OfficersPage() {
                   </p>
                 </div>
                 {entry.id === officer.userId ? (
-                  <span className="text-xs text-foreground/60">
+                  <span className="text-xs text-misa-muted">
                     You can&apos;t remove your own access
                   </span>
                 ) : (
@@ -135,7 +137,7 @@ export default async function OfficersPage() {
       </section>
 
       <section aria-labelledby="pending-heading">
-        <h2 id="pending-heading" className="font-display text-xl font-bold">
+        <h2 id="pending-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
           Outstanding invitations
         </h2>
 
@@ -146,7 +148,7 @@ export default async function OfficersPage() {
             No invitations are waiting to be used.
           </Notice>
         ) : (
-          <ul className="mt-4 divide-y divide-black/10 border border-black/15">
+          <ul className="mt-4 divide-y divide-misa-hairline border border-misa-hairline">
             {pending?.map((invite) => (
               <li
                 key={invite.id}
@@ -161,7 +163,7 @@ export default async function OfficersPage() {
                   <p className="font-medium">
                     {invite.email ?? "Anyone with the link"}
                   </p>
-                  <p className="text-xs text-foreground/60">
+                  <p className="text-xs text-misa-muted">
                     {invite.role === "admin" ? "Admin" : "Officer"} · expires{" "}
                     {describeExpiry(invite.expires_at, now)}
                     {invite.email ? null : " · anyone who opens it can use it"}
@@ -176,7 +178,7 @@ export default async function OfficersPage() {
           </ul>
         )}
 
-        <p className="mt-3 max-w-2xl text-xs text-foreground/60">
+        <p className="mt-3 max-w-2xl text-xs text-misa-muted">
           The link is shown once, when you create it — nothing can display it
           again, because only a fingerprint of it is stored. If it goes missing,
           invite them again and the older link stops working.
@@ -185,10 +187,10 @@ export default async function OfficersPage() {
 
       {inactive && inactive.length > 0 ? (
         <section aria-labelledby="history-heading">
-          <h2 id="history-heading" className="font-display text-xl font-bold">
+          <h2 id="history-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
             Past invitations
           </h2>
-          <ul className="mt-4 divide-y divide-black/10 border border-black/15">
+          <ul className="mt-4 divide-y divide-misa-hairline border border-misa-hairline">
             {inactive.slice(0, 15).map((invite) => (
               <li key={invite.id} className="px-4 py-3">
                 {/* Once redeemed, an open invite's row names whoever used it —
@@ -197,7 +199,7 @@ export default async function OfficersPage() {
                 <p className="text-sm">
                   {invite.email ?? "Anyone with the link"}
                 </p>
-                <p className="text-xs text-foreground/60">
+                <p className="text-xs text-misa-muted">
                   {describeInviteOutcome(invite, now)}
                 </p>
               </li>
@@ -207,10 +209,10 @@ export default async function OfficersPage() {
       ) : null}
 
       <section aria-labelledby="noaccess-heading">
-        <h2 id="noaccess-heading" className="font-display text-xl font-bold">
+        <h2 id="noaccess-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
           Accounts without access
         </h2>
-        <p className="mt-2 max-w-2xl text-sm text-foreground/70">
+        <p className="mt-2 max-w-2xl text-sm text-misa-secondary">
           Accounts that exist but can&apos;t get in — former officers, and anyone
           who signed up without being granted access. Giving one access needs no
           invitation: they already have a password.
@@ -223,7 +225,7 @@ export default async function OfficersPage() {
             Every account on this project has officer access.
           </Notice>
         ) : (
-          <ul className="mt-4 divide-y divide-black/10 border border-black/15">
+          <ul className="mt-4 divide-y divide-misa-hairline border border-misa-hairline">
             {roster.withoutAccess.map((account) => (
               <li
                 key={account.id}
@@ -231,7 +233,7 @@ export default async function OfficersPage() {
               >
                 <div>
                   <p className="font-medium">{account.email}</p>
-                  <p className="text-xs text-foreground/60">
+                  <p className="text-xs text-misa-muted">
                     account created {formatInstant(account.createdAt)}
                   </p>
                 </div>

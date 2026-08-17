@@ -36,7 +36,7 @@ export function PointsTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         No adjustments match these filters.
       </p>
     );
@@ -46,23 +46,23 @@ export function PointsTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[64rem] border-collapse text-sm">
         <thead>
-          <tr className="border-b-2 border-black text-left">
-            <th className="py-2 pr-4 font-medium">Awarded</th>
-            <th className="py-2 pr-4 font-medium">Member</th>
-            <th className="py-2 pr-4 font-medium">Points</th>
-            <th className="py-2 pr-4 font-medium">Category</th>
-            <th className="py-2 pr-4 font-medium">Reason</th>
-            <th className="py-2 pr-4 font-medium">Event</th>
-            <th className="py-2 pr-4 font-medium">Term</th>
-            <th className="py-2 font-medium">Officer</th>
+          <tr className="border-b border-misa-border text-left">
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Awarded</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Member</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Points</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Category</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Reason</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Term</th>
+            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Officer</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
             <tr
               key={row.id}
-              className={`border-b border-black/15 align-top ${
-                row.voided ? "text-foreground/50" : ""
+              className={`border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70 ${
+                row.voided ? "text-misa-muted" : ""
               }`}
             >
               <td className="py-2 pr-4 whitespace-nowrap">
@@ -87,10 +87,10 @@ export function PointsTable({
                     {row.members.full_name}
                   </Link>
                 ) : (
-                  <span className="text-foreground/50">unknown member</span>
+                  <span className="text-misa-muted">unknown member</span>
                 )}
                 {row.members?.active === false && (
-                  <span className="ml-2 text-xs text-foreground/50">
+                  <span className="ml-2 text-xs text-misa-muted">
                     inactive
                   </span>
                 )}
@@ -100,7 +100,7 @@ export function PointsTable({
                   {signedPoints(row.points)}
                 </span>
                 {row.voided && (
-                  <span className="ml-2 border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+                  <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
                     voided
                   </span>
                 )}
@@ -116,7 +116,7 @@ export function PointsTable({
                     {row.events.title}
                   </Link>
                 ) : (
-                  <span className="text-foreground/50">—</span>
+                  <span className="text-misa-muted">—</span>
                 )}
               </td>
               {/* Not decoration: both views are scoped to current_term(), so a

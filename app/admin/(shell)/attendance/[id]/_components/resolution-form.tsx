@@ -1,5 +1,10 @@
 "use client";
 
+import { Banner } from "@/components/ui/banner";
+
+import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState, useState } from "react";
 
 import {
@@ -30,7 +35,7 @@ import type { MemberOption } from "@/lib/member-options";
 const initial: ResolutionState = { status: "idle" };
 const initialAction: ReviewActionState = { status: "idle" };
 
-const fieldClass = "w-full border border-black/70 bg-white px-3 py-2 text-sm";
+const fieldClass = controlClass("sm", "w-full");
 
 export function ResolutionForm({
   id,
@@ -173,7 +178,7 @@ function Fields({
               </option>
             ))}
           </select>
-          <p className="mt-1 text-xs text-foreground/60">
+          <p className="mt-1 text-xs text-misa-muted">
             {/* The picker reaches events the ranker cannot: nearby_events() is
                 published-only and stops at 48 hours. */}
             Every event, including drafts and cancelled ones — the suggestions
@@ -215,7 +220,7 @@ function Fields({
             name="intent"
             value="save"
             disabled={pending}
-            className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel disabled:opacity-40"
+            className={BUTTON_QUIET_SM}
           >
             SAVE
           </button>
@@ -239,7 +244,7 @@ function Fields({
                       ? "Pick an event first — an approved row must have one"
                       : "Link a member first — an approved row must have one"
             }
-            className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-40"
+            className={BUTTON_PRIMARY_SM}
           >
             {pending ? "SAVING…" : "APPROVE"}
           </button>
@@ -266,13 +271,13 @@ function RejectForm({
   return (
     <form
       action={formAction}
-      className="border-t border-black/15 pt-6 flex flex-col gap-3"
+      className="border-t border-misa-hairline pt-6 flex flex-col gap-3"
     >
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="updatedAt" value={updatedAt} />
       <input type="hidden" name="returnTo" value={returnTo} />
 
-      <p className="text-sm text-foreground/70">
+      <p className="text-sm text-misa-secondary">
         Rejecting keeps the row and its history — nothing is deleted, and a
         rejected row never blocks a corrected re-entry.
       </p>
@@ -296,7 +301,7 @@ function RejectForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel disabled:opacity-40"
+          className={BUTTON_QUIET_SM}
         >
           {pending ? "REJECTING…" : "REJECT"}
         </button>
@@ -320,16 +325,16 @@ function ReopenForm({
   );
 
   return (
-    <form action={formAction} className="border-t border-black/15 pt-6">
+    <form action={formAction} className="border-t border-misa-hairline pt-6">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="updatedAt" value={updatedAt} />
 
-      <p className="text-sm text-foreground/70">
+      <p className="text-sm text-misa-secondary">
         This row is {status}. Reopening puts it back in the pending queue.
       </p>
 
       {state.status === "slot_taken" && (
-        <p className="mt-3 border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm">
+        <p className="mt-3 border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm">
           {/* The partial unique index excludes rejected rows, so while this one
               sat rejected something else took its place at that event. */}
           Can&apos;t reopen this: {state.holderName ?? "another submission"} already
@@ -363,7 +368,7 @@ function ReopenForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel disabled:opacity-40"
+          className={BUTTON_QUIET_SM}
         >
           {pending ? "REOPENING…" : "REOPEN"}
         </button>
@@ -391,16 +396,9 @@ function Notice({ state }: { state: ResolutionState }) {
               : "Couldn't save this submission.";
 
   return (
-    <p
-      role="status"
-      className={`border-l-4 px-4 py-3 text-sm ${
-        state.status === "saved"
-          ? "border-misa-blue bg-misa-panel"
-          : "border-amber-700 bg-misa-panel"
-      }`}
-    >
+    <Banner tone={state.status === "saved" ? "affirm" : "caution"} role="status">
       {message}
-    </p>
+    </Banner>
   );
 }
 
@@ -415,10 +413,10 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="text-foreground/60">{label}</span>
+      <span className="text-misa-muted">{label}</span>
       {children}
       {error && error.length > 0 && (
-        <span className="text-xs text-amber-800">{error[0]}</span>
+        <span className="text-xs text-misa-caution">{error[0]}</span>
       )}
     </label>
   );

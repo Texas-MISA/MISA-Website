@@ -1,5 +1,8 @@
 "use client";
 
+import { BUTTON_DANGER_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState } from "react";
 
 import {
@@ -23,12 +26,12 @@ const ACCESS_INITIAL: OfficerAccessState = { status: "idle" };
 const INVITE_INITIAL: InviteRevokeState = { status: "idle" };
 
 const dangerButton =
-  "rounded-full border border-red-800 px-4 py-1.5 text-xs font-medium tracking-wider text-red-900 transition hover:bg-red-50 disabled:opacity-60";
+  BUTTON_DANGER_SM;
 
 const plainButton =
-  "rounded-full border border-black/70 px-4 py-1.5 text-xs font-medium tracking-wider transition hover:bg-black/5 disabled:opacity-60";
+  BUTTON_QUIET_SM;
 
-const selectClass = "border border-black/70 bg-misa-panel px-2 py-1.5 text-xs";
+const selectClass = controlClass("xs");
 
 export function RevokeAccessButton({
   userId,
@@ -108,12 +111,12 @@ export function RevokeInviteButton({
     <form action={formAction} className="flex items-center gap-3">
       <input type="hidden" name="id" value={id} />
       {state.status === "already_gone" ? (
-        <span role="status" className="text-xs text-foreground/70">
+        <span role="status" className="text-xs text-misa-secondary">
           Already gone
         </span>
       ) : null}
       {state.status === "error" || state.status === "unauthorized" ? (
-        <span role="alert" className="text-xs text-red-800">
+        <span role="alert" className="text-xs text-misa-critical">
           Couldn&apos;t withdraw it
         </span>
       ) : null}
@@ -136,25 +139,25 @@ function ActionMessage({ state }: { state: OfficerAccessState }) {
   switch (state.status) {
     case "self":
       return (
-        <span role="alert" className="text-xs text-red-800">
+        <span role="alert" className="text-xs text-misa-critical">
           You can&apos;t remove your own access
         </span>
       );
     case "no_change":
       return (
-        <span role="status" className="text-xs text-foreground/70">
+        <span role="status" className="text-xs text-misa-secondary">
           Nothing to change
         </span>
       );
     case "unauthorized":
       return (
-        <span role="alert" className="text-xs text-red-800">
+        <span role="alert" className="text-xs text-misa-critical">
           Session expired
         </span>
       );
     case "error":
       return (
-        <span role="alert" className="text-xs text-red-800">
+        <span role="alert" className="text-xs text-misa-critical">
           That didn&apos;t work
         </span>
       );

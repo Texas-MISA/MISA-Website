@@ -3,7 +3,9 @@
 import { useMemo, useState } from "react";
 
 import { BUTTON_OUTLINE_NAVY } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/chip";
 import { Hatch } from "@/components/ui/hatch";
+import { Section } from "@/components/ui/section";
 import {
   GALLERY_FILTERS,
   GALLERY_ITEMS,
@@ -54,64 +56,72 @@ export function GalleryGrid({
 
   return (
     <>
-      <section className="flex flex-wrap items-center justify-between gap-6 px-5 pt-10 pb-6 sm:px-14">
+      <Section
+        padTop="sm"
+        padBottom="xs"
+        width="page"
+        innerClassName="flex flex-wrap items-center justify-between gap-6"
+      >
         <ul className="flex flex-wrap gap-2.5">
-          {GALLERY_FILTERS.map((chip) => {
-            const active = filter === chip.value;
-            return (
-              <li key={chip.value}>
-                <button
-                  type="button"
-                  onClick={() => choose(chip.value)}
-                  aria-pressed={active}
-                  className={`px-[18px] py-[9px] font-display text-[13px] leading-none font-semibold tracking-[0.1em] uppercase transition ${
-                    active
-                      ? "bg-misa-blue text-white"
-                      : "border border-misa-border text-misa-secondary hover:border-misa-blue hover:text-misa-blue"
-                  }`}
-                >
-                  {chip.label}
-                </button>
-              </li>
-            );
-          })}
+          {GALLERY_FILTERS.map((chip) => (
+            <li key={chip.value}>
+              <FilterChip
+                active={filter === chip.value}
+                onClick={() => choose(chip.value)}
+              >
+                {chip.label}
+              </FilterChip>
+            </li>
+          ))}
         </ul>
         <p
-          className="text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-muted"
+          className="text-[12px] leading-tight font-medium tracking-[0.14em] text-misa-muted uppercase"
           aria-live="polite"
         >
           {GALLERY_TERM} — {matching.length}{" "}
           {matching.length === 1 ? "photo" : "photos"} to come
         </p>
-      </section>
+      </Section>
 
       {feature}
 
       {/* CSS columns rather than a grid: the point of a masonry is that the
-          items keep their own heights and the column flows around them. */}
-      <section className="columns-2 gap-4 px-5 pt-6 pb-16 sm:px-14 lg:columns-4">
-        {visible.map((slot, i) => (
-          <div key={`${slot.caption}-${i}`} className="mb-4 break-inside-avoid">
-            <Hatch
-              caption={slot.caption}
-              className="border border-misa-border"
-              style={{ height: slot.height }}
-            />
-          </div>
-        ))}
-      </section>
+          items keep their own heights and the column flows around them.
 
-      {shown < matching.length && (
-        <section className="flex justify-center px-5 pb-16 sm:px-14">
-          <button
-            type="button"
-            onClick={() => setShown((n) => n + GALLERY_PAGE_SIZE)}
-            className={BUTTON_OUTLINE_NAVY}
-          >
-            Load more photos
-          </button>
-        </section>
-      )}
+          🪤 No `data-reveal` on these tiles, and it is not an oversight. The
+          observer scans once per pathname, so a tile appended by Load more
+          would never be observed — and its hidden start state is unconditional,
+          so it would stay at `opacity: 0` permanently. An entrance animation
+          that hides content on a button press is a worse failure than no
+          entrance at all. */}
+      <Section padTop="xs" padBottom="md" width="page">
+        <div className="columns-2 gap-tile lg:columns-4">
+          {visible.map((slot, i) => (
+            <div
+              key={`${slot.caption}-${i}`}
+              className="mb-tile break-inside-avoid"
+            >
+              <Hatch
+                caption={slot.caption}
+                className="border border-misa-border"
+                style={{ height: slot.height }}
+              />
+            </div>
+          ))}
+        </div>
+
+        {shown < matching.length && (
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShown((n) => n + GALLERY_PAGE_SIZE)}
+              className={BUTTON_OUTLINE_NAVY}
+            >
+              Load more photos
+            </button>
+          </div>
+        )}
+      </Section>
     </>
   );
 }

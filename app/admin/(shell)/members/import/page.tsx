@@ -38,7 +38,7 @@ export default async function MemberImportPage() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
         Import members
       </h1>
 
@@ -48,7 +48,7 @@ export default async function MemberImportPage() {
         </Link>
       </p>
 
-      <p className="mt-6 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
         Upload a CSV. Nothing is saved until you confirm, and{" "}
         <span className="font-medium">
           people already on the roster are never changed
@@ -57,9 +57,9 @@ export default async function MemberImportPage() {
         nothing.
       </p>
 
-      <div className="mt-8 border-2 border-black bg-misa-panel px-4 py-4">
-        <h2 className="font-display text-lg font-bold">Columns</h2>
-        <p className="mt-2 text-sm text-foreground/70">
+      <div className="mt-8 border border-misa-border bg-misa-panel px-4 py-4">
+        <h2 className="font-display text-[18px] leading-[1.1] font-semibold">Columns</h2>
+        <p className="mt-2 text-sm text-misa-secondary">
           Columns are matched <span className="font-medium">by header name</span>
           , so the order does not matter and extra columns are ignored. A file
           downloaded from{" "}
@@ -70,7 +70,7 @@ export default async function MemberImportPage() {
         </p>
         <dl className="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2">
           <div>
-            <dt className="text-xs uppercase tracking-wider text-foreground/60">
+            <dt className="text-xs uppercase tracking-wider text-misa-muted">
               Required
             </dt>
             <dd className="font-medium">
@@ -78,7 +78,7 @@ export default async function MemberImportPage() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wider text-foreground/60">
+            <dt className="text-xs uppercase tracking-wider text-misa-muted">
               Optional
             </dt>
             <dd>
@@ -88,7 +88,7 @@ export default async function MemberImportPage() {
             </dd>
           </div>
         </dl>
-        <p className="mt-3 text-xs text-foreground/60">
+        <p className="mt-3 text-xs text-misa-muted">
           Up to {MAX_ROSTER_IMPORT_ROWS.toLocaleString()} rows per import.
           Calculated columns — points, attendance, dues — are ignored: they come
           from what members do, not from a spreadsheet.

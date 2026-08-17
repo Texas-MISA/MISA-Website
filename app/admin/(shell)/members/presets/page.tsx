@@ -80,7 +80,7 @@ export default async function MemberPresetsPage() {
           className="mb-6"
         />
       )}
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
         Saved views
       </h1>
 
@@ -90,7 +90,7 @@ export default async function MemberPresetsPage() {
         </Link>
       </p>
 
-      <p className="mt-6 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
         Named filters, <span className="font-medium">shared by every officer</span>
         . Save a new one from the directory once you have narrowed the list; this
         page is for renaming and clearing out the ones nobody uses.
@@ -100,7 +100,7 @@ export default async function MemberPresetsPage() {
         {presetsFailed ? (
           <ReadError what="the saved views" />
         ) : rows.length === 0 ? (
-          <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             No saved views yet. Filter the directory, then use{" "}
             <span className="font-medium">Save this view…</span> under the
             filters.

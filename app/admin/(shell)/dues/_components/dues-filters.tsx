@@ -1,5 +1,7 @@
 "use client";
 
+import { controlClass } from "@/components/ui/field";
+
 import { useRouter, useSearchParams } from "next/navigation";
 
 // Same contract as point-filters.tsx and attendance-filters.tsx: no submit
@@ -15,8 +17,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 // in application code is a bug (§4.7), and the page derives them from what is
 // actually in the database.
 
-const selectClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
-const inputClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
+const selectClass = controlClass("sm");
+const inputClass = controlClass("sm");
 
 export function DuesFilters({
   terms,

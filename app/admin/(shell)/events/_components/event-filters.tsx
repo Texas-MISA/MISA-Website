@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { EVENT_CATEGORIES, EVENT_STATUSES, formatCategory } from "@/lib/events";
+import { controlClass } from "@/components/ui/field";
 
 // Client Component so a filter change navigates without a submit button.
 // Filters live in the URL rather than in component state, so a filtered view
@@ -10,7 +11,7 @@ import { EVENT_CATEGORIES, EVENT_STATUSES, formatCategory } from "@/lib/events";
 // people paste to each other.
 
 const selectClass =
-  "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
+  controlClass("sm");
 
 export function EventFilters({
   terms,

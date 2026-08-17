@@ -19,7 +19,7 @@ export default async function NewSeriesPage() {
   return (
     <div className="max-w-3xl">
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           New recurring series
         </h1>
         <Link
@@ -30,7 +30,7 @@ export default async function NewSeriesPage() {
         </Link>
       </div>
 
-      <p className="mt-3 text-foreground/80">
+      <p className="mt-3 text-misa-body">
         Every occurrence is created as a draft sharing one series, so you can
         review the whole schedule before any of it goes public. Times are
         Central and stay Central — a 6pm meeting is still 6pm after the

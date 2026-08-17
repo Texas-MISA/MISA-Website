@@ -1,5 +1,8 @@
 "use client";
 
+import { controlClass } from "@/components/ui/field";
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
+
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
@@ -78,7 +81,7 @@ export function PresetBar({
 
   return (
     <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-      <span className="text-xs uppercase tracking-wider text-foreground/60">
+      <span className="text-xs uppercase tracking-wider text-misa-muted">
         Saved views
       </span>
 
@@ -92,8 +95,8 @@ export function PresetBar({
             aria-current={active ? "true" : undefined}
             className={`border px-3 py-1 text-xs transition ${
               active
-                ? "border-black bg-black text-white"
-                : "border-black/40 hover:bg-black/5"
+                ? "border-black bg-misa-blue text-white"
+                : "border-misa-border hover:bg-misa-panel"
             }`}
           >
             {preset.name}
@@ -102,7 +105,7 @@ export function PresetBar({
       })}
 
       {nothingSaved && (
-        <span className="text-xs text-foreground/60">
+        <span className="text-xs text-misa-muted">
           None yet — filter the list, then save it here.
         </span>
       )}
@@ -111,7 +114,7 @@ export function PresetBar({
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="border border-black/40 px-3 py-1 text-xs transition hover:bg-black/5"
+          className="border border-misa-border px-3 py-1 text-xs transition hover:bg-misa-panel"
         >
           Save this view…
         </button>
@@ -120,7 +123,7 @@ export function PresetBar({
       {/* Shown rather than hidden when the filter is the default, so the reason
           is visible instead of the control simply being absent. */}
       {!canSave && !nothingSaved && (
-        <span className="text-xs text-foreground/60">
+        <span className="text-xs text-misa-muted">
           Narrow the list to save it as a view.
         </span>
       )}
@@ -198,7 +201,7 @@ function ReplaceOrCreate({
           value={target}
           onChange={(e) => setTarget(e.target.value)}
           aria-label="Save as"
-          className="border border-black/70 bg-misa-panel px-2 py-1 text-xs"
+          className={controlClass("xs")}
         >
           <option value="">Save as a new view</option>
           {presets.map((preset) => (
@@ -232,7 +235,7 @@ function ReplaceOrCreate({
           maxLength={MAX_PRESET_NAME}
           placeholder="Name this view"
           defaultValue={submittedName}
-          className="border border-black/70 bg-misa-panel px-2 py-1 text-xs"
+          className={controlClass("xs")}
         />
       ) : (
         // The name travels with the update so a re-point cannot blank it —
@@ -249,7 +252,7 @@ function ReplaceOrCreate({
       <button
         type="submit"
         disabled={saving}
-        className="border-2 border-black bg-black px-3 py-1 text-xs font-semibold uppercase tracking-wider text-white disabled:opacity-40"
+        className={BUTTON_PRIMARY_SM}
       >
         {saving ? "Saving…" : creating ? "Save" : "Replace"}
       </button>

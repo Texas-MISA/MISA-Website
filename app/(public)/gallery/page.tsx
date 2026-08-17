@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import { BUTTON_SOLID_WHITE } from "@/components/ui/button";
 import { PageHero } from "@/components/ui/chevron-section";
 import { Hatch } from "@/components/ui/hatch";
+import { Headline } from "@/components/ui/heading";
+import { revealDelay } from "@/components/ui/reveal";
+import { Section } from "@/components/ui/section";
 import {
   GALLERY_FEATURE,
   INSTAGRAM_HANDLE,
@@ -31,26 +34,37 @@ export default function GalleryPage() {
           stays server-rendered. */}
       <GalleryGrid
         feature={
-          <section className="px-5 pb-6 sm:px-14">
-            <figure data-reveal="up">
+          <Section as="div" pad="none" padBottom="xs" width="page">
+            <figure data-reveal="rise">
               <Hatch
                 caption={GALLERY_FEATURE.slot.caption}
                 className="h-70 border border-misa-border sm:h-105"
               />
-              <figcaption className="mt-2.5 text-xs leading-tight font-medium tracking-[0.14em] uppercase text-misa-muted">
+              <figcaption className="mt-2.5 text-[12px] leading-tight font-medium tracking-[0.14em] text-misa-muted uppercase">
                 {GALLERY_FEATURE.caption}
               </figcaption>
             </figure>
-          </section>
+          </Section>
         }
       />
 
-      <section className="on-navy flex flex-wrap items-center justify-between gap-12 bg-misa-blue px-5 py-14 text-white sm:px-14">
+      <Section
+        ground="navy"
+        pad="md"
+        width="page"
+        innerClassName="flex flex-wrap items-center justify-between gap-12"
+      >
         <div>
-          <h2 className="mb-2.5 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] sm:text-[42px]">
+          <Headline data-reveal="up" className="mb-2.5">
             Tagged us?
-          </h2>
-          <p className="max-w-[52ch] leading-[1.65] text-white/80">{INSTAGRAM_PROMPT}</p>
+          </Headline>
+          <p
+            data-reveal="up"
+            style={revealDelay(0.05)}
+            className="max-w-[52ch] leading-[1.65] text-white/80"
+          >
+            {INSTAGRAM_PROMPT}
+          </p>
         </div>
         <a
           href={SOCIAL_LINKS.instagram}
@@ -60,7 +74,7 @@ export default function GalleryPage() {
         >
           {INSTAGRAM_HANDLE}
         </a>
-      </section>
+      </Section>
     </>
   );
 }

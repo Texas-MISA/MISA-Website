@@ -1,5 +1,8 @@
 "use client";
 
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState } from "react";
 
 import {
@@ -18,7 +21,7 @@ import type { MemberOption } from "@/lib/member-options";
 
 const initial: ManualEntryState = { status: "idle" };
 
-const fieldClass = "w-full border border-black/70 bg-white px-3 py-2 text-sm";
+const fieldClass = controlClass("sm", "w-full");
 
 export function ManualEntryForm({
   events,
@@ -47,7 +50,7 @@ export function ManualEntryForm({
       {state.status === "duplicate" && (
         <p
           role="status"
-          className="border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm"
         >
           {state.memberName ?? "That member"} already has a check-in at this
           event. Open the existing row rather than adding a second one — the
@@ -57,7 +60,7 @@ export function ManualEntryForm({
       {state.status === "error" && (
         <p
           role="status"
-          className="border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm"
         >
           Couldn&apos;t record that check-in.
         </p>
@@ -65,7 +68,7 @@ export function ManualEntryForm({
       {state.status === "unauthorized" && (
         <p
           role="status"
-          className="border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm"
         >
           Your session has expired — sign in again.
         </p>
@@ -125,7 +128,7 @@ export function ManualEntryForm({
         <button
           type="submit"
           disabled={pending}
-          className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-40"
+          className={BUTTON_PRIMARY_SM}
         >
           {pending ? "RECORDING…" : "RECORD CHECK-IN"}
         </button>
@@ -145,10 +148,10 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="text-foreground/60">{label}</span>
+      <span className="text-misa-muted">{label}</span>
       {children}
       {error && error.length > 0 && (
-        <span className="text-xs text-amber-800">{error[0]}</span>
+        <span className="text-xs text-misa-caution">{error[0]}</span>
       )}
     </label>
   );

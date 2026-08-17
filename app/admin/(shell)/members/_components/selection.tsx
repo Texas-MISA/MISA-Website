@@ -205,11 +205,11 @@ export function SelectAllHeader() {
   return (
     <th
       scope="col"
-      className="sticky top-0 z-10 w-10 border-b-2 border-black bg-misa-panel px-3 py-2"
+      className="sticky top-0 z-10 w-10 border-b border-misa-border bg-misa-panel px-3 py-2"
     >
       <input
         type="checkbox"
-        className="size-4 accent-black"
+        className="size-4 shrink-0 accent-misa-blue"
         checked={all}
         // Indeterminate is a property, not an attribute, so React cannot set it
         // declaratively — a ref callback is the only way to reach it.
@@ -238,7 +238,7 @@ export function SelectRowCell({
     <td className="w-10 px-3 py-2">
       <input
         type="checkbox"
-        className="size-4 accent-black"
+        className="size-4 shrink-0 accent-misa-blue"
         checked={isSelected(id)}
         onChange={() => toggle(id)}
         aria-label={`Select ${label}`}

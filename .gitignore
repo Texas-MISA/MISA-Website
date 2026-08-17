@@ -69,3 +69,13 @@ docs/VenmoStatement_*.csv
 .claude/skills/
 .claude/settings.local.json
 skills-lock.json
+
+# 📌 DESIGN.md, PRODUCT.md and .impeccable/design.json are NOT ignored, and that
+# is deliberate (2026-08-17). They are Impeccable OUTPUT rather than vendored
+# tooling: DESIGN.md is the design source of truth for the whole site, PRODUCT.md
+# records the product context and the refusals (no photography, no invented
+# statistics), and design.json is the machine sidecar `/impeccable doctor` diffs
+# for staleness. Leaving them untracked meant the binding spec existed on one
+# laptop. Everything else Impeccable writes under .impeccable/ is session state:
+.impeccable/*
+!.impeccable/design.json

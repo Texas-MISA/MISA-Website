@@ -12,7 +12,10 @@ import {
 // constant the server decides with — a hardcoded "48 hours" would start
 // lying the moment ORPHAN_WINDOW_HOURS changed. lib/checkin.ts is free of
 // next/* and server-only imports, so a Client Component can import it.
+import { Banner } from "@/components/ui/banner";
 import { BUTTON_OUTLINE_NAVY, BUTTON_SOLID_NAVY } from "@/components/ui/button";
+import { CHECKBOX, Field, Input } from "@/components/ui/field";
+import { Panel } from "@/components/ui/panel";
 import { ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 
 // Client Component for useActionState only — the form posts to the Server
@@ -23,14 +26,11 @@ import { ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 
 const INITIAL: CheckinState = { status: "idle" };
 
-const inputClass =
-  "w-full border border-misa-border bg-white px-3 py-3 text-base focus:border-misa-blue";
-
-const buttonClass = `${BUTTON_SOLID_NAVY} disabled:opacity-60`;
-
-const bannerClass =
-  "border-l-2 border-misa-blue bg-misa-panel px-4 py-3 text-sm text-misa-body";
-
+// 📌 The local `inputClass`, `bannerClass` and `Field` this file used to carry
+// are gone — they were three of the eleven and nine copies of the same thing
+// scattered across the app. The disabled tint went with them: `BUTTON_SOLID_NAVY`
+// now carries one threshold for the whole codebase instead of the three that
+// were in use.
 const EMPTY: SubmittedValues = {
   fullName: "",
   eid: "",
@@ -88,7 +88,14 @@ export function CheckinForm() {
       );
 
     case "needs_confirmation":
-      return <ReviewPanel action={formAction} pending={pending} submitted={submitted} existing={state.existing} />;
+      return (
+        <ReviewPanel
+          action={formAction}
+          pending={pending}
+          submitted={submitted}
+          existing={state.existing}
+        />
+      );
 
     case "idle":
     case "invalid":
@@ -132,40 +139,39 @@ function CheckinFields({
   return (
     <form action={action} className="flex flex-col gap-5" noValidate>
       {state.status === "unmatched" && (
-        <p role="alert" className={bannerClass}>
-          We don&apos;t have that info on file. Check your EID and email
-          for a typo and try again — or, if this is your first MISA event, tick
-          the box below.
-        </p>
+        <Banner role="alert">
+          We don&apos;t have that info on file. Check your EID and email for a
+          typo and try again — or, if this is your first MISA event, tick the
+          box below.
+        </Banner>
       )}
       {state.status === "rate_limited" && (
-        <p role="alert" className={bannerClass}>
+        <Banner tone="caution" role="alert">
           Too many check-ins from this connection — wait a few minutes and try
           again.
-        </p>
+        </Banner>
       )}
       {state.status === "error" && (
-        <p role="alert" className={bannerClass}>
+        <Banner tone="critical" role="alert">
           Something went wrong on our end — please try again. If it keeps
           failing, tell an officer at the event so your attendance isn&apos;t
           lost.
-        </p>
+        </Banner>
       )}
 
-      <Field label="Full name" error={fieldErrors?.fullName}>
-        <input
+      <Field label="Full name" error={fieldErrors?.fullName?.[0]}>
+        <Input
           type="text"
           name="fullName"
           required
           autoComplete="name"
           defaultValue={submitted.fullName}
-          className={inputClass}
           aria-invalid={fieldErrors?.fullName ? true : undefined}
         />
       </Field>
 
-      <Field label="UT EID" error={fieldErrors?.eid}>
-        <input
+      <Field label="UT EID" error={fieldErrors?.eid?.[0]}>
+        <Input
           type="text"
           name="eid"
           required
@@ -174,20 +180,19 @@ function CheckinFields({
           autoCorrect="off"
           spellCheck={false}
           defaultValue={submitted.eid}
-          className={inputClass}
           aria-invalid={fieldErrors?.eid ? true : undefined}
         />
       </Field>
 
-      <Field label="Email" error={fieldErrors?.email}>
-        <input
+      <Field label="Email" error={fieldErrors?.email?.[0]}>
+        <Input
           type="email"
+          spellCheck={false}
           name="email"
           required
           autoComplete="email"
           inputMode="email"
           defaultValue={submitted.email}
-          className={inputClass}
           aria-invalid={fieldErrors?.email ? true : undefined}
         />
       </Field>
@@ -200,7 +205,7 @@ function CheckinFields({
           type="checkbox"
           name="firstTime"
           defaultChecked={submitted.declaredNew}
-          className="mt-1 size-4"
+          className={`mt-1 ${CHECKBOX}`}
         />
         <span>
           This is my first MISA event
@@ -223,8 +228,13 @@ function CheckinFields({
           add a hidden <input name="step"> here: React inserts a submitter's
           name/value immediately before the submitter, so an earlier hidden
           field of the same name would win formData.get("step"). */}
-      <button type="submit" disabled={pending} className={`mt-1 w-fit ${buttonClass}`}>
-        {pending ? "CHECKING IN…" : "CHECK IN"}
+      <button
+        type="submit"
+        disabled={pending}
+        aria-busy={pending}
+        className={`mt-1 w-fit ${BUTTON_SOLID_NAVY}`}
+      >
+        {pending ? "Checking in…" : "Check in"}
       </button>
     </form>
   );
@@ -252,9 +262,12 @@ function ReviewPanel({
 }) {
   return (
     <form action={action} className="flex flex-col gap-5">
-      <div
+      <Panel
+        as="div"
+        ground="panel"
+        pad="none"
+        className="px-6 py-6"
         role="status"
-        className="border-l-2 border-misa-blue bg-misa-panel px-6 py-6"
       >
         <h2 className="font-display text-[26px] leading-[1.08] font-semibold">
           Check your details
@@ -269,9 +282,14 @@ function ReviewPanel({
           <Row label="UT EID" value={submitted.eid} />
           <Row label="Email" value={submitted.email} />
         </dl>
-      </div>
+      </Panel>
 
-      <input type="hidden" name="fullName" value={submitted.fullName} readOnly />
+      <input
+        type="hidden"
+        name="fullName"
+        value={submitted.fullName}
+        readOnly
+      />
       <input type="hidden" name="eid" value={submitted.eid} readOnly />
       <input type="hidden" name="email" value={submitted.email} readOnly />
       <input type="hidden" name="firstTime" value="on" readOnly />
@@ -293,18 +311,19 @@ function ReviewPanel({
           name="step"
           value="confirm"
           disabled={pending}
-          className={buttonClass}
+          aria-busy={pending}
+          className={BUTTON_SOLID_NAVY}
         >
-          {pending ? "CHECKING IN…" : "CONFIRM & CHECK IN"}
+          {pending ? "Checking in…" : "Confirm & check in"}
         </button>
         <button
           type="submit"
           name="step"
           value="edit"
           disabled={pending}
-          className={`${BUTTON_OUTLINE_NAVY} disabled:opacity-60`}
+          className={BUTTON_OUTLINE_NAVY}
         >
-          GO BACK
+          Go back
         </button>
       </div>
     </form>
@@ -320,28 +339,6 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string[];
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1 text-sm">
-      {label}
-      {children}
-      {error && (
-        <span role="alert" className="text-xs text-red-700">
-          {error[0]}
-        </span>
-      )}
-    </label>
-  );
-}
-
 function ResultPanel({
   heading,
   children,
@@ -350,11 +347,15 @@ function ResultPanel({
   children: React.ReactNode;
 }) {
   return (
-    <div
-      role="status"
-      className="border-l-2 border-misa-blue bg-misa-panel px-6 py-6"
-    >
-      <h2 className="font-display text-[26px] leading-[1.08] font-semibold">{heading}</h2>
+    // 🪤 NO `data-reveal` here, ever. This panel replaces the form after the
+    // action resolves, and the reveal observer scans once per pathname — a node
+    // mounted by a state change is never observed, so its unconditional
+    // `opacity: 0` start state would become permanent. The one screen that
+    // tells a member their attendance was recorded would render blank.
+    <Panel ground="panel" pad="none" className="px-6 py-6" role="status">
+      <h2 className="font-display text-[26px] leading-[1.08] font-semibold">
+        {heading}
+      </h2>
       <p className="mt-2 leading-[1.65] text-misa-body">{children}</p>
       {/* Stage 7 phase 2. On every terminal outcome, including `pending` and
           `duplicate` — those are the two where someone most wants to see for
@@ -363,11 +364,11 @@ function ResultPanel({
       <p className="mt-4 text-sm text-misa-muted">
         <Link
           href="/lookup"
-          className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+          className="text-misa-blue underline hover:text-misa-blue-dark"
         >
           Check your points and attendance
         </Link>
       </p>
-    </div>
+    </Panel>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
 
 import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
@@ -88,7 +89,7 @@ export function RosterImportForm() {
   return (
     <div className="flex flex-col gap-6">
       {!done && (
-        <div className="border-2 border-black bg-misa-panel px-4 py-4">
+        <div className="border border-misa-border bg-misa-panel px-4 py-4">
           <label className="block text-sm font-semibold" htmlFor="roster">
             Roster (.csv)
           </label>
@@ -101,7 +102,7 @@ export function RosterImportForm() {
             onChange={(event) => onFile(event.currentTarget.files?.[0])}
           />
           {fileName && (
-            <p className="mt-2 text-xs text-foreground/70">
+            <p className="mt-2 text-xs text-misa-secondary">
               Loaded <span className="font-medium">{fileName}</span> (
               {Math.max(1, Math.round(csv.length / 1024))} KB). Nothing has been
               saved yet.
@@ -118,7 +119,7 @@ export function RosterImportForm() {
           <button
             type="submit"
             disabled={previewing || reading}
-            className="border-2 border-black bg-black px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white disabled:opacity-40"
+            className={BUTTON_PRIMARY_SM}
           >
             {previewing ? "Reading…" : "Preview import"}
           </button>
@@ -145,7 +146,7 @@ export function RosterImportForm() {
             <button
               type="submit"
               disabled={committing || preview.counts.fresh === 0}
-              className="border-2 border-black bg-black px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white disabled:opacity-40"
+              className={BUTTON_PRIMARY_SM}
             >
               {committing
                 ? "Importing…"
@@ -156,7 +157,7 @@ export function RosterImportForm() {
             <button
               type="button"
               onClick={reset}
-              className="border-2 border-black px-3 py-2 text-xs font-semibold uppercase tracking-wider"
+              className={BUTTON_QUIET_SM}
             >
               Choose a different file
             </button>
@@ -200,7 +201,7 @@ function Problem({ state }: { state: PreviewState | CommitState }) {
   return (
     <p
       role="alert"
-      className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+      className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
     >
       {message}
     </p>
@@ -215,8 +216,8 @@ function Summary({
   ignoredColumns: string[];
 }) {
   return (
-    <div className="border-2 border-black px-4 py-4">
-      <h2 className="font-display text-lg font-bold">Before you import</h2>
+    <div className="border border-misa-border px-4 py-4">
+      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">Before you import</h2>
       <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <Stat label="New members" value={counts.fresh} />
         <Stat label="Already on the roster" value={counts.existing} />
@@ -225,7 +226,7 @@ function Summary({
       </dl>
 
       {counts.existing > 0 && (
-        <p className="mt-3 text-sm text-foreground/70">
+        <p className="mt-3 text-sm text-misa-secondary">
           {counts.existing} {counts.existing === 1 ? "row is" : "rows are"}{" "}
           already on the roster and will be skipped —{" "}
           <span className="font-medium">
@@ -247,7 +248,7 @@ function Summary({
       )}
 
       {ignoredColumns.length > 0 && (
-        <p className="mt-2 text-xs text-foreground/60">
+        <p className="mt-2 text-xs text-misa-muted">
           Ignored {ignoredColumns.length}{" "}
           {ignoredColumns.length === 1 ? "column" : "columns"}:{" "}
           {ignoredColumns.join(", ")}. Calculated values are not imported.
@@ -260,7 +261,7 @@ function Summary({
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wider text-foreground/60">
+      <dt className="text-xs uppercase tracking-wider text-misa-muted">
         {label}
       </dt>
       <dd className="text-xl font-bold tabular-nums">{value}</dd>
@@ -272,7 +273,7 @@ function RowTable({ rows }: { rows: PreviewRow[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <div className="max-h-[60vh] overflow-auto border-2 border-black">
+    <div className="max-h-[60vh] overflow-auto border border-misa-border">
       <table className="w-full min-w-[48rem] border-collapse text-sm">
         <thead className="bg-misa-panel">
           <tr>
@@ -280,7 +281,7 @@ function RowTable({ rows }: { rows: PreviewRow[] }) {
               <th
                 key={head}
                 scope="col"
-                className="sticky top-0 z-10 border-b-2 border-black bg-misa-panel px-3 py-2 text-left"
+                className="sticky top-0 z-10 border-b border-misa-border bg-misa-panel px-3 py-2 text-left"
               >
                 {head}
               </th>
@@ -291,15 +292,15 @@ function RowTable({ rows }: { rows: PreviewRow[] }) {
           {rows.map((row) => (
             <tr
               key={row.line}
-              className={`border-b border-black/20 last:border-b-0 ${
-                row.willImport ? "" : "bg-black/[0.03] text-foreground/60"
+              className={`border-b border-misa-border last:border-b-0 ${
+                row.willImport ? "" : "bg-misa-panel text-misa-muted"
               }`}
             >
               <td className="px-3 py-2 tabular-nums">{row.line}</td>
               <td className="px-3 py-2">
                 {row.fullName || "—"}
                 {!row.active && (
-                  <span className="ml-2 border border-black/40 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider">
+                  <span className="ml-2 border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
                     inactive
                   </span>
                 )}
@@ -323,8 +324,8 @@ function Done({
   onAnother: () => void;
 }) {
   return (
-    <div className="border-2 border-black px-4 py-4">
-      <h2 className="font-display text-lg font-bold">Imported</h2>
+    <div className="border border-misa-border px-4 py-4">
+      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">Imported</h2>
       <p className="mt-2 text-sm">
         {counts.fresh} member{counts.fresh === 1 ? "" : "s"} added
         {counts.existing > 0 &&
@@ -340,14 +341,14 @@ function Done({
       <div className="mt-4 flex flex-wrap gap-3">
         <Link
           href="/admin/members"
-          className="border-2 border-black bg-black px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white"
+          className={BUTTON_PRIMARY_SM}
         >
           Back to the directory
         </Link>
         <button
           type="button"
           onClick={onAnother}
-          className="border-2 border-black px-3 py-2 text-xs font-semibold uppercase tracking-wider"
+          className={BUTTON_QUIET_SM}
         >
           Import another file
         </button>

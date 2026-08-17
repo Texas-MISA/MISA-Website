@@ -58,8 +58,8 @@ export function DirectoryRow({
 
   return (
     <tr
-      className={`border-b border-black/20 last:border-b-0 ${
-        row.active ? "" : "bg-black/[0.03] text-foreground/60"
+      className={`border-b border-misa-hairline transition-colors duration-150 last:border-b-0 hover:bg-misa-panel/70 ${
+        row.active ? "" : "bg-misa-panel text-misa-muted"
       }`}
     >
       {/* Outside the per-cell <form> elements below, deliberately: those each
@@ -74,14 +74,14 @@ export function DirectoryRow({
           {row.fullName}
         </Link>
         {!row.active && (
-          <span className="ml-2 border border-black/40 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider">
+          <span className="ml-2 border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
             inactive
           </span>
         )}
         {row.source === "self_checkin" && (
           <span
             title="Created by the check-in form rather than an officer"
-            className="ml-2 border border-black/40 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider"
+            className="ml-2 border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]"
           >
             self
           </span>
@@ -102,11 +102,11 @@ export function DirectoryRow({
           room to show the payments themselves. */}
       <td className={text}>
         {row.duesPaid ? (
-          <span className="border border-black/30 bg-misa-panel px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+          <span className="border border-misa-border bg-misa-panel px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
             paid
           </span>
         ) : (
-          <span className="border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider text-foreground/60 uppercase">
+          <span className="border border-misa-border px-2 py-0.5 text-[0.7rem] tracking-wider text-misa-muted uppercase">
             not paid
           </span>
         )}
@@ -128,7 +128,7 @@ export function DirectoryRow({
             // still means the same thing in every row.
             <span className="text-sm">
               {fieldValue(row.customFields, definition.key) ?? (
-                <span className="text-foreground/40">—</span>
+                <span className="text-misa-muted">—</span>
               )}
             </span>
           )}

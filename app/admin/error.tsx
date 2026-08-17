@@ -1,5 +1,7 @@
 "use client";
 
+import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
+
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -33,15 +35,15 @@ export default function AdminShellError({
   return (
     <main className="px-6 py-16 sm:py-20">
       <div className="mx-auto max-w-2xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           The admin section couldn&apos;t load
         </h1>
-        <p className="mt-4 text-foreground/80">
+        <p className="mt-4 text-misa-body">
           This is the officer area failing to start up rather than one screen
           going wrong, so the usual navigation isn&apos;t available. Most often
           it means the database was briefly unreachable.
         </p>
-        <p className="mt-3 text-sm text-foreground/70">
+        <p className="mt-3 text-sm text-misa-secondary">
           Nothing has been changed. If retrying doesn&apos;t work, signing in
           again is the next thing to try.
         </p>
@@ -50,26 +52,26 @@ export default function AdminShellError({
           <button
             type="button"
             onClick={() => unstable_retry()}
-            className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
+            className={BUTTON_PRIMARY_SM}
           >
             TRY AGAIN
           </button>
           <Link
             href="/admin/login"
-            className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel"
+            className={BUTTON_QUIET_SM}
           >
             SIGN IN AGAIN
           </Link>
           <Link
             href="/"
-            className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel"
+            className={BUTTON_QUIET_SM}
           >
             PUBLIC SITE
           </Link>
         </div>
 
         {error.digest && (
-          <p className="mt-6 text-xs text-foreground/60">
+          <p className="mt-6 text-xs text-misa-muted">
             Reference: <code className="font-mono">{error.digest}</code>
           </p>
         )}

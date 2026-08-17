@@ -28,7 +28,7 @@ export async function PendingBadge() {
 
   if (count === null) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         Couldn&apos;t load the pending count.
       </p>
     );
@@ -36,7 +36,7 @@ export async function PendingBadge() {
 
   if (count === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         Nothing waiting for review.{" "}
         <Link href="/admin/attendance?status=all" className="underline">
           Browse all submissions
@@ -47,13 +47,13 @@ export async function PendingBadge() {
   }
 
   return (
-    <div className="border-l-4 border-amber-700 bg-misa-panel px-4 py-3">
+    <div className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-3">
       <p className="text-sm">
         <strong className="font-display text-lg">{count}</strong>{" "}
         {count === 1 ? "check-in is" : "check-ins are"} waiting for an officer
         to match {count === 1 ? "it" : "them"} to an event or a member.
       </p>
-      <p className="mt-1 text-xs text-foreground/70">
+      <p className="mt-1 text-xs text-misa-secondary">
         <Link href="/admin/attendance?status=pending" className="underline">
           Open the review queue
         </Link>{" "}

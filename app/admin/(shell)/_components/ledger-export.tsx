@@ -76,7 +76,7 @@ export function LedgerExport({
   }
 
   return (
-    <div className="border-2 border-black">
+    <div className="border border-misa-border">
       <div className="flex flex-wrap items-center gap-3 px-3 py-2">
         <span className="text-sm">
           <span className="font-semibold">{total}</span> {noun}
@@ -108,7 +108,7 @@ export function LedgerExport({
       </div>
 
       {status.kind !== "idle" && (
-        <p role="status" className="px-3 pb-2 text-xs text-foreground/70">
+        <p role="status" className="px-3 pb-2 text-xs text-misa-secondary">
           {status.kind === "copied"
             ? `Copied ${status.count} row${status.count === 1 ? "" : "s"}.`
             : "Couldn't copy — try a download instead."}

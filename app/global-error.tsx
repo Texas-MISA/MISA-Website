@@ -45,7 +45,7 @@ export default function GlobalError({
             <button
               type="button"
               onClick={() => unstable_retry()}
-              className="border-2 border-black px-4 py-2 text-xs font-semibold tracking-wider uppercase"
+              className="border border-misa-border px-4 py-2 text-xs font-semibold tracking-wider uppercase"
             >
               Try again
             </button>
@@ -57,7 +57,7 @@ export default function GlobalError({
             {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
             <a
               href="/"
-              className="border-2 border-black px-4 py-2 text-xs font-semibold tracking-wider uppercase"
+              className="border border-misa-border px-4 py-2 text-xs font-semibold tracking-wider uppercase"
             >
               Home
             </a>

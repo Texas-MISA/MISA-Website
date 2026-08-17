@@ -251,7 +251,7 @@ export default async function SubmissionDetailPage({
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Submission
         </h1>
         <StatusPill status={submission.status} />
@@ -264,8 +264,8 @@ export default async function SubmissionDetailPage({
       </p>
 
       <section className="mt-10 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">As it was submitted</h2>
-        <p className="mt-2 text-sm text-foreground/70">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">As it was submitted</h2>
+        <p className="mt-2 text-sm text-misa-secondary">
           Exactly what the member typed. Nothing here has been corrected or
           normalized.
         </p>
@@ -276,7 +276,7 @@ export default async function SubmissionDetailPage({
             {submission.normalized_eid &&
               submission.normalized_eid !==
                 submission.submitted_eid && (
-                <span className="ml-2 text-xs text-foreground/60">
+                <span className="ml-2 text-xs text-misa-muted">
                   matches as {submission.normalized_eid}
                 </span>
               )}
@@ -302,7 +302,7 @@ export default async function SubmissionDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">Where it stands</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Where it stands</h2>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Event">
             {submission.events ? (
@@ -313,19 +313,19 @@ export default async function SubmissionDetailPage({
                 {submission.events.title}
               </Link>
             ) : (
-              <span className="text-foreground/50">not linked</span>
+              <span className="text-misa-muted">not linked</span>
             )}
           </Row>
           <Row label="Member">
             {submission.members ? (
               <>
                 {submission.members.full_name}{" "}
-                <span className="text-xs text-foreground/60">
+                <span className="text-xs text-misa-muted">
                   ({submission.members.eid})
                 </span>
               </>
             ) : (
-              <span className="text-foreground/50">not linked</span>
+              <span className="text-misa-muted">not linked</span>
             )}
           </Row>
         </dl>
@@ -333,7 +333,7 @@ export default async function SubmissionDetailPage({
         {warnings.length > 0 && (
           <div
             role="status"
-            className="mt-6 border-l-4 border-amber-700 bg-misa-panel px-4 py-3"
+            className="mt-6 border border-misa-caution/45 bg-misa-caution-wash px-4 py-3"
           >
             <p className="text-sm font-medium">
               Worth knowing before approving this
@@ -349,8 +349,8 @@ export default async function SubmissionDetailPage({
 
       {!submission.event_id && (
         <section className="mt-12 max-w-3xl">
-          <h2 className="font-display text-xl font-bold">Which event?</h2>
-          <p className="mt-2 text-sm text-foreground/70">
+          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Which event?</h2>
+          <p className="mt-2 text-sm text-misa-secondary">
             Ranked by how close the submission was to each event&apos;s
             check-in window. Suggestions only — nothing is selected, and
             assigning one is your call.
@@ -372,8 +372,8 @@ export default async function SubmissionDetailPage({
 
       {!submission.member_id && (
         <section className="mt-12 max-w-3xl">
-          <h2 className="font-display text-xl font-bold">Which member?</h2>
-          <p className="mt-2 text-sm text-foreground/70">
+          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Which member?</h2>
+          <p className="mt-2 text-sm text-misa-secondary">
             Closest roster matches on email, EID, and name. The
             highlighted character is where the submitted ID first differs.
           </p>
@@ -390,8 +390,8 @@ export default async function SubmissionDetailPage({
       )}
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">Resolving this</h2>
-        <p className="mt-2 text-sm text-foreground/70">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Resolving this</h2>
+        <p className="mt-2 text-sm text-misa-secondary">
           Correct whatever the member mistyped, set both links, and approve —
           one save. Nothing above is preselected; the choice is yours.
         </p>
@@ -426,7 +426,7 @@ export default async function SubmissionDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">History</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
         <div className="mt-4">
           <AuditTrail entityType="attendance" entityId={submission.id} />
         </div>
@@ -444,7 +444,7 @@ function Row({
 }) {
   return (
     <>
-      <dt className="text-sm text-foreground/60">{label}</dt>
+      <dt className="text-sm text-misa-muted">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </>
   );

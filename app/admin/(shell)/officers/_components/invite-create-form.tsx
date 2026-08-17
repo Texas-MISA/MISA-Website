@@ -1,5 +1,8 @@
 "use client";
 
+import { BUTTON_PRIMARY, BUTTON_QUIET_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState, useState } from "react";
 
 import { createInvite, type InviteCreateState } from "@/app/actions/invites";
@@ -14,11 +17,9 @@ import { createInvite, type InviteCreateState } from "@/app/actions/invites";
 
 const INITIAL: InviteCreateState = { status: "idle" };
 
-const inputClass =
-  "border border-black/70 bg-misa-panel px-3 py-2 text-base w-full";
+const inputClass = controlClass("md", "w-full");
 
-const buttonClass =
-  "rounded-full bg-misa-blue px-8 py-2.5 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60";
+const buttonClass = BUTTON_PRIMARY;
 
 export function InviteCreateForm() {
   const [state, formAction, pending] = useActionState(createInvite, INITIAL);
@@ -35,7 +36,7 @@ export function InviteCreateForm() {
       {state.status === "already_registered" ? (
         <p
           role="alert"
-          className="border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm"
         >
           {state.email} already has an account, so there is nothing to create.{" "}
           {state.hasAccess
@@ -47,7 +48,7 @@ export function InviteCreateForm() {
       {state.status === "unauthorized" ? (
         <p
           role="alert"
-          className="border-l-4 border-red-800 bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-critical/45 bg-misa-critical-wash px-4 py-3 text-sm"
         >
           Your session expired. Sign in again.
         </p>
@@ -56,7 +57,7 @@ export function InviteCreateForm() {
       {state.status === "error" ? (
         <p
           role="alert"
-          className="border-l-4 border-red-800 bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-critical/45 bg-misa-critical-wash px-4 py-3 text-sm"
         >
           Couldn&apos;t create the invitation. Nothing was sent. Try again, and
           check the invitation list below before retrying in case it went
@@ -68,12 +69,13 @@ export function InviteCreateForm() {
         <div>
           <label htmlFor="email" className="block text-sm font-medium">
             Their email{" "}
-            <span className="font-normal text-foreground/60">(optional)</span>
+            <span className="font-normal text-misa-muted">(optional)</span>
           </label>
           <input
             id="email"
             name="email"
             type="email"
+            spellCheck={false}
             maxLength={254}
             autoComplete="off"
             // React 19 resets the form once the action resolves, so this is
@@ -86,9 +88,9 @@ export function InviteCreateForm() {
               two options are not equally safe and the screen should not pretend
               otherwise — a pinned address makes a forwarded link useless to
               anyone else, and an open one makes the link a bearer credential. */}
-          <p id="email-help" className="mt-1 text-xs text-foreground/60">
-            Leave blank and the link works for whoever opens it — useful when you
-            don&apos;t know which address they&apos;ll use.{" "}
+          <p id="email-help" className="mt-1 text-xs text-misa-muted">
+            Leave blank and the link works for whoever opens it — useful when
+            you don&apos;t know which address they&apos;ll use.{" "}
             <strong className="font-medium">
               Anyone who gets hold of an open link can use it,
             </strong>{" "}
@@ -117,7 +119,7 @@ export function InviteCreateForm() {
         <div className="sm:col-span-2">
           <label htmlFor="displayName" className="block text-sm font-medium">
             Their name{" "}
-            <span className="font-normal text-foreground/60">(optional)</span>
+            <span className="font-normal text-misa-muted">(optional)</span>
           </label>
           <input
             id="displayName"
@@ -128,9 +130,9 @@ export function InviteCreateForm() {
             className={`mt-1 ${inputClass}`}
             aria-describedby="displayName-help"
           />
-          <p id="displayName-help" className="mt-1 text-xs text-foreground/60">
-            A starting point they can change. Filling it in means the audit trail
-            names them properly from their first action.
+          <p id="displayName-help" className="mt-1 text-xs text-misa-muted">
+            A starting point they can change. Filling it in means the audit
+            trail names them properly from their first action.
           </p>
           <FieldError messages={fieldErrors.displayName} />
         </div>
@@ -139,9 +141,9 @@ export function InviteCreateForm() {
           <button type="submit" disabled={pending} className={buttonClass}>
             {pending ? "Creating…" : "Create invitation link"}
           </button>
-          <p className="mt-2 text-xs text-foreground/60">
-            Nothing is emailed — you&apos;ll get a link to send them yourself. It
-            works once and expires in 72 hours.
+          <p className="mt-2 text-xs text-misa-muted">
+            Nothing is emailed — you&apos;ll get a link to send them yourself.
+            It works once and expires in 72 hours.
           </p>
         </div>
       </form>
@@ -155,7 +157,7 @@ function InviteLink({ url, email }: { url: string; email: string | null }) {
   return (
     <div
       role="status"
-      className="border-l-4 border-green-800 bg-misa-panel px-4 py-3"
+      className="border border-misa-affirm/45 bg-misa-affirm-wash px-4 py-3"
     >
       <p className="text-sm font-medium">
         {email
@@ -163,7 +165,7 @@ function InviteLink({ url, email }: { url: string; email: string | null }) {
           : "Open invitation ready. Send this link to one person."}
       </p>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        <code className="min-w-0 flex-1 break-all border border-black/20 bg-white px-2 py-1 text-xs">
+        <code className="min-w-0 flex-1 break-all border border-misa-border bg-white px-2 py-1 text-xs">
           {url}
         </code>
         <button
@@ -177,12 +179,12 @@ function InviteLink({ url, email }: { url: string; email: string | null }) {
               .then(() => setCopied(true))
               .catch(() => setCopied(false));
           }}
-          className="rounded-full border border-black/70 px-4 py-1.5 text-xs font-medium tracking-wider transition hover:bg-black/5"
+          className={BUTTON_QUIET_SM}
         >
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <p className="mt-2 text-xs text-foreground/70">
+      <p className="mt-2 text-xs text-misa-secondary">
         This is the only time it can be shown — only a fingerprint of it is
         stored, so nothing can display it again.{" "}
         {email
@@ -195,5 +197,7 @@ function InviteLink({ url, email }: { url: string; email: string | null }) {
 
 function FieldError({ messages }: { messages?: string[] }) {
   if (!messages || messages.length === 0) return null;
-  return <p className="mt-1 text-sm text-red-800">{messages.join(" ")}</p>;
+  return (
+    <p className="mt-1 text-sm text-misa-critical">{messages.join(" ")}</p>
+  );
 }

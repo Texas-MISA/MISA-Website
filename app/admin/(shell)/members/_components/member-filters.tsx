@@ -1,7 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
 
 import {
   EVENT_MODES,
@@ -54,8 +57,10 @@ import {
 // row above. The panel OPENS whenever one of them is set: a collapsed panel
 // hiding an applied filter would be the phase-1 defect with a lid on it.
 
-const controlClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
-const smallNumber = `${controlClass} w-24`;
+// Named `control` rather than `controlClass`, which is the shared helper's
+// name and would shadow it.
+const control = controlClass("sm");
+const smallNumber = `${control} w-24`;
 
 export function MemberFilters({
   filter,
@@ -165,7 +170,7 @@ export function MemberFilters({
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          className={`${controlClass} w-64`}
+          className={`${control} w-64`}
           value={fields.q}
           onChange={(e) => set("q", e.target.value)}
           onBlur={(e) => update({ q: e.target.value })}
@@ -183,7 +188,7 @@ export function MemberFilters({
 
       <Labelled label="Roster">
         <select
-          className={controlClass}
+          className={control}
           value={filter.state}
           onChange={(e) => update({ state: e.target.value })}
         >
@@ -205,7 +210,7 @@ export function MemberFilters({
           its six retired fields outright rather than hiding them. */}
       <Labelled label="Dues">
         <select
-          className={controlClass}
+          className={control}
           value={filter.dues}
           onChange={(e) => update({ dues: e.target.value })}
         >
@@ -232,7 +237,7 @@ export function MemberFilters({
             onChange={(e) => set("minPoints", e.target.value)}
             onBlur={(e) => update({ minPoints: e.target.value })}
           />
-          <span className="text-foreground/50">–</span>
+          <span className="text-misa-muted">–</span>
           <input
             type="number"
             inputMode="numeric"
@@ -247,7 +252,7 @@ export function MemberFilters({
 
       <Labelled label="Added by">
         <select
-          className={controlClass}
+          className={control}
           value={filter.source}
           onChange={(e) => update({ source: e.target.value })}
         >
@@ -274,7 +279,7 @@ export function MemberFilters({
         return (
           <Labelled key={definition.key} label={definition.label}>
             <select
-              className={controlClass}
+              className={control}
               value={selected}
               onChange={(e) =>
                 update({ [customFieldKey(definition.key)]: e.target.value })
@@ -295,7 +300,7 @@ export function MemberFilters({
         <button
           type="button"
           onClick={() => router.push("/admin/members")}
-          className="rounded-full border border-black/50 px-4 py-2 text-xs font-medium tracking-wider transition hover:bg-black/5"
+          className={BUTTON_QUIET_SM}
         >
           CLEAR
         </button>
@@ -346,22 +351,22 @@ function RelationalPanel({
   return (
     <details
       open={hasRelationalFilter(filter)}
-      className="mt-4 border border-black/30 bg-misa-panel/40"
+      className="mt-4 border border-misa-border bg-misa-panel/40"
     >
       <summary className="cursor-pointer px-4 py-2 text-sm font-medium">
         Attendance filters
         {activeCount > 0 && (
-          <span className="ml-2 border border-black/40 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+          <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
             {activeCount} active
           </span>
         )}
       </summary>
 
-      <div className="border-t border-black/20 px-4 pt-3 pb-4">
+      <div className="border-t border-misa-border px-4 pt-3 pb-4">
         {/* Says what the panel is, because these are the only filters on the
             screen that narrow on something the table does not show. Without
             this the count and the visible columns look unrelated. */}
-        <p className="mb-3 max-w-2xl text-xs text-foreground/60">
+        <p className="mb-3 max-w-2xl text-xs text-misa-muted">
           These narrow the list without being columns — the table still shows the
           same fields either way. Open a member for the detail behind them.
         </p>
@@ -369,7 +374,7 @@ function RelationalPanel({
         <div className="flex flex-wrap items-end gap-4">
           <Labelled label="Event">
             <select
-              className={`${controlClass} max-w-[22rem]`}
+              className={`${control} max-w-[22rem]`}
               value={filter.event ?? ""}
               onChange={(e) => update({ event: e.target.value })}
             >
@@ -387,7 +392,7 @@ function RelationalPanel({
               hidden so the pairing is visible before the officer picks one. */}
           <Labelled label="Who">
             <select
-              className={controlClass}
+              className={control}
               value={filter.eventMode}
               disabled={filter.event === null}
               onChange={(e) => update({ eventMode: e.target.value })}
@@ -402,7 +407,7 @@ function RelationalPanel({
 
           <Labelled label="Pending check-ins">
             <select
-              className={controlClass}
+              className={control}
               value={filter.pending}
               onChange={(e) => update({ pending: e.target.value })}
             >
@@ -420,7 +425,7 @@ function RelationalPanel({
           <Labelled label="Not seen since (all-time)">
             <input
               type="date"
-              className={controlClass}
+              className={control}
               value={fields.notSeenSince}
               onChange={(e) => set("notSeenSince", e.target.value)}
               onBlur={(e) => update({ notSeenSince: e.target.value })}
@@ -438,7 +443,7 @@ function RelationalPanel({
                 onChange={(e) => set("minEvents", e.target.value)}
                 onBlur={(e) => update({ minEvents: e.target.value })}
               />
-              <span className="text-foreground/50">–</span>
+              <span className="text-misa-muted">–</span>
               <input
                 type="number"
                 inputMode="numeric"

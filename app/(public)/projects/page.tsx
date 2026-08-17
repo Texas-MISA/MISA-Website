@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
 
-import { BUTTON_OUTLINE_WHITE, BUTTON_SOLID_WHITE } from "@/components/ui/button";
+import {
+  BUTTON_OUTLINE_WHITE,
+  BUTTON_SOLID_WHITE,
+} from "@/components/ui/button";
+import { Tag } from "@/components/ui/chip";
 import { PageHero } from "@/components/ui/chevron-section";
 import { Hatch } from "@/components/ui/hatch";
+import { Headline, Title } from "@/components/ui/heading";
 import { KpiPlate } from "@/components/ui/kpi-plate";
+import { Pill } from "@/components/ui/pill";
 import { revealDelay } from "@/components/ui/reveal";
+import { Section } from "@/components/ui/section";
 import {
   CORPORATE_EMAIL,
   PROJECT_STATS,
@@ -26,21 +33,24 @@ export default function ProjectsPage() {
         subhead="Turning classroom knowledge into real-world impact."
       />
 
-      <section className="px-5 pt-16 pb-12 sm:px-14">
-        <div data-reveal="up" className="mx-auto max-w-[900px]">
+      <Section padTop="md" padBottom="sm" width="measure">
+        {/* `wipe` rather than a translate: the plate is a 1px-gap grid over a
+            hairline ground, so drawing it on from the left reads as the rules
+            being ruled. This is the page's one authored moment. */}
+        <div data-reveal="wipe">
           <KpiPlate stats={PROJECT_STATS} align="center" />
         </div>
         <p
           data-reveal="up"
           style={revealDelay(0.1)}
-          className="mx-auto mt-9 max-w-[900px] text-center text-[18px] leading-[1.65] text-misa-body"
+          className="mt-9 text-center text-lg leading-[1.65] text-misa-body"
         >
           {PROJECTS_INTRO}
         </p>
-      </section>
+      </Section>
 
       {/* Case studies, alternating sides */}
-      <section className="px-5 pb-14 sm:px-14">
+      <Section padTop="none" padBottom="md" width="page">
         {PROJECTS.map((project, i) => {
           const photoFirst = i % 2 === 1;
           return (
@@ -51,23 +61,20 @@ export default function ProjectsPage() {
             >
               <div>
                 <p className="mb-3.5">
-                  <span className="inline-block border border-misa-blue/35 px-2.5 py-1 text-[11px] leading-tight font-medium tracking-[0.12em] uppercase text-misa-blue">
+                  <Pill tone="info" size="sm">
                     {project.term}
-                  </span>
+                  </Pill>
                 </p>
-                <h2 className="mb-3 font-display text-[26px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
+                <Title as="h2" className="mb-3">
                   {project.client}
-                </h2>
+                </Title>
                 <p className="mb-4.5 max-w-[48ch] leading-[1.65] text-misa-secondary">
                   {project.body}
                 </p>
                 <ul className="flex flex-wrap gap-2.5">
                   {project.skills.map((skill) => (
-                    <li
-                      key={skill}
-                      className="bg-misa-panel px-[11px] py-[5px] text-xs leading-tight font-medium tracking-[0.1em] uppercase text-misa-secondary"
-                    >
-                      {skill}
+                    <li key={skill}>
+                      <Tag>{skill}</Tag>
                     </li>
                   ))}
                 </ul>
@@ -81,15 +88,26 @@ export default function ProjectsPage() {
             </article>
           );
         })}
-      </section>
+      </Section>
 
       {/* Work with MISA */}
-      <section className="on-navy grid items-center gap-14 bg-misa-blue px-5 py-16 text-white sm:px-14 lg:grid-cols-[1.2fr_0.8fr]">
+      <Section
+        ground="navy"
+        pad="md"
+        width="page"
+        innerClassName="grid items-center gap-14 lg:grid-cols-[1.2fr_0.8fr]"
+      >
         <div>
-          <h2 className="mb-3 font-display text-[30px] leading-none font-semibold tracking-[-0.02em] sm:text-[42px]">
+          <Headline data-reveal="up" className="mb-3">
             Work with MISA
-          </h2>
-          <p className="max-w-[60ch] leading-[1.65] text-white/80">{WORK_WITH_MISA}</p>
+          </Headline>
+          <p
+            data-reveal="up"
+            style={revealDelay(0.05)}
+            className="max-w-[60ch] leading-[1.65] text-white/80"
+          >
+            {WORK_WITH_MISA}
+          </p>
         </div>
         <div className="flex flex-col gap-2.5">
           {/* Both buttons go to corporate relations — the address below is the
@@ -107,7 +125,7 @@ export default function ProjectsPage() {
             {CORPORATE_EMAIL}
           </a>
         </div>
-      </section>
+      </Section>
     </>
   );
 }

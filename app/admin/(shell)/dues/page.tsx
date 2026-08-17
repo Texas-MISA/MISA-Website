@@ -1,3 +1,4 @@
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -317,18 +318,18 @@ export default async function AdminDuesPage({
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Dues
         </h1>
         <Link
           href="/admin/dues/import"
-          className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
+          className={BUTTON_PRIMARY_SM}
         >
           IMPORT A STATEMENT
         </Link>
       </div>
 
-      <p className="mt-3 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
         Every payment reconciled from a Venmo statement. A member counts as
         official for a term when a live payment covers it — nothing here is
         ticked by hand, and voiding a payment takes that status away again.
@@ -339,17 +340,17 @@ export default async function AdminDuesPage({
           current view. */}
       <p className="mt-4 text-sm">
         {reviewCount === null ? (
-          <span className="text-foreground/60">
+          <span className="text-misa-muted">
             Couldn&apos;t count what needs review.
           </span>
         ) : reviewCount === 0 ? (
-          <span className="text-foreground/60">
+          <span className="text-misa-muted">
             Nothing is waiting on an officer.
           </span>
         ) : (
           <Link
             href="/admin/dues?state=review"
-            className="border-l-4 border-amber-700 bg-misa-panel px-4 py-2 underline underline-offset-2"
+            className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-2 underline underline-offset-2"
           >
             {reviewCount} payment{reviewCount === 1 ? "" : "s"} need
             {reviewCount === 1 ? "s" : ""} an officer
@@ -372,12 +373,12 @@ export default async function AdminDuesPage({
 
       <div className="mt-8">
         {result.kind === "error" ? (
-          <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             Couldn&apos;t load the dues ledger.
           </p>
         ) : (
           <>
-            <p className="mb-3 text-xs text-foreground/60">
+            <p className="mb-3 text-xs text-misa-muted">
               {result.total === 0
                 ? "No matching payments."
                 : result.total > result.rows.length

@@ -174,11 +174,11 @@ export default async function PaymentDetailPage({
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Payment
         </h1>
         {voided && (
-          <span className="border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+          <span className="border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
             voided
           </span>
         )}
@@ -191,7 +191,7 @@ export default async function PaymentDetailPage({
       </p>
 
       {!voided && review.needsReview && (
-        <p className="mt-6 max-w-3xl border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm">
+        <p className="mt-6 max-w-3xl border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm">
           {review.noMember && review.undecidedAmount
             ? "Nobody is credited with this payment and nothing has been decided about what it bought."
             : review.noMember
@@ -202,7 +202,7 @@ export default async function PaymentDetailPage({
       )}
 
       <section className="mt-10 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">What arrived</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">What arrived</h2>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Amount">
             <span className={voided ? "line-through" : ""}>
@@ -212,7 +212,7 @@ export default async function PaymentDetailPage({
           <Row label="Paid at">
             {formatInstant(payment.paid_at)} CT
             {isSummerTerm(paidAt) && (
-              <span className="ml-2 text-xs text-foreground/60">
+              <span className="ml-2 text-xs text-misa-muted">
                 summer — {derivedTerm} by date, which may not be what the payer
                 meant
               </span>
@@ -221,7 +221,7 @@ export default async function PaymentDetailPage({
           <Row label="From">
             {payment.payer_name ?? <Missing />}
             {payment.payer_handle && (
-              <span className="ml-2 text-foreground/60">
+              <span className="ml-2 text-misa-muted">
                 {payment.payer_handle}
               </span>
             )}
@@ -240,14 +240,14 @@ export default async function PaymentDetailPage({
             {payment.submitted_eid ? (
               <span className="font-mono">{payment.submitted_eid}</span>
             ) : (
-              <span className="text-foreground/50">
+              <span className="text-misa-muted">
                 nothing in the note matched the roster
               </span>
             )}
           </Row>
           <Row label="Venmo ID">
             <span className="font-mono text-xs">{payment.venmo_txn_id}</span>
-            <span className="ml-2 text-xs text-foreground/60">
+            <span className="ml-2 text-xs text-misa-muted">
               re-importing this statement will not duplicate it
             </span>
           </Row>
@@ -260,10 +260,10 @@ export default async function PaymentDetailPage({
 
       {review.noMember && !voided && (
         <section className="mt-12 max-w-3xl">
-          <h2 className="font-display text-xl font-bold">
+          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
             Who might have sent this
           </h2>
-          <p className="mt-2 text-sm text-foreground/70">
+          <p className="mt-2 text-sm text-misa-secondary">
             Ranked from the payer&apos;s name and the note. Nothing is
             preselected — pick below once you are sure.
           </p>
@@ -277,7 +277,7 @@ export default async function PaymentDetailPage({
       )}
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">Who it credits</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Who it credits</h2>
 
         {voided ? (
           <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
@@ -290,12 +290,12 @@ export default async function PaymentDetailPage({
                   {payment.members.full_name}
                 </Link>
               ) : (
-                <span className="text-foreground/50">nobody</span>
+                <span className="text-misa-muted">nobody</span>
               )}
             </Row>
             <Row label="Covered">
               <Covered terms={payment.covered_terms} />
-              <span className="ml-2 text-xs text-foreground/60">
+              <span className="ml-2 text-xs text-misa-muted">
                 no longer counting
               </span>
             </Row>
@@ -306,7 +306,7 @@ export default async function PaymentDetailPage({
                 alone reads as though somebody is getting a term out of this,
                 which is exactly wrong on an unassigned row — coverage without a
                 member counts towards nobody. */}
-            <p className="mt-2 text-sm text-foreground/70">
+            <p className="mt-2 text-sm text-misa-secondary">
               {payment.covered_terms && payment.covered_terms.length > 0 ? (
                 <>
                   This payment buys <Covered terms={payment.covered_terms} />,{" "}
@@ -351,7 +351,7 @@ export default async function PaymentDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
           {voided ? "How it was voided" : "Void this payment"}
         </h2>
 
@@ -377,7 +377,7 @@ export default async function PaymentDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">History</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
         <div className="mt-4">
           <AuditTrail entityType="dues_payment" entityId={payment.id} />
         </div>
@@ -388,7 +388,7 @@ export default async function PaymentDetailPage({
 
 function Covered({ terms }: { terms: string[] | null }) {
   if (!terms || terms.length === 0) {
-    return <span className="text-foreground/50">nothing</span>;
+    return <span className="text-misa-muted">nothing</span>;
   }
   // Rendered in the order terms_from() generated, which is term-index order —
   // never re-sorted here, because a string compare puts Fall before Spring.
@@ -396,7 +396,7 @@ function Covered({ terms }: { terms: string[] | null }) {
 }
 
 function Missing() {
-  return <span className="text-foreground/50">—</span>;
+  return <span className="text-misa-muted">—</span>;
 }
 
 function Row({
@@ -408,7 +408,7 @@ function Row({
 }) {
   return (
     <>
-      <dt className="text-sm text-foreground/60">{label}</dt>
+      <dt className="text-sm text-misa-muted">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </>
   );

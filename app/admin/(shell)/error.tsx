@@ -1,5 +1,7 @@
 "use client";
 
+import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
+
 import Link from "next/link";
 import { useEffect } from "react";
 
@@ -35,10 +37,10 @@ export default function AdminError({
 
   return (
     <div className="max-w-2xl">
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
         Something went wrong
       </h1>
-      <p className="mt-4 text-foreground/80">
+      <p className="mt-4 text-misa-body">
         This screen failed to load. Nothing has been changed — this is a read
         failing, not an action half-finishing.
       </p>
@@ -47,13 +49,13 @@ export default function AdminError({
         <button
           type="button"
           onClick={() => unstable_retry()}
-          className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
+          className={BUTTON_PRIMARY_SM}
         >
           TRY AGAIN
         </button>
         <Link
           href="/admin"
-          className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel"
+          className={BUTTON_QUIET_SM}
         >
           BACK TO THE DASHBOARD
         </Link>
@@ -65,7 +67,7 @@ export default function AdminError({
           digest is the hash that matches it to the server log. Without it an
           officer can only report "it broke". */}
       {error.digest && (
-        <p className="mt-6 text-xs text-foreground/60">
+        <p className="mt-6 text-xs text-misa-muted">
           Reference: <code className="font-mono">{error.digest}</code> — quote
           this if you report it.
         </p>

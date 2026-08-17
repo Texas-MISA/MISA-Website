@@ -1,5 +1,10 @@
 "use client";
 
+import { Banner } from "@/components/ui/banner";
+
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState, useState } from "react";
 
 import {
@@ -28,7 +33,7 @@ import type { MemberOption } from "@/lib/member-options";
 
 const initial: PaymentSaveState = { status: "idle" };
 
-const selectClass = "border border-black/70 bg-white px-3 py-2 text-sm";
+const selectClass = controlClass("sm");
 
 export function PaymentEditor({
   id,
@@ -120,11 +125,11 @@ export function PaymentEditor({
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="expectedUpdatedAt" value={token} />
 
-      <Banner state={state} />
+      <StatusBanner state={state} />
 
       <div className="flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-foreground/60">Credit this payment to</span>
+          <span className="text-misa-muted">Credit this payment to</span>
           <select
             name="memberId"
             value={values.memberId}
@@ -145,7 +150,7 @@ export function PaymentEditor({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-foreground/60">Starts covering</span>
+          <span className="text-misa-muted">Starts covering</span>
           <select
             name="startTerm"
             value={values.startTerm}
@@ -163,7 +168,7 @@ export function PaymentEditor({
         </label>
 
         <label className="flex flex-col gap-1 text-sm">
-          <span className="text-foreground/60">Terms bought</span>
+          <span className="text-misa-muted">Terms bought</span>
           <select
             name="termsCovered"
             value={values.termsCovered}
@@ -191,7 +196,7 @@ export function PaymentEditor({
       <button
         type="submit"
         disabled={pending}
-        className="mt-5 rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-40"
+        className={`mt-5 ${BUTTON_PRIMARY_SM}`}
       >
         {pending ? "SAVING…" : "SAVE"}
       </button>
@@ -201,10 +206,10 @@ export function PaymentEditor({
 
 function FieldError({ messages }: { messages?: string[] }) {
   if (!messages || messages.length === 0) return null;
-  return <span className="text-xs text-amber-800">{messages[0]}</span>;
+  return <span className="text-xs text-misa-caution">{messages[0]}</span>;
 }
 
-function Banner({ state }: { state: PaymentSaveState }) {
+function StatusBanner({ state }: { state: PaymentSaveState }) {
   if (state.status === "idle" || state.status === "invalid") return null;
 
   const message =
@@ -223,15 +228,12 @@ function Banner({ state }: { state: PaymentSaveState }) {
                 : "Something went wrong and nothing was saved. Try again.";
 
   return (
-    <p
+    <Banner
+      tone={state.status === "done" ? "affirm" : "caution"}
       role="status"
-      className={`mb-4 border-l-4 px-4 py-3 text-sm ${
-        state.status === "done"
-          ? "border-misa-blue bg-misa-panel"
-          : "border-amber-700 bg-misa-panel"
-      }`}
+      className="mb-4"
     >
       {message}
-    </p>
+    </Banner>
   );
 }

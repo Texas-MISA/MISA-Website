@@ -1,3 +1,4 @@
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -117,18 +118,18 @@ export default async function AdminAttendancePage({
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Attendance
         </h1>
         <Link
           href={`/admin/attendance/new${suffix}`}
-          className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
+          className={BUTTON_PRIMARY_SM}
         >
           ADD A CHECK-IN
         </Link>
       </div>
 
-      <p className="mt-3 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
         Every submission the check-in form has produced. A pending row is
         missing its event link, its member link, or both — open one to see what
         the member typed and what it most likely meant.
@@ -157,12 +158,12 @@ export default async function AdminAttendancePage({
 
       <div className="mt-8">
         {result.kind === "error" ? (
-          <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             Couldn&apos;t load the review queue.
           </p>
         ) : (
           <>
-            <p className="mb-3 text-xs text-foreground/60">
+            <p className="mb-3 text-xs text-misa-muted">
               {result.total === 0
                 ? "No matching submissions."
                 : result.total > result.rows.length

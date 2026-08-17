@@ -1,5 +1,8 @@
 "use client";
 
+import { controlClass } from "@/components/ui/field";
+import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
+
 import { useActionState, useState } from "react";
 
 import {
@@ -78,13 +81,13 @@ export function MergePanel({
 
   return (
     <section className="mt-12 max-w-3xl">
-      <details className="border border-black/30 bg-misa-panel/40">
+      <details className="border border-misa-border bg-misa-panel/40">
         <summary className="cursor-pointer px-4 py-2 text-sm font-medium">
           Merge a duplicate into this member
         </summary>
 
-        <div className="border-t border-black/20 px-4 pt-3 pb-4">
-          <p className="mb-4 max-w-2xl text-xs text-foreground/70">
+        <div className="border-t border-misa-border px-4 pt-3 pb-4">
+          <p className="mb-4 max-w-2xl text-xs text-misa-secondary">
             Moves another member&apos;s check-ins, points and dues payments onto
             this one, then{" "}
             <span className="font-medium">deletes the other member row</span>.
@@ -109,7 +112,7 @@ export function MergePanel({
             <>
               {suggestions.length > 0 && (
                 <div className="mb-4">
-                  <p className="text-xs uppercase tracking-wider text-foreground/60">
+                  <p className="text-xs uppercase tracking-wider text-misa-muted">
                     Possible duplicates
                   </p>
                   <ul className="mt-2 flex flex-col gap-1">
@@ -120,8 +123,8 @@ export function MergePanel({
                           onClick={() => setLoserId(hint.id)}
                           className={`w-full border px-3 py-2 text-left text-sm transition ${
                             loserId === hint.id
-                              ? "border-black bg-black text-white"
-                              : "border-black/40 hover:bg-black/5"
+                              ? "border-black bg-misa-blue text-white"
+                              : "border-misa-border hover:bg-misa-panel"
                           }`}
                         >
                           {hint.label}
@@ -129,7 +132,7 @@ export function MergePanel({
                             className={`ml-2 text-xs ${
                               loserId === hint.id
                                 ? "text-white/70"
-                                : "text-foreground/60"
+                                : "text-misa-muted"
                             }`}
                           >
                             {hint.why}
@@ -156,7 +159,7 @@ export function MergePanel({
                   <select
                     value={loserId}
                     onChange={(e) => setLoserId(e.target.value)}
-                    className="max-w-[24rem] border border-black/70 bg-misa-panel px-3 py-2 text-sm"
+                    className={controlClass("sm", "max-w-[24rem]")}
                   >
                     <option value="">Choose a member…</option>
                     {options.map((member) => (
@@ -172,7 +175,7 @@ export function MergePanel({
                   <button
                     type="submit"
                     disabled={previewing || loserId === ""}
-                    className="border-2 border-black px-3 py-2 text-xs font-semibold uppercase tracking-wider disabled:opacity-40"
+                    className={BUTTON_QUIET_SM}
                   >
                     {previewing ? "Checking…" : "Preview merge"}
                   </button>
@@ -180,7 +183,7 @@ export function MergePanel({
               </div>
 
               {suggestions.length === 0 && (
-                <p className="mt-3 text-xs text-foreground/60">
+                <p className="mt-3 text-xs text-misa-muted">
                   Nothing on the roster looks like a duplicate of this member.
                   Pick one above if you know otherwise.
                 </p>
@@ -228,7 +231,7 @@ function Preview({
   const { counts, collisions, conflicts } = preview;
 
   return (
-    <form action={action} className="mt-5 border-2 border-black px-4 py-4">
+    <form action={action} className="mt-5 border border-misa-border px-4 py-4">
       <input type="hidden" name="survivorId" value={preview.survivor.id} readOnly />
       <input type="hidden" name="loserId" value={preview.loser.id} readOnly />
       {/* The survivor's compare-and-set anchor, as the raw PostgREST string —
@@ -240,7 +243,7 @@ function Preview({
         readOnly
       />
 
-      <h3 className="font-display text-lg font-bold">
+      <h3 className="font-display text-[18px] leading-[1.1] font-semibold">
         Merge {preview.loser.label} into {survivorLabel}
       </h3>
 
@@ -260,13 +263,13 @@ function Preview({
           {/* 🔓 Why this matters, said out loud: the database cannot catch this
               one, so an unresolved collision would credit the survivor twice for
               a single event. */}
-          <p className="mt-1 text-xs text-foreground/70">
+          <p className="mt-1 text-xs text-misa-secondary">
             The duplicate&apos;s check-in is rejected so the event is only
             counted once. This member keeps theirs.
           </p>
           <ul className="mt-2 flex flex-col gap-1 text-sm">
             {collisions.map((row) => (
-              <li key={row.id} className="text-foreground/80">
+              <li key={row.id} className="text-misa-body">
                 {row.eventLabel}
               </li>
             ))}
@@ -294,7 +297,7 @@ function Preview({
                       value={field.survivorValue ?? ""}
                       defaultChecked
                     />
-                    {field.survivorValue} <span className="text-foreground/50">(keep)</span>
+                    {field.survivorValue} <span className="text-misa-muted">(keep)</span>
                   </label>
                   <label className="flex items-center gap-2">
                     <input
@@ -303,7 +306,7 @@ function Preview({
                       value={field.loserValue ?? ""}
                     />
                     {field.loserValue}{" "}
-                    <span className="text-foreground/50">(from the duplicate)</span>
+                    <span className="text-misa-muted">(from the duplicate)</span>
                   </label>
                 </div>
               </fieldset>
@@ -323,7 +326,7 @@ function Preview({
           <button
             type="submit"
             disabled={committing}
-            className="border-2 border-black bg-black px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white disabled:opacity-40"
+            className={BUTTON_PRIMARY_SM}
           >
             {committing ? "Merging…" : "Yes, merge"}
           </button>
@@ -339,7 +342,7 @@ function Preview({
         <button
           type="button"
           onClick={onConfirm}
-          className="mt-4 border-2 border-black px-3 py-2 text-xs font-semibold uppercase tracking-wider"
+          className={`mt-4 ${BUTTON_QUIET_SM}`}
         >
           Merge
         </button>
@@ -351,7 +354,7 @@ function Preview({
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wider text-foreground/60">
+      <dt className="text-xs uppercase tracking-wider text-misa-muted">
         {label}
       </dt>
       <dd className="text-xl font-bold tabular-nums">{value}</dd>
@@ -379,7 +382,7 @@ function Problem({ state }: { state: PreviewState | CommitState }) {
   return (
     <p
       role="alert"
-      className="mt-3 border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+      className="mt-3 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
     >
       {message}
     </p>

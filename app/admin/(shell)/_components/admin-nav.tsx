@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { signOut } from "@/app/actions/auth";
+import { BUTTON_ON_NAVY_SM } from "@/components/ui/button";
+import { Pill } from "@/components/ui/pill";
 import { Wordmark } from "@/components/ui/wordmark";
 
 // Persistent admin nav (§7 Stage 4). Client Component only for the active-link
@@ -39,7 +41,7 @@ export function AdminNav({
   const pathname = usePathname();
 
   return (
-    <header className="on-navy border-b-2 border-misa-blue-dark bg-misa-blue text-white">
+    <header className="on-navy border-b border-misa-blue-dark bg-misa-blue text-white">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-3 px-6 py-4">
         <Link href="/admin" className="shrink-0">
           <Wordmark />
@@ -58,12 +60,22 @@ export function AdminNav({
               if (!item.ready) {
                 return (
                   <li key={item.href}>
-                    <span
+                    {/* 🪤 A disabled BUTTON, not a `<span>`. As a span this was
+                        invisible to the keyboard and to assistive technology:
+                        an officer tabbing the nav skipped it entirely, and
+                        nothing announced that the item exists but is not built
+                        — the `title` tooltip is mouse-only. It is in the nav
+                        precisely so the shape of the section is visible, which
+                        only works if everyone can perceive it. */}
+                    <button
+                      type="button"
+                      disabled
+                      aria-disabled="true"
                       title="Not built yet"
                       className="cursor-not-allowed text-sm text-white/40"
                     >
                       {item.label}
-                    </span>
+                    </button>
                   </li>
                 );
               }
@@ -73,8 +85,10 @@ export function AdminNav({
                   <Link
                     href={item.href}
                     aria-current={active ? "page" : undefined}
-                    className={`text-sm text-white/85 transition hover:text-white ${
-                      active ? "underline decoration-1 underline-offset-4" : ""
+                    className={`text-sm transition-colors duration-150 hover:text-white ${
+                      active
+                        ? "text-white underline decoration-1 underline-offset-4"
+                        : "text-white/85"
                     }`}
                   >
                     {item.label}
@@ -89,19 +103,16 @@ export function AdminNav({
           <span className="text-sm text-white/80">
             {displayName}
             {role === "admin" && (
-              <span className="ml-2 border border-white/40 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider">
+              <Pill tone="onNavy" size="sm" className="ml-2">
                 admin
-              </span>
+              </Pill>
             )}
           </span>
           {/* A form POST, so signing out can't be triggered by a prefetch or
               an <img> the way a GET link could. */}
           <form action={signOut}>
-            <button
-              type="submit"
-              className="rounded-full border border-white/50 px-4 py-1.5 text-xs font-medium tracking-wider text-white/90 transition hover:bg-white/10"
-            >
-              SIGN OUT
+            <button type="submit" className={BUTTON_ON_NAVY_SM}>
+              Sign out
             </button>
           </form>
         </div>

@@ -6,6 +6,30 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## Done — Site-wide visual rework; DESIGN.md is now the design authority (2026-08-17, doc v1.67)
+
+Requested as "a comprehensive rework of the misa website — core logic remains, just visuals are edited". **No migration, no Server Action, no route, no query, no schema change.** ~90 files, presentational only.
+
+🔓 **The design authority moved, reversing v1.58.** The handoff is five desktop-only prototypes with no breakpoints authored, no focus/hover/disabled/empty/error states, and nothing for `/admin` (75 files), `/attend`, `/leaderboard`, `/lookup`, `/contact` or `/officer-invite`. So most of the interface had no source of truth, and that is where the drift was. `DESIGN.md` now covers all of it; the identity is unchanged. **`DESIGN.md`, `PRODUCT.md` and `.impeccable/design.json` are committed** — the binding spec was living on one laptop.
+
+📌 **The drift, measured, which is the case for the whole exercise.** `/admin` imported **two** things from `components/ui/`. It had **37 `rounded-full` pills** across 26 files against a system whose first rule is `rounded: none`, **three** button dialects, a local `Field` **redefined verbatim in nine files**, an input class redeclared in **eleven files with four distinct values**, the status pill reimplemented **four times plus ~15 inline**, and the `notice.tsx` literal written out **26 times across 20 files** while 12 files imported the component that already existed.
+
+📌 **New in the system, not merely tidied:** a spacing scale and easing/duration tokens (`@theme` had none at all); a three-ink **status palette** with washes, replacing ~40 uses of raw Tailwind `red-700`/`amber-700`/`green-800`; **five reveal variants** chosen by what an element is; themed browser surfaces (selection, caret, scrollbar, underline offset); **row hover** on all eight admin tables; one disabled threshold where three were in use; and a keyboard-reachable disabled nav item where a `<span>` had been invisible to assistive tech.
+
+🪤 **Two defects found by measuring rather than looking.**
+- A lateral reveal offset of 24px against the 20px phone gutter gave every phone a horizontal scrollbar until the rows revealed — 390px: `scrollWidth` 379 vs `clientWidth` 375, on `/`, `/about` and `/projects`. The travel is now `md`-and-up, which is also right compositionally since those rows are one column on a phone.
+- **`data-reveal` on a node that mounts after first paint never gets observed**, so its unconditional `opacity: 0` is permanent. `/attend`'s terminal result panel — the one screen whose job is telling a member their attendance was recorded — would have rendered blank. Both sites now carry a comment.
+
+⚠️ **Mobile is measured for the first time.** v1.58 shipped breakpoints that were "reasoned rather than measured" and flagged it as a launch blocker; zero horizontal overflow is now confirmed on all nine public routes at 390 and 768. **A real-device check is still outstanding.**
+
+📌 **Skill conflicts are settled in `DESIGN.md`, with reasons, so they are not relitigated each turn.** Refused: dark mode, real imagery, the eyebrow ban, mono-as-costume, the 65–75ch measure, one-marquee-per-page, the em-dash ban, "no oversized H1". Adopted: no coloured border-left above 1px, entrance variety, themed browser surfaces, emil's easing and durations.
+
+**Verified:** `npm run lint`, `npx tsc --noEmit`, `npm run build` and `tests/docs.test.ts` all clean; `npx supabase start` rebuilt the stack from migrations + seed; browser pass over the nine public routes plus `/admin/login`; nav wordmark clearance re-measured at 1646 (left group ends x=331, wordmark starts x=791 — unchanged).
+
+**Open:** `/admin`'s authed screens were **not** visually confirmed — that needs an officer sign-in, and passwords are not something the agent enters. `.impeccable/design.json`'s `components` array still carries pre-rework demos (hand-synced rather than regenerated, because `/impeccable document` would overwrite DESIGN.md's hand-written reasoning). `web-design-guidelines` review not yet run.
+
+---
+
 ## Done — UI design skills installed (2026-08-16, doc v1.66)
 
 Requested by pointing at `docs/install-ui-skills.md` and saying to execute it. Tooling only — no application code, no migration, no route. Four skills in `.claude/skills/`: `emil-design-eng`, `design-taste-frontend`, `web-design-guidelines`, `impeccable`. One skill taken from each bundle, not all 10 / 13 / 9.
@@ -16,7 +40,7 @@ Requested by pointing at `docs/install-ui-skills.md` and saying to execute it. T
 
 🪤 **Impeccable's hook is live** — after every `Edit`/`Write` and at end of turn, context injection only, cannot block or write. Rollback is deleting `.claude/settings.local.json`.
 
-**Open:** `/impeccable init` has **not** been run — it needs a Claude Code restart (skills are scanned at session start) and an officer to answer its interview. It writes `PRODUCT.md` / `DESIGN.md` at the repo root, neither of which is currently gitignored; decide whether to commit them when they appear.
+**Closed 2026-08-17:** `/impeccable init` and `/impeccable document` were both run, writing `PRODUCT.md`, `DESIGN.md` and `.impeccable/design.json`. All three are now **committed** — see the v1.67 entry above, where `DESIGN.md` also became the design authority for the whole site.
 
 ---
 

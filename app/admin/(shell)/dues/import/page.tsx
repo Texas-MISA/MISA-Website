@@ -24,11 +24,11 @@ export default async function DuesImportPage() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
         Import payments
       </h1>
 
-      <p className="mt-3 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
         Upload a Venmo statement CSV. Nothing is saved until you confirm, and{" "}
         <span className="font-medium">
           importing the same statement twice is safe

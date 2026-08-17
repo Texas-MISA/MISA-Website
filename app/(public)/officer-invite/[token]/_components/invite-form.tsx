@@ -7,7 +7,9 @@ import {
   acceptInvite,
   type AcceptInviteState,
 } from "@/app/actions/officer-invite";
+import { Banner } from "@/components/ui/banner";
 import { BUTTON_SOLID_NAVY } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
 
 // Client Component for useActionState only, the same shape as
 // app/(public)/lookup/_components/lookup-form.tsx. The form posts via
@@ -23,11 +25,17 @@ import { BUTTON_SOLID_NAVY } from "@/components/ui/button";
 
 const INITIAL: AcceptInviteState = { status: "idle" };
 
-const inputClass =
-  "w-full border border-misa-border bg-white px-3 py-3 text-base focus:border-misa-blue";
-
-const buttonClass =
-  `${BUTTON_SOLID_NAVY} disabled:opacity-60`;
+// 📌 The control skin and the four status panels come from components/ui now.
+// This file had been the site's SECOND banner language on its own — `border-l-4`
+// in raw `amber-700` / `green-800` / `red-800`, against the `border-l-2
+// border-misa-blue` that /attend and /lookup used — which meant the three
+// unauthenticated forms, written to mirror each other in every other respect,
+// announced their outcomes in two different visual dialects.
+//
+// ⚠️ The fields still carry no help text and no `minLength` (requested
+// 2026-08-10). Nothing below adds either: `controlClass` is a skin, not a
+// validator, and the only length rule remains the server's.
+const inputClass = controlClass("md", "w-full");
 
 export function InviteForm({
   token,
@@ -47,15 +55,12 @@ export function InviteForm({
   if (state.status === "created_sign_in_failed") {
     return (
       <div className="mt-8">
-        <p
-          role="alert"
-          className="border-l-4 border-green-800 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Banner tone="affirm" role="alert">
           Your officer account is ready. We couldn&apos;t sign you in
           automatically, so use the password you just chose.
-        </p>
+        </Banner>
         <p className="mt-6">
-          <Link href="/admin/login" className={buttonClass}>
+          <Link href="/admin/login" className={BUTTON_SOLID_NAVY}>
             Go to sign in
           </Link>
         </p>
@@ -67,30 +72,24 @@ export function InviteForm({
   // submit — revoked by an officer, or claimed by a second tab.
   if (state.status === "unusable" || state.status === "unknown") {
     return (
-      <p
-        role="alert"
-        className="mt-8 border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
-      >
+      <Banner tone="caution" role="alert" className="mt-8">
         {state.status === "unusable"
           ? state.message
           : "This invitation link is not valid. Ask an officer for a new one."}
-      </p>
+      </Banner>
     );
   }
 
   if (state.status === "already_registered") {
     return (
       <div className="mt-8">
-        <p
-          role="alert"
-          className="border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Banner tone="caution" role="alert">
           There is already an account for {state.email}, so this link can&apos;t
           create one. If it&apos;s yours, sign in — an officer can grant it
           access without a new invitation.
-        </p>
+        </Banner>
         <p className="mt-6">
-          <Link href="/admin/login" className={buttonClass}>
+          <Link href="/admin/login" className={BUTTON_SOLID_NAVY}>
             Go to sign in
           </Link>
         </p>
@@ -133,6 +132,7 @@ export function InviteForm({
               id="email"
               name="email"
               type="email"
+              spellCheck={false}
               required
               maxLength={254}
               autoComplete="email"
@@ -222,26 +222,25 @@ export function InviteForm({
       </div>
 
       {state.status === "rate_limited" ? (
-        <p
-          role="alert"
-          className="border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Banner tone="caution" role="alert">
           Too many attempts from this network. Wait a few minutes and try again.
-        </p>
+        </Banner>
       ) : null}
 
       {state.status === "error" ? (
-        <p
-          role="alert"
-          className="border-l-4 border-red-800 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Banner tone="critical" role="alert">
           Something went wrong setting up the account, and nothing was created.
           Try again — if it keeps happening, ask the officer who invited you for
           a fresh link.
-        </p>
+        </Banner>
       ) : null}
 
-      <button type="submit" disabled={pending} className={buttonClass}>
+      <button
+        type="submit"
+        disabled={pending}
+        aria-busy={pending}
+        className={BUTTON_SOLID_NAVY}
+      >
         {pending ? "Setting up…" : "Create my account"}
       </button>
     </form>
@@ -251,7 +250,7 @@ export function InviteForm({
 function FieldError({ messages }: { messages?: string[] }) {
   if (!messages || messages.length === 0) return null;
   return (
-    <p className="mt-1 text-sm text-red-800">
+    <p role="alert" className="mt-1 text-sm text-misa-critical">
       {messages.join(" ")}
     </p>
   );

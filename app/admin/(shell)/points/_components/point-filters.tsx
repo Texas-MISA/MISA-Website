@@ -1,5 +1,7 @@
 "use client";
 
+import { controlClass } from "@/components/ui/field";
+
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { formatPointCategory, POINT_CATEGORIES } from "@/lib/points";
@@ -12,8 +14,8 @@ import { formatPointCategory, POINT_CATEGORIES } from "@/lib/points";
 // the alternative is a second 400-entry <select> that an officer would have to
 // scroll to answer a question they already answered by looking at a row.
 
-const selectClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
-const inputClass = "border border-black/70 bg-misa-panel px-3 py-2 text-sm";
+const selectClass = controlClass("sm");
+const inputClass = controlClass("sm");
 
 export type OfficerOption = {
   id: string;

@@ -31,7 +31,7 @@ export default async function AdminLoginPage({
           <h1 className="text-center font-display text-3xl font-semibold tracking-[-0.02em]">
             Officer Sign-In
           </h1>
-          <p className="mt-2 text-center text-sm text-foreground/70">
+          <p className="mt-2 text-center text-sm text-misa-secondary">
             For MISA officers only. Members check in at{" "}
             <a
               href="/attend"

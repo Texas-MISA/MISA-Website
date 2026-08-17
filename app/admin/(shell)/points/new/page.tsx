@@ -49,7 +49,7 @@ export default async function NewGrantPage({
           className="mb-6"
         />
       )}
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
         Grant points
       </h1>
 
@@ -59,7 +59,7 @@ export default async function NewGrantPage({
         </Link>
       </p>
 
-      <p className="mt-6 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
         For points that did not come from a check-in. Everyone picked here gets
         the same points, category, and reason, recorded as separate rows in the
         ledger under your name.

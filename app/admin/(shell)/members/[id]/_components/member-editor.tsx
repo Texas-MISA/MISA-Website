@@ -1,5 +1,8 @@
 "use client";
 
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState, useCallback, useEffect, useState } from "react";
 
 import {
@@ -62,10 +65,10 @@ export function MemberEditor({
   return (
     <>
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">Custom fields</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Custom fields</h2>
 
         {live.length === 0 && archivedHeld.length === 0 ? (
-          <p className="mt-4 border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+          <p className="mt-4 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             No custom fields are defined.
           </p>
         ) : (
@@ -89,7 +92,7 @@ export function MemberEditor({
               <FieldRow key={definition.key} label={definition.label}>
                 <span className="flex items-center gap-2 text-sm">
                   {fieldValue(customFields, definition.key)}
-                  <span className="border border-black/40 px-1.5 py-0.5 text-[0.65rem] uppercase tracking-wider">
+                  <span className="border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
                     archived
                   </span>
                 </span>
@@ -118,7 +121,7 @@ function FieldRow({
 }) {
   return (
     <>
-      <dt className="text-sm text-foreground/60">{label}</dt>
+      <dt className="text-sm text-misa-muted">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </>
   );
@@ -151,8 +154,8 @@ function NotesEditor({
 
   return (
     <section className="mt-12 max-w-3xl">
-      <h2 className="font-display text-xl font-bold">Officer notes</h2>
-      <p className="mt-2 text-sm text-foreground/70">
+      <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Officer notes</h2>
+      <p className="mt-2 text-sm text-misa-secondary">
         Visible to officers only. Never shown on the public site or the
         leaderboard.
       </p>
@@ -169,11 +172,11 @@ function NotesEditor({
           defaultValue={value}
           rows={5}
           placeholder="Anything the next officer should know."
-          className="w-full border border-black/70 bg-white px-3 py-2 text-sm"
+          className={controlClass("sm", "w-full")}
         />
 
         {state.status === "invalid" && state.fieldErrors.notes && (
-          <p role="alert" className="mt-1 text-xs text-red-700">
+          <p role="alert" className="mt-1 text-xs text-misa-critical">
             {state.fieldErrors.notes[0]}
           </p>
         )}
@@ -182,24 +185,24 @@ function NotesEditor({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel disabled:opacity-40"
+            className={BUTTON_QUIET_SM}
           >
             {pending ? "SAVING…" : "SAVE NOTES"}
           </button>
 
           {state.status === "done" && (
-            <span role="status" className="text-xs text-green-800">
+            <span role="status" className="text-xs text-misa-affirm">
               Saved.
             </span>
           )}
           {state.status === "conflict" && (
-            <span role="status" className="text-xs text-amber-800">
+            <span role="status" className="text-xs text-misa-caution">
               Someone else changed this member — reload and look again. Nothing
               here was saved.
             </span>
           )}
           {(state.status === "error" || state.status === "unauthorized") && (
-            <span role="status" className="text-xs text-amber-800">
+            <span role="status" className="text-xs text-misa-caution">
               {state.status === "unauthorized"
                 ? "Your session expired. Sign in again — nothing was saved."
                 : "Something went wrong. Nothing was saved."}

@@ -41,7 +41,7 @@ export function AttendanceTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
         No submissions match these filters.
       </p>
     );
@@ -60,8 +60,8 @@ export function AttendanceTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[60rem] border-collapse text-sm">
         <thead>
-          <tr className="border-b-2 border-black text-left">
-            <th className="py-2 pr-3 font-medium">
+          <tr className="border-b border-misa-border text-left">
+            <th className="py-2 pr-3 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">
               {selectableIds.length > 0 && (
                 <input
                   type="checkbox"
@@ -74,16 +74,16 @@ export function AttendanceTable({
                 />
               )}
             </th>
-            <th className="py-2 pr-4 font-medium">Submitted</th>
-            <th className="py-2 pr-4 font-medium">Name</th>
-            <th className="py-2 pr-4 font-medium">EID</th>
-            <th className="py-2 pr-4 font-medium">Event</th>
-            <th className="py-2 font-medium">Status</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Submitted</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Name</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">EID</th>
+            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
+            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Status</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b border-black/15 align-top">
+            <tr key={row.id} className="border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70">
               <td className="py-2 pr-3">
                 {row.status === "pending" && (
                   <input
@@ -107,7 +107,7 @@ export function AttendanceTable({
               <td className="py-2 pr-4">
                 {row.submitted_name}
                 {row.source === "admin_manual" && (
-                  <span className="ml-2 text-xs text-foreground/50">
+                  <span className="ml-2 text-xs text-misa-muted">
                     entered by an officer
                   </span>
                 )}
@@ -133,5 +133,5 @@ export function AttendanceTable({
  * rather than left as an empty cell. */
 function Unlinked({ value, label }: { value?: string; label: string }) {
   if (value) return <>{value}</>;
-  return <span className="text-foreground/50">{label}</span>;
+  return <span className="text-misa-muted">{label}</span>;
 }

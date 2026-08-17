@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PageHero } from "@/components/ui/chevron-section";
+import { Section } from "@/components/ui/section";
 
 import { LookupForm } from "./_components/lookup-form";
 
@@ -33,27 +34,25 @@ export default function LookupPage() {
         title="My Attendance"
         subhead="Enter your UT EID and the email we have on file, and you'll see where you stand this term."
       />
-      <section className="px-5 py-14 sm:px-14">
-        <div className="mx-auto max-w-3xl">
-          <p className="leading-[1.65] text-misa-body">
-            You&apos;ll see which events you attended, which you missed, anything still
-            waiting on an officer, and whether your dues are paid.
-          </p>
-          <p className="mt-2 text-sm text-misa-muted">
-            Both have to match the same member, which is why this shows more than{" "}
-            <Link
-              href="/leaderboard"
-              className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
-            >
-              the leaderboard
-            </Link>{" "}
-            does.
-          </p>
-          <div className="mt-8">
-            <LookupForm />
-          </div>
+      <Section pad="md" width="narrow">
+        <p className="leading-[1.65] text-misa-body">
+          You&apos;ll see which events you attended, which you missed, anything
+          still waiting on an officer, and whether your dues are paid.
+        </p>
+        <p className="mt-2 text-sm text-misa-muted">
+          Both have to match the same member, which is why this shows more than{" "}
+          <Link
+            href="/leaderboard"
+            className="text-misa-blue underline hover:text-misa-blue-dark"
+          >
+            the leaderboard
+          </Link>{" "}
+          does.
+        </p>
+        <div className="mt-8">
+          <LookupForm />
         </div>
-      </section>
+      </Section>
     </>
   );
 }

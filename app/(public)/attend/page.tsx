@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PageHero } from "@/components/ui/chevron-section";
+import { Section } from "@/components/ui/section";
 
 import { CheckinForm } from "./_components/checkin-form";
 
@@ -20,11 +21,9 @@ export default function AttendPage() {
         title="Event Check-In"
         subhead="At a MISA event? Enter your details and you're done."
       />
-      <section className="px-5 py-14 sm:px-14">
-        <div className="mx-auto max-w-xl">
-          <CheckinForm />
-        </div>
-      </section>
+      <Section pad="md" width="narrow" innerClassName="max-w-xl">
+        <CheckinForm />
+      </Section>
     </>
   );
 }

@@ -86,18 +86,18 @@ export default async function EventDetailPage({
   return (
     <div>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           {event.title}
         </h1>
         <EventStatusPill status={event.status} />
       </div>
-      <p className="mt-3 text-foreground/80">
+      <p className="mt-3 text-misa-body">
         {formatEventRange(event.starts_at, event.ends_at)} Central ·{" "}
         {event.term} · {event.points}{" "}
         {event.points === 1 ? "point" : "points"}
       </p>
       {event.series_id && (
-        <p className="mt-1 text-sm text-foreground/70">
+        <p className="mt-1 text-sm text-misa-secondary">
           Part of a recurring series.{" "}
           <Link
             href={`/admin/events?series=${event.series_id}`}
@@ -122,7 +122,7 @@ export default async function EventDetailPage({
       </div>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">Details</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Details</h2>
         <div className="mt-4">
           <EventForm
             initial={{
@@ -147,7 +147,7 @@ export default async function EventDetailPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-xl font-bold">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
           Check-ins ({attendanceFailed ? "—" : rows.length})
         </h2>
         <div className="mt-4">
@@ -159,16 +159,16 @@ export default async function EventDetailPage({
             <div className="overflow-x-auto">
               <table className="w-full min-w-[36rem] border-collapse text-sm">
                 <thead>
-                  <tr className="border-b-2 border-black text-left">
-                    <th className="py-2 pr-4 font-medium">Name</th>
-                    <th className="py-2 pr-4 font-medium">EID</th>
-                    <th className="py-2 pr-4 font-medium">Submitted (CT)</th>
-                    <th className="py-2 font-medium">Status</th>
+                  <tr className="border-b border-misa-border text-left">
+                    <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Name</th>
+                    <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">EID</th>
+                    <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Submitted (CT)</th>
+                    <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {rows.map((row) => (
-                    <tr key={row.id} className="border-b border-black/15">
+                    <tr key={row.id} className="border-b border-misa-hairline transition-colors duration-150 hover:bg-misa-panel/70">
                       <td className="py-2 pr-4">{row.submitted_name}</td>
                       <td className="py-2 pr-4 font-mono text-xs">
                         {row.submitted_eid}

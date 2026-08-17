@@ -1,4 +1,5 @@
 "use client";
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
 
 import type { ExportField } from "@/lib/export";
 
@@ -38,9 +39,9 @@ export function Download({
   return (
     <a
       href={disabled ? undefined : href}
-      className={`border-2 border-black px-2 py-1 text-xs font-semibold uppercase tracking-wider ${
+      className={`border border-misa-border px-2 py-1 text-xs font-semibold uppercase tracking-wider ${
         disabled ? "pointer-events-none opacity-40" : ""
-      } ${primary && !disabled ? "bg-black text-white" : ""}`}
+      } ${primary && !disabled ? "bg-misa-blue text-white" : ""}`}
       aria-disabled={disabled}
     >
       {children}
@@ -63,7 +64,7 @@ export function Action({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="border-2 border-black px-2 py-1 text-xs font-semibold uppercase tracking-wider disabled:opacity-40"
+      className={BUTTON_QUIET_SM}
     >
       {children}
     </button>
@@ -96,19 +97,19 @@ export function FieldPicker({
   }
 
   return (
-    <div className="border-t-2 border-black px-3 py-2">
+    <div className="border-t border-misa-border px-3 py-2">
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
         {catalogue.map((field) => (
           <label key={field.key} className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
-              className="size-4 accent-black"
+              className="size-4 accent-misa-blue"
               checked={chosen.has(field.key)}
               onChange={() => toggle(field.key)}
             />
             <span>{field.label}</span>
             {field.source === "custom" && (
-              <span className="border border-black/40 px-1 text-[0.6rem] uppercase tracking-wider">
+              <span className="border border-misa-border px-1 text-[0.6rem] uppercase tracking-wider">
                 custom
               </span>
             )}

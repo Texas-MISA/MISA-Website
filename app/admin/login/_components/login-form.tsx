@@ -3,14 +3,15 @@
 import { useActionState } from "react";
 
 import { signIn, type SignInState } from "@/app/actions/auth";
+import { BUTTON_PRIMARY } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
 
 // Client Component for useActionState only — the form posts to the Server
 // Action via <form action>, so it works before hydration too.
 
 const INITIAL: SignInState = { status: "idle" };
 
-const inputClass =
-  "border border-black/70 bg-misa-panel px-3 py-3 text-base w-full";
+const inputClass = controlClass("md", "w-full");
 
 export function LoginForm({ next }: { next?: string }) {
   const [state, formAction, pending] = useActionState(signIn, INITIAL);
@@ -23,7 +24,7 @@ export function LoginForm({ next }: { next?: string }) {
       {state.status === "failed" && (
         <p
           role="alert"
-          className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
         >
           That email and password don&apos;t match an officer account. Check
           both, or ask another officer to reset your access.
@@ -32,7 +33,7 @@ export function LoginForm({ next }: { next?: string }) {
       {state.status === "error" && (
         <p
           role="alert"
-          className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm"
+          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
         >
           Something went wrong signing you in — please try again.
         </p>
@@ -43,6 +44,7 @@ export function LoginForm({ next }: { next?: string }) {
       <Field label="Email" error={fieldErrors?.email}>
         <input
           type="email"
+          spellCheck={false}
           name="email"
           required
           autoComplete="username"
@@ -66,7 +68,7 @@ export function LoginForm({ next }: { next?: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="mt-1 w-full rounded-full bg-misa-blue px-10 py-3 text-sm font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-60"
+        className={`mt-1 w-full ${BUTTON_PRIMARY}`}
       >
         {pending ? "SIGNING IN…" : "SIGN IN"}
       </button>
@@ -88,7 +90,7 @@ function Field({
       {label}
       {children}
       {error && (
-        <span role="alert" className="text-xs text-red-700">
+        <span role="alert" className="text-xs text-misa-critical">
           {error[0]}
         </span>
       )}

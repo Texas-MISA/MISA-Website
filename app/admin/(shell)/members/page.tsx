@@ -265,7 +265,7 @@ export default async function AdminMembersPage({
         />
       )}
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Members
         </h1>
         {/* Not admin-nav entries: admin-nav.tsx marks an item active with
@@ -288,7 +288,7 @@ export default async function AdminMembersPage({
         </div>
       </div>
 
-      <p className="mt-3 max-w-2xl text-sm text-foreground/70">
+      <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
         The roster. <span className="font-medium">Total points are scoped to
         the current term.</span> Open a member for their attendance, rate,
         points breakdown, pending submissions, and history.
@@ -307,7 +307,7 @@ export default async function AdminMembersPage({
 
       <div className="mt-8">
         {result.kind === "error" ? (
-          <p className="border-l-4 border-misa-blue bg-misa-panel px-4 py-3 text-sm">
+          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             Couldn&apos;t load the directory.
           </p>
         ) : (
@@ -315,7 +315,7 @@ export default async function AdminMembersPage({
             {/* Every matching member is on screen, so this is a count rather
                 than a window — and it is the SAME number the export carries,
                 which is the property the whole screen is built around. */}
-            <p className="mb-3 text-xs text-foreground/60">
+            <p className="mb-3 text-xs text-misa-muted">
               {result.total === 0
                 ? isDefaultFilter(filter)
                   ? "No active members yet."

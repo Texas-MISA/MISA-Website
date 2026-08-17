@@ -18,15 +18,15 @@ export default async function AdminDashboardPage() {
 
   return (
     <div>
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
         Dashboard
       </h1>
-      <p className="mt-3 text-foreground/80">
+      <p className="mt-3 text-misa-body">
         Signed in as {officer.email}.
       </p>
 
       <section className="mt-10">
-        <h2 className="font-display text-xl font-bold">Needs review</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Needs review</h2>
         <div className="mt-4">
           <PendingBadge />
         </div>
@@ -34,7 +34,7 @@ export default async function AdminDashboardPage() {
 
       <section className="mt-10">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="font-display text-xl font-bold">Recent check-ins</h2>
+          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Recent check-ins</h2>
           <Link
             href="/admin/events"
             className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"

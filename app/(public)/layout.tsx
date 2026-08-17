@@ -15,8 +15,17 @@ export default function PublicLayout({
 }>) {
   return (
     <>
+      {/* First focusable thing in the document. The header carries five nav
+          items, two links and a button before the content begins, and a
+          keyboard or switch user should not have to walk them on every page.
+          Off-screen until focused — see `.skip-link` in globals.css. */}
+      <a href="#main" className="skip-link">
+        Skip to content
+      </a>
       <SiteHeader />
-      <main className="flex-1">{children}</main>
+      <main id="main" className="flex-1">
+        {children}
+      </main>
       <SiteFooter />
       <RevealObserver />
     </>

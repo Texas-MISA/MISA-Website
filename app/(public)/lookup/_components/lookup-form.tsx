@@ -7,7 +7,11 @@ import {
   type LookupState,
   type SubmittedValues,
 } from "@/app/actions/lookup";
+import { Banner } from "@/components/ui/banner";
 import { BUTTON_SOLID_NAVY } from "@/components/ui/button";
+import { Field, Input } from "@/components/ui/field";
+import { Pill } from "@/components/ui/pill";
+import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import type { LookupProfile } from "@/lib/lookup";
 import type { TermEventState } from "@/lib/members";
 
@@ -22,17 +26,14 @@ import type { TermEventState } from "@/lib/members";
 // different ICU data for the space before "PM", and the React diff then shows
 // two strings that look character-for-character identical. Formatting lives in
 // lib/lookup.ts, on the server.
+//
+// 📌 This page used to read as an admin screen wearing a public hero: it had
+// its own `inputClass`, its own `Field`, its own `bannerClass`, a fourth
+// independent status-pill implementation, and two tables built on the admin's
+// plain-table idiom. All five now come from components/ui, so the difference
+// between this page and /officers is the content rather than the vocabulary.
 
 const INITIAL: LookupState = { status: "idle" };
-
-const inputClass =
-  "w-full border border-misa-border bg-white px-3 py-3 text-base focus:border-misa-blue";
-
-const buttonClass =
-  `${BUTTON_SOLID_NAVY} disabled:opacity-60`;
-
-const bannerClass =
-  "border-l-2 border-misa-blue bg-misa-panel px-4 py-3 text-sm text-misa-body";
 
 const EMPTY: SubmittedValues = { eid: "", email: "" };
 
@@ -97,31 +98,37 @@ function LookupFields({
           probeable with an EID alone, and this page shows dues status only
           because its gate is strictly narrower than that. Two distinguishable
           failures would let someone confirm an EID and then walk the email,
-          which is a stronger oracle than the one that was accepted. */}
+          which is a stronger oracle than the one that was accepted.
+
+          ⚠️ The TONE is `info` for the same reason. A miss here is not an
+          error — most of the time it is a typo or somebody who has genuinely
+          never checked in — and painting it critical would make "you are not on
+          the roster" look like "something broke", which is the empty-vs-error
+          confusion running in the other direction. */}
       {state.status === "unmatched" && (
-        <p role="alert" className={bannerClass}>
+        <Banner role="alert">
           We couldn&apos;t match that EID and email to a member. Both have to
           match the same person — check them for a typo and try again. If
           you&apos;ve never checked in to a MISA event, you won&apos;t be on the
           roster yet.
-        </p>
+        </Banner>
       )}
       {state.status === "rate_limited" && (
-        <p role="alert" className={bannerClass}>
+        <Banner tone="caution" role="alert">
           Too many lookups from this connection — wait a few minutes and try
           again. This limit is per network, so it can trigger on shared campus
           WiFi even if it&apos;s your first try.
-        </p>
+        </Banner>
       )}
       {state.status === "error" && (
-        <p role="alert" className={bannerClass}>
+        <Banner tone="critical" role="alert">
           Something went wrong on our end — please try again. This isn&apos;t a
           statement about your records; we just couldn&apos;t read them.
-        </p>
+        </Banner>
       )}
 
-      <Field label="UT EID" error={fieldErrors?.eid}>
-        <input
+      <Field label="UT EID" error={fieldErrors?.eid?.[0]}>
+        <Input
           type="text"
           name="eid"
           required
@@ -130,31 +137,30 @@ function LookupFields({
           autoCorrect="off"
           spellCheck={false}
           defaultValue={submitted.eid}
-          className={inputClass}
           aria-invalid={fieldErrors?.eid ? true : undefined}
         />
       </Field>
 
-      <Field label="Email" error={fieldErrors?.email}>
-        <input
+      <Field
+        label="Email"
+        error={fieldErrors?.email?.[0]}
+        hint="The email we have on file for you. Both fields have to match the same member."
+      >
+        <Input
           type="email"
+          spellCheck={false}
           name="email"
           required
           autoComplete="email"
           inputMode="email"
           defaultValue={submitted.email}
-          className={inputClass}
           aria-invalid={fieldErrors?.email ? true : undefined}
         />
-        <p className="mt-1 text-xs text-misa-muted">
-          The email we have on file for you. Both fields have to match the same
-          member.
-        </p>
       </Field>
 
       {/* Honeypot (§6): visually hidden and skipped by keyboard/screen readers;
           bots that autofill every field give themselves away. */}
-      <div aria-hidden="true" className="absolute -left-[9999px] top-auto">
+      <div aria-hidden="true" className="absolute top-auto -left-[9999px]">
         <label>
           Website
           <input type="text" name="website" tabIndex={-1} autoComplete="off" />
@@ -168,9 +174,10 @@ function LookupFields({
       <button
         type="submit"
         disabled={pending}
-        className={`mt-1 w-fit ${buttonClass}`}
+        aria-busy={pending}
+        className={`mt-1 w-fit ${BUTTON_SOLID_NAVY}`}
       >
-        {pending ? "LOOKING UP…" : "LOOK UP MY ATTENDANCE"}
+        {pending ? "Looking up…" : "Look up my attendance"}
       </button>
     </form>
   );
@@ -190,7 +197,9 @@ function Result({
   return (
     <div className="flex flex-col gap-10">
       <section>
-        <h2 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em]">{profile.fullName}</h2>
+        <h2 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em]">
+          {profile.fullName}
+        </h2>
         <p className="mt-1 text-sm text-misa-muted">
           Everything below is scoped to <strong>{term}</strong>, denominators
           included. A grant from a past term counts for nothing here.
@@ -232,22 +241,24 @@ function Result({
           </p>
           <ul className="mt-4 flex flex-col gap-2">
             {profile.pending.map((row) => (
-              <li key={row.id} className={bannerClass}>
-                Submitted {row.submitted}
-                {row.eventTitle ? (
-                  <>
-                    {" "}
-                    for <strong>{row.eventTitle}</strong>
-                  </>
-                ) : (
-                  // An orphan: received inside the grace window with no event
-                  // open. It must be visible — silence here is the failure §4.2
-                  // exists to prevent.
-                  <span className="text-misa-muted">
-                    {" "}
-                    — not yet matched to an event
-                  </span>
-                )}
+              <li key={row.id}>
+                <Banner tone="caution">
+                  Submitted {row.submitted}
+                  {row.eventTitle ? (
+                    <>
+                      {" "}
+                      for <strong>{row.eventTitle}</strong>
+                    </>
+                  ) : (
+                    // An orphan: received inside the grace window with no event
+                    // open. It must be visible — silence here is the failure §4.2
+                    // exists to prevent.
+                    <span className="opacity-80">
+                      {" "}
+                      — not yet matched to an event
+                    </span>
+                  )}
+                </Banner>
               </li>
             ))}
           </ul>
@@ -255,7 +266,9 @@ function Result({
       )}
 
       <section>
-        <h3 className="font-display text-[22px] leading-[1.05] font-semibold">Events this term</h3>
+        <h3 className="font-display text-[22px] leading-[1.05] font-semibold">
+          Events this term
+        </h3>
         <p className="mt-2 text-sm text-misa-muted">
           Published events only — a cancelled event credits nobody, and{" "}
           <span className="font-medium">
@@ -266,35 +279,31 @@ function Result({
         </p>
 
         {profile.events.length === 0 ? (
-          <p className={`mt-4 ${bannerClass}`}>
-            No published events in {term} yet.
-          </p>
+          <Banner className="mt-4">No published events in {term} yet.</Banner>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[32rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-misa-border text-left">
-                  <th className="py-2 pr-4 font-medium">Event</th>
-                  <th className="py-2 pr-4 font-medium">When</th>
-                  <th className="py-2 pr-4 font-medium">Points</th>
-                  <th className="py-2 font-medium">You</th>
+          <div className="mt-4">
+            <Table minWidth="min-w-[32rem]">
+              <THead>
+                <tr>
+                  <Th>Event</Th>
+                  <Th>When</Th>
+                  <Th numeric>Points</Th>
+                  <Th>You</Th>
                 </tr>
-              </thead>
+              </THead>
               <tbody>
                 {profile.events.map((event) => (
-                  <tr key={event.id} className="border-b border-misa-hairline">
-                    <td className="py-2 pr-4">{event.title}</td>
-                    <td className="py-2 pr-4 whitespace-nowrap">
-                      {event.when}
-                    </td>
-                    <td className="py-2 pr-4 tabular-nums">{event.points}</td>
-                    <td className="py-2">
+                  <Tr key={event.id}>
+                    <Td>{event.title}</Td>
+                    <Td className="whitespace-nowrap">{event.when}</Td>
+                    <Td numeric>{event.points}</Td>
+                    <Td>
                       <AttendanceMark state={event.state} />
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
       </section>
@@ -309,37 +318,42 @@ function Result({
             gave. These are the difference between your attendance points and
             your total.
           </p>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[32rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-misa-border text-left">
-                  <th className="py-2 pr-4 font-medium">When</th>
-                  <th className="py-2 pr-4 font-medium">Points</th>
-                  <th className="py-2 pr-4 font-medium">Category</th>
-                  <th className="py-2 font-medium">Reason</th>
+          <div className="mt-4">
+            <Table minWidth="min-w-[32rem]">
+              <THead>
+                <tr>
+                  <Th>When</Th>
+                  <Th numeric>Points</Th>
+                  <Th>Category</Th>
+                  <Th wrap>Reason</Th>
                 </tr>
-              </thead>
+              </THead>
               <tbody>
                 {profile.adjustments.map((row) => (
-                  <tr key={row.id} className="border-b border-misa-hairline">
-                    <td className="py-2 pr-4 whitespace-nowrap">
-                      {row.awarded}
-                    </td>
-                    <td className="py-2 pr-4 font-mono whitespace-nowrap">
+                  <Tr key={row.id}>
+                    <Td className="whitespace-nowrap">{row.awarded}</Td>
+                    {/* 🪤 `tabular-nums`, not `font-mono`. Monospace means one
+                        thing in this system — the caption naming a photograph
+                        that does not exist yet — and using it for figures makes
+                        that convention unreadable. Tabular figures are what was
+                        actually wanted: columns of digits that line up. */}
+                    <Td numeric className="whitespace-nowrap">
                       {row.points}
-                    </td>
-                    <td className="py-2 pr-4">{row.category}</td>
-                    <td className="py-2">{row.reason}</td>
-                  </tr>
+                    </Td>
+                    <Td>{row.category}</Td>
+                    <Td>{row.reason}</Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         </section>
       )}
 
       <section>
-        <h3 className="font-display text-[22px] leading-[1.05] font-semibold">Membership dues</h3>
+        <h3 className="font-display text-[22px] leading-[1.05] font-semibold">
+          Membership dues
+        </h3>
         {/* 🔓 The one surface in the whole system that shows dues status to an
             unauthenticated caller, and it is allowed here only because the gate
             is EID AND matching email (§6). It must never reach /leaderboard. */}
@@ -358,8 +372,8 @@ function Result({
           )}{" "}
           {profile.paidThrough ? (
             <>
-              Your dues cover you through{" "}
-              <strong>{profile.paidThrough}</strong>.
+              Your dues cover you through <strong>{profile.paidThrough}</strong>
+              .
             </>
           ) : (
             <>No payment of yours covers a term yet.</>
@@ -376,9 +390,9 @@ function Result({
           name="step"
           value="reset"
           disabled={pending}
-          className={`w-fit ${buttonClass}`}
+          className={`w-fit ${BUTTON_SOLID_NAVY}`}
         >
-          LOOK UP SOMEONE ELSE
+          Look up someone else
         </button>
       </form>
     </div>
@@ -389,20 +403,23 @@ function Result({
 function AttendanceMark({ state }: { state: TermEventState }) {
   if (state === "attended") {
     return (
-      <span className="border border-misa-border bg-misa-panel px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+      <Pill tone="affirm" size="sm">
         attended
-      </span>
+      </Pill>
     );
   }
   if (state === "missed") {
     return (
-      <span className="border border-misa-border px-2 py-0.5 text-[0.7rem] tracking-wider text-misa-muted uppercase">
+      <Pill tone="neutral" size="sm">
         missed
-      </span>
+      </Pill>
     );
   }
+  // Upcoming carries no frame at all: it is the absence of an outcome, not an
+  // outcome, and a bordered badge would give it the same weight as the two
+  // states that actually happened.
   return (
-    <span className="text-[0.7rem] tracking-wider text-misa-muted uppercase">
+    <span className="text-[11px] tracking-[0.12em] text-misa-muted uppercase">
       upcoming
     </span>
   );
@@ -421,41 +438,19 @@ function Stat({
 }) {
   return (
     <div>
-      <dt className="text-xs tracking-wider text-misa-muted uppercase">
+      <dt className="text-[12px] tracking-[0.14em] text-misa-muted uppercase">
         {label}
       </dt>
       <dd
         className={
           emphasis
-            ? "font-display text-[34px] leading-none font-semibold tabular-nums text-misa-blue"
-            : "font-display text-[26px] leading-none font-semibold tabular-nums text-misa-blue"
+            ? "font-display text-[34px] leading-none font-semibold text-misa-blue tabular-nums"
+            : "font-display text-[26px] leading-none font-semibold text-misa-blue tabular-nums"
         }
       >
         {value}
       </dd>
       {note && <p className="text-xs text-misa-muted">{note}</p>}
     </div>
-  );
-}
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string[];
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
-      {children}
-      {error?.length ? (
-        <span role="alert" className="text-sm text-red-700">
-          {error[0]}
-        </span>
-      ) : null}
-    </label>
   );
 }

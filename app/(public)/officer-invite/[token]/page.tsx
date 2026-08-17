@@ -128,7 +128,7 @@ function Unusable({
         <h1 className="font-display text-[34px] leading-[1.02] font-semibold tracking-[-0.02em] sm:text-[42px]">
           This invitation can&apos;t be used
         </h1>
-        <p className="mt-4 border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm">
+        <p className="mt-4 border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm">
           {message}
         </p>
         {showSignIn ? (

@@ -88,11 +88,11 @@ export default async function AdjustmentDetailPage({
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Adjustment
         </h1>
         {voided && (
-          <span className="border border-black/30 px-2 py-0.5 text-[0.7rem] tracking-wider uppercase">
+          <span className="border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
             voided
           </span>
         )}
@@ -105,7 +105,7 @@ export default async function AdjustmentDetailPage({
       </p>
 
       <section className="mt-10 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">What was awarded</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">What was awarded</h2>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Member">
             {adjustment.members ? (
@@ -116,10 +116,10 @@ export default async function AdjustmentDetailPage({
                 {adjustment.members.full_name}
               </Link>
             ) : (
-              <span className="text-foreground/50">unknown member</span>
+              <span className="text-misa-muted">unknown member</span>
             )}
             {adjustment.members?.active === false && (
-              <span className="ml-2 text-xs text-foreground/50">inactive</span>
+              <span className="ml-2 text-xs text-misa-muted">inactive</span>
             )}
           </Row>
           <Row label="Points">
@@ -127,7 +127,7 @@ export default async function AdjustmentDetailPage({
               {signedPoints(adjustment.points)}
             </span>
             {voided && (
-              <span className="ml-2 text-xs text-foreground/60">
+              <span className="ml-2 text-xs text-misa-muted">
                 no longer counting
               </span>
             )}
@@ -138,7 +138,7 @@ export default async function AdjustmentDetailPage({
           <Row label="Reason">{adjustment.reason}</Row>
           <Row label="Term">
             {adjustment.term}
-            <span className="ml-2 text-xs text-foreground/60">
+            <span className="ml-2 text-xs text-misa-muted">
               set from the award date
             </span>
           </Row>
@@ -151,7 +151,7 @@ export default async function AdjustmentDetailPage({
                 {adjustment.events.title}
               </Link>
             ) : (
-              <span className="text-foreground/50">not linked</span>
+              <span className="text-misa-muted">not linked</span>
             )}
           </Row>
           <Row label="Awarded by">
@@ -164,7 +164,7 @@ export default async function AdjustmentDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
           {voided ? "How it was voided" : "Void this adjustment"}
         </h2>
 
@@ -172,7 +172,7 @@ export default async function AdjustmentDetailPage({
           <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
             <Row label="Reason">
               {adjustment.void_reason ?? (
-                <span className="text-foreground/50">—</span>
+                <span className="text-misa-muted">—</span>
               )}
             </Row>
             <Row label="Voided by">
@@ -194,7 +194,7 @@ export default async function AdjustmentDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-xl font-bold">History</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
         <div className="mt-4">
           <AuditTrail entityType="point_adjustment" entityId={adjustment.id} />
         </div>
@@ -212,7 +212,7 @@ function Row({
 }) {
   return (
     <>
-      <dt className="text-sm text-foreground/60">{label}</dt>
+      <dt className="text-sm text-misa-muted">{label}</dt>
       <dd className="text-sm">{children}</dd>
     </>
   );

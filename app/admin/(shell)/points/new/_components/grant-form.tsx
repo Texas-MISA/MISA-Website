@@ -1,5 +1,8 @@
 "use client";
 
+import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
+import { controlClass } from "@/components/ui/field";
+
 import { useActionState, useState } from "react";
 
 import {
@@ -39,7 +42,7 @@ const EMPTY: SubmittedGrantValues = {
   eventId: "",
 };
 
-const fieldClass = "w-full border border-black/70 bg-white px-3 py-2 text-sm";
+const fieldClass = controlClass("sm", "w-full");
 
 export function GrantForm({
   members,
@@ -109,7 +112,7 @@ export function GrantForm({
             placeholder="5"
             className={fieldClass}
           />
-          <span className="text-xs text-foreground/60">
+          <span className="text-xs text-misa-muted">
             Negative is allowed — a deduction and a correction use the same
             mechanism as a bonus.
           </span>
@@ -136,7 +139,7 @@ export function GrantForm({
             rows={3}
             className={fieldClass}
           />
-          <span className="text-xs text-foreground/60">
+          <span className="text-xs text-misa-muted">
             Required. This is what makes the ledger readable a year from now.
           </span>
         </Field>
@@ -155,7 +158,7 @@ export function GrantForm({
               </option>
             ))}
           </select>
-          <span className="text-xs text-foreground/60">
+          <span className="text-xs text-misa-muted">
             Context only. It does not credit attendance.
           </span>
         </Field>
@@ -167,11 +170,11 @@ export function GrantForm({
             title={
               selected.size === 0 ? "Pick at least one member first" : undefined
             }
-            className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark disabled:opacity-40"
+            className={BUTTON_PRIMARY_SM}
           >
             {pending ? "GRANTING…" : "GRANT POINTS"}
           </button>
-          <span className="text-xs text-foreground/60">
+          <span className="text-xs text-misa-muted">
             The term is set from the date; it is never typed.
           </span>
         </div>
@@ -201,7 +204,7 @@ function Banner({ state }: { state: GrantState }) {
   return (
     <p
       role="status"
-      className="mb-6 border-l-4 border-amber-700 bg-misa-panel px-4 py-3 text-sm"
+      className="mb-6 border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm"
     >
       {message}
     </p>
@@ -219,10 +222,10 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm">
-      <span className="text-foreground/60">{label}</span>
+      <span className="text-misa-muted">{label}</span>
       {children}
       {error && error.length > 0 && (
-        <span className="text-xs text-amber-800">{error[0]}</span>
+        <span className="text-xs text-misa-caution">{error[0]}</span>
       )}
     </label>
   );

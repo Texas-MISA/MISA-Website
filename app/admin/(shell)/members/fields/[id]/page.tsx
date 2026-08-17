@@ -33,11 +33,11 @@ export default async function MemberFieldPage({
   return (
     <div className="max-w-3xl">
       <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           {definition.label}
         </h1>
         {definition.archivedAt && (
-          <span className="border border-black/40 px-2 py-1 text-[0.65rem] uppercase tracking-wider">
+          <span className="border border-misa-border px-2 py-1 text-[11px] uppercase tracking-[0.12em]">
             archived
           </span>
         )}
@@ -49,7 +49,7 @@ export default async function MemberFieldPage({
         </Link>
       </p>
 
-      <p className="mt-6 text-sm text-foreground/70">
+      <p className="mt-6 text-sm text-misa-secondary">
         {holders === 0
           ? "No member holds a value for this field yet."
           : holders === 1
@@ -58,14 +58,14 @@ export default async function MemberFieldPage({
       </p>
 
       <section className="mt-10">
-        <h2 className="font-display text-xl font-bold">Settings</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Settings</h2>
         <div className="mt-4">
           <FieldForm definition={definition} />
         </div>
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-xl font-bold">
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
           {definition.archivedAt ? "Restore" : "Archive"}
         </h2>
         <div className="mt-4">
@@ -78,7 +78,7 @@ export default async function MemberFieldPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-xl font-bold">History</h2>
+        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
         <div className="mt-4">
           <AuditTrail entityType="member_field" entityId={definition.id} />
         </div>

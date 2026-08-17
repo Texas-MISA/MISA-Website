@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { LINK_EYEBROW } from "@/components/ui/button";
 import { Hatch } from "@/components/ui/hatch";
+import { Section } from "@/components/ui/section";
 
 // The gallery band on the home page: two marquee tracks, the top one scrolling
 // left and the bottom one scrolling right.
@@ -134,13 +135,17 @@ export function GalleryMarquee() {
     // The band moved above the mission later the same day, and the hero is the
     // one neighbour that donates nothing: its pb-28 is consumed by the chevron
     // notch cut out of it, so the next section starts at the notch's tip. Hence
-    // pt-14/sm:pt-16 here — the exact padding the mission used to carry when it
-    // held this slot — against a bottom that stays minimal because the mission
-    // below brings its own pt-16.
-    <section className="pt-14 pb-2 sm:pt-16 sm:pb-3">
-      <div className="mb-[22px] flex justify-end px-5 sm:px-14">
+    // a real top step here against a `flush` bottom, because the mission below
+    // brings its own. Desktop is unchanged at 64px; the phone step comes down
+    // from 56px to 48px, which is the scale's answer rather than this section's.
+    //
+    // 🪤 `gutter={false}` is load-bearing: the tracks must reach both edges of
+    // the viewport or the loop has a visible margin to wrap into.
+    <Section gutter={false} padTop="md" padBottom="flush">
+      <div className="mb-[22px] flex justify-end px-gutter-sm sm:px-gutter">
         <Link
           href="/gallery"
+          data-reveal="fade"
           className={`${LINK_EYEBROW} text-misa-blue hover:text-misa-blue-dark`}
         >
           See all photos →
@@ -150,6 +155,6 @@ export function GalleryMarquee() {
         <Track captions={TRACK_ONE} size="lg" direction="left" />
       </div>
       <Track captions={TRACK_TWO} size="sm" direction="right" />
-    </section>
+    </Section>
   );
 }

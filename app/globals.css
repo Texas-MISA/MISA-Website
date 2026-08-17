@@ -29,6 +29,43 @@
   /* Placeholder hatch: light on white grounds, navy on navy ones. */
   --misa-hatch-a: #2c4b7c;
   --misa-hatch-b: #26436f;
+
+  /* The second stripe of the LIGHT hatch. It was a literal in `.hatch-light`
+     while its navy counterparts were tokens; DESIGN.md names it Vellum Shade
+     and says it exists for the hatch and nothing else. */
+  --misa-hatch-light-a: #f2f2f3;
+  --misa-hatch-light-b: #e7e7ea;
+
+  /* ── Status ───────────────────────────────────────────────────────────────
+     📌 These are NEW, and they are not a second accent — the Rare Navy Rule is
+     about expression and these are feedback. The system had been reaching for
+     raw Tailwind (`text-red-700`, `border-amber-700`, `text-green-800`) at ~40
+     sites, which is how a palette that forbids a third colour ended up with
+     three undocumented ones, in whatever hue Tailwind happened to pick.
+
+     ⚠️ They are deliberately DESATURATED and dark — earth inks, not signal
+     lights. A drafting set annotates in red pencil; it does not have a warning
+     LED. Each is ≥4.5:1 on Paper and on its own wash, so either may carry text.
+
+     Navy remains the colour of everything that is merely true. These three
+     appear only when something needs attention, is wrong, or has just
+     succeeded — never as decoration, and never as a category colour. */
+  --misa-caution: #8a5a12; /* needs review, pending, unsaved, will change data */
+  --misa-caution-wash: #faf4e8;
+  --misa-critical: #8f2323; /* failed, refused, destructive, void */
+  --misa-critical-wash: #fbf0ef;
+  --misa-affirm: #1f5c34; /* saved, approved, resolved */
+  --misa-affirm-wash: #eff5f0;
+
+  /* ── Durations ───────────────────────────────────────────────────────────
+     Per emil-design-eng, which wins on motion here: UI animations stay under
+     300ms, and the number is chosen by what the element IS, not by taste.
+     Entrance durations are the reveal scale below and are deliberately longer
+     — a scroll entrance is not a UI response. */
+  --dur-press: 140ms; /* :active feedback on a control */
+  --dur-hover: 150ms; /* colour swaps — the only hover this system has */
+  --dur-pop: 200ms; /* tooltips, inline status markers */
+  --dur-overlay: 260ms; /* disclosure panels, expanding filters */
 }
 
 @theme inline {
@@ -42,8 +79,47 @@
   --color-misa-muted: var(--misa-muted);
   --color-misa-hairline: var(--misa-hairline);
   --color-misa-border: var(--misa-border);
+  --color-misa-caution: var(--misa-caution);
+  --color-misa-caution-wash: var(--misa-caution-wash);
+  --color-misa-critical: var(--misa-critical);
+  --color-misa-critical-wash: var(--misa-critical-wash);
+  --color-misa-affirm: var(--misa-affirm);
+  --color-misa-affirm-wash: var(--misa-affirm-wash);
   --font-sans: var(--font-barlow);
   --font-display: var(--font-barlow-condensed);
+
+  /* ── Spacing scale ────────────────────────────────────────────────────────
+     📌 These are the handoff's own numbers, which until now existed only as
+     prose in its README and as hand-tuned arbitrary values in ten page files
+     (`pt-13`, `pb-22`, `sm:pb-27`, `pb-6.5`, …). Naming them is what lets
+     components/ui/section.tsx own the rhythm instead of each page rediscovering
+     it. The names are ROLES, not sizes: `px-gutter` says "this is the page
+     gutter", which survives a decision to change the number.
+
+     ⚠️ Tailwind's numeric spacing (`p-4`, `gap-6`) is untouched and still the
+     right tool inside a component. These are for page and section structure. */
+  --spacing-rule: 1px; /* the shared-hairline grid gap (KPI + partner plates) */
+  --spacing-gutter-sm: 1.25rem; /* 20px — page gutter on phones */
+  --spacing-gutter: 3.5rem; /* 56px — page gutter from `sm` up */
+  --spacing-tile: 1rem; /* 16px — tile and image-grid gaps */
+  --spacing-card: 1.25rem; /* 20px — card-grid gaps */
+  --spacing-split: 3rem; /* 48px — two-column split gaps */
+  --spacing-section-sm: 3.5rem; /* 56px — the tight end of section padding */
+  --spacing-section: 4rem; /* 64px — the standard section step */
+  --spacing-section-lg: 5rem; /* 80px — the airy end, for a section that leads */
+
+  /* ── Easing ───────────────────────────────────────────────────────────────
+     🪤 Deliberately NOT named `--ease-out` / `--ease-in-out`: those are
+     Tailwind's own theme keys, and overriding them would silently retime every
+     existing `ease-out` in the codebase. These are additive.
+
+     `reveal` is the house entrance curve and predates the others; the two
+     `-quint` curves are emil-design-eng's, for entering/exiting and for
+     moving/morphing respectively. There is no ease-IN curve on purpose — an
+     ease-in start reads as lag on anything a person is waiting for. */
+  --ease-reveal: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-quint: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 /* 🪤 Everything below is INSIDE a cascade layer, and that is load-bearing
@@ -84,9 +160,97 @@
   .on-navy:focus-visible {
     outline-color: #ffffff;
   }
+
+  /* ── Browser surfaces ─────────────────────────────────────────────────────
+     The parts of the page the OS draws, which no component owns and which
+     therefore stayed at their user-agent defaults through the whole overhaul:
+     the selection highlight, the caret, the scrollbar, and the offset of a
+     text underline. Left alone they are the one place a carefully specified
+     navy-and-white document still shows somebody else's blue. */
+
+  ::selection {
+    /* A tint rather than the fill: a solid navy selection hides the ink it is
+       selecting, and the ink is the thing being pointed at. */
+    background: color-mix(in srgb, var(--misa-blue) 20%, transparent);
+    color: var(--foreground);
+  }
+
+  /* On navy the same tint is invisible, so it inverts with the ground — the
+     Two Grounds Rule reaching one level further down than it used to. */
+  .on-navy ::selection {
+    background: rgb(255 255 255 / 0.26);
+    color: #ffffff;
+  }
+
+  html {
+    /* 🪤 **`color-scheme: light` is load-bearing on a light-only site, and its
+       absence is invisible on a light OS.** Without it, a visitor whose system
+       is set to dark gets user-agent dark chrome inside light controls — and
+       `/admin` is full of native `<select>`, `date`, `time` and `number` inputs,
+       which is where it shows worst: a dark dropdown list under a Vellum field.
+       This declares what the palette already assumes. See DESIGN.md, *Light
+       only*, for why there is no dark counterpart to declare. */
+    color-scheme: light;
+    caret-color: var(--misa-blue);
+    scrollbar-color: var(--misa-border) transparent;
+  }
+
+  /* Kills the ~300ms double-tap-to-zoom delay browsers hold before dispatching
+     a click. /attend is used standing up, on a phone, against a 20-second
+     target — a third of a second per tap is a real share of that. */
+  a,
+  button,
+  label,
+  summary,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+
+  /* Set deliberately rather than left to the platform, which paints an opaque
+     grey block over the element on tap. A navy wash matches the hover ink. */
+  a,
+  button {
+    -webkit-tap-highlight-color: color-mix(
+      in srgb,
+      var(--misa-blue) 14%,
+      transparent
+    );
+  }
+
+  a {
+    /* A drawing set has rule weights, not the browser's 1px-under-the-baseline
+       default. Only applies where an underline is actually drawn. */
+    text-underline-offset: 0.18em;
+    text-decoration-thickness: 1px;
+  }
 }
 
 @layer components {
+  /* ── Skip link ──────────────────────────────────────────────────────────── */
+
+  /* Off-screen until focused, then a normal navy button at the top-left. Both
+     layouts render one as their first child; the header carries five to eight
+     tab stops before the content starts, and on /admin the nav is nine. */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 100;
+  }
+
+  .skip-link:focus-visible {
+    left: 0;
+    margin: 0.5rem;
+    background: var(--misa-blue);
+    color: #ffffff;
+    padding: 0.625rem 1rem;
+    font-family: var(--font-barlow-condensed), system-ui, sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
   /* ── Shared shapes ──────────────────────────────────────────────────────── */
 
   /* The chevron notch cut from the bottom edge of every hero. Carried over from
@@ -114,10 +278,10 @@
   .hatch-light {
     background: repeating-linear-gradient(
       45deg,
-      #f2f2f3,
-      #f2f2f3 7px,
-      #e7e7ea 7px,
-      #e7e7ea 14px
+      var(--misa-hatch-light-a),
+      var(--misa-hatch-light-a) 7px,
+      var(--misa-hatch-light-b) 7px,
+      var(--misa-hatch-light-b) 14px
     );
   }
 
@@ -183,37 +347,93 @@
      whereas an unscoped `opacity:0` would leave a JS-less visitor with a blank
      page, which is exactly what the prototypes' 250ms rAF-probe fallback was
      working around. The observer lives in components/ui/reveal-observer.tsx. */
+  /* 📌 There are five entrances rather than one, and the reason is a rule this
+     system had been failing: an identical entrance on every element is not an
+     authored moment, it is a page-wide effect, and it reads as one. The variant
+     is chosen by what the element IS, not by where it sits:
+
+       rise   a section's LEAD element — at most one per section. The longest
+              travel and the longest duration; this is the moment.
+       up     ordinary blocks following a lead. Short travel, gets out of the way.
+       left   the alternating two-column rows, entering from their own side.
+       right
+       fade   dense content — tables, ledgers, standings. Rows that slide are
+              rows a reader has to wait for before they can start reading.
+       wipe   hairline rules and the shared-rule plates, drawn on rather than
+              moved in. A drawn line is the one entrance that suits a drawing.
+
+     ⚠️ Adding a variant means adding its reset to BOTH the `[data-revealed]`
+     rule and the reduced-motion block below. A variant that animates a property
+     neither of them resets stays stuck in its start state forever — silently,
+     and only for the people it hurts most. */
   html.js [data-reveal] {
     opacity: 0;
     transition:
       opacity 0.7s ease var(--reveal-delay, 0s),
-      transform 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) var(--reveal-delay, 0s);
+      transform 0.7s var(--ease-reveal) var(--reveal-delay, 0s);
   }
 
   html.js [data-reveal="up"] {
     transform: translateY(18px);
   }
 
+  html.js [data-reveal="rise"] {
+    transform: translateY(32px);
+    transition:
+      opacity 0.9s ease var(--reveal-delay, 0s),
+      transform 0.9s var(--ease-reveal) var(--reveal-delay, 0s);
+  }
+
   /* The alternating activity and case-study rows slide in from their own side,
-     over .8s rather than .7s. */
+     over .8s rather than .7s.
+
+     🪤 **The lateral travel is desktop-only, and the reason is a measured
+     defect rather than taste.** These rows sit inside the 20px phone gutter, so
+     a start state of `translateX(24px)` put their right edge 4px past the
+     viewport — every un-revealed row widened the document, and a phone got a
+     horizontal scrollbar that disappeared as the reader scrolled past. Measured
+     at 390px: scrollWidth 379 against clientWidth 375, on `/`, `/about` and
+     `/projects`.
+
+     It is also the right call compositionally. The alternating two-column rows
+     collapse to a single column below `md`, so there is no "own side" left for
+     them to enter from — a sideways slide on a phone is motion with nothing
+     behind it. Below `md` they rise like everything else. */
   html.js [data-reveal="left"],
   html.js [data-reveal="right"] {
+    transform: translateY(18px);
     transition:
       opacity 0.8s ease var(--reveal-delay, 0s),
-      transform 0.8s cubic-bezier(0.2, 0.7, 0.3, 1) var(--reveal-delay, 0s);
+      transform 0.8s var(--ease-reveal) var(--reveal-delay, 0s);
   }
 
-  html.js [data-reveal="left"] {
-    transform: translateX(-24px);
+  @media (min-width: 768px) {
+    html.js [data-reveal="left"] {
+      transform: translateX(-24px);
+    }
+
+    html.js [data-reveal="right"] {
+      transform: translateX(24px);
+    }
   }
 
-  html.js [data-reveal="right"] {
-    transform: translateX(24px);
+  /* Opacity only. No transform, so nothing reflows under a reader's eye. */
+  html.js [data-reveal="fade"] {
+    transition: opacity 0.6s ease var(--reveal-delay, 0s);
+  }
+
+  /* Drawn from the left. `clip-path` is composited like transform and opacity,
+     so this stays off the main thread. */
+  html.js [data-reveal="wipe"] {
+    opacity: 1;
+    clip-path: inset(0 100% 0 0);
+    transition: clip-path 0.8s var(--ease-reveal) var(--reveal-delay, 0s);
   }
 
   html.js [data-reveal][data-revealed] {
     opacity: 1;
     transform: none;
+    clip-path: inset(0 0 0 0);
   }
 
   /* The prototypes do not honour this query and the handoff says they should. */
@@ -221,6 +441,7 @@
     html.js [data-reveal] {
       opacity: 1;
       transform: none;
+      clip-path: none;
       transition: none;
     }
 

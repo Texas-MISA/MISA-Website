@@ -1,4 +1,5 @@
 "use client";
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
 
 import { useMemo, useState } from "react";
 
@@ -98,7 +99,7 @@ export function ExportToolbar({
   const canPromote = mode === "ids" && count > 0 && count < total;
 
   return (
-    <div className="mb-4 border-2 border-black bg-misa-panel">
+    <div className="mb-4 border border-misa-border bg-misa-panel">
       <div className="flex flex-wrap items-center gap-3 px-3 py-2">
         <span className="text-sm font-semibold">
           {mode === "filter"
@@ -136,7 +137,7 @@ export function ExportToolbar({
         <button
           type="button"
           onClick={() => setPicking((open) => !open)}
-          className="border-2 border-black px-2 py-1 text-xs font-semibold uppercase tracking-wider"
+          className={BUTTON_QUIET_SM}
           aria-expanded={picking}
         >
           Fields ({chosen.size})
@@ -152,7 +153,7 @@ export function ExportToolbar({
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-2 border-t-2 border-black px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 border-t border-misa-border px-3 py-2">
         <Action
           disabled={nothingSelected}
           onClick={() => copy("emails", "addresses")}
@@ -186,18 +187,18 @@ export function ExportToolbar({
         </Download>
 
         {status.kind === "working" && (
-          <span className="text-sm text-foreground/70">Working…</span>
+          <span className="text-sm text-misa-secondary">Working…</span>
         )}
         {status.kind === "done" && (
           <span className="text-sm font-medium">{status.message}</span>
         )}
         {status.kind === "failed" && (
-          <span className="text-sm font-medium text-red-700">
+          <span className="text-sm font-medium text-misa-critical">
             {status.message}
           </span>
         )}
         {chosen.size === 0 && (
-          <span className="text-sm text-foreground/70">
+          <span className="text-sm text-misa-secondary">
             Pick at least one field.
           </span>
         )}

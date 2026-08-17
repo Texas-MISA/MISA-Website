@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect } from "react";
 
+import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
+
 // The root-segment boundary (Stage 8 phase 3).
 //
 // 📌 Its real job is /admin/login. That route sits outside the (shell) group —
@@ -29,29 +31,26 @@ export default function RootError({
   return (
     <main className="px-6 py-16 sm:py-20">
       <div className="mx-auto max-w-2xl">
-        <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
+        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Something went wrong
         </h1>
-        <p className="mt-4 text-foreground/80">
+        <p className="mt-4 text-misa-body">
           This page failed to load. Nothing you were doing has been changed.
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
             onClick={() => unstable_retry()}
-            className="rounded-full bg-misa-blue px-6 py-2 text-xs font-medium tracking-wider text-white transition hover:bg-misa-blue-dark"
+            className={BUTTON_PRIMARY_SM}
           >
-            TRY AGAIN
+            Try again
           </button>
-          <Link
-            href="/"
-            className="rounded-full border border-black/70 px-6 py-2 text-xs font-medium tracking-wider transition hover:bg-misa-panel"
-          >
-            HOME
+          <Link href="/" className={BUTTON_QUIET_SM}>
+            Home
           </Link>
         </div>
         {error.digest && (
-          <p className="mt-6 text-xs text-foreground/60">
+          <p className="mt-6 text-xs text-misa-muted">
             Reference: <code className="font-mono">{error.digest}</code>
           </p>
         )}
