@@ -36,9 +36,15 @@ export function Hatch({
         navy ? "hatch-navy" : "hatch-light"
       } ${className}`}
     >
+      {/* 🪤 The light caption is Secondary Graphite, not Annotation Grey. The
+          hatch is a two-stripe fill, so the worst case is the DARKER stripe
+          (#e7e7ea) — and Annotation Grey against that is 3.92:1, which fails AA
+          for text that is doing real work: the caption is what makes this box a
+          commission rather than a bug. Secondary is 6.89:1 on the same stripe.
+          The navy caption needs no change; white/65 over Poché Light is 4.75:1. */}
       <span
         className={`font-mono text-[11px] leading-none ${
-          navy ? "text-white/65" : "text-misa-muted"
+          navy ? "text-white/65" : "text-misa-secondary"
         }`}
       >
         {caption}

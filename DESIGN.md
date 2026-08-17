@@ -245,9 +245,14 @@ single light panel for alternation; the greys exist to keep the navy rare.
 - **Secondary Graphite** (`#4a4d50`): card body copy and unselected filter chip
   text. One step lighter than body because a card already has a frame doing
   some of the separating.
-- **Annotation Grey** (`#6f7275`): meta labels, dates, venue lines, placeholder
-  captions, inactive nav items, the footer email. Everything that annotates
-  rather than states.
+- **Annotation Grey** (`#6f7275`): meta labels, dates, venue lines, inactive nav
+  items, the footer email. Everything that annotates rather than states.
+  ⚠️ **On Paper only — it is 4.84:1 there and 4.33:1 on Vellum, which fails AA.**
+  Anything grey sitting on a Vellum ground uses Secondary Graphite instead: form
+  placeholders (7.60:1) and the light hatch caption, whose worst case is the
+  darker `#e7e7ea` hatch stripe at 6.89:1 against Annotation Grey's 3.92:1.
+  Measure a grey against the ground it actually sits on; this one passed
+  everywhere it was used until the day the field ground changed.
 - **Vellum** (`#f2f2f3`): the alternating section ground, skill-chip fills, and
   form-field interiors. The system's only non-white ground on a light page.
 - **Vellum Shade** (`#e7e7ea`): the second stripe of the light hatch. It exists

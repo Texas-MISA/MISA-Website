@@ -45,9 +45,15 @@ import type {
 // field should fill its column — but the officer filter bars call
 // `controlClass` directly for controls that sit inline in a flex row, and a
 // forced full width there stretches a six-control row into six stacked ones.
+// 🪤 The placeholder is Secondary Graphite, not Annotation Grey, and that is a
+// contrast fix rather than a preference. Annotation Grey (#6f7275) is 4.84:1 on
+// Paper — fine — but only **4.33:1 on the Vellum interior these controls now
+// have**, which fails AA for placeholder text. Secondary (#4a4d50) is 7.60:1 on
+// the same ground. Measure a grey against the ground it actually sits on: this
+// one passed everywhere it was used until the day the field ground changed.
 const CONTROL =
   "border border-misa-border bg-misa-panel text-foreground transition-colors duration-150 " +
-  "placeholder:text-misa-muted hover:border-misa-blue/50 focus:border-misa-blue " +
+  "placeholder:text-misa-secondary hover:border-misa-blue/50 focus:border-misa-blue " +
   "aria-invalid:border-misa-critical " +
   "disabled:pointer-events-none disabled:opacity-50";
 
