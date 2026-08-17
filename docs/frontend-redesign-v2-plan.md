@@ -131,10 +131,31 @@ Per §2.A and Appendix A. **Verify `package.json` before every install (§3.F).*
 Current state: no component library, no animation library, no icon library.
 
 ```bash
-npx shadcn@latest init          # §2.A: "modern SaaS where you own the components"
+npx shadcn@latest init -d -y    # §2.A: "modern SaaS where you own the components"
 npm install motion              # §3.A: import from "motion/react"
-npm install @phosphor-icons/react   # §3.C allowed list
 ```
+
+✅ **Phase 0 ran these on 2026-08-17.** What it actually took:
+
+🪤 **`shadcn init` is destructive here, and must never be run unsupervised
+again.** It **overwrote `components/ui/button.tsx`** — the project's
+`buttonClass` module, imported by **45 files** — with its own Button. It also
+deleted `--background` and `--foreground` from `globals.css`, left a dangling
+comment where they had been, flattened its additions onto one line, injected
+Geist into `layout.tsx`, and wrote `--font-sans: var(--font-sans)` into
+`@theme inline`, a circular definition that resolves to nothing.
+
+The recovery, and the standing procedure if it is ever re-run: keep
+`components.json`, `lib/utils.ts` and the `package.json` dependencies; **revert
+everything else** and hand-apply the CSS. `components.json`'s `ui` alias now
+points at **`components/shadcn/`**, so a future `add` cannot collide with this
+project's own `components/ui/` again.
+
+🔓 **The icon family is Lucide, not Phosphor.** shadcn's presets and its
+components' internals are Lucide, and §3.C bans mixing families while permitting
+Lucide "when the project already depends on it" — which adopting shadcn makes
+true. Stripping Lucide out of every generated component would be friction for no
+gain.
 
 - **shadcn/ui** — chosen because the stack is already Next 16 + Tailwind v4 +
   RSC, and because owning the code is what lets it be re-skinned to navy/white

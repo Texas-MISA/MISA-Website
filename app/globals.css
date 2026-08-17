@@ -1,4 +1,6 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 /* Brand tokens from the design handoff
    (docs/Texas MISA website UI mockups/design_handoff_misa_website/README.md).
@@ -66,6 +68,53 @@
   --dur-hover: 150ms; /* colour swaps — the only hover this system has */
   --dur-pop: 200ms; /* tooltips, inline status markers */
   --dur-overlay: 260ms; /* disclosure panels, expanding filters */
+
+  /* ── shadcn/ui semantic tokens ────────────────────────────────────────────
+     📌 Written BY HAND against this project's palette, not by `shadcn init`.
+     §9.E: never ship shadcn in its default state, and the generated defaults
+     were a neutral-grey oklch ramp with a 0.625rem radius that belongs to no
+     brand. Every value below resolves to a colour this system already owns, so
+     a shadcn component is navy-and-white from the first render rather than
+     grey-and-rounded until someone remembers to theme it.
+
+     🪤 `shadcn init` also has to be kept away from this file. Its automated
+     edit DELETED `--background` and `--foreground`, left a dangling comment
+     where they had been, flattened its own additions onto a single line, and
+     wrote `--font-sans: var(--font-sans)` into `@theme inline` — a circular
+     definition that resolves to nothing. It overwrote `components/ui/button.tsx`
+     (45 files import that module) and injected Geist into `layout.tsx`. If the
+     CLI ever needs re-running, run it, then revert everything except
+     `components.json`, `lib/utils.ts` and `package.json`, and hand-apply the
+     rest. `components.json` now writes components to `components/shadcn/`, so
+     at least the overwrite cannot happen twice.
+
+     ⚠️ `--radius` is 0 to match the current square-corner system. Radius is
+     OPEN for v2 (see docs/frontend-redesign-v2-plan.md) and this is the
+     starting value, not the decision: whatever it becomes, the Shape
+     Consistency Lock says it becomes that everywhere. */
+  --radius: 0rem;
+
+  --card: var(--background);
+  --card-foreground: var(--foreground);
+  --popover: var(--background);
+  --popover-foreground: var(--foreground);
+
+  --primary: var(--misa-blue);
+  --primary-foreground: #ffffff;
+  --secondary: var(--misa-panel);
+  --secondary-foreground: var(--foreground);
+
+  --muted: var(--misa-panel);
+  --muted-foreground: var(--misa-muted);
+  --accent: var(--misa-panel);
+  --accent-foreground: var(--misa-blue);
+
+  --destructive: var(--misa-critical);
+  --destructive-foreground: #ffffff;
+
+  --border: var(--misa-border);
+  --input: var(--misa-border);
+  --ring: var(--misa-blue);
 }
 
 @theme inline {
@@ -120,6 +169,73 @@
   --ease-reveal: cubic-bezier(0.2, 0.7, 0.3, 1);
   --ease-out-quint: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out-quint: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* ── shadcn/ui utility mappings ───────────────────────────────────────────
+     What turns the tokens above into the `bg-primary` / `border-border` /
+     `rounded-md` utilities shadcn's components are written against. Without
+     these the components compile but render unstyled. */
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+
+  --radius-2xl: var(--radius);
+}
+
+/* ── Elevation ──────────────────────────────────────────────────────────────
+     🔓 NEW in v2. The system was flat by inheritance and `DESIGN.md` asked for
+     a vocabulary to be defined before any shadow shipped. This is it.
+
+     🪤 A plain `@theme` block, NOT `@theme inline`, and the difference is not
+     cosmetic. `inline` resolves a token into the utilities that use it and
+     never emits the custom property, so `--shadow-lift` was unreadable at
+     runtime and could not be referenced from an arbitrary value. A plain
+     `@theme` both emits `--shadow-*` onto `:root` and registers the
+     `shadow-*` utilities. This is the same trap that made a font swap appear
+     to do nothing earlier in this redesign; it is worth knowing once.
+
+     📌 Four steps, each with a job. A shadow that does not match one of these
+     jobs does not get added; a fifth step is a change to this list, not a
+     one-off class.
+
+       lift    a resting element that is nonetheless above the page: a card
+               that can be picked up, a floating image plate.
+       raised  the same element while the pointer is on it. The ONLY hover
+               elevation in the system.
+       overlay menus, popovers, dialogs. Things that genuinely float.
+       sticky  a bar pinned over scrolling content, where the shadow's job is
+               to prove the content is passing underneath.
+
+     🪤 §4.4: shadows are TINTED TO THE BACKGROUND HUE, never pure black on a
+     light ground. These are all navy at low alpha, so the shadow reads as the
+     ink of this palette rather than as dirt. A `rgba(0,0,0,…)` shadow anywhere
+     in this codebase is a bug.
+
+     Each carries a real offset and a soft blur, per `craft-floor`: a
+     zero-offset coloured halo is decoration, not depth. */
+@theme {
+  --shadow-lift: 0 1px 2px rgb(22 48 92 / 0.06), 0 4px 12px rgb(22 48 92 / 0.08);
+  --shadow-raised: 0 2px 4px rgb(22 48 92 / 0.07), 0 10px 26px rgb(22 48 92 / 0.13);
+  --shadow-overlay: 0 8px 20px rgb(22 48 92 / 0.12), 0 24px 56px rgb(22 48 92 / 0.18);
+  --shadow-sticky: 0 1px 0 rgb(22 48 92 / 0.08), 0 6px 16px rgb(22 48 92 / 0.07);
 }
 
 /* 🪤 Everything below is INSIDE a cascade layer, and that is load-bearing

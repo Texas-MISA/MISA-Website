@@ -3741,6 +3741,12 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              resolution form, manual entry, grant picker
   admin-profiles.ts          fetchOfficerNames — actor_id FKs auth.users,
                              which has no PostgREST path to admin_profiles
+  utils.ts                   `cn()` — clsx + tailwind-merge. Created by
+                             `shadcn init` during the v2 redesign's phase 0 and
+                             required by every shadcn component.
+                             ⚠️ NOT a general-purpose helper drawer. Nothing
+                             else goes in this file; the rest of the app
+                             composes class strings directly, as it always has
   site.ts / officers.ts      ALL public copy and content constants, plus the
                              officer roster. site.ts grew with the v1.58 UI
                              overhaul: ACTIVITIES (was PILLARS), HISTORY_CARDS
