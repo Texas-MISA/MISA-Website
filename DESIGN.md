@@ -182,6 +182,24 @@ components:
 
 # Design System: Texas MISA
 
+> ⏳ **RETIRED FOR THE DURATION OF THE v2 REDESIGN** (officer's call,
+> 2026-08-17). Every aesthetic rule in this document is open: the named rules,
+> the frontmatter tokens, the type ramp, the flatness, the light-only decision,
+> the Do/Don't list. **Do not treat anything below as binding**, and do not
+> "fix" new work to match it.
+>
+> **Seven engineering rules survive**, listed in
+> [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md) under
+> *The engineering set*: focus rings visible on every ground; sections owning
+> their own padding; shared-rule plates; contrast measured per pairing on the
+> real ground; monospace for `/admin` identifiers; named feedback colours; no
+> photography.
+>
+> 📌 **This document is still an accurate description of what is on screen
+> today**, which is why it has not been deleted: `/admin` and the member-facing
+> pages still render exactly this system, and will until phases 3 and 4. It is
+> replaced at phase 5 by a new document written from what actually ships.
+
 ## Overview
 
 **Creative North Star: "The Drawing Set"**

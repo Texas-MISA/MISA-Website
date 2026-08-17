@@ -1,9 +1,30 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.67
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next.
+**Version:** 1.68
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next. 🏗️ A **v2 visual redesign is in progress** (phase 0 complete).
 **Last updated:** August 2026
 
+> **v1.68: the v2 visual redesign begins, and the design authority moves again.**
+> A v1 redesign was planned, built and **scrapped** (branch `redesign-stage-1`;
+> `main` untouched) after the officer rejected it as bland and same-ey. Each
+> criticism turned out to be a named rule in `design-taste-frontend`, and the
+> root cause was process: v1 hand-rolled everything against §2's *"do not invent
+> CSS for things that have an official package."*
+>
+> Three reversals, all officer decisions: **`design-taste-frontend` is primary**
+> for the public visual UI; **`DESIGN.md` is retired** for the redesign's
+> duration except seven engineering rules; and the locked "colour scheme" means
+> the **palette, not the ground** — gradients and tinted fields are in play.
+> Scope is **every surface, `/admin` included**; only the word content and the
+> navy-and-white palette are fixed. **No migration, no Server Action, no route,
+> no query, no schema change.** Plan in
+> [`frontend-redesign-v2-plan.md`](frontend-redesign-v2-plan.md).
+>
+> Phase 0 installed **shadcn/ui** (writing to `components/shadcn/`), `motion`
+> and Lucide, and defined the **elevation vocabulary** `DESIGN.md` had asked for
+> before any shadow shipped. 🪤 `shadcn init` is destructive here — see the
+> build log before re-running it.
+>
 > **v1.67: one design system, applied to the whole site — and `DESIGN.md`
 > replaces the design handoff as the design authority.** Requested 2026-08-17
 > ("comprehensive rework… core logic remains, just visuals are edited"). **No
@@ -3859,6 +3880,16 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
   /migrations                versioned SQL
   seed.sql
 /components
+  /shadcn                    🏗️ shadcn/ui components, added on demand with
+                             `npx shadcn@latest add <name>`. Added in the v2
+                             redesign's phase 0.
+                             ⚠️ **This path is deliberate.** shadcn's default
+                             alias is `components/ui`, and `shadcn init` used it
+                             to overwrite this project's own `button.tsx` —
+                             the `buttonClass` module that 45 files import.
+                             `components.json` now redirects here; never point
+                             it back. See the build log for the full list of
+                             what that one command clobbered
   site-header.tsx            the 5-item nav (About · Projects · Gallery ·
                              Officers · Admin), the absolutely centred wordmark,
                              and the navy Check In button. Client only for the

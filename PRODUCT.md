@@ -114,13 +114,20 @@ Durable constraints future work must preserve:
   accept all majors & years!" is the register. Not corporate, not ironic.
 - All public copy lives in `lib/site.ts` and `lib/officers.ts` and is the source
   of truth for wording. It is never hardcoded into a page.
-- **`DESIGN.md` is the binding visual authority for the whole site** (since
-  2026-08-17). The design handoff at `docs/Texas MISA website UI mockups/` is
-  historical reference: it is desktop-only, covers five public pages and none of
-  `/admin`, `/attend`, `/leaderboard` or `/lookup`, and authors no breakpoints
-  or interaction states. The identity it established — navy on white, the Barlow
-  pair, square corners, hairlines, the chevron hero, the hatch — is unchanged and
-  is recorded in `DESIGN.md`. See its *Relationship to the design handoff*.
+- ⏳ **A v2 visual redesign is underway, and `DESIGN.md` is RETIRED for its
+  duration** (2026-08-17). Only the **colour scheme** (navy `#16305c` and white)
+  and this file's content commitments are fixed; type, layout, depth, shape,
+  grounds and motion are all open. The plan is
+  [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md), and
+  `design-taste-frontend` is the primary design authority while it runs.
+  `DESIGN.md` still describes what is on screen today and is replaced at phase 5.
+- **The design handoff at `docs/Texas MISA website UI mockups/` is historical
+  reference**: desktop-only, covers five public pages and none of `/admin`,
+  `/attend`, `/leaderboard` or `/lookup`, and authors no breakpoints or
+  interaction states. ⚠️ The identity it established — the Barlow pair, square
+  corners, hairlines, the chevron hero, the hatch — is **no longer fixed**; only
+  the navy-and-white palette carries forward. Its README remains the only home
+  of the duotone image-treatment spec, for whenever photography arrives.
 - The real MISA logo file has never been supplied; the header wordmark is drawn
   in CSS.
 

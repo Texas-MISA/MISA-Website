@@ -164,6 +164,24 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 
 ## Design, rendering and the public UI (added 2026-08-14, doc v1.58)
 
+> ⏳ **The AESTHETIC rules in this section are retired for the duration of the v2
+> visual redesign** (2026-08-17, doc v1.68) — square corners, the two grounds,
+> the Barlow pair, flatness, the hatch device, the chevron hero, the centred
+> wordmark, entrance-only motion. Do not hold new work to them, and do not
+> "fix" a redesigned surface to match. Plan:
+> [`frontend-redesign-v2-plan.md`](frontend-redesign-v2-plan.md).
+>
+> **The RENDERING and ENGINEERING rules below still bind, without exception** —
+> the failed-read rule, the error-boundary behaviour, the Central-anchored date
+> handling, the React 19 form reset, `data-reveal` never on a node that mounts
+> after first paint, the cascade-layer rule, and `reveal.tsx` staying
+> server-safe. Those are correctness, not taste, and the evidence recorded here
+> is exactly why they are not up for renegotiation.
+>
+> 📌 The evidence below stays valuable even for the retired rules: it records
+> what each one *cost* when it was broken, which is what a replacement has to
+> beat. Read it before arguing one away.
+
 - 📌 **`DESIGN.md` is the source of truth for the design, site-wide (2026-08-17).** 🔓 **The design handoff held that position from 2026-08-14 until this date and is now historical reference.** It lives in `docs/Texas MISA website UI mockups/design_handoff_misa_website/`: five `.dc.html` prototypes plus a README carrying the full token, typography and spacing table. Its own instruction was always to **recreate the designs in Tailwind and tokens, never to port the inline styles** — the prototypes are single-file documents with no build step, and copying them would put the design language in five places instead of one. That instruction still holds for anything read out of them.
 
   **Why the authority moved, since this reverses a documented decision.** The handoff was never a description of this application; it was a description of five of its pages. It is desktop-only and says so — "the prototypes are desktop-only fixed layouts; no breakpoints were authored. Mobile is undesigned" — and it defines no focus ring, no hover on nav items or buttons, no disabled state, no empty state and no error state, asking in its own README for all of them to be added. It draws nothing at all for `/admin` (75 files), `/attend`, `/leaderboard`, `/lookup`, `/contact` or `/officer-invite`. Holding it as *the* source of truth therefore left the majority of the interface with no source of truth, and that is precisely where the drift accumulated: three button dialects and three undocumented status colours in `/admin`, and a second banner language on the member-facing pages.

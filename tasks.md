@@ -6,36 +6,30 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
-## 📋 Planned, NOT BUILT — complete redesign of the public frontend (written 2026-08-17)
+## 🏗️ IN PROGRESS — v2 visual redesign of the whole site (2026-08-17)
 
-Plan in [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md). A redesign of the public site's **design and its information architecture**. **All eight open decisions were settled with the officer on 2026-08-17** — the plan is a brief now, not a menu.
+Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 is complete.**
+
+⚠️ **A v1 redesign was built and SCRAPPED.** It survives on the abandoned branch `redesign-stage-1` (tip `60ca71d`) as a record; `main` was never touched. It was rejected as bland, lacking depth, with image slots concentrated into one section and a scattered, same-ey layout. Each of those turned out to be a named rule in `design-taste-frontend` that v1 read too late or not at all. The root cause was process: v1 treated the skills as advisory and hand-rolled everything, against §2's *"do not invent CSS for things that have an official package."* The v1 plan, [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md), is **superseded**.
 
 | | |
 |---|---|
-| Typography | **Keep** Barlow + Barlow Condensed |
-| Register | **Keep** — institutional, unhurried |
-| Chevron hero | **Open** to replacement |
-| Absent imagery | **Rework the device**, keep the principle |
-| Navigation | **Direction phase decides**, in stage 1 |
-| New pages | **Join / Get involved** and **Upcoming events**, nothing else |
-| Frozen four | **Inherit the new skin** (behaviour + markup frozen) |
-| `/contact` | **Leave as-is** — routed, unlinked from desktop nav |
+| Primary design authority | **`design-taste-frontend`**, for the duration |
+| Locked | The **word content**, verbatim, and the **navy + white colour scheme** |
+| Open | Type, layout, depth, shape, grounds, motion, components |
+| Scope | **Every surface**, `/admin` included |
+| Foundation | **shadcn/ui** (+ `motion`, Lucide icons) |
+| `DESIGN.md` | ⏳ **Retired**, except seven engineering rules |
 
-📌 **Palette, type and register are all fixed, so the design must be carried by STRUCTURE** — how a page opens, the composition system, rhythm, hierarchy, component shape, motion. ⚠️ That rules out a whole class of candidate: directions differing only in ornament will look nearly identical here, because the three levers they rely on are locked. A candidate is only genuinely different if it *composes* differently.
+📌 **"Colour scheme" is not "flat white ground."** Gradients, tinted fields and drawn backgrounds are in play so long as they are built from the palette. A plain white page behind everything is a large part of why v1 read as bland.
 
-**Frozen: `/attend`, `/leaderboard`, `/lookup`, `/admin`, and the whole data layer.** No route, Server Action, query, migration, view or schema change. They inherit tokens and re-skinned primitives only — which is what the `components/ui/` shelf was for.
+📌 **Many image slots, in every section** — the reverse of v1. This is §4.8's sanctioned path for a project that cannot ship photography, and each phase hands the officer a list of the shots needed.
 
-⚠️ **The v1.67 rework below was refinement, not this.** One consistent system — worth doing, and what makes this tractable. But refinement preserves the incumbent design and a redesign replaces it. This is the second job.
+🪤 **`shadcn init` is destructive here and must not be run unsupervised.** It overwrote `components/ui/button.tsx`, which **45 files** import, deleted `--background`/`--foreground` from `globals.css`, injected Geist into `layout.tsx`, and wrote a circular `--font-sans: var(--font-sans)`. If re-run: keep `components.json`, `lib/utils.ts` and the dependencies, revert everything else, hand-apply the CSS. Components now write to `components/shadcn/`.
 
-🔴 **No new page may invent a fact about the club.** `PRODUCT.md` says testimonials, member counts, placement stats, awards and press do not exist and must not be fabricated. Propose, **get real copy from an officer**, then build. If the copy does not arrive the page does not ship — a normal outcome. Of the two approved pages only **Join** is exposed to this; Upcoming events needs no new copy.
+🔴 **No new page may invent a fact about the club**, and per the officer any new copy is **reviewed before it ships**. `PRODUCT.md`: testimonials, member counts, placement stats, awards and press do not exist.
 
-🪤 **The nav goes from five items to seven, and five is the measured ceiling.** The wordmark is absolutely centred and wins the z-order, so a sixth item *disappears behind the logo* and nothing fails (measured at 1280: 285px left, 312px right). The header is therefore a stage-1 design problem, and the requirement is that **the failure mode stops being silent** — not that somebody remembers to re-measure.
-
-🪤 **Remounting `upcoming-events.tsx` must restore `export const dynamic = "force-dynamic"`.** The read touches `cookies()`, and a build-time snapshot serves a stale schedule while looking completely fine.
-
-🔓 **Needs `CLAUDE.md`'s *Design skill precedence* rule amended in its first commit** — that rule currently puts `impeccable`'s `new-work.md` path out of scope site-wide, and `new-work` is exactly the path this takes. `DESIGN.md` is replaced at the end, not edited.
-
-📌 **Considered and NOT selected**, so they are not re-proposed: a *How points work* page, *Partner with us / Sponsorship*, *Recruitment / Junior Directors*, *Teams / committees*, and promoting the FAQ to its own page.
+**Next: phase 1 — the home page and header**, with the layout-family budget declared up front. §14 Final Pre-Flight is a gate before every review, not advice.
 
 ---
 

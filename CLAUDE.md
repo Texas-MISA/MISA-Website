@@ -390,6 +390,12 @@ lib/
 scripts/create-officer.mjs  officer bootstrap / password reset / revoke
 supabase/migrations/    versioned SQL
 supabase/seed.sql
+components/shadcn/      🏗️ shadcn/ui components, added on demand with
+                        `npx shadcn@latest add <name>`. ⚠️ This path is
+                        DELIBERATE, set in components.json: shadcn's default
+                        alias is `components/ui`, and `shadcn init` used it to
+                        overwrite this project's own button.tsx, which 45 files
+                        import. Never point it back
 components/             site-header.tsx (5-item nav incl. Admin, absolutely
                         centred wordmark, navy Check In), site-footer.tsx
                         (socials row + address; NO officer link — it is in the

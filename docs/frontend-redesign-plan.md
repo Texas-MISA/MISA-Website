@@ -1,7 +1,28 @@
-# Frontend redesign — plan
+# Frontend redesign — plan (v1, SUPERSEDED)
 
-**Status: NOT STARTED.** Written 2026-08-17; scope widened and then narrowed with
-the officer the same day. Nothing here is built.
+> ⛔ **SUPERSEDED by [`frontend-redesign-v2-plan.md`](frontend-redesign-v2-plan.md)
+> on 2026-08-17. Do not build from this document.**
+>
+> v1 was planned here, built, and **scrapped**. It survives on the abandoned
+> branch `redesign-stage-1` (tip `60ca71d`); `main` was never touched. The
+> officer rejected it as bland, lacking depth, with image slots concentrated
+> into a single section and a scattered, same-ey layout.
+>
+> 📌 **Kept for its reasoning, not its decisions.** The analysis below of what
+> the site is and what the no-photography constraint does to it is still good,
+> and the v2 plan builds on it. But its decision table is substantially
+> reversed: type is open, the frozen four are full redesigns, image slots go in
+> every section rather than one, `DESIGN.md` is retired rather than replaced at
+> the end, and the direction is taken from `design-taste-frontend` rather than
+> from a concept roll.
+>
+> ⚠️ **The lesson worth carrying forward** is that v1's failure was process, not
+> taste: it treated the installed design skills as advisory and hand-rolled
+> everything, against §2's *"do not invent CSS for things that have an official
+> package."*
+
+**Original status line: NOT STARTED.** Written 2026-08-17; scope widened and then
+narrowed with the officer the same day.
 
 A complete redesign of the public site — its design **and** its information
 architecture. The data layer is untouched.
