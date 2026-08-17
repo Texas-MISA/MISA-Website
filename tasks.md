@@ -6,6 +6,18 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## 📋 Planned, NOT BUILT — complete redesign of the public frontend (written 2026-08-17)
+
+Plan in [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md). Same content, same routes, same behaviour, new design; palette mostly kept; `/admin` out of scope.
+
+⚠️ **The v1.67 rework below was refinement, not this.** It was asked for as a comprehensive rework and delivered one consistent system — worth doing, and it is what makes this tractable, since `components/ui/` is a vocabulary that can be re-skinned. But refinement preserves the incumbent look and a redesign replaces it. This is the second job.
+
+🔓 **It needs `CLAUDE.md`'s *Design skill precedence* rule amended in its first commit** — that rule currently puts `impeccable`'s `new-work.md` path out of scope site-wide, and `new-work` is exactly the path this takes. `DESIGN.md` is replaced at the end, not edited.
+
+**Three decisions the officer owns before direction work starts:** whether the Barlow pair changes, whether the chevron hero survives, and how far the hatch convention may move. 📌 The no-photography rule is not one of them — it is the brief, not a constraint on it.
+
+---
+
 ## Done — Site-wide visual rework; DESIGN.md is now the design authority (2026-08-17, doc v1.67)
 
 Requested as "a comprehensive rework of the misa website — core logic remains, just visuals are edited". **No migration, no Server Action, no route, no query, no schema change.** ~90 files, presentational only.

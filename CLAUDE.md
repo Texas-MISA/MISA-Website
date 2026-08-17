@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | [`docs/dues-and-membership.md`](docs/dues-and-membership.md) | Stage 6.5 spec, including the real Venmo CSV format — and the plan for **manual dues entry**, which is written down but NOT BUILT. |
 | [`docs/attend-confirmation-flow.md`](docs/attend-confirmation-flow.md) | `/attend`'s first-time confirmation and the accepted membership-oracle tradeoff. |
 | [`docs/existing-site-inventory.md`](docs/existing-site-inventory.md) | What was reproduced from the old Squarespace site and what is a placeholder. |
+| [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md) | 📋 **NOT BUILT.** The plan for a complete redesign of the public site's presentation — same content, same behaviour, new design. Names the three decisions the officer owns and the invariants that survive it. |
 
 ## Repository status
 
