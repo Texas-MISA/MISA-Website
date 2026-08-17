@@ -58,6 +58,56 @@ is a large part of why v1 read as bland.
 
 ---
 
+## `DESIGN.md` is retired for v2, except one set
+
+🔓 **Officer decision, 2026-08-17: every aesthetic rule in `DESIGN.md` is open.**
+The Two Grounds Rule, the Rare Navy Rule, the Poché Rule, the Two-Width Rule, the
+Mono-Means-Placeholder Rule, the Tight-Top Rule, the Square Corner Rule, the
+Wordmark Clearance Rule, the flatness, the light-only decision, the fixed image
+ratios, the 1px-only border weight, the one-Display-per-page rule, the ban on a
+second accent or a tint of navy, and the ban on hover motion are **all retired
+for the duration of v2**. The frontmatter tokens are not binding either.
+
+📌 **Why wholesale rather than rule by rule:** v1 relaxed constraints one at a
+time and ended up half-committed, which is most of what "bland" described. A new
+`DESIGN.md` is written at phase 5 from what actually ships.
+
+⚠️ Two of these were already blocking things the officer has asked for, which is
+how the decision surfaced: **"Don't animate on hover with a lift, a scale on a
+control, or a shadow"** forbids the floating-card hover-enlarge, and **"Don't
+introduce … a tint of navy other than Pressed Navy"** forbids a navy-to-navy
+gradient.
+
+### The engineering set, which still binds
+
+These read as design rules and are not. Each prevents a specific failure this
+codebase has already shipped, and each is stated as its **principle** rather than
+its current implementation, because v2 may not keep the implementation.
+
+1. **A focus ring must be visible on every ground it can land on.** Today that is
+   the `.on-navy` flip to white; a navy ring on a navy field is invisible. Any
+   new ground needs its own answer in the same commit.
+2. **Space between sections belongs to the sections, never to a margin between
+   them.** Removing a band's ground once left 112px of dead air behind because
+   the padding had been sized for a field that was gone.
+3. **A shared-rule plate is one background showing through `gap: 1px`, never a
+   border per cell.** Two adjacent borders read as a double rule.
+4. **Contrast is measured per pairing, on the ground the text actually sits on,
+   compositing any alpha.** Annotation Grey passed everywhere until the day a
+   field's ground changed under it; v1's nav numeral measured 3.35:1 this way.
+5. **Identifiers in `/admin` are monospace.** An EID is transcribed by hand off a
+   phone screen, and monospace is what separates `l` from `1` and `0` from `O`.
+6. **Feedback colours are named, never raw framework scales.** Reaching for
+   `red-700` at ~40 sites is how a palette that forbade a third colour quietly
+   acquired three, in whatever hue the framework shipped.
+7. **No photography.** This is `PRODUCT.md`, not `DESIGN.md` — the organization
+   has not taken the photographs. Slots stay slots.
+
+The markup-level invariants under *What must not regress* below bind equally and
+are a separate list.
+
+---
+
 ## Skill routing
 
 `design-taste-frontend` is primary. The others serve it:
