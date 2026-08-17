@@ -8,7 +8,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ## 🏗️ IN PROGRESS — v2 visual redesign of the whole site (2026-08-17)
 
-Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 is complete.**
+Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 complete. ✅ Phase 1 (home page + header) is BUILT and AT THE REVIEW GATE.**
 
 ⚠️ **A v1 redesign was built and SCRAPPED.** It survives on the abandoned branch `redesign-stage-1` (tip `60ca71d`) as a record; `main` was never touched. It was rejected as bland, lacking depth, with image slots concentrated into one section and a scattered, same-ey layout. Each of those turned out to be a named rule in `design-taste-frontend` that v1 read too late or not at all. The root cause was process: v1 treated the skills as advisory and hand-rolled everything, against §2's *"do not invent CSS for things that have an official package."* The v1 plan, [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md), is **superseded**.
 
@@ -29,7 +29,18 @@ Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md)
 
 🔴 **No new page may invent a fact about the club**, and per the officer any new copy is **reviewed before it ships**. `PRODUCT.md`: testimonials, member counts, placement stats, awards and press do not exist.
 
-**Next: phase 1 — the home page and header**, with the layout-family budget declared up front. §14 Final Pre-Flight is a gate before every review, not advice.
+**Phase 1 is built and waiting on the officer.** Six files, presentational only. The layout-family budget was declared before any markup and is named per section in code comments: Asymmetric Split Hero → Kinetic Marquee → Editorial Manifesto → Bento Grid → Featured-plus-rest → Shared-rule logo plate. **Six sections, six families, none repeated.** Image slots now sit in every section (four in the hero, two flanking the mission) rather than concentrated in the marquee band.
+
+Measured at the gate: zero horizontal overflow at 390/768/1024/1280/1646, hero fits the viewport at every width, headline 2 lines everywhere, nav one line at 61px with 277/304px wordmark clearance at 1280, **0 of 21 reveals hidden with JS off**, every contrast pairing ≥4.5:1 on the composited ground, 1022 tests green.
+
+🔴 **Three things need the officer before phase 2 starts:**
+1. **A light hatch on the navy hero field**, which departs from `hatch.tsx`'s never-mixed rule. The reason is that the plates overlap and navy-on-navy gave no separation — and a navy-tinted shadow composites to nothing on a navy ground, so the frame could not rescue it either.
+2. **No hero CTA.** Refused because the sticky header carries Check In above the fold at all times and adding one means authoring a string on a page whose copy is locked. Reversible if the officer supplies a locked label.
+3. **A real-device mobile check.** The breakpoint numbers are same-origin iframe probes, which are a layout measurement and not a device.
+
+⚠️ **Zero shadcn components were added**, which falsifies the plan's premise that phase 1 would be the first `shadcn add`. The home page has no dialog, popover, select or form control to own; the first genuine candidates are phase 2 and phase 4.
+
+**Next after the gate: phase 2** — `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. `PageHero` and `Partners` are both deliberately untouched by phase 1 and belong to it. §14 Final Pre-Flight is a gate before every review, not advice.
 
 ---
 

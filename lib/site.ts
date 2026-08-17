@@ -56,6 +56,35 @@ export type Slot = {
   category: GalleryCategory;
 };
 
+// ── Home page slots (hero + mission) ─────────────────────────────────────────
+
+/**
+ * 🔓 NEW in the v2 redesign, phase 1. The hero and the mission used to carry
+ * **zero** image slots between them, while the marquee band carried eleven —
+ * and concentrating the slots into one band is the single thing v1 was most
+ * clearly scrapped for. `design-taste-frontend` §4.8 wants slots in every
+ * section, not one plate section.
+ *
+ * ⚠️ Captions here are drawn from the vocabulary `GALLERY_ITEMS` already uses,
+ * deliberately. A caption names a shot, so an invented one ("case competition
+ * photo", "hackathon photo") would assert an activity the club has not told us
+ * it runs — which is the same failure as inventing a fact about the club, just
+ * wearing a placeholder's clothes. Every string below already appears below.
+ *
+ * 📌 Content only. The tilt, the aspect ratio and the stacking order are
+ * composition and live with the component, the same way `ACTIVITIES[].caption`
+ * is content while `activities.tsx` owns the layout.
+ */
+export const HERO_SLOTS = [
+  "chapter photo",
+  "general meeting photo",
+  "workshop photo",
+  "banquet photo",
+] as const;
+
+/** The two plates flanking the mission statement. */
+export const MISSION_SLOTS = ["member photo", "service day photo"] as const;
+
 // ── Activities (home page) ───────────────────────────────────────────────────
 
 /**

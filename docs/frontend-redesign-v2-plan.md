@@ -325,7 +325,7 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 | Phase | Scope |
 |---|---|
 | **0** | Amend `CLAUDE.md` precedence. Install the three packages. Re-skin shadcn out of default state. Define the elevation vocabulary and the radius scale. Read §0, §4, §5, §10, §12 in full. |
-| **1** | **Home page + header.** The proof. Layout-family budget declared up front. → **GATE** |
+| **1** | ✅ **BUILT, at the GATE.** Home page + header. Record below. |
 | **2** | `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries |
 | **3** | `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched |
 | **4** | `/admin` under scanability rules, screen by screen, suite green between screens |
@@ -341,6 +341,105 @@ against the ramp that actually ships, or not at all.
 first scan, and it is not v2's doing: `app/(public)/_components/upcoming-events.tsx:87`
 sets `text-[21px]`, which is off the documented ramp today. Leave findings like
 this standing until the section that owns them is rebuilt.
+
+---
+
+## Phase 1 record (2026-08-17) — home page + header
+
+Built, measured, and waiting on the officer. Six files; `app/actions/`, `supabase/`
+and `proxy.ts` untouched, and the only `lib/` change is 29 lines of slot captions.
+
+**Officer decisions taken at the start of the phase:** keep **Barlow + Barlow
+Condensed** (retune the ramp only); stay **all-sharp at `--radius: 0`**; and build
+the hero as an **Asymmetric Split with floating captioned plates** over a navy
+radial field, taking the reference's floating frame, hover lift and non-flat
+ground while refusing its radius, its hard block shadow and its accent.
+
+### The layout-family budget
+
+| # | Section | Family | Ground | Slots | Grouping |
+|---|---|---|---|---|---|
+| 1 | Hero | Asymmetric Split Hero + plate cluster | `field` | 4 | negative space |
+| 2 | Gallery band | Kinetic Marquee (the only one) | white | ~11/group | negative space |
+| 3 | Mission | Editorial Manifesto | white | 2 | negative space |
+| 4 | Activities | Bento Grid, 4 cells / 4 items | white | 4 | gap |
+| 5 | Projects | Featured + rest | navy | 3 | one plate through `gap: 1px` |
+| 6 | Partners | Shared-rule logo plate | panel | 0 (4 real logos) | one plate through `gap: 1px` |
+
+**Six sections, six families, none repeated.** Longest consecutive-split run is 1
+against a cap of 2. Eyebrows above section headlines: **0**, against a budget of
+`ceil(6/3) = 2`; the crude `uppercase tracking` grep finds one hit, the per-card
+`term` label, which is card metadata rather than a section eyebrow.
+
+### What the diagnosis actually was
+
+Three of the six sections failed a *named* rule before anything was designed: a
+centred hero at VARIANCE 8 (§4.3), Activities as **four consecutive** image+text
+rows against §4.7's cap of two with `border-t` + `last:border-b` on every row
+(§9.F), and Projects as **three equal cards** (§9.C). "Scattered and same-ey" was
+countable, not vague.
+
+### Decisions that need the officer
+
+1. 🔓 **A light hatch on the navy field**, departing from `hatch.tsx`'s
+   "never mixed" rule. The plates overlap, overlap is where the cluster's depth
+   comes from, and navy-on-navy gave no plate-to-plate separation — nor could the
+   frame rescue it, because **a shadow tinted to the background hue composites to
+   nothing on a ground of that hue**, which is what every shadow here is by
+   design. A light plate separates from the field *and* gives `shadow-lift` a
+   light surface to land on. Fallback is navy tone plus `border-white/25`, at the
+   cost of most of the depth.
+2. **No hero CTA**, refused with a reason rather than omitted: the sticky header
+   carries Check In above the fold at every scroll position, and adding one means
+   authoring a string on a page whose copy is locked. Reversible if the officer
+   supplies a locked label.
+3. **`Partners` drift deferred.** It predates `<Section>`, hardcodes its own
+   gutter and duplicates `Headline`'s class string — but it is shared with
+   `/about`, so it belongs to phase 2 rather than to a phase that is not
+   reviewing that page.
+
+### Premises this phase falsified
+
+- ⚠️ **"Phase 1 is the first `shadcn add`" is wrong.** Zero components were added
+  and that is the honest answer: the home page has no dialog, popover, select or
+  form control, and `Button` would collide with the `buttonClass` module 45 files
+  import. Phase 0's deliverable was the theme, and it is live. First real
+  candidates are phase 2 and phase 4.
+- 🪤 **"A plain `@theme` emits `--shadow-*` onto `:root`" is wrong.** Tailwind
+  still tree-shakes: a step used only through its utility is inlined and its
+  custom property never appears, so `--shadow-lift` reads as an **empty string**
+  while `shadow-lift` paints correctly. Probe the utility, never the variable.
+
+### Measured at the gate
+
+`scrollWidth − clientWidth === 0` at **390 / 768 / 1024 / 1280 / 1646**, document
+and body. Hero **716 / 576 / 628 / 668 / 668px**, fitting the viewport at every
+width. Headline **2 lines everywhere**. Header **61px** (cap 80), nav on **one
+line**, wordmark clearance **277 / 304 at 1280** and **461 / 487 at 1646**. No-JS:
+**0 of 21** reveals hidden. Contrast on the composited field at its lightest
+point: white H1 **11.2:1**, tagline **7.83:1**, focus ring **11.2:1**; page
+minimum 4.84:1 (pre-existing nav muted). Lint, `tsc`, build clean; **1022 tests
+pass**; detector 5 findings, all `design-system-font-size` against the retired
+ramp, all left standing.
+
+⚠️ **A real-device mobile check is still outstanding.** Those widths were measured
+in same-origin iframes, which is a layout probe and not a device.
+
+### Photography this phase needs (handback)
+
+Six new slots, all captioned from the vocabulary already in `lib/site.ts`:
+
+| Slot | Caption | Shape |
+|---|---|---|
+| Hero, back-left | chapter photo | landscape 4:3, ≥1600×1200 |
+| Hero, tall right | general meeting photo | portrait 3:4, ≥1200×1600 |
+| Hero, square | workshop photo | square, ≥1200×1200 |
+| Hero, low right | banquet photo | landscape 3:2, ≥1500×1000 |
+| Mission, left | member photo | portrait 3:4, ≥1200×1600 |
+| Mission, right | service day photo | portrait 3:4, ≥1200×1600 |
+
+The Activities and Projects slots keep their existing captions and are unchanged
+in number.
 
 ---
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -77,7 +78,9 @@ export function SiteHeader() {
   const isActive = (href: string) => pathname === href;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-misa-hairline bg-white">
+    // `header-lift` adds the scroll-driven shadow — see globals.css. It needs
+    // the element to be positioned, which `sticky` already makes it.
+    <header className="header-lift sticky top-0 z-50 border-b border-misa-hairline bg-white">
       <div className="relative flex h-15 items-center justify-between gap-6 px-5 sm:px-8">
         {/* Desktop nav, left. xl rather than lg: below that width the centred
             wordmark and the two groups cannot coexist, so everything is in the
@@ -114,21 +117,17 @@ export function SiteHeader() {
           className="-ml-1 flex h-10 w-10 items-center justify-center text-foreground xl:hidden"
         >
           <span className="sr-only">{open ? "Close menu" : "Open menu"}</span>
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            className="h-6 w-6"
-            aria-hidden="true"
-          >
-            {open ? (
-              <path d="M6 6l12 12M18 6L6 18" />
-            ) : (
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            )}
-          </svg>
+          {/* 🔓 Lucide, replacing a hand-rolled SVG. §9.E bans drawing icon
+              paths from scratch when an icon library is available, and phase 0
+              made Lucide this project's family — shadcn's own components are
+              Lucide internally, and §3.C permits it "when the project already
+              depends on it". `strokeWidth` is standardised at 1.5, which is
+              what the hand-rolled glyph used. */}
+          {open ? (
+            <X className="h-6 w-6" strokeWidth={1.5} aria-hidden="true" />
+          ) : (
+            <Menu className="h-6 w-6" strokeWidth={1.5} aria-hidden="true" />
+          )}
         </button>
 
         {/* Centred wordmark, absolutely positioned so neither side group can

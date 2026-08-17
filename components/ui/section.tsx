@@ -17,12 +17,24 @@ import type { ElementType, ReactNode } from "react";
 
 /**
  * White is the default page ground; Panel is the alternating light ground;
- * Navy is the full-bleed brand band.
+ * Navy is the full-bleed brand band; Field is the drawn navy gradient.
  *
- * ⚠️ There is no fourth. Adding one is a change to DESIGN.md's Two Grounds
- * Rule, not a prop.
+ * 🔓 **`field` is the fourth ground, added in the v2 redesign.** This entry
+ * used to read "there is no fourth — adding one is a change to DESIGN.md's Two
+ * Grounds Rule, not a prop", and that is exactly what happened: the officer
+ * retired the rule on 2026-08-17, clarifying that the navy-and-white *palette*
+ * is locked while the *ground* is not. Gradients, tinted fields and drawn
+ * backgrounds are in play so long as they are built from the palette, and
+ * `.ground-field` in globals.css is built from three colours the system already
+ * owns. A fifth ground is still a decision, not a prop.
+ *
+ * 🪤 `field` carries `.on-navy` for the same reason `navy` does, and that is
+ * the engineering rule that survived the retirement: **a focus ring must be
+ * visible on every ground it can land on, and a new ground answers that in the
+ * same commit.** A navy ring on a navy field is not a subtle defect; it is no
+ * focus indicator at all.
  */
-export type SectionGround = "white" | "panel" | "navy";
+export type SectionGround = "white" | "panel" | "navy" | "field";
 
 /**
  * The vertical rhythm scale. Every step is responsive — the handoff's 56–80px
@@ -53,6 +65,10 @@ const GROUND: Record<SectionGround, string> = {
   // `.on-navy` is not decoration — it is the focus-ring flip, and it must
   // travel with the fill or every ring inside this section becomes invisible.
   navy: "on-navy bg-misa-blue text-white",
+  // The drawn field. `.ground-field` sets its own background-color as well as
+  // the radials, so no `bg-*` utility belongs here — one would win the cascade
+  // and flatten the gradient back to a solid.
+  field: "on-navy ground-field text-white",
 };
 
 const PAD_TOP: Record<SectionPad, string> = {

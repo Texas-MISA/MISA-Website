@@ -268,7 +268,11 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         layout.tsx holds the shared header/footer and mounts
                         RevealObserver once; _components/ holds page-private
                         pieces (leading underscore = not a route) — the home
-                        page's gallery-marquee.tsx and upcoming-events.tsx
+                        page's home-hero.tsx (v2 phase 1: the Asymmetric Split
+                        Hero and its floating plate cluster — replaces PageHero
+                        on the HOME PAGE ONLY; the other nine public pages still
+                        use PageHero, so chevron-section.tsx is untouched until
+                        phase 2), gallery-marquee.tsx and upcoming-events.tsx
                         (KEPT BUT UNMOUNTED; remounting it also restores the
                         page's force-dynamic), and
                         /gallery's gallery-grid.tsx, the one client component
@@ -403,8 +407,12 @@ components/             site-header.tsx (5-item nav incl. Admin, absolutely
                         halves of the app use it — /admin used to import two
                         things from here, which is the whole story of its drift:
                           layout    section.tsx (ground + gutter + rhythm in one
-                                    place, so the Two Grounds Rule is structural),
-                                    panel.tsx, page-header.tsx
+                                    place, so the Two Grounds Rule is structural).
+                                    🔓 v2 phase 1 added a FOURTH ground, `field`
+                                    — the drawn navy radial — and it carries
+                                    `.on-navy` for the same reason `navy` does:
+                                    a new ground answers the focus ring in the
+                                    same commit. panel.tsx, page-header.tsx
                           type      heading.tsx (Headline/Title/Eyebrow/Lead —
                                     ground-aware via an .on-navy variant, not a
                                     prop), chevron-section.tsx (PageHero — navy

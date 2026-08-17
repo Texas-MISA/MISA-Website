@@ -208,9 +208,23 @@
      cosmetic. `inline` resolves a token into the utilities that use it and
      never emits the custom property, so `--shadow-lift` was unreadable at
      runtime and could not be referenced from an arbitrary value. A plain
-     `@theme` both emits `--shadow-*` onto `:root` and registers the
-     `shadow-*` utilities. This is the same trap that made a font swap appear
-     to do nothing earlier in this redesign; it is worth knowing once.
+     `@theme` registers the `shadow-*` utilities and makes the custom property
+     available. This is the same trap that made a font swap appear to do
+     nothing earlier in this redesign; it is worth knowing once.
+
+     ⚠️ **Corrected in phase 1, because the sentence above overstated it.** A
+     plain `@theme` does NOT put all four onto `:root` unconditionally —
+     Tailwind still tree-shakes, so a step used only through its utility is
+     inlined into that utility and its custom property is never emitted.
+     Measured on the built page:
+     `getComputedStyle(document.documentElement).getPropertyValue('--shadow-lift')`
+     returns an EMPTY STRING even though `shadow-lift` paints correctly as
+     `rgb(22 48 92 / .06) 0 1px 2px, rgb(22 48 92 / .08) 0 4px 12px`. The
+     property materialises only once something references it with `var()`,
+     which is why `--shadow-sticky` resolves (`.header-lift::after` uses it)
+     and the other three do not. So: to check a step is live, probe the
+     UTILITY on a real element, never the variable. The variable coming back
+     empty is not evidence of a broken token, and it cost half an hour once.
 
      📌 Four steps, each with a job. A shadow that does not match one of these
      jobs does not get added; a fifth step is a change to this list, not a
@@ -389,6 +403,94 @@
     background-size: 60px 60px;
   }
 
+  /* ── The drawn navy field ────────────────────────────────────────────────
+     🔓 NEW in v2, and the fourth ground. `DESIGN.md`'s Two Grounds Rule read
+     "two grounds only … never a third, never a gradient"; the officer retired
+     that clause on 2026-08-17 with the clarification that the *palette* is
+     locked and the *ground* is not. A plain white page behind everything is a
+     large part of why v1 read as bland.
+
+     📌 Every stop is a colour this system already owns — Pressed Navy as the
+     base, Drafting Navy as the warm centre, and the light hatch stripe as the
+     lift behind the plate cluster. No new hue enters the palette, which is what
+     "built from navy and white" has to mean if it is to mean anything.
+
+     🪤 The base COLOUR is declared separately from the image, and that is not
+     tidiness. `background-image` alone leaves the element transparent wherever
+     the radials fall off, so the white page would show through the corners of a
+     field that is supposed to be solid.
+
+     ⚠️ A gradient is not one ground, so contrast is measured at BOTH ends of
+     it: white on Pressed Navy (#0d1d38) and white on the lightest point the
+     radials reach. `Section`'s `field` ground carries `.on-navy` for the same
+     reason `navy` does — the focus ring must be white here or it disappears
+     into the field. */
+  .ground-field {
+    background-color: var(--misa-blue-dark);
+    background-image:
+      radial-gradient(
+        120% 86% at 18% 0%,
+        color-mix(in srgb, var(--misa-hatch-a) 62%, transparent),
+        transparent 64%
+      ),
+      radial-gradient(
+        96% 74% at 82% 4%,
+        color-mix(in srgb, var(--misa-blue) 88%, transparent),
+        transparent 70%
+      );
+  }
+
+  /* ── Floating image plates ───────────────────────────────────────────────
+     The hero cluster and the mission's flanking slots. A plate is a framed
+     placeholder that sits ABOVE the page rather than in it, which is the one
+     job `--shadow-lift` names.
+
+     🪤 The rotation lives HERE, on the inner element, and never on the node
+     carrying `data-reveal`. `html.js [data-reveal][data-revealed]` sets
+     `transform: none` on every revealed node regardless of variant, so a plate
+     that was both would snap square the instant it entered — silently, and only
+     after a scroll, which is the hardest kind of defect to catch in a
+     screenshot.
+
+     📌 Depth reads differently on the two grounds, so the hover cue moves with
+     the ground exactly like `Hatch`'s tone, its frame and its caption already
+     do. On white the lift is the shadow step (`lift` → `raised`, the system's
+     only hover elevation). On the navy field a navy-tinted shadow is invisible,
+     so the frame brightens instead. Same gesture, same duration, the cue each
+     ground can actually carry. */
+  .plate {
+    /* The resting tilt. `--plate-tilt` is set per plate by the component, so
+       the angles live with the composition rather than as six near-identical
+       classes here. Default 0deg, so a plate that sets nothing is simply square
+       and still gets the hover. */
+    transform: rotate(var(--plate-tilt, 0deg));
+    transition:
+      transform var(--dur-hover) var(--ease-out-quint),
+      box-shadow var(--dur-hover) var(--ease-out-quint),
+      border-color var(--dur-hover) var(--ease-out-quint);
+  }
+
+  @media (hover: hover) {
+    .plate:hover {
+      transform: translateY(-4px) rotate(var(--plate-tilt, 0deg));
+    }
+  }
+
+  /* ⚠️ Reduced motion kills the travel, not the feedback. The shadow and the
+     frame still respond, so a reader who has asked for less motion still gets
+     told the plate is interactive. */
+  @media (prefers-reduced-motion: reduce) {
+    .plate {
+      transition:
+        box-shadow var(--dur-hover) linear,
+        border-color var(--dur-hover) linear;
+    }
+
+    .plate:hover {
+      transform: rotate(var(--plate-tilt, 0deg));
+    }
+  }
+
   /* Placeholder hatch — 45°, 7px stripes. Two grounds, never mixed: a light
      box on white, a navy box on navy. */
   .hatch-light {
@@ -419,6 +521,48 @@
      `::after` overlay of `background:#16305c; mix-blend-mode:color` filling
      the frame, with officer headshots and the About mission cluster
      deliberately exempt. Restore it alongside the first real photo. */
+
+  /* ── The sticky header's shadow ─────────────────────────────────────────────
+     `--shadow-sticky`'s stated job, finally used: "a bar pinned over scrolling
+     content, where the shadow's job is to prove the content is passing
+     underneath." At rest the header is flat and separated by its hairline
+     alone; once the page has scrolled, it lifts.
+
+     🪤 **Driven by a CSS scroll-driven animation, not a scroll listener.**
+     §5.D bans `window.addEventListener("scroll", …)` outright — it fires every
+     frame, cannot be batched, and in React it re-renders the tree. This needs
+     no JavaScript at all, so the header stays as cheap as it was.
+
+     🪤 **The opacity of a pseudo-element is animated, not the box-shadow.**
+     Only `transform` and `opacity` are compositor-friendly; animating
+     `box-shadow` directly repaints the header on every scroll tick, which is
+     the one element on the page guaranteed to be visible during every scroll.
+
+     📌 Degrades to no shadow where `animation-timeline` is unsupported, which
+     is the correct failure: the hairline border is still there, so the header
+     is still separated from the content. Nothing is lost but the emphasis. */
+  .header-lift::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    box-shadow: var(--shadow-sticky);
+    opacity: 0;
+  }
+
+  @supports (animation-timeline: scroll()) {
+    .header-lift::after {
+      animation: header-lift linear both;
+      animation-timeline: scroll();
+      animation-range: 0 72px;
+    }
+  }
+
+  @keyframes header-lift {
+    to {
+      opacity: 1;
+    }
+  }
 
   /* ── Homepage gallery marquees ──────────────────────────────────────────── */
 
