@@ -76,6 +76,11 @@ skills-lock.json
 # records the product context and the refusals (no photography, no invented
 # statistics), and design.json is the machine sidecar `/impeccable doctor` diffs
 # for staleness. Leaving them untracked meant the binding spec existed on one
-# laptop. Everything else Impeccable writes under .impeccable/ is session state:
+# laptop. `.impeccable/config.json` is tracked for the same reason: its detector
+# ignores are DESIGN DECISIONS with their evidence attached (the hero's 60×60
+# grid is the handoff's spec, not generated-UI decoration), and left untracked
+# the next officer's hook re-raises every one of them. Everything else
+# Impeccable writes under .impeccable/ is session state:
 .impeccable/*
 !.impeccable/design.json
+!.impeccable/config.json
