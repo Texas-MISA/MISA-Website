@@ -8,13 +8,19 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ## 📋 Planned, NOT BUILT — complete redesign of the public frontend (written 2026-08-17)
 
-Plan in [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md). Same content, same routes, same behaviour, new design; palette mostly kept; `/admin` out of scope.
+Plan in [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md). A redesign of the public site's **design and its information architecture** — new pages and features are in scope, inferred from the club's existing content.
 
-⚠️ **The v1.67 rework below was refinement, not this.** It was asked for as a comprehensive rework and delivered one consistent system — worth doing, and it is what makes this tractable, since `components/ui/` is a vocabulary that can be re-skinned. But refinement preserves the incumbent look and a redesign replaces it. This is the second job.
+**Frozen: `/attend`, `/leaderboard`, `/lookup`, `/admin`, and the whole data layer.** No route, Server Action, query, migration, view or schema change. ⚠️ Open decision: whether those four inherit the new skin. Recommendation is yes — otherwise the site splits visually in two, which is the exact defect v1.67 spent 121 files closing.
 
-🔓 **It needs `CLAUDE.md`'s *Design skill precedence* rule amended in its first commit** — that rule currently puts `impeccable`'s `new-work.md` path out of scope site-wide, and `new-work` is exactly the path this takes. `DESIGN.md` is replaced at the end, not edited.
+⚠️ **The v1.67 rework below was refinement, not this.** One consistent system — worth doing, and what makes this tractable, since `components/ui/` is a vocabulary that can be re-skinned. But refinement preserves the incumbent design and a redesign replaces it. This is the second job.
 
-**Three decisions the officer owns before direction work starts:** whether the Barlow pair changes, whether the chevron hero survives, and how far the hatch convention may move. 📌 The no-photography rule is not one of them — it is the brief, not a constraint on it.
+🔴 **The rule that governs new pages: no new page may invent a fact about the club.** `PRODUCT.md` says testimonials, member counts, placement stats, awards and press do not exist and must not be fabricated. A new surface is proposed with its evidence, then **waits for real copy from an officer**. If the copy does not arrive, the page does not ship — a normal outcome, not a failure. This is the likeliest way the work goes wrong; all four skills will happily generate plausible club prose.
+
+🔓 **Needs `CLAUDE.md`'s *Design skill precedence* rule amended in its first commit** — that rule currently puts `impeccable`'s `new-work.md` path out of scope site-wide, and `new-work` is exactly the path this takes. `DESIGN.md` is replaced at the end, not edited.
+
+🪤 **Any nav change re-opens the wordmark clearance measurement.** Five items fit today (285px clearance left at 1280, 312px right); the wordmark is absolutely centred and wins the z-order, so an overflowing item *disappears silently*. More than five means a different navigation pattern, and that is a stage-1 design problem rather than a stage-5 fix-up.
+
+**Four decisions the officer owns before direction work starts:** whether the Barlow pair changes, whether the chevron hero survives, how far the hatch convention may move, and whether the frozen four inherit the new skin. 📌 The no-photography rule is not one of them — it is the brief, not a constraint on it.
 
 ---
 
