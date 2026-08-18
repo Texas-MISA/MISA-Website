@@ -44,59 +44,78 @@ import { HERO_SLOTS, TAGLINE } from "@/lib/site";
  * The cluster, as composition rather than content: the captions come from
  * `lib/site.ts`, the geometry lives here.
  *
- * 🔓 **Uniform, and larger** (officer, 2026-08-18: make the layout of the
- * images more consistent, and make them bigger). This was four different
- * shapes at four different sizes, absolutely positioned into a scatter —
- * 4:3, 3:4, 1:1 and 3:2, at widths from 34% to 50%. It read as four unrelated
- * objects rather than as one set of photographs.
+ * 🔓 **Same size and shape, layered instead of gridded** (officer,
+ * 2026-08-18). The four plates went through three arrangements and this is
+ * the one that keeps what each round was actually asking for:
  *
- * Now every plate is the SAME aspect ratio at the SAME size in a plain grid,
- * and the only thing that varies is a small alternating tilt. That is the
- * distinction worth keeping: varying one property by a fixed amount reads as
- * a deliberate set, varying four properties by arbitrary amounts reads as
- * scatter.
+ *   - a scatter of four different shapes at four sizes, which read as four
+ *     unrelated objects rather than one set of photographs;
+ *   - a flat 2×2, which fixed that but flattened the depth out with it;
+ *   - this: one aspect ratio at one size, **overlapping**.
  *
- * ⚠️ 3:2 rather than 4:3 is a height decision, not a taste one. A landscape
- * frame this wide gets tall fast in a 2×2, and the hero has to fit the
- * viewport — 4:3 at these widths put it back over the fold, which is the
- * failure that bounded the cluster in the first place.
+ * 📌 The distinction that survived all three is worth stating once. Varying
+ * ONE property reads as a deliberate set; varying four reads as scatter. Here
+ * the single varying property is POSITION, and size, shape, frame and radius
+ * are identical across all four.
  *
- * 🔓 **The tilt is 0 and the plates sit square.** They were rotated ±1.5°, and
- * at a 2×2 that is worse than it sounds: two plates leaning opposite ways turn
- * the gap between them into a wedge, so the thing that was supposed to read as
- * hand-placed read as misaligned. A rotation needs room around it to look
- * deliberate, and a tight grid is exactly the arrangement that denies it that.
+ * ⚠️ 3:2 is a height decision, not a taste one. The hero has to fit the
+ * viewport, and a taller frame at these widths puts it back over the fold —
+ * the failure that bounded this cluster in the first place. Overlapping
+ * actually buys height back, because four plates in a layered box occupy less
+ * vertical space than the same four in a 2×2.
  *
- * 📌 The mechanism is kept rather than ripped out — `--plate-tilt` still
- * threads through `.plate`, and a non-zero value here is the only edit needed
- * to bring the lean back. ⚠️ If it comes back, the overflow arithmetic comes
- * back with it: a plate of width W and height H rotated by θ has a bounding
- * width of `W·cos θ + H·sin θ`, it applies at EVERY width because
- * `--plate-tilt` is an inline custom property rather than a breakpoint-scoped
- * utility, and 390px is where v1 shipped a scrollbar. The `px-3` reserve and
- * the section's `overflow-x-clip` are still there holding the door.
+ * 📌 Tilt stays at 0. It was removed because two plates leaning opposite ways
+ * in a tight grid turn the gap between them into a wedge; overlapping would
+ * hide that problem rather than solve it, and nothing here needs the lean.
+ * `.plate` still reads `--plate-tilt`, so restoring it means putting the
+ * custom property back on the inner element (`style={{ "--plate-tilt": … }}`)
+ * — the CSS side is untouched and waiting. ⚠️ If it comes back,
+ * the overflow arithmetic comes back with it: a plate of width W and height H
+ * rotated by θ has a bounding width of `W·cos θ + H·sin θ`, and it applies at
+ * EVERY width because `--plate-tilt` is an inline custom property rather than
+ * a breakpoint-scoped utility. 390px is where v1 shipped a scrollbar.
  */
 const PLATES = [
-  { tilt: "0deg", delay: 0.1 },
-  { tilt: "0deg", delay: 0.16 },
-  { tilt: "0deg", delay: 0.22 },
-  { tilt: "0deg", delay: 0.28 },
+  // 🪤 Positions are PERCENTAGES of the cluster box, and the box carries an
+  // aspect ratio, so the whole arrangement scales as one thing. Pixel offsets
+  // would need re-tuning at every breakpoint and would drift apart the first
+  // time one of them was missed.
+  //
+  // Right edges: 48% wide from 0 / 44 / 8 / 50 lands at 48 / 92 / 56 / 98 —
+  // all inside the box, which is what keeps this off the horizontal-overflow
+  // check. Bottom edge: the last plate starts at 50% of a box whose height is
+  // set so 50% + one plate height is exactly the full height.
+  { place: "lg:absolute lg:w-[48%] lg:left-0 lg:top-0 lg:z-40", delay: 0.1 },
+  {
+    place: "lg:absolute lg:w-[48%] lg:left-[44%] lg:top-[6%] lg:z-30",
+    delay: 0.16,
+  },
+  {
+    place: "lg:absolute lg:w-[48%] lg:left-[8%] lg:top-[42%] lg:z-20",
+    delay: 0.22,
+  },
+  {
+    place: "lg:absolute lg:w-[48%] lg:left-[50%] lg:top-[50%] lg:z-10",
+    delay: 0.28,
+  },
 ] as const;
 
 function Plate({
   caption,
-  tilt,
+  place,
   delay,
 }: {
   caption: string;
-  tilt: string;
+  place: string;
   delay: number;
 }) {
   return (
-    // Trap 2: the reveal is out here, the tilt is on the child. Never both on
-    // one node — `[data-revealed]` sets `transform: none`, so a plate carrying
-    // its reveal and its rotation together snaps square the instant it enters.
-    <div data-reveal="up" style={revealDelay(delay)}>
+    // 🪤 Trap 2, still live even with the tilt at 0: `[data-revealed]` sets
+    // `transform: none` on every revealed node, so anything transform-based on
+    // a plate belongs on the INNER element and never on the node carrying
+    // `data-reveal`. The positioning is safe out here because `left`/`top` are
+    // not transforms; a `translate`-based offset would be silently erased.
+    <div data-reveal="up" style={revealDelay(delay)} className={place}>
       <div
         // 🪤 **`misa-plate-edge`, not `misa-border`.** `--misa-border` is an
         // ALPHA colour, and these plates sit on a navy field, so it resolved to
@@ -108,7 +127,6 @@ function Plate({
         // the documented exception to the all-sharp rule, and it applies to
         // floating plates only.
         className="plate border border-misa-plate-edge shadow-lift"
-        style={{ "--plate-tilt": tilt } as React.CSSProperties}
       >
         {/* 🔓 **A LIGHT hatch on a navy ground, which departs from `hatch.tsx`'s
             "light on white, navy on navy, never mixed" rule.** Recorded as a
@@ -236,7 +254,7 @@ export function HomeHero() {
             🪤 `px-3` is the reserve for the rotated corners and the section's
             `overflow-x-clip` is the guarantee behind it. Both still earn their
             place: the tilt is smaller now, but it is not zero. */}
-        <div className="grid grid-cols-2 gap-tile px-3 sm:grid-cols-4 lg:grid-cols-2">
+        <div className="grid grid-cols-2 gap-tile px-3 sm:grid-cols-4 lg:relative lg:block lg:aspect-20/13">
           {HERO_SLOTS.map((caption, i) => (
             <Plate key={caption} caption={caption} {...PLATES[i]} />
           ))}

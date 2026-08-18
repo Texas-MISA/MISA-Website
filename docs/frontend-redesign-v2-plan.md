@@ -467,6 +467,34 @@ everywhere, hero fits the fold at every width (766px at its tallest, header
 included), plates uniform to 0.009px, project cells uniform, 0 of 22 reveals
 hidden with JS off, 1022 tests pass.
 
+### Iteration 3 (2026-08-18, officer review)
+
+**The hero plates keep their size and shape but are layered again.** The flat
+2×2 fixed the inconsistency and flattened the depth out with it. Size, aspect
+ratio, frame and radius are identical across all four; only POSITION varies.
+
+📌 The principle that survived all three arrangements is the one worth keeping:
+**vary one property and it reads as a deliberate set, vary four and it reads as
+scatter.** The original varied shape, size and position at once.
+
+- 🪤 Positions are percentages of a cluster box carrying its own aspect ratio,
+  so the arrangement scales as a single object. Pixel offsets would need
+  re-tuning per breakpoint and would drift apart the first time one was missed.
+- 🪤 **Trap 2 is still live at tilt 0.** `[data-revealed]` sets
+  `transform: none`, so transform-based offsets must stay on the inner element.
+  `left`/`top` are safe on the reveal wrapper only because they are not
+  transforms — a `translate` offset there would be erased on entry.
+- 📌 Overlapping buys height back: four layered plates occupy less vertical
+  space than four gridded ones, so the hero is 702px against the grid's 705px
+  with the plates at the same 376×251.
+- Below `lg` it stays a grid. A layered cluster at phone widths is four
+  thumbnails on top of each other.
+
+Measured: overflow 0 and zero offending elements at
+390/640/768/1024/1280/1440/1646, headline 2 lines everywhere, hero fits the
+fold at every width (763px at its tallest), all four plates identical in size,
+5 overlapping pairs at `lg`+ and 0 below, 0 of 22 reveals hidden with JS off.
+
 ### Decisions that need the officer
 
 1. 🔓 **A light hatch on the navy field**, departing from `hatch.tsx`'s
