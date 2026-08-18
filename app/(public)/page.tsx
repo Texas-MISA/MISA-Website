@@ -41,7 +41,7 @@ const PROJECT_CELLS = [...PROJECTS, PROJECT_PLACEHOLDER];
 //   2. Gallery band ...... Kinetic Marquee            (the page's only marquee)
 //   3. Mission ........... Editorial Manifesto statement
 //   4. Activities ........ Bento Grid
-//   5. Projects .......... Featured + rest, on a shared-rule plate
+//   5. Projects .......... Quadrant grid (2×2) on a shared-rule plate
 //   6. Partners .......... Shared-rule logo plate
 //
 // Each family is named again in its own section below, which is what makes the
@@ -52,7 +52,7 @@ const PROJECT_CELLS = [...PROJECTS, PROJECT_PLACEHOLDER];
 // 🔓 The reversal that mattered most. v1 concentrated every slot into one band,
 // which is exactly backwards, and the hero and mission carried none at all.
 // Every section now carries slots: 4 in the hero, ~11 per marquee group, 2
-// flanking the mission, 4 in the bento, 3 in the projects band. Partners is the
+// flanking the mission, 4 in the bento, 4 in the projects band. Partners is the
 // one exception and always was, because its four logos are real images.
 //
 // ── WHAT DID NOT CHANGE ─────────────────────────────────────────────────────
@@ -83,33 +83,24 @@ export default function HomePage() {
            rather than as body copy in a 68ch column. Two plates flank it, so
            the section carries slots like every other one.
            📌 Grouping mechanism: negative space only. No rule, no divider. */}
-      {/* 🔓 The hero's drafting grid and a gradient ground, carried down the
-          page (officer's note, 2026-08-17: the depth at the top reads well,
-          the rest should have more of it). `.hero-grid` draws in white and is
-          invisible on anything but navy, so `.paper-grid` is the same 60px
-          rhythm in navy at a very low alpha.
+      {/* 🔓 **Depth here is a raised sheet, not a drawn grid** (officer,
+          2026-08-18: take the hash off the white ground, find another way).
+          The grid put a pattern ON the ground and asked the pattern to imply
+          space; this stacks two real surfaces instead — a white sheet lifted
+          off the tinted `paper` ground beneath it. It is also the mechanism
+          the rest of the page already uses, since the bento cards and every
+          image plate are lifted surfaces too, so the light grounds stop having
+          a texture of their own.
 
-          🪤 **The grid is an absolute OVERLAY, not a second class on the
-          section, and it has to be.** `.ground-paper` and `.paper-grid` both
-          set `background-image`, so stacking them on one element is not two
-          layers — it is a collision, and the later rule in the cascade simply
-          erases the earlier one. Put both on the section and you silently get
-          the grid with no gradient. The hero already solved this the right way
-          and this follows it. */}
-      <Section
-        ground="paper"
-        padTop="lg"
-        padBottom="md"
-        width="page"
-        className="relative"
-      >
-        <div
-          aria-hidden="true"
-          className="paper-grid pointer-events-none absolute inset-0"
-        />
-        <div className="relative lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_minmax(0,1fr)] lg:items-center lg:gap-split">
-          <div className="text-center lg:order-2">
-            <Headline data-reveal="rise">Our Mission</Headline>
+          🪤 The sheet needs `ground="paper"` under it. On a plain white
+          section it is an invisible rectangle wearing a shadow. */}
+      <Section ground="paper" padTop="lg" padBottom="md" width="page">
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_minmax(0,1fr)] lg:items-center lg:gap-split">
+          <div
+            data-reveal="rise"
+            className="sheet px-6 py-10 text-center sm:px-10 sm:py-12 lg:order-2"
+          >
+            <Headline>Our Mission</Headline>
             <p
               data-reveal="up"
               style={revealDelay(0.08)}
@@ -129,13 +120,21 @@ export default function HomePage() {
               wrong way round: PRODUCT.md's primary reader is a prospective
               undergrad on a phone. */}
           <div className="mt-10 grid grid-cols-2 gap-tile lg:contents">
-            <div data-reveal="up" style={revealDelay(0.14)} className="lg:order-1">
-              <div className="plate border border-misa-plate-edge shadow-lift hover:shadow-raised">
+            <div
+              data-reveal="up"
+              style={revealDelay(0.14)}
+              className="lg:order-1"
+            >
+              <div className="plate border border-misa-plate-edge shadow-lift">
                 <Hatch caption={MISSION_SLOTS[0]} className="aspect-3/4" />
               </div>
             </div>
-            <div data-reveal="up" style={revealDelay(0.2)} className="lg:order-3">
-              <div className="plate border border-misa-plate-edge shadow-lift hover:shadow-raised">
+            <div
+              data-reveal="up"
+              style={revealDelay(0.2)}
+              className="lg:order-3"
+            >
+              <div className="plate border border-misa-plate-edge shadow-lift">
                 <Hatch caption={MISSION_SLOTS[1]} className="aspect-3/4" />
               </div>
             </div>

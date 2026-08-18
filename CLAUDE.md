@@ -408,11 +408,12 @@ components/             site-header.tsx (5-item nav incl. Admin, absolutely
                         things from here, which is the whole story of its drift:
                           layout    section.tsx (ground + gutter + rhythm in one
                                     place, so the Two Grounds Rule is structural).
-                                    🔓 v2 phase 1 added a FOURTH ground, `field`
-                                    — the drawn navy radial — and it carries
-                                    `.on-navy` for the same reason `navy` does:
-                                    a new ground answers the focus ring in the
-                                    same commit. panel.tsx, page-header.tsx
+                                    🔓 v2 phase 1 added two grounds: `field`
+                                    (the drawn navy radial, which carries
+                                    `.on-navy` because a new ground answers the
+                                    focus ring in the SAME commit) and `paper`
+                                    (its light counterpart, which needs none).
+                                    panel.tsx, page-header.tsx
                           type      heading.tsx (Headline/Title/Eyebrow/Lead —
                                     ground-aware via an .on-navy variant, not a
                                     prop), chevron-section.tsx (PageHero — navy

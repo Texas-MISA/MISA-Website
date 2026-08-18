@@ -61,17 +61,19 @@ export function Activities({ className = "" }: { className?: string }) {
           key={activity.title}
           data-reveal="up"
           style={revealDelay(0.06 * i)}
-          // The elevation vocabulary doing its stated job: `lift` is a resting
-          // element that is nonetheless above the page, `raised` is the same
-          // element under the pointer and is the system's ONLY hover elevation.
-          // `.plate` carries the travel and the timing, shared with the hero's
-          // cluster so both grounds move the same way.
-          // 📌 `misa-plate-edge` rather than `misa-border`: every `.plate` on
-          // the page carries the same edge colour, so a plate is one object
-          // with one frame wherever it lands. On this white ground the two
-          // resolve identically — the token exists because the hero's plates
-          // cross two backdrops and an alpha border does not.
-          className={`plate flex flex-col border border-misa-plate-edge bg-white shadow-lift hover:shadow-raised ${CELLS[i].span}`}
+          // `shadow-lift` is the elevation vocabulary doing its stated job: a
+          // resting element that is nonetheless above the page.
+          //
+          // 🔓 **No hover step** (officer, 2026-08-18: remove the
+          // expand-on-hover). These cards are non-interactive `<article>`s with
+          // nothing to click, so an elevation change on hover was advertising
+          // an affordance that does not exist — the same reason the image
+          // plates lost theirs. ⚠️ That leaves `--shadow-raised` unused for now.
+          // It stays in the vocabulary rather than being deleted: it is the
+          // named answer for the first genuinely interactive surface, which is
+          // phase 3 and phase 4, and re-deriving it later is how a fifth
+          // one-off shadow gets invented instead.
+          className={`plate flex flex-col border border-misa-plate-edge bg-white shadow-lift ${CELLS[i].span}`}
         >
           <Hatch caption={activity.caption} className={CELLS[i].aspect} />
           <div className="flex flex-1 flex-col px-6 pt-5 pb-6">

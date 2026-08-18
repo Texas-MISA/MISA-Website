@@ -42,6 +42,21 @@
      before, and now keeps looking that way whatever passes underneath it. */
   --misa-plate-edge: #bfbfc2;
 
+  /* 🔓 **A second radius, and it is a documented exception to the Shape
+     Consistency Lock rather than a drift.** The page is all-sharp at
+     `--radius: 0` (officer, 2026-08-17) and structure stays that way: sections,
+     tables, inputs, buttons, and any cell whose corner is defined by a 1px seam
+     rather than by its own edge. **Only a floating plate is rounded** — the
+     image plates and the raised sheets, the things that read as objects sitting
+     ON the page rather than as the page itself. §4.4 permits a mixed system
+     exactly when the rule is written down and followed everywhere; this is that
+     rule, and the whole of it.
+
+     ⚠️ 4px is deliberately almost nothing. It softens the corner of a photo
+     without making the page look like a different design system, which is what
+     happens the moment this reaches 8px or more. */
+  --radius-plate: 4px;
+
   /* Placeholder hatch: light on white grounds, navy on navy ones. */
   --misa-hatch-a: #2c4b7c;
   --misa-hatch-b: #26436f;
@@ -261,10 +276,14 @@
      Each carries a real offset and a soft blur, per `craft-floor`: a
      zero-offset coloured halo is decoration, not depth. */
 @theme {
-  --shadow-lift: 0 1px 2px rgb(22 48 92 / 0.06), 0 4px 12px rgb(22 48 92 / 0.08);
-  --shadow-raised: 0 2px 4px rgb(22 48 92 / 0.07), 0 10px 26px rgb(22 48 92 / 0.13);
-  --shadow-overlay: 0 8px 20px rgb(22 48 92 / 0.12), 0 24px 56px rgb(22 48 92 / 0.18);
-  --shadow-sticky: 0 1px 0 rgb(22 48 92 / 0.08), 0 6px 16px rgb(22 48 92 / 0.07);
+  --shadow-lift:
+    0 1px 2px rgb(22 48 92 / 0.06), 0 4px 12px rgb(22 48 92 / 0.08);
+  --shadow-raised:
+    0 2px 4px rgb(22 48 92 / 0.07), 0 10px 26px rgb(22 48 92 / 0.13);
+  --shadow-overlay:
+    0 8px 20px rgb(22 48 92 / 0.12), 0 24px 56px rgb(22 48 92 / 0.18);
+  --shadow-sticky:
+    0 1px 0 rgb(22 48 92 / 0.08), 0 6px 16px rgb(22 48 92 / 0.07);
 }
 
 /* 🪤 Everything below is INSIDE a cascade layer, and that is load-bearing
@@ -467,53 +486,26 @@
      after a scroll, which is the hardest kind of defect to catch in a
      screenshot.
 
-     📌 Depth reads differently on the two grounds, so the hover cue moves with
-     the ground exactly like `Hatch`'s tone, its frame and its caption already
-     do. On white the lift is the shadow step (`lift` → `raised`, the system's
-     only hover elevation). On the navy field a navy-tinted shadow is invisible,
-     so the frame brightens instead. Same gesture, same duration, the cue each
-     ground can actually carry. */
+     🔓 **No hover state, by design** (officer, 2026-08-18: remove the
+     expand-on-hover). These plates lifted and scaled; they no longer do
+     anything. Two reasons the removal is clean rather than a hole. They are
+     non-interactive `<div>`s, so a hover affordance was advertising something
+     that was never clickable. And with the expansion gone there is no transform
+     to animate, no `z-index` juggling to keep a growing plate above its
+     neighbours, and no `prefers-reduced-motion` branch to maintain — the whole
+     apparatus went with it. If a plate ever becomes a link, the cue comes back
+     with the interaction, not before. */
   .plate {
     /* The resting tilt. `--plate-tilt` is set per plate by the component, so
-       the angles live with the composition rather than as six near-identical
-       classes here. Default 0deg, so a plate that sets nothing is simply square
-       and still gets the hover. */
+       the angles live with the composition rather than as near-identical
+       classes here. Default 0deg, so a plate that sets nothing is square. */
     transform: rotate(var(--plate-tilt, 0deg));
-    /* 📌 `--dur-pop` (200ms) rather than `--dur-hover` (150ms). 150ms is the
-       duration for a colour swap; a plate that changes SIZE is travelling
-       further and reads as clipped at that speed. Still inside the 300ms
-       ceiling `emil-design-eng` sets for UI motion. */
-    transition:
-      transform var(--dur-pop) var(--ease-out-quint),
-      box-shadow var(--dur-pop) var(--ease-out-quint),
-      border-color var(--dur-pop) var(--ease-out-quint);
-  }
 
-  @media (hover: hover) {
-    /* 🪤 **The plate ENLARGES; a 4px nudge was not the gesture.** The first
-       version translated only, which reads as the plate twitching rather than
-       as it coming forward — the reference this cluster is adapted from lifts
-       AND scales. Transform functions apply right to left, so the rotation is
-       applied first and the scale and travel then happen in screen space; put
-       `rotate` first and the plate would slide along its own tilted axis. */
-    .plate:hover {
-      transform: translateY(-8px) scale(1.045) rotate(var(--plate-tilt, 0deg));
-    }
-  }
-
-  /* ⚠️ Reduced motion drops the travel and the scale, not the feedback. The
-     shadow and the frame still respond, so a reader who asked for less motion
-     is still told the plate is interactive. */
-  @media (prefers-reduced-motion: reduce) {
-    .plate {
-      transition:
-        box-shadow var(--dur-hover) linear,
-        border-color var(--dur-hover) linear;
-    }
-
-    .plate:hover {
-      transform: rotate(var(--plate-tilt, 0deg));
-    }
+    /* 🪤 **The radius needs the clip.** `Hatch` paints a hard-edged repeating
+       gradient, so without `overflow: hidden` its stripes square the corners
+       off again and the radius looks like it simply did not apply. */
+    border-radius: var(--radius-plate);
+    overflow: hidden;
   }
 
   /* ── The drawn light ground ──────────────────────────────────────────────
@@ -538,15 +530,32 @@
     );
   }
 
-  /* The hero's 60×60 drafting grid, restated for light grounds. `.hero-grid`
-     draws in white and is invisible on anything but navy; this is the same
-     rhythm in navy at a very low alpha, so the motif carries down the page
-     instead of belonging to the hero alone. */
-  .paper-grid {
-    background-image:
-      linear-gradient(rgba(22, 48, 92, 0.045) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(22, 48, 92, 0.045) 1px, transparent 1px);
-    background-size: 60px 60px;
+  /* ── Depth on a light ground: a raised sheet ────────────────────────────
+     🔓 **Replaces the drafting grid** (officer, 2026-08-18: take the hash off
+     the white ground and find a different way to get depth there).
+
+     📌 The grid was a DRAWN texture — it put a pattern on the ground and asked
+     the pattern to imply space. This is the other family of answer entirely:
+     **stacked planes.** A white sheet, hairlined and lifted off the tinted
+     ground beneath it, so depth comes from two real surfaces at two real
+     heights rather than from a picture of depth. It is also the mechanism the
+     rest of the page already uses — the bento cards and the image plates are
+     both lifted surfaces — so the light grounds now read the way the white
+     cards do instead of carrying a private texture of their own.
+
+     🪤 It has to sit on a ground that is NOT white, or there is nothing for it
+     to be lifted off. `.ground-paper` supplies that, and the two are a pair: a
+     sheet on a plain white section is an invisible rectangle wearing a shadow.
+
+     🪤 Reaching for `--shadow-lift` with `var()` here is also what makes the
+     custom property exist. Tailwind tree-shakes a theme value only ever
+     reached through its utility, which is why `--shadow-lift` reads as an
+     empty string off `:root` while `shadow-lift` paints perfectly. */
+  .sheet {
+    background: var(--background);
+    border: 1px solid var(--misa-plate-edge);
+    border-radius: var(--radius-plate);
+    box-shadow: var(--shadow-lift);
   }
 
   /* Placeholder hatch — 45°, 7px stripes. Two grounds, never mixed: a light

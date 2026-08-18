@@ -434,6 +434,39 @@ line, clearance unchanged at 277/304 and 461/487, **0 of 21 reveals hidden with
 JS off**, all four project cells uniform at every width. Lint, `tsc`, build clean;
 **1022 tests pass**.
 
+### Iteration 2 (2026-08-18, officer review)
+
+- **Depth on light grounds is a raised sheet, not a drawn grid.** `.paper-grid`
+  is deleted. `.sheet` is a white surface, hairlined and lifted off the tinted
+  `paper` ground — stacked planes rather than a picture of depth, and the same
+  mechanism the bento cards and image plates already used. 🪤 It needs a
+  non-white ground beneath it or it is an invisible rectangle wearing a shadow.
+- **No hover state on any plate or card.** The reason it was wrong is that none
+  of them is interactive: `<div>`s and `<article>`s with nothing to click were
+  advertising an affordance that does not exist. ⚠️ `--shadow-raised` is unused
+  as a result; it stays in the vocabulary as the named answer for the first real
+  interactive surface, in phases 3–4.
+- 🔓 **A second radius, documented.** `--radius-plate: 4px` on floating plates
+  and sheets; `--radius: 0` everywhere else, including any cell whose corner is
+  a 1px seam. This is the Shape Consistency Lock's permitted mixed system and
+  the sentence above is the entire rule. 🪤 It needs `overflow: hidden`, or
+  `Hatch`'s hard-edged gradient squares the corners back off.
+- 🔓 **The hero cluster is a uniform, larger 2×2**, replacing four aspect ratios
+  at four widths in an absolute scatter. Tilt is 0: at ±1.5° in a tight grid two
+  plates leaning opposite ways make the gap between them a wedge, so
+  "hand-placed" read as "misaligned". `--plate-tilt` is kept, so it is one value
+  to bring back.
+- 🪤 **The type ramp now DIPS at `lg`** (44 → 38 → 48 → 56px). Headline size is a
+  function of the type COLUMN, not the viewport, and the column is narrowest
+  where the split first engages. Widening the cluster to enlarge the images
+  pushed the headline to three lines at 1024 and 1280 until this landed.
+  **Re-measure whenever the split ratio changes.**
+
+Re-measured: overflow 0 at 390/640/768/1024/1280/1440/1646, headline 2 lines
+everywhere, hero fits the fold at every width (766px at its tallest, header
+included), plates uniform to 0.009px, project cells uniform, 0 of 22 reveals
+hidden with JS off, 1022 tests pass.
+
 ### Decisions that need the officer
 
 1. 🔓 **A light hatch on the navy field**, departing from `hatch.tsx`'s

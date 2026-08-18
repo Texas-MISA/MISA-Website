@@ -44,116 +44,95 @@ import { HERO_SLOTS, TAGLINE } from "@/lib/site";
  * The cluster, as composition rather than content: the captions come from
  * `lib/site.ts`, the geometry lives here.
  *
- * ⚠️ **The tilts apply at EVERY width, phones included** — `--plate-tilt` is an
- * inline custom property, not a breakpoint-scoped utility — so the overflow
- * arithmetic has to hold at 390px, which is where v1 shipped a scrollbar.
- * A plate of width W and height H rotated by θ has a bounding width of
- * `W·cos θ + H·sin θ`. Worst case here is the 3.5° square plate: in the 390px
- * two-column grid it is about 155px wide, so the bounding box grows to roughly
- * 164px, about 4.5px past each edge. The cluster's `px-3` (12px) reserve covers
- * that, and `overflow-x-clip` on the section is the guarantee behind it.
- * Measured at 390 / 768 / 1280 / 1646: `scrollWidth − clientWidth === 0` at all
- * four. Raising an angle means redoing this arithmetic, not eyeballing it.
+ * 🔓 **Uniform, and larger** (officer, 2026-08-18: make the layout of the
+ * images more consistent, and make them bigger). This was four different
+ * shapes at four different sizes, absolutely positioned into a scatter —
+ * 4:3, 3:4, 1:1 and 3:2, at widths from 34% to 50%. It read as four unrelated
+ * objects rather than as one set of photographs.
+ *
+ * Now every plate is the SAME aspect ratio at the SAME size in a plain grid,
+ * and the only thing that varies is a small alternating tilt. That is the
+ * distinction worth keeping: varying one property by a fixed amount reads as
+ * a deliberate set, varying four properties by arbitrary amounts reads as
+ * scatter.
+ *
+ * ⚠️ 3:2 rather than 4:3 is a height decision, not a taste one. A landscape
+ * frame this wide gets tall fast in a 2×2, and the hero has to fit the
+ * viewport — 4:3 at these widths put it back over the fold, which is the
+ * failure that bounded the cluster in the first place.
+ *
+ * 🔓 **The tilt is 0 and the plates sit square.** They were rotated ±1.5°, and
+ * at a 2×2 that is worse than it sounds: two plates leaning opposite ways turn
+ * the gap between them into a wedge, so the thing that was supposed to read as
+ * hand-placed read as misaligned. A rotation needs room around it to look
+ * deliberate, and a tight grid is exactly the arrangement that denies it that.
+ *
+ * 📌 The mechanism is kept rather than ripped out — `--plate-tilt` still
+ * threads through `.plate`, and a non-zero value here is the only edit needed
+ * to bring the lean back. ⚠️ If it comes back, the overflow arithmetic comes
+ * back with it: a plate of width W and height H rotated by θ has a bounding
+ * width of `W·cos θ + H·sin θ`, it applies at EVERY width because
+ * `--plate-tilt` is an inline custom property rather than a breakpoint-scoped
+ * utility, and 390px is where v1 shipped a scrollbar. The `px-3` reserve and
+ * the section's `overflow-x-clip` are still there holding the door.
  */
 const PLATES = [
-  {
-    // Back-left, the largest. Landscape, so the cluster has a horizon.
-    place: "lg:absolute lg:top-[4%] lg:left-0 lg:z-20 lg:w-[50%]",
-    aspect: "aspect-4/3",
-    tilt: "-3deg",
-    delay: 0.1,
-  },
-  {
-    // Tall on the right, running nearly the full height of the box.
-    place: "lg:absolute lg:top-0 lg:right-0 lg:z-10 lg:w-[44%]",
-    aspect: "aspect-3/4",
-    tilt: "2.5deg",
-    delay: 0.16,
-  },
-  {
-    // Square, bottom-left, overlapping the back plate. The overlap is where
-    // depth actually comes from on this ground.
-    place: "lg:absolute lg:bottom-0 lg:left-[8%] lg:z-30 lg:w-[40%]",
-    aspect: "aspect-square",
-    tilt: "3.5deg",
-    delay: 0.22,
-  },
-  {
-    // Small, low right, sitting over the tall plate.
-    place: "lg:absolute lg:right-[4%] lg:bottom-[6%] lg:z-20 lg:w-[34%]",
-    aspect: "aspect-3/2",
-    tilt: "-2deg",
-    delay: 0.28,
-  },
+  { tilt: "0deg", delay: 0.1 },
+  { tilt: "0deg", delay: 0.16 },
+  { tilt: "0deg", delay: 0.22 },
+  { tilt: "0deg", delay: 0.28 },
 ] as const;
 
 function Plate({
   caption,
-  place,
-  aspect,
   tilt,
   delay,
 }: {
   caption: string;
-  place: string;
-  aspect: string;
   tilt: string;
   delay: number;
 }) {
   return (
-    // Trap 2: the reveal is out here, the tilt is on the child.
-    //
-    // 🪤 `hover:z-40` lives on THIS element, not on `.plate`. The stacking
-    // order belongs to the absolutely-positioned wrapper, so a z-index on the
-    // inner (statically positioned) plate would do nothing and the enlarging
-    // plate would grow UNDERNEATH its neighbours. Hovering the plate hovers the
-    // wrapper too, so the rule fires from here correctly.
-    <div
-      data-reveal="up"
-      style={revealDelay(delay)}
-      className={`${place} hover:z-40`}
-    >
+    // Trap 2: the reveal is out here, the tilt is on the child. Never both on
+    // one node — `[data-revealed]` sets `transform: none`, so a plate carrying
+    // its reveal and its rotation together snaps square the instant it enters.
+    <div data-reveal="up" style={revealDelay(delay)}>
       <div
-        // The hairline is what makes an OVERLAP legible: two light plates
-        // meeting edge to edge do not separate by shadow alone unless the
-        // shadow is heavy, and the next step up (`raised`) is spoken for as the
-        // hover state. So the frame draws the edge and the shadow does depth.
+        // 🪤 **`misa-plate-edge`, not `misa-border`.** `--misa-border` is an
+        // ALPHA colour, and these plates sit on a navy field, so it resolved to
+        // almost nothing there while reading as a clear hairline anywhere else.
+        // The opaque twin is that same colour resolved once, so the frame holds
+        // whatever passes beneath it.
         //
-        // 🪤 **`misa-plate-edge`, not `misa-border`, and the difference is the
-        // whole point.** `--misa-border` is an ALPHA colour. These plates cross
-        // two different backdrops — each other, and the navy field — so one
-        // border resolved to a clear grey hairline over a plate and to nothing
-        // at all over the field. Same border, two apparent weights, which is
-        // exactly the inconsistency it looked like. The opaque twin is that
-        // same colour resolved once, so it holds whatever passes beneath.
-        className="plate border border-misa-plate-edge shadow-lift hover:shadow-raised"
+        // 📌 The radius and the clip come from `.plate`; the corner softening is
+        // the documented exception to the all-sharp rule, and it applies to
+        // floating plates only.
+        className="plate border border-misa-plate-edge shadow-lift"
         style={{ "--plate-tilt": tilt } as React.CSSProperties}
       >
         {/* 🔓 **A LIGHT hatch on a navy ground, which departs from `hatch.tsx`'s
             "light on white, navy on navy, never mixed" rule.** Recorded as a
-            departure with its reason rather than done quietly, and it is a
-            gate item for the officer.
+            departure with its reason rather than done quietly, and still a gate
+            item for the officer.
 
-            The reason is measured rather than aesthetic. These plates OVERLAP,
-            and overlap is where the depth in this cluster comes from. Navy
-            plates on a navy field gave no plate-to-plate separation at all —
-            the pairs read as one blob — and the frame could not rescue it,
-            because a shadow tinted to the background hue (which every shadow in
-            this system is, by design) composites to nothing on a ground of that
-            same hue. A light plate fixes both at once: it separates from the
-            field, and `shadow-lift` now falls on the light surface of the plate
-            beneath it, so `lift` → `raised` is a hover cue you can actually see.
+            A navy plate on a navy field gave no separation from the ground at
+            all, and the frame could not rescue it: a shadow tinted to the
+            background hue — which every shadow in this system is, by design —
+            composites to nothing on a ground of that same hue. A light plate
+            separates from the field and gives `shadow-lift` a light surface to
+            fall on.
 
-            Contrast is unaffected, because the caption sits on the hatch and not
-            on the field: `text-misa-secondary` on the darker `#e7e7ea` stripe is
-            6.89:1, already measured in the component.
+            Contrast is unaffected, because the caption sits on the hatch and
+            not on the field: `text-misa-secondary` on the darker `#e7e7ea`
+            stripe is 6.89:1, already measured in the component.
 
-            ⚠️ The constraint that comes with it: nothing focusable may go inside
-            one of these plates. The field carries `.on-navy`, which flips the
-            focus ring to WHITE, and a white ring on a near-white plate is no
-            ring at all. They are non-interactive `<div>`s today; if a plate ever
-            becomes a link, it needs its own navy ring in the same commit. */}
-        <Hatch caption={caption} tone="light" className={aspect} />
+            ⚠️ The constraint that comes with it: nothing focusable may go
+            inside one of these plates. The field carries `.on-navy`, which
+            flips the focus ring to WHITE, and a white ring on a near-white
+            plate is no ring at all. They are non-interactive `<div>`s today; if
+            one ever becomes a link it needs its own navy ring in the same
+            commit. */}
+        <Hatch caption={caption} tone="light" className="aspect-3/2" />
       </div>
     </div>
   );
@@ -164,7 +143,13 @@ export function HomeHero() {
     <Section
       ground="field"
       width="page"
-      padTop="lg"
+      // 🪤 `md` rather than `lg`, and it is the images that bought it. The
+      // hero has to fit the viewport, so every pixel the plates gain has to
+      // come from somewhere — 16px off the top inset is 16px the cluster can
+      // spend. The bottom inset is NOT available for the same trick: the
+      // chevron notch eats 48px of it and the marquee band below is sized
+      // against what is left.
+      padTop="md"
       // 🪤 The bottom inset is off the shared scale, and deliberately so: the
       // chevron notch eats 48px of it, so a `lg` step here would leave the
       // marquee band sitting under the notch's tip rather than clear of it.
@@ -186,7 +171,7 @@ export function HomeHero() {
           it — the headline went to THREE lines, which §4.7 calls a font-size
           error rather than a copy problem. Below `lg` the hero stacks instead:
           the type gets the full measure and the cluster sits under it. */}
-      <div className="relative grid items-center gap-12 lg:grid-cols-[minmax(0,1.06fr)_minmax(0,1fr)] lg:gap-split">
+      <div className="relative grid items-center gap-12 lg:grid-cols-[minmax(0,0.84fr)_minmax(0,1.16fr)] lg:gap-split">
         {/* The type column. Two text elements, which is inside the hero stack
             discipline of four.
 
@@ -203,10 +188,20 @@ export function HomeHero() {
               headline at 1280 and above. §4.7 is blunt about that: a four-line
               hero headline is always a font-size error, never a copy-length
               one. The sizes below are set so "Management Information" fits the
-              type column on one line at every width. */}
+              type column on one line at every width.
+
+              🪤 **The ramp DIPS at `lg` (44px → 38px) and that is not a typo.**
+              Type size here is not a function of viewport width, it is a
+              function of the TYPE COLUMN, and the column is narrowest exactly
+              where the split first engages: below `lg` the heading has the full
+              measure, at `lg` it suddenly has 0.84 of half of it. Widening the
+              cluster to make the images larger narrowed this column, and the
+              headline went to three lines at 1024 and 1280 until these steps
+              came down. Change the split ratio and you have to re-measure this.
+              */}
           <h1
             data-reveal="rise"
-            className="font-display text-[34px] leading-[0.94] font-semibold tracking-[-0.02em] text-white sm:text-[44px] lg:text-[46px] xl:text-[56px]"
+            className="font-display text-[34px] leading-[0.94] font-semibold tracking-[-0.02em] text-white sm:text-[44px] lg:text-[38px] xl:text-[48px] 2xl:text-[56px]"
           >
             Management Information
             <br />
@@ -222,31 +217,26 @@ export function HomeHero() {
         </div>
 
         {/* The cluster.
-            🪤 **The height is BOUNDED, and that is a hero-fits-the-viewport
-            requirement rather than a style.** Sized by its content the cluster
-            grew with the column — four stacked plates at half the track width
-            each made the hero 973px tall, so on a laptop the tagline sat below
-            the fold and the whole composition had to be scrolled to. §4.7:
-            the hero fits the initial viewport, CTA and all. A fixed box also
-            makes the arrangement a composition instead of a grid, which is the
-            point of a cluster.
+            🔓 **A plain grid, not an absolutely-positioned scatter** (officer,
+            2026-08-18). The bounded box and the four hand-placed plates are
+            gone; four equal cells in a 2×2 do the same job with none of the
+            arithmetic, and the height now follows the content instead of being
+            pinned to a magic number per breakpoint.
 
-            📌 Below `md` it is a plain two-column grid and no plate is
-            positioned or rotated. All four slots stay on screen at every
-            width — hiding an image slot at a breakpoint hides content, and the
-            phone is PRODUCT.md's primary reader.
+            📌 The column counts are a height control. At `sm`–`lg` the cluster
+            has the full measure to itself, so a 2×2 there would make each plate
+            enormous and push the hero past the fold; one row of four keeps it
+            short. On a phone it is 2×2 again, because four across at 390px is
+            four thumbnails.
 
-            Trap 3: `px-3` is the reserve for the rotated corners (bounding
-            width of a rotated rect is `w·cos θ + h·sin θ`, about 9px over at
-            these angles), and the section's `overflow-x-clip` is the guarantee
-            behind it. */}
-        {/* 🪤 Four columns in the stacked range, two on a phone. At `sm`–`lg`
-            the cluster has the full measure to itself, and a 2×2 of it made the
-            plates ~320px wide and the hero 1104px tall — the hero no longer fit
-            the viewport, which is the same §4.7 failure the bounded box above
-            fixes at desktop, arriving from the other side. One row of four is
-            short, and it keeps all four slots on screen. */}
-        <div className="relative grid grid-cols-2 gap-tile px-3 sm:grid-cols-4 lg:block lg:h-[420px] xl:h-[460px]">
+            📌 All four slots stay on screen at every width. A breakpoint that
+            hides an image slot hides content, and the phone is PRODUCT.md's
+            primary reader.
+
+            🪤 `px-3` is the reserve for the rotated corners and the section's
+            `overflow-x-clip` is the guarantee behind it. Both still earn their
+            place: the tilt is smaller now, but it is not zero. */}
+        <div className="grid grid-cols-2 gap-tile px-3 sm:grid-cols-4 lg:grid-cols-2">
           {HERO_SLOTS.map((caption, i) => (
             <Plate key={caption} caption={caption} {...PLATES[i]} />
           ))}
