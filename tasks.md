@@ -33,6 +33,10 @@ Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md)
 
 Measured at the gate: zero horizontal overflow at 390/768/1024/1280/1646, hero fits the viewport at every width, headline 2 lines everywhere, nav one line at 61px with 277/304px wordmark clearance at 1280, **0 of 21 reveals hidden with JS off**, every contrast pairing ≥4.5:1 on the composited ground, 1022 tests green.
 
+🔄 **Iteration 1 landed** (officer review of the built page): depth generalised to the rest of the page (`ground-paper` + `paper-grid`, grounds now run field → white → paper → white → field → paper); the hero plates now **enlarge** on hover rather than nudging; plate borders made consistent via an opaque `--misa-plate-edge`, because `--misa-border` is an alpha colour and resolved differently over a plate than over the field; and Projects is a symmetric 2×2 with `PROJECT_PLACEHOLDER` in the fourth cell.
+
+🔴 **`PROJECT_PLACEHOLDER` in `lib/site.ts` is a placeholder and must be replaced.** It names no client, term or scope on purpose. Adding a fourth entry to `PROJECTS` and deleting the constant is the whole swap; the band renders whatever the array holds.
+
 🔴 **Three things need the officer before phase 2 starts:**
 1. **A light hatch on the navy hero field**, which departs from `hatch.tsx`'s never-mixed rule. The reason is that the plates overlap and navy-on-navy gave no separation — and a navy-tinted shadow composites to nothing on a navy ground, so the frame could not rescue it either.
 2. **No hero CTA.** Refused because the sticky header carries Check In above the fold at all times and adding one means authoring a string on a page whose copy is locked. Reversible if the officer supplies a locked label.

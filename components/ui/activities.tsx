@@ -66,7 +66,12 @@ export function Activities({ className = "" }: { className?: string }) {
           // element under the pointer and is the system's ONLY hover elevation.
           // `.plate` carries the travel and the timing, shared with the hero's
           // cluster so both grounds move the same way.
-          className={`plate flex flex-col border border-misa-border bg-white shadow-lift hover:shadow-raised ${CELLS[i].span}`}
+          // 📌 `misa-plate-edge` rather than `misa-border`: every `.plate` on
+          // the page carries the same edge colour, so a plate is one object
+          // with one frame wherever it lands. On this white ground the two
+          // resolve identically — the token exists because the hero's plates
+          // cross two backdrops and an alpha border does not.
+          className={`plate flex flex-col border border-misa-plate-edge bg-white shadow-lift hover:shadow-raised ${CELLS[i].span}`}
         >
           <Hatch caption={activity.caption} className={CELLS[i].aspect} />
           <div className="flex flex-1 flex-col px-6 pt-5 pb-6">

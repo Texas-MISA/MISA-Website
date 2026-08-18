@@ -10,12 +10,24 @@ import { Section } from "@/components/ui/section";
 import {
   MISSION,
   MISSION_SLOTS,
+  PROJECT_PLACEHOLDER,
   PROJECTS,
   PROJECTS_SUMMARY,
 } from "@/lib/site";
 
 import { GalleryMarquee } from "./_components/gallery-marquee";
 import { HomeHero } from "./_components/home-hero";
+
+/**
+ * The four cells of the projects quadrant: the three real projects and one
+ * labelled slot.
+ *
+ * 🔴 **Delete the placeholder the moment a fourth project exists** — add it to
+ * `PROJECTS` and this list needs no change. The placeholder names no client,
+ * term or scope on purpose: a plausible fourth client would be inventing a fact
+ * about the club, and that is the one error here nobody would ever catch.
+ */
+const PROJECT_CELLS = [...PROJECTS, PROJECT_PLACEHOLDER];
 
 // The home page, rebuilt in v2 phase 1.
 //
@@ -71,8 +83,31 @@ export default function HomePage() {
            rather than as body copy in a 68ch column. Two plates flank it, so
            the section carries slots like every other one.
            📌 Grouping mechanism: negative space only. No rule, no divider. */}
-      <Section padTop="lg" padBottom="md" width="page">
-        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_minmax(0,1fr)] lg:items-center lg:gap-split">
+      {/* 🔓 The hero's drafting grid and a gradient ground, carried down the
+          page (officer's note, 2026-08-17: the depth at the top reads well,
+          the rest should have more of it). `.hero-grid` draws in white and is
+          invisible on anything but navy, so `.paper-grid` is the same 60px
+          rhythm in navy at a very low alpha.
+
+          🪤 **The grid is an absolute OVERLAY, not a second class on the
+          section, and it has to be.** `.ground-paper` and `.paper-grid` both
+          set `background-image`, so stacking them on one element is not two
+          layers — it is a collision, and the later rule in the cascade simply
+          erases the earlier one. Put both on the section and you silently get
+          the grid with no gradient. The hero already solved this the right way
+          and this follows it. */}
+      <Section
+        ground="paper"
+        padTop="lg"
+        padBottom="md"
+        width="page"
+        className="relative"
+      >
+        <div
+          aria-hidden="true"
+          className="paper-grid pointer-events-none absolute inset-0"
+        />
+        <div className="relative lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_minmax(0,1fr)] lg:items-center lg:gap-split">
           <div className="text-center lg:order-2">
             <Headline data-reveal="rise">Our Mission</Headline>
             <p
@@ -95,12 +130,12 @@ export default function HomePage() {
               undergrad on a phone. */}
           <div className="mt-10 grid grid-cols-2 gap-tile lg:contents">
             <div data-reveal="up" style={revealDelay(0.14)} className="lg:order-1">
-              <div className="plate border border-misa-border shadow-lift hover:shadow-raised">
+              <div className="plate border border-misa-plate-edge shadow-lift hover:shadow-raised">
                 <Hatch caption={MISSION_SLOTS[0]} className="aspect-3/4" />
               </div>
             </div>
             <div data-reveal="up" style={revealDelay(0.2)} className="lg:order-3">
-              <div className="plate border border-misa-border shadow-lift hover:shadow-raised">
+              <div className="plate border border-misa-plate-edge shadow-lift hover:shadow-raised">
                 <Hatch caption={MISSION_SLOTS[1]} className="aspect-3/4" />
               </div>
             </div>
@@ -114,42 +149,72 @@ export default function HomePage() {
         <Activities className="mt-9" />
       </Section>
 
-      {/* 5. LAYOUT FAMILY: Featured + rest. The page's one navy band, kept
-             against §4.11's Page Theme Lock: that rule exists to stop accidental
-             theme drift, and this full-bleed navy field is the identity rather
-             than an accident. Recorded as a deliberate refusal in the v2 plan.
+      {/* 5. LAYOUT FAMILY: Quadrant grid — a symmetric 2×2 on a shared-rule
+             plate. The page's one navy band, kept against §4.11's Page Theme
+             Lock: that rule exists to stop accidental theme drift, and this
+             full-bleed navy field is the identity rather than an accident.
+
+             🔓 **Was "Featured + rest" (one wide lead plus two). Changed to a
+             symmetric 2×2 on the officer's instruction, 2026-08-17.** The
+             fourth cell is `PROJECT_PLACEHOLDER`, because `PROJECTS` holds
+             three and a plausible fourth client would be inventing a fact
+             about the club.
+
+             ⚠️ **This is the closest two families on the page come to each
+             other**, and it is worth stating rather than hoping nobody
+             notices: Partners is also four cells on a shared-rule plate. They
+             stay distinguishable — this is a 2×2 of image-and-text cards, that
+             is a single row of bare logos — but the budget has less slack than
+             it did, and a third shared-rule plate would break it.
 
              📌 Grouping mechanism: ONE plate showing through `gap: 1px`, never
-             a border per cell. Two adjacent borders read as a double rule, and
-             a border per card is what this section used to have.
-
-             📌 Three projects, so a lead plus two rather than three equal cards
-             — §9.C bans the three-identical-cards row outright. */}
-      <Section ground="navy" pad="lg" width="page">
+             a border per cell. Two adjacent borders read as a double rule.
+             🪤 That is also why the cells stay OPAQUE on a gradient ground:
+             the rule is the container's background showing through the gap, so
+             a transparent cell would show it across the whole card instead of
+             at the seam. The gradient and the grid read in the band's own
+             padding, around and behind the plate. */}
+      <Section
+        ground="field"
+        pad="lg"
+        width="page"
+        className="relative overflow-hidden"
+      >
         <div
-          data-reveal="up"
-          className="flex flex-wrap items-baseline justify-between gap-4"
-        >
-          <Headline>Client &amp; Data Projects</Headline>
-          <Link
-            href="/projects"
-            className={`${LINK_EYEBROW} text-white/75 hover:text-white`}
+          aria-hidden="true"
+          className="hero-grid pointer-events-none absolute inset-0"
+        />
+        <div className="relative">
+          <div
+            data-reveal="up"
+            className="flex flex-wrap items-baseline justify-between gap-4"
           >
-            All projects →
-          </Link>
-        </div>
-        <p
-          data-reveal="up"
-          style={revealDelay(0.05)}
-          className="mt-3 mb-9 max-w-[74ch] leading-[1.65] text-white/80"
-        >
-          {PROJECTS_SUMMARY}
-        </p>
+            <Headline>Client &amp; Data Projects</Headline>
+            <Link
+              href="/projects"
+              className={`${LINK_EYEBROW} text-white/75 hover:text-white`}
+            >
+              All projects →
+            </Link>
+          </div>
+          <p
+            data-reveal="up"
+            style={revealDelay(0.05)}
+            className="mt-3 mb-9 max-w-[74ch] leading-[1.65] text-white/80"
+          >
+            {PROJECTS_SUMMARY}
+          </p>
 
-        <ul className="grid gap-px border border-white/30 bg-white/30 lg:grid-cols-2">
-          {PROJECTS.map((project, i) => {
-            const lead = i === 0;
-            return (
+          {/* The 2×2. Every cell is the same shape, which is what "symmetric"
+              asks for: image on top, term, client, one line of scope. */}
+          {/* 🪤 `auto-rows-fr` is what makes "symmetric" true at EVERY width,
+              not just most. Grid rows size independently, so at 768 the
+              summaries wrapped to different line counts and the top row came
+              out 22px taller than the bottom one — left/right symmetry held
+              and the quadrant still read lopsided. Equal-fraction rows force
+              all four cells to one height. */}
+          <ul className="grid auto-rows-fr gap-px border border-white/30 bg-white/30 sm:grid-cols-2">
+            {PROJECT_CELLS.map((project, i) => (
               <li
                 key={project.client}
                 data-reveal="fade"
@@ -157,50 +222,34 @@ export default function HomePage() {
                 // The cells carry the band's own ground, so only the 1px gap
                 // between them paints — one rule, drawn once, shared by both
                 // neighbours.
-                className={`bg-misa-blue ${
-                  lead ? "lg:col-span-2 lg:grid lg:grid-cols-2" : "flex flex-col"
-                }`}
+                className="flex flex-col bg-misa-blue"
               >
                 <Hatch
                   caption={project.caption}
                   tone="navy"
-                  className={lead ? "aspect-16/10 lg:aspect-auto" : "aspect-3/2"}
+                  className="aspect-3/2"
                 />
-                <div
-                  className={
-                    lead
-                      ? "flex flex-col justify-center px-6 py-8 sm:px-8"
-                      : "flex-1 px-5 pt-4.5 pb-5.5"
-                  }
-                >
+                <div className="flex-1 px-5 pt-4.5 pb-5.5">
                   <p className="text-[11px] leading-none font-medium tracking-[0.14em] text-white/60 uppercase">
                     {project.term}
                   </p>
-                  <h3
-                    className={`mt-2.5 mb-1.5 font-display leading-[1.05] font-semibold ${
-                      lead ? "text-[30px] sm:text-[38px]" : "text-[26px]"
-                    }`}
-                  >
+                  <h3 className="mt-2.5 mb-1.5 font-display text-[26px] leading-[1.05] font-semibold">
                     {project.client}
                   </h3>
-                  <p
-                    className={`leading-[1.55] text-white/80 ${
-                      lead ? "max-w-[52ch] text-base" : "text-sm"
-                    }`}
-                  >
+                  <p className="text-sm leading-[1.55] text-white/80">
                     {project.summary}
                   </p>
                 </div>
               </li>
-            );
-          })}
-        </ul>
+            ))}
+          </ul>
+        </div>
       </Section>
 
       {/* 6. LAYOUT FAMILY: Shared-rule logo plate. Already the right shape, and
              shared with /about — so its internal drift (it predates <Section>
              and hardcodes its own gutter) is phase 2's, not phase 1's. */}
-      <Partners ground="panel" />
+      <Partners ground="paper" />
     </>
   );
 }

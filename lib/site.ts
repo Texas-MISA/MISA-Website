@@ -216,6 +216,30 @@ export const PROJECTS = [
   },
 ] as const;
 
+/**
+ * 🔴 **A PLACEHOLDER, not a project. Replace it with a real one.**
+ *
+ * The home page's projects band is laid out as a symmetric 2×2 (officer's
+ * call, 2026-08-17) and `PROJECTS` holds three. This fills the fourth cell
+ * until a fourth project exists.
+ *
+ * ⚠️ It deliberately names no client, no term and no scope. A plausible-looking
+ * fourth client would be **inventing a fact about the club**, which is the one
+ * thing no page here may do — and unlike a wrong colour, nobody would ever spot
+ * it. So it reads as an empty commission in the same voice `<Hatch>` uses for a
+ * photograph that has not been taken: labelled, obviously pending, and useless
+ * to anyone trying to mistake it for a real engagement.
+ *
+ * 📌 Swapping it out is deleting this constant and adding a fourth entry to
+ * `PROJECTS`; the band renders whatever the array holds and needs no change.
+ */
+export const PROJECT_PLACEHOLDER = {
+  term: "Term to be confirmed",
+  client: "Fourth project",
+  summary: "Client and scope to be added.",
+  caption: "project photo / fourth project",
+} as const;
+
 export const WORK_WITH_MISA =
   "Organizations bring a real problem; a student team spends a semester on it. If your team has a scoped project and someone who can meet with students regularly, we would like to hear from you.";
 

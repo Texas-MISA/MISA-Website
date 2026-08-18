@@ -361,10 +361,16 @@ ground while refusing its radius, its hard block shadow and its accent.
 |---|---|---|---|---|---|
 | 1 | Hero | Asymmetric Split Hero + plate cluster | `field` | 4 | negative space |
 | 2 | Gallery band | Kinetic Marquee (the only one) | white | ~11/group | negative space |
-| 3 | Mission | Editorial Manifesto | white | 2 | negative space |
+| 3 | Mission | Editorial Manifesto | `paper` | 2 | negative space |
 | 4 | Activities | Bento Grid, 4 cells / 4 items | white | 4 | gap |
-| 5 | Projects | Featured + rest | navy | 3 | one plate through `gap: 1px` |
-| 6 | Partners | Shared-rule logo plate | panel | 0 (4 real logos) | one plate through `gap: 1px` |
+| 5 | Projects | Quadrant grid (2×2) | `field` | 4 | one plate through `gap: 1px` |
+| 6 | Partners | Shared-rule logo plate | `paper` | 0 (4 real logos) | one plate through `gap: 1px` |
+
+⚠️ **Sections 5 and 6 are the closest two families come to each other**, and it is
+worth stating rather than hoping nobody notices: both are four cells on a
+shared-rule plate. They stay distinguishable — one is a 2×2 of image-and-text
+cards, the other a single row of bare logos — but the budget has less slack than
+it did, and **a third shared-rule plate would break it.**
 
 **Six sections, six families, none repeated.** Longest consecutive-split run is 1
 against a cap of 2. Eyebrows above section headlines: **0**, against a budget of
@@ -378,6 +384,55 @@ centred hero at VARIANCE 8 (§4.3), Activities as **four consecutive** image+tex
 rows against §4.7's cap of two with `border-t` + `last:border-b` on every row
 (§9.F), and Projects as **three equal cards** (§9.C). "Scattered and same-ey" was
 countable, not vague.
+
+### Iteration 1 (2026-08-17, officer review of the built page)
+
+Four notes, all addressed.
+
+- 🔓 **"Add more of that depth to the rest of the page."** The hero's field and
+  grid were the parts that read well, so both were generalised: `.ground-paper`
+  is the light counterpart of `.ground-field` (Vellum glowing off the top edge,
+  clearing to Paper) and `.paper-grid` is `.hero-grid`'s 60px rhythm in navy at
+  low alpha, since the white version is invisible on anything but navy. Grounds
+  now run **field → white → paper → white → field → paper**, so no section is a
+  flat rectangle except the two that are deliberately a rest.
+  - 🪤 **`.ground-paper` and `.paper-grid` cannot both sit on one element.** Both
+    set `background-image`, so stacking them is not two layers, it is a
+    collision, and the later rule in the cascade erases the earlier one — you
+    silently get the grid with no gradient. The grid is an absolute overlay, the
+    way the hero already did it.
+- 🪤 **"The photos that can be hovered over just shift slightly instead of
+  expanding."** Correct, and the gesture was wrong: a 4px translate reads as a
+  twitch. Plates now `translateY(-8px) scale(1.045)` on `--dur-pop` (200ms, since
+  150ms is a colour-swap duration and reads clipped on something that changes
+  size). ⚠️ Transform functions apply **right to left**, so `rotate` must come
+  last or the plate slides along its own tilted axis. And `hover:z-40` belongs on
+  the absolutely-positioned **wrapper**, not on `.plate` — a z-index on the
+  statically-positioned inner element does nothing, and the enlarging plate grows
+  *underneath* its neighbours.
+- 🪤 **"Make the corners/borders of the pictures at the top consistent."** They
+  genuinely were not, and the cause is worth keeping: `--misa-border` is an
+  **alpha** colour. The hero's plates cross two backdrops — each other and the
+  navy field — so one border resolved to a clear grey hairline over a plate and
+  to nothing at all over the field. `--misa-plate-edge` is that same colour
+  resolved once (`#bfbfc2`, exactly `rgba(29,31,32,.2)` over the light hatch), so
+  it holds whatever passes beneath. Every `.plate` on the page now uses it.
+- 🔓 **Projects became a symmetric 2×2** (was one wide lead plus two). The fourth
+  cell is `PROJECT_PLACEHOLDER`, on the officer's instruction to use a
+  placeholder for now: it names no client, term or scope, because a plausible
+  fourth client is **inventing a fact about the club** and is the one error here
+  nobody would ever catch. Replacing it is adding a fourth entry to `PROJECTS`
+  and deleting the constant; the band renders whatever the array holds.
+  - 🪤 `auto-rows-fr` is what makes "symmetric" true at every width. Grid rows
+    size independently, so at 768 the summaries wrapped to different line counts
+    and the top row came out 22px taller than the bottom — left/right symmetry
+    held and the quadrant still read lopsided.
+
+**Re-measured after the iteration:** overflow 0 at 390/640/768/1024/1280/1646,
+hero 716/533/576/628/668/668, headline 2 lines everywhere, header 61px, nav one
+line, clearance unchanged at 277/304 and 461/487, **0 of 21 reveals hidden with
+JS off**, all four project cells uniform at every width. Lint, `tsc`, build clean;
+**1022 tests pass**.
 
 ### Decisions that need the officer
 

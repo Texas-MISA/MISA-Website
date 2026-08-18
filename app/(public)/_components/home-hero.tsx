@@ -102,15 +102,31 @@ function Plate({
 }) {
   return (
     // Trap 2: the reveal is out here, the tilt is on the child.
-    <div data-reveal="up" style={revealDelay(delay)} className={place}>
+    //
+    // 🪤 `hover:z-40` lives on THIS element, not on `.plate`. The stacking
+    // order belongs to the absolutely-positioned wrapper, so a z-index on the
+    // inner (statically positioned) plate would do nothing and the enlarging
+    // plate would grow UNDERNEATH its neighbours. Hovering the plate hovers the
+    // wrapper too, so the rule fires from here correctly.
+    <div
+      data-reveal="up"
+      style={revealDelay(delay)}
+      className={`${place} hover:z-40`}
+    >
       <div
-        // The hairline is what makes an OVERLAP legible. Two light plates
-        // meeting edge to edge separate by shadow alone only if the shadow is
-        // heavy, and the next step up (`raised`) is spoken for as the hover
-        // state — so the frame draws the edge and the shadow does the depth.
-        // `border-misa-border` is the same frame the marquee tiles already use
-        // on a light hatch, so this is the house pattern rather than a new one.
-        className="plate border border-misa-border shadow-lift hover:shadow-raised"
+        // The hairline is what makes an OVERLAP legible: two light plates
+        // meeting edge to edge do not separate by shadow alone unless the
+        // shadow is heavy, and the next step up (`raised`) is spoken for as the
+        // hover state. So the frame draws the edge and the shadow does depth.
+        //
+        // 🪤 **`misa-plate-edge`, not `misa-border`, and the difference is the
+        // whole point.** `--misa-border` is an ALPHA colour. These plates cross
+        // two different backdrops — each other, and the navy field — so one
+        // border resolved to a clear grey hairline over a plate and to nothing
+        // at all over the field. Same border, two apparent weights, which is
+        // exactly the inconsistency it looked like. The opaque twin is that
+        // same colour resolved once, so it holds whatever passes beneath.
+        className="plate border border-misa-plate-edge shadow-lift hover:shadow-raised"
         style={{ "--plate-tilt": tilt } as React.CSSProperties}
       >
         {/* 🔓 **A LIGHT hatch on a navy ground, which departs from `hatch.tsx`'s

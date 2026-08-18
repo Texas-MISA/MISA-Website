@@ -34,7 +34,7 @@ import type { ElementType, ReactNode } from "react";
  * same commit.** A navy ring on a navy field is not a subtle defect; it is no
  * focus indicator at all.
  */
-export type SectionGround = "white" | "panel" | "navy" | "field";
+export type SectionGround = "white" | "panel" | "navy" | "field" | "paper";
 
 /**
  * The vertical rhythm scale. Every step is responsive — the handoff's 56–80px
@@ -69,6 +69,10 @@ const GROUND: Record<SectionGround, string> = {
   // the radials, so no `bg-*` utility belongs here — one would win the cascade
   // and flatten the gradient back to a solid.
   field: "on-navy ground-field text-white",
+  // The light counterpart. Same rule about `bg-*`: `.ground-paper` owns its own
+  // background-color. No `.on-navy`, because the default navy focus ring stays
+  // visible on every stop of this gradient.
+  paper: "ground-paper",
 };
 
 const PAD_TOP: Record<SectionPad, string> = {

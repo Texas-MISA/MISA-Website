@@ -28,6 +28,20 @@
   --misa-hairline: rgba(29, 31, 32, 0.16); /* section rules, grid gaps */
   --misa-border: rgba(29, 31, 32, 0.2); /* card and image frames */
 
+  /* 🪤 **The opaque twin of `--misa-border`, for a frame that sits on more than
+     one ground.** Both of the above are ALPHA colours, which is right for a card
+     on a known background and wrong for a floating plate: the hero's plates
+     overlap each other over a navy field, so the same `--misa-border` composited
+     to a visible grey hairline where it crossed another plate and to nothing at
+     all where it crossed the field. One border, two apparent weights, which read
+     as the frames being inconsistent — and they were.
+
+     📌 This is not a new colour in the palette. It is exactly
+     `rgba(29,31,32,0.2)` resolved over the light hatch's darker stripe
+     (`#e7e7ea`), so a plate's edge looks identical to what it looked like
+     before, and now keeps looking that way whatever passes underneath it. */
+  --misa-plate-edge: #bfbfc2;
+
   /* Placeholder hatch: light on white grounds, navy on navy ones. */
   --misa-hatch-a: #2c4b7c;
   --misa-hatch-b: #26436f;
@@ -128,6 +142,7 @@
   --color-misa-muted: var(--misa-muted);
   --color-misa-hairline: var(--misa-hairline);
   --color-misa-border: var(--misa-border);
+  --color-misa-plate-edge: var(--misa-plate-edge);
   --color-misa-caution: var(--misa-caution);
   --color-misa-caution-wash: var(--misa-caution-wash);
   --color-misa-critical: var(--misa-critical);
@@ -464,21 +479,31 @@
        classes here. Default 0deg, so a plate that sets nothing is simply square
        and still gets the hover. */
     transform: rotate(var(--plate-tilt, 0deg));
+    /* 📌 `--dur-pop` (200ms) rather than `--dur-hover` (150ms). 150ms is the
+       duration for a colour swap; a plate that changes SIZE is travelling
+       further and reads as clipped at that speed. Still inside the 300ms
+       ceiling `emil-design-eng` sets for UI motion. */
     transition:
-      transform var(--dur-hover) var(--ease-out-quint),
-      box-shadow var(--dur-hover) var(--ease-out-quint),
-      border-color var(--dur-hover) var(--ease-out-quint);
+      transform var(--dur-pop) var(--ease-out-quint),
+      box-shadow var(--dur-pop) var(--ease-out-quint),
+      border-color var(--dur-pop) var(--ease-out-quint);
   }
 
   @media (hover: hover) {
+    /* 🪤 **The plate ENLARGES; a 4px nudge was not the gesture.** The first
+       version translated only, which reads as the plate twitching rather than
+       as it coming forward — the reference this cluster is adapted from lifts
+       AND scales. Transform functions apply right to left, so the rotation is
+       applied first and the scale and travel then happen in screen space; put
+       `rotate` first and the plate would slide along its own tilted axis. */
     .plate:hover {
-      transform: translateY(-4px) rotate(var(--plate-tilt, 0deg));
+      transform: translateY(-8px) scale(1.045) rotate(var(--plate-tilt, 0deg));
     }
   }
 
-  /* ⚠️ Reduced motion kills the travel, not the feedback. The shadow and the
-     frame still respond, so a reader who has asked for less motion still gets
-     told the plate is interactive. */
+  /* ⚠️ Reduced motion drops the travel and the scale, not the feedback. The
+     shadow and the frame still respond, so a reader who asked for less motion
+     is still told the plate is interactive. */
   @media (prefers-reduced-motion: reduce) {
     .plate {
       transition:
@@ -489,6 +514,39 @@
     .plate:hover {
       transform: rotate(var(--plate-tilt, 0deg));
     }
+  }
+
+  /* ── The drawn light ground ──────────────────────────────────────────────
+     🔓 The light counterpart to `.ground-field`, added so the depth does not
+     stop at the hero. The officer's note: the tab and grid at the top read
+     well, and the rest of the page should carry more of the same.
+
+     📌 Built from the palette exactly like the navy field is: Vellum
+     (`--misa-panel`) glowing off the top edge of the section and clearing to
+     Paper. No new hue, no third colour — the same two grounds the system
+     always had, with the boundary between them softened instead of hard.
+
+     📌 No focus-ring answer needed and that is not an oversight: this ground
+     stays light enough at every stop that the default navy ring holds. It is
+     the reason `field` needed `.on-navy` and this does not. */
+  .ground-paper {
+    background-color: var(--background);
+    background-image: radial-gradient(
+      110% 70% at 50% 0%,
+      color-mix(in srgb, var(--misa-panel) 92%, transparent),
+      transparent 72%
+    );
+  }
+
+  /* The hero's 60×60 drafting grid, restated for light grounds. `.hero-grid`
+     draws in white and is invisible on anything but navy; this is the same
+     rhythm in navy at a very low alpha, so the motif carries down the page
+     instead of belonging to the hero alone. */
+  .paper-grid {
+    background-image:
+      linear-gradient(rgba(22, 48, 92, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(22, 48, 92, 0.045) 1px, transparent 1px);
+    background-size: 60px 60px;
   }
 
   /* Placeholder hatch — 45°, 7px stripes. Two grounds, never mixed: a light
