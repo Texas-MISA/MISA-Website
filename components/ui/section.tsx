@@ -16,17 +16,30 @@
 import type { ElementType, ReactNode } from "react";
 
 /**
- * White is the default page ground; Panel is the alternating light ground;
- * Navy is the full-bleed brand band; Field is the drawn navy gradient.
+ * `page` is the default: it paints nothing and lets the public layout's ground
+ * — grey since 2026-08-19 — show through. `white` is an explicit white band.
+ * `panel` is the same grey declared on the section itself. `navy` is the
+ * full-bleed brand band and `field` the drawn navy gradient.
+ *
+ * 🔓 **`white` used to be the default AND used to mean `""`.** Both changed on
+ * 2026-08-19, when the officer made the public page ground a flat grey: a key
+ * called `white` that painted nothing was already a lie, and once the page
+ * behind it stopped being white it would have been an actively misleading one.
+ * So `page` took over the empty string and the default, and `white` became a
+ * real `bg-white` — used by exactly one caller, the gallery marquee band, which
+ * is now the only white ground on the public site.
+ *
+ * 🔓 **`paper` was retired in the same change.** It was `.ground-paper`, a
+ * gray-to-white radial; with the page flat grey the class had nothing left to
+ * say that `panel` does not, and a variant with nothing distinct behind it gets
+ * deleted rather than aliased.
  *
  * 🔓 **`field` is the fourth ground, added in the v2 redesign.** This entry
  * used to read "there is no fourth — adding one is a change to DESIGN.md's Two
  * Grounds Rule, not a prop", and that is exactly what happened: the officer
  * retired the rule on 2026-08-17, clarifying that the navy-and-white *palette*
  * is locked while the *ground* is not. Gradients, tinted fields and drawn
- * backgrounds are in play so long as they are built from the palette, and
- * `.ground-field` in globals.css is built from three colours the system already
- * owns. A fifth ground is still a decision, not a prop.
+ * backgrounds are in play so long as they are built from the palette.
  *
  * 🪤 `field` carries `.on-navy` for the same reason `navy` does, and that is
  * the engineering rule that survived the retirement: **a focus ring must be
@@ -34,7 +47,7 @@ import type { ElementType, ReactNode } from "react";
  * same commit.** A navy ring on a navy field is not a subtle defect; it is no
  * focus indicator at all.
  */
-export type SectionGround = "white" | "panel" | "navy" | "field" | "paper";
+export type SectionGround = "page" | "white" | "panel" | "navy" | "field";
 
 /**
  * The vertical rhythm scale. Every step is responsive — the handoff's 56–80px
@@ -60,7 +73,14 @@ export type SectionPad = "none" | "flush" | "xs" | "sm" | "md" | "lg";
 export type SectionWidth = "none" | "page" | "narrow" | "prose" | "measure";
 
 const GROUND: Record<SectionGround, string> = {
-  white: "",
+  // Paints nothing, so the public layout's grey `<main>` shows through. This is
+  // what almost every section wants.
+  page: "",
+  // 🪤 A REAL white, and the only thing on the public site that is one. Reach
+  // for it when a section carries controls or tabular data whose own fills are
+  // `bg-misa-panel` — on the grey page ground those surfaces would be the same
+  // colour as what is behind them. The grey is the background; cards stay white.
+  white: "bg-white",
   panel: "bg-misa-panel",
   // `.on-navy` is not decoration — it is the focus-ring flip, and it must
   // travel with the fill or every ring inside this section becomes invisible.
@@ -69,10 +89,6 @@ const GROUND: Record<SectionGround, string> = {
   // the radials, so no `bg-*` utility belongs here — one would win the cascade
   // and flatten the gradient back to a solid.
   field: "on-navy ground-field text-white",
-  // The light counterpart. Same rule about `bg-*`: `.ground-paper` owns its own
-  // background-color. No `.on-navy`, because the default navy focus ring stays
-  // visible on every stop of this gradient.
-  paper: "ground-paper",
 };
 
 const PAD_TOP: Record<SectionPad, string> = {
@@ -127,7 +143,7 @@ export type SectionProps = {
 export function Section({
   children,
   as: Tag = "section",
-  ground = "white",
+  ground = "page",
   pad = "md",
   padTop,
   padBottom,

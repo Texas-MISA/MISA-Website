@@ -18,26 +18,38 @@ export const CONTACT_EMAIL = "txmisa@gmail.com";
 export const CORPORATE_EMAIL = "utmisa.corporate@gmail.com";
 export const INSTAGRAM_HANDLE = "@texasmisa";
 
-export const TAGLINE = "— Where Analytics, Innovation, and Leadership Converge —";
+export const TAGLINE =
+  "— Where Analytics, Innovation, and Leadership Converge —";
 
 export const MISSION =
   "MISA exists to bring together like-minded individuals who have a passion for technology and business. We equip our members with tools by going beyond the course curriculum and covering broader issues in IT. Our aim is to foster an environment that empowers students to succeed in the world outside the Forty Acres, both as professionals and as individuals.";
 
 // ── Image slots ──────────────────────────────────────────────────────────────
 
-// 📌 THERE IS NO PHOTOGRAPHY ON THIS SITE, and that is a decision rather than a
-// gap (2026-08-14). Every image slot on every page renders a hatched
-// placeholder naming the shot that belongs there — which is what the design
-// handoff already specifies for the slots it had no photo for, applied to all
-// of them. `public/photos/` was deleted with the change, so there is no file
-// to render and no unlinked-but-fetchable URL left behind either. The four
-// partner logos in `public/partners/` are the only images the site serves.
+// 📌 THE PUBLISHED SITE STILL HAS NO PHOTOGRAPHY, and that is a decision rather
+// than a gap (2026-08-14). Every image slot renders a hatched placeholder naming
+// the shot that belongs there — which is what the design handoff specifies for
+// the slots it had no photo for, applied to all of them. The four partner logos
+// in `public/partners/` remain the only images the site SERVES.
 //
-// Restoring a photo means: add the file, give the slot a `src`, and swap its
-// <Hatch> for an <Image>. The design handoff's README carries the treatment
-// spec — duotone is `filter: grayscale(1) contrast(1.05)` plus a navy
-// `mix-blend-mode: color` overlay, and officer headshots and the About mission
-// cluster are deliberately NOT duotoned.
+// 🔓 **The home page is the first exception, and only on the officer's machine**
+// (2026-08-18). `HERO_SLOTS` and `MISSION_SLOTS` below carry real `src` values
+// pointing at `public/photos/`, which is **gitignored** — so a clone, a CI run
+// and a Vercel deploy all still render placeholders. Publishing for real is a
+// separate, deliberate act of committing those files.
+//
+// ⚠️ Note what has NOT changed: a file under `public/` is fetchable at its own
+// URL whether or not a page links it. That is why the original `public/photos/`
+// was DELETED rather than unlinked, and it is why the directory is ignored now
+// rather than merely unused.
+//
+// Restoring a photo means: add the file, give the slot a `src`, and let
+// `components/ui/photo-slot.tsx` swap the <Hatch> for an <Image>. The design
+// handoff's README carries the treatment spec — duotone is
+// `filter: grayscale(1) contrast(1.05)` plus a navy `mix-blend-mode: color`
+// overlay, and officer headshots and the About mission cluster are deliberately
+// NOT duotoned. ⚠️ The home page currently renders its photographs UNTREATED;
+// duotone is a live option, not a thing that was skipped by accident.
 //
 // 🪤 When photography does return, size the framed slots with next/image's
 // `fill`. An intrinsically sized <img> makes the frame grow to the photo's own
@@ -45,7 +57,8 @@ export const MISSION =
 // column next to it — the handoff hit this in its own prototype and calls it
 // out. The gallery masonry is the one place that wants intrinsic heights.
 
-export type GalleryCategory = "socials" | "workshops" | "professional" | "banquet";
+export type GalleryCategory =
+  "socials" | "workshops" | "professional" | "banquet";
 
 /** One placeholder slot: what belongs there, and how tall it stands. */
 export type Slot = {
@@ -58,60 +71,139 @@ export type Slot = {
 
 // ── Home page slots (hero + mission) ─────────────────────────────────────────
 
+/** One image slot: what belongs there, and what is actually in it. */
+export type ImageSlot = {
+  /** The shot that belongs here. Shown by `<Hatch>` while `src` is unset. */
+  caption: string;
+  /** Web-sized derivative under `public/photos/`. Unset = placeholder. */
+  src?: string;
+  /**
+   * ⚠️ Describes the PHOTOGRAPH, not the slot. `caption` names the shot that
+   * was wanted; `alt` names the one that actually landed, and the two are
+   * allowed to disagree. Alt text describing a different event than the image
+   * on screen is worse than no alt text at all.
+   */
+  alt?: string;
+};
+
 /**
- * 🔓 NEW in the v2 redesign, phase 1. The hero and the mission used to carry
- * **zero** image slots between them, while the marquee band carried eleven —
- * and concentrating the slots into one band is the single thing v1 was most
- * clearly scrapped for. `design-taste-frontend` §4.8 wants slots in every
- * section, not one plate section.
+ * 🔓 NEW in the v2 redesign, phase 1: the hero and the mission used to carry
+ * **zero** image slots between them while the marquee band carried eleven, and
+ * concentrating the slots into one band is the single thing v1 was most clearly
+ * scrapped for. §4.8 wants slots in every section.
  *
- * ⚠️ Captions here are drawn from the vocabulary `GALLERY_ITEMS` already uses,
- * deliberately. A caption names a shot, so an invented one ("case competition
- * photo", "hackathon photo") would assert an activity the club has not told us
- * it runs — which is the same failure as inventing a fact about the club, just
- * wearing a placeholder's clothes. Every string below already appears below.
+ * ⚠️ The CAPTIONS are drawn from the vocabulary `GALLERY_ITEMS` already uses.
+ * A caption names a shot, so an invented one ("case competition photo") would
+ * assert an activity the club has not told us it runs — the same failure as
+ * inventing a fact about the club, wearing a placeholder's clothes.
  *
- * 📌 Content only. The tilt, the aspect ratio and the stacking order are
- * composition and live with the component, the same way `ACTIVITIES[].caption`
- * is content while `activities.tsx` owns the layout.
+ * 📌 Content only. Aspect ratio, position and stacking order are composition and
+ * live with the component, the same way `ACTIVITIES[].caption` is content while
+ * `activities.tsx` owns the layout.
+ *
+ * 🔴 **PHOTOGRAPHS ARE LIVE ON THE HOME PAGE, LOCALLY ONLY** (officer,
+ * 2026-08-18). `public/photos/` is **gitignored**, so these files exist on the
+ * officer's machine and nowhere else — a deploy builds from the repo, so every
+ * one of these slots renders as a `<Hatch>` again in production.
+ *
+ * 🔓 That is the safe default and it is not an accident. **This repository is
+ * public**, and the `.gitignore` entry carries the reasoning: a third party's
+ * face in a public git history is not something a later commit can take back.
+ * Publishing for real means deliberately committing these files, and that needs
+ * the officer's sign-off on the people in them rather than a git command.
+ *
+ * ⚠️ **The pairings below are inferred from the photographs, not supplied.**
+ * Nobody said which event each frame is from; the alt text is a careful reading
+ * of what is visible. This is the milder cousin of the officer-headshot problem
+ * — a wrong name against a real face — and it wants an officer's eye before it
+ * goes anywhere public.
  */
-export const HERO_SLOTS = [
-  "chapter photo",
-  "general meeting photo",
-  "workshop photo",
-  "banquet photo",
-] as const;
+export const HERO_SLOTS: readonly ImageSlot[] = [
+  // The wide plate above the pair. 🔓 Was two plates side by side up here
+  // (officer, 2026-08-19); the second one was dropped and this one grew into
+  // the space. It is the LCP candidate, so it is the one that gets `priority`.
+  {
+    caption: "chapter photo",
+    src: "/photos/home/homepage-top-main.jpg",
+    alt: "MISA members holding balloon letters spelling MISA at a chapter celebration",
+  },
+  // The pair below, unchanged.
+  {
+    caption: "workshop photo",
+    src: "/photos/home/homepage-top-2.jpg",
+    alt: "MISA members at a general meeting in a lecture hall",
+  },
+  {
+    caption: "banquet photo",
+    src: "/photos/home/homepage-top-3.jpg",
+    alt: "MISA members in formal dress at the banquet",
+  },
+];
 
 /** The two plates flanking the mission statement. */
-export const MISSION_SLOTS = ["member photo", "service day photo"] as const;
+export const MISSION_SLOTS: readonly ImageSlot[] = [
+  {
+    caption: "member photo",
+    src: "/photos/home/mission-1.jpg",
+    alt: "MISA members gathered on the steps for a chapter photo",
+  },
+  {
+    caption: "service day photo",
+    src: "/photos/home/mission-2.jpg",
+    alt: "MISA members outside the UT Tower at dusk",
+  },
+];
 
 // ── Activities (home page) ───────────────────────────────────────────────────
 
 /**
- * The four alternating rows on the home page. `caption` is what the hatched
- * placeholder box says while real photography is pending — the handoff calls
- * these out as intentional placeholders, not missing assets.
+ * The four bento cells on the home page, IN RENDER ORDER.
+ *
+ * 🔓 **The order is the layout** (officer, 2026-08-19): Leadership top-left
+ * (small), Professional Development top-right (large), Social Events
+ * bottom-left (large), Technical Workshops bottom-right (small). This array
+ * and `CELLS` in `components/ui/activities.tsx` are read in lockstep by index,
+ * so re-ordering here without re-ordering there silently swaps which activity
+ * gets which cell size.
+ *
+ * ⚠️ Two of the images are a poor fit for the cell they were assigned, and it
+ * is worth knowing before someone calls the crop a bug. `tech-workshops` is a
+ * 2.14 panorama in a 1.33 cell, so `object-cover` discards roughly half its
+ * width; `social-events` is 1.33 in a 2.33 cell. The two would suit each
+ * other's cell almost exactly. Assigned as instructed; swapping them is one
+ * edit to `CELLS`.
+ *
+ * `caption` is what the `<Hatch>` says while a slot is empty; `alt` describes
+ * the photograph that actually landed. They are allowed to disagree.
  */
 export const ACTIVITIES = [
   {
-    title: "Social Events",
-    body: "Come and have fun with members and build a sense of community with our casual social events! We host game nights, kickbacks, IM sports, and more!",
-    caption: "social event photo",
-  },
-  {
-    title: "Technical Workshops",
-    body: "Members will have the opportunity to learn skills and tools that will help them in their academic and professional careers. No prior experience is required to attend our technical workshops - everyone is welcome to join and learn something new!",
-    caption: "workshop photo",
+    title: "Leadership Opportunities",
+    body: "Get involved with MISA Leadership as a Junior Director! Boost your resume while developing collaboration skills and growing professionally. Open to freshmen and sophomores of all majors! Applications will reopen Fall 2026!",
+    caption: "junior director photo",
+    src: "/photos/home/leadership-opp.jpg",
+    alt: "A MISA member leading a session in a full lecture hall",
   },
   {
     title: "Professional Development",
     body: "Gain valuable knowledge and skills that will help you succeed in your future careers. Developing professional skills, such as networking, resume building, and interview skills.",
     caption: "networking night photo",
+    src: "/photos/home/professional-dev.jpg",
+    alt: "MISA members at the Fall Frenzy case competition",
   },
   {
-    title: "Leadership Opportunities",
-    body: "Get involved with MISA Leadership as a Junior Director! Boost your resume while developing collaboration skills and growing professionally. Open to freshmen and sophomores of all majors! Applications will reopen Fall 2026!",
-    caption: "junior director photo",
+    title: "Social Events",
+    body: "Come and have fun with members and build a sense of community with our casual social events! We host game nights, kickbacks, IM sports, and more!",
+    caption: "social event photo",
+    src: "/photos/home/social-events.jpg",
+    alt: "MISA members at an evening social",
+  },
+  {
+    title: "Technical Workshops",
+    body: "Members will have the opportunity to learn skills and tools that will help them in their academic and professional careers. No prior experience is required to attend our technical workshops - everyone is welcome to join and learn something new!",
+    caption: "workshop photo",
+    src: "/photos/home/tech-workshops.jpg",
+    alt: "MISA members working on laptops during a technical workshop",
   },
 ] as const;
 

@@ -69,8 +69,15 @@ second accent or a tint of navy, and the ban on hover motion are **all retired
 for the duration of v2**. The frontmatter tokens are not binding either.
 
 📌 **Why wholesale rather than rule by rule:** v1 relaxed constraints one at a
-time and ended up half-committed, which is most of what "bland" described. A new
-`DESIGN.md` is written at phase 5 from what actually ships.
+time and ended up half-committed, which is most of what "bland" described.
+
+✅ **THE RETIREMENT IS OVER as of 2026-08-19.** `DESIGN.md` was rewritten from
+what phase 1 actually shipped and is the design source of truth again, site-wide.
+It was scheduled for phase 5; it moved up because **phase 2 rebuilds five pages
+and cannot be executed consistently against an undocumented system.** The v1 file
+is kept verbatim at [`design-v1-superseded.md`](design-v1-superseded.md) for its
+reasoning. ⚠️ What phase 5 still owes is `docs/invariants.md`, which has not been
+reconciled and still describes v1 for every surface v2 has not reached.
 
 ⚠️ Two of these were already blocking things the officer has asked for, which is
 how the decision surfaced: **"Don't animate on hover with a lift, a scale on a
@@ -100,8 +107,16 @@ its current implementation, because v2 may not keep the implementation.
 6. **Feedback colours are named, never raw framework scales.** Reaching for
    `red-700` at ~40 sites is how a palette that forbade a third colour quietly
    acquired three, in whatever hue the framework shipped.
-7. **No photography.** This is `PRODUCT.md`, not `DESIGN.md` — the organization
-   has not taken the photographs. Slots stay slots.
+7. 🔓 **~~No photography.~~ SUPERSEDED 2026-08-18/19 — the organization *had*
+   taken the photographs.** The rule's premise was factual, not aesthetic, and
+   the fact changed. What replaces it is narrower and still binding: **a slot
+   renders a photograph or a labelled placeholder, never a hole**
+   (`components/ui/photo-slot.tsx` is the single swap), and 🔴 **image files and
+   the code carrying their `src` values are committed together or not at all** —
+   the repository is public, so publishing faces is an officer decision. Officer
+   headshots and project cells stay placeholders for a second reason: pairing a
+   face or a photo to a named person or client is a factual claim nobody
+   supplied.
 
 The markup-level invariants under *What must not regress* below bind equally and
 are a separate list.
@@ -325,11 +340,11 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 | Phase | Scope |
 |---|---|
 | **0** | Amend `CLAUDE.md` precedence. Install the three packages. Re-skin shadcn out of default state. Define the elevation vocabulary and the radius scale. Read §0, §4, §5, §10, §12 in full. |
-| **1** | ✅ **BUILT, at the GATE.** Home page + header. Record below. |
-| **2** | `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries |
+| **1** | ✅ **COMPLETE, gate passed 2026-08-19.** Home page + header. Record below. |
+| **2** | ⬅️ **NEXT.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Brief below. |
 | **3** | `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched |
 | **4** | `/admin` under scanability rules, screen by screen, suite green between screens |
-| **5** | Replace `DESIGN.md` from the built result; update `docs/invariants.md` for every invariant retired, each with its replacement argued; record in `build-log.md` and `tasks.md` |
+| **5** | ~~Replace `DESIGN.md`~~ ✅ **done early, 2026-08-19.** What remains: reconcile `docs/invariants.md` for every invariant retired, each with its replacement argued; final record in `build-log.md` and `tasks.md` |
 
 📌 **Do not pre-suppress detector findings.** v1 added ten `design-system-font-size`
 ignores to `.impeccable/config.json` as it went; that set died with the branch and
@@ -341,6 +356,77 @@ against the ramp that actually ships, or not at all.
 first scan, and it is not v2's doing: `app/(public)/_components/upcoming-events.tsx:87`
 sets `text-[21px]`, which is off the documented ramp today. Leave findings like
 this standing until the section that owns them is rebuilt.
+
+---
+
+## Phase 2 brief — the five content pages (NOT STARTED)
+
+**Scope:** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, plus the
+error and not-found boundaries. Presentational only — no route, action, `lib/` or
+schema change. `/attend`, `/leaderboard`, `/lookup` and `/admin` are **out of
+scope** and must not be touched.
+
+### Read first
+
+1. [`../DESIGN.md`](../DESIGN.md) — the built v2 system, top to bottom. It is the
+   source of truth again, and phase 2's job is to execute it, not extend it.
+2. `CLAUDE.md`'s Invariants. They outrank every design skill without exception.
+3. `app/(public)/page.tsx` and `_components/home-hero.tsx` — the worked example
+   of a page on this system, including how families are declared in comments.
+
+### Where the five pages actually are today
+
+All five still use **`PageHero`** (`components/ui/chevron-section.tsx`) and a
+stack of `<Section>`s. They already sit on the v2 grey page ground, so **do not
+read "it has the grey background" as "it has been done."**
+
+| Page | Today | Notes |
+|---|---|---|
+| `/about` | `PageHero` + mission + history + FAQ + `<Partners />` | `Hatch` slots throughout; the FAQ band is a contact path, since `/contact` left the nav |
+| `/projects` | `PageHero` + summary + project list + CTA | ⚠️ **Descriptions and photographs are coming later** (officer, 2026-08-19). Build the shape; leave the placeholders. |
+| `/gallery` | `PageHero` + `GalleryGrid` (the one client component: filter chips + load more) | 🪤 Its filter section already carries `ground="white"` — `FilterChip` fills with the page grey. Keep it. |
+| `/officers` | `PageHero` + a card grid | ⚠️ Headshots stay `Hatch`. `Officer` has no `photo` field, deliberately. |
+| `/contact` | `PageHero` + contact details | 📌 **Routed but unlinked** from the desktop nav; still in the mobile sheet. |
+
+### What phase 2 has to decide
+
+- 🔴 **`PageHero` is the one shared thing all five carry, and phase 1 left it
+  untouched on purpose.** Its `size="home"` branch is already unreachable — the
+  home page uses `HomeHero` now. Phase 2 either rebuilds `PageHero` once (and
+  every page inherits it) or replaces it per page. **Retire the dead `size="home"`
+  branch either way.**
+- **The layout-family budget applies per page, not per site.** A family used on
+  the home page may be reused on `/about`; a family may not appear twice on
+  `/about`. Families still unspent are listed in `DESIGN.md`.
+- **`/about` and `/projects` are the two at real risk of the v1 failure** — both
+  are long stacks of alternating image+text rows, which is exactly the ≤2
+  consecutive splits cap and the `border-t` + `last:border-b` pattern §9.F bans
+  outright.
+
+### Constraints specific to this phase
+
+- 🔴 **No new page may invent a fact about the club.** Copy comes from
+  `lib/site.ts` and `lib/officers.ts`. `PRODUCT.md`: testimonials, member counts,
+  placement stats, awards and press **do not exist**. Any new string is reviewed
+  by the officer before it ships.
+- ⚠️ **`GALLERY_ITEMS[].category` is a statement of intent, not a record.** The
+  gallery filter sorts on it and it describes shots that do not exist yet.
+- 🪤 **Any section carrying controls, chips or a table needs `ground="white"`** —
+  four shared primitives fill with the page grey. This already bit once.
+- 🪤 **`/contact` stays out of the desktop nav.** The nav cannot grow without
+  re-measuring the wordmark clearance.
+- **Error and not-found boundaries:** `app/(public)/error.tsx`,
+  `app/(public)/not-found.tsx`, `app/error.tsx`, `app/not-found.tsx`,
+  `app/global-error.tsx` all exist. 🪤 Boundaries use `unstable_retry`, not
+  `reset`, and render `error.digest`. 🪤 One `loading.tsx` per route **or**
+  granular `<Suspense>`, never both.
+
+### The gate
+
+Same bar phase 1 was held to: zero horizontal overflow at 390/768/1024/1280/1646,
+every contrast pairing measured on the composited ground, 0 reveals hidden with
+JS off, `npm run lint`, `npm run build` and the full suite green, and a browser
+walkthrough of all five pages. Then stop for the officer.
 
 ---
 
@@ -357,9 +443,14 @@ ground while refusing its radius, its hard block shadow and its accent.
 
 ### The layout-family budget
 
+⚠️ **The Ground column below is as of iteration 1 and is superseded by
+iteration 4** — `paper` was retired, the light page ground became a flat grey,
+the marquee band became the only declared `white`, and the strip was split in
+two so it brackets Activities. The families and slot counts are unchanged.
+
 | # | Section | Family | Ground | Slots | Grouping |
 |---|---|---|---|---|---|
-| 1 | Hero | Asymmetric Split Hero + plate cluster | `field` | 4 | negative space |
+| 1 | Hero | Asymmetric Split Hero + plate cluster | `field` | 3 | negative space |
 | 2 | Gallery band | Kinetic Marquee (the only one) | white | ~11/group | negative space |
 | 3 | Mission | Editorial Manifesto | `paper` | 2 | negative space |
 | 4 | Activities | Bento Grid, 4 cells / 4 items | white | 4 | gap |
@@ -434,6 +525,42 @@ line, clearance unchanged at 277/304 and 461/487, **0 of 21 reveals hidden with
 JS off**, all four project cells uniform at every width. Lint, `tsc`, build clean;
 **1022 tests pass**.
 
+### Iteration 4 (2026-08-19, officer review) — and the ground the site now has
+
+- 🐛 **`[data-revealed]` set `clip-path: inset(0 0 0 0)` on every revealed node**,
+  which is not "no clip" but *clip to my own axis-aligned border box* — and a
+  clip-path clips descendants. The reveal wrapper was slicing the corners off
+  the hero's rotated plates, so they rendered as polygons rather than
+  rectangles. Now `clip-path: none`; `wipe` keeps its own `inset()` rule
+  because it is the one variant that animates the property.
+  ⚠️ A first pass misread the same symptom as a border problem and moved the
+  frame to an `outline`; **that was reverted** — a plain `border` is fine on a
+  rotated plate once nothing is clipping it.
+- **The hero cluster's overlap, tilt and stagger were arithmetic accidents.**
+  Two pixels of overlap, 0.4px of stagger, a 1° lean. The angle went 15° → 8° →
+  **4°** across review rounds, and **the arithmetic is written out above
+  `PLATES`** so the next change has to answer it. 🪤 The rotated bounding box
+  (`w·cosθ + h·sinθ`) is solved against the box on all four sides, which is why
+  the box ratio came *down* as the angle did and the hero never got taller.
+- ✂️ **All four seams around the gallery bands are 64px**, down from 112px, and
+  the bands carry nothing but tiles — the "See all photos" card and the white
+  band under it were both tried and reversed the same day.
+- 🔓 **The light ground is a FLAT GREY, site-wide, and `paper` is retired.**
+  `bg-misa-panel` on the public layout's `<main>` — not on `body`, which is what
+  keeps `/admin` white. `Section`'s `white` was renamed `page` (paints nothing,
+  inherits the grey) and a real `white` took the name, used only by the four
+  sections that carry controls. Grounds run **field → grey → grey → grey → grey
+  → field → grey**, with white reserved for cards and forms.
+  - 🐛 **The audit that made it safe.** `controlClass`, the sticky `<THead>`,
+    `FilterChip` and the neutral `Banner` all fill with `bg-misa-panel` — the
+    exact colour the page became. They were **not** recoloured (all four are
+    shared with `/admin`); the four sections that carry them took
+    `ground="white"` instead. The officer's rule: *the grey is the background,
+    cards stay white.*
+  - ⚠️ `<Hatch tone="light">`'s lighter stripe **is** `#f2f2f3`, so a
+    placeholder reads as half-visible stripes in a frame on the grey rather than
+    a distinct box. Still legible; open, and possibly moot if photography ships.
+
 ### Iteration 2 (2026-08-18, officer review)
 
 - **Depth on light grounds is a raised sheet, not a drawn grid.** `.paper-grid`
@@ -494,6 +621,31 @@ Measured: overflow 0 and zero offending elements at
 390/640/768/1024/1280/1440/1646, headline 2 lines everywhere, hero fits the
 fold at every width (763px at its tallest), all four plates identical in size,
 5 overlapping pairs at `lg`+ and 0 below, 0 of 22 reveals hidden with JS off.
+
+### Iterations 4–5 (2026-08-18/19) — photographs, and the asset pipeline
+
+🖼️ **The home page renders real photographs, locally only.** `pictures/` and
+`public/photos/` are gitignored and the code carrying the `src` values is
+uncommitted with them. They move together or production gets ~30 broken
+images. See the build log for the two commit paths.
+
+- **One folder per page.** `pictures/{home,about,projects,officers,gallery,_saved-site}`.
+  `scripts/organise-pictures.mjs` sorts it (moves, never overwrites);
+  `scripts/build-photos.mjs` renders `public/photos/` (clears output first).
+- 🪤 **HEIC needs `heic-convert`.** libvips ships HEIF for AVIF only, and
+  `.metadata()` reads the header fine — so a probe will NOT reveal the failure.
+  40% of the library is HEIC. This falsified a premise in the plan for the round.
+- 🔓 **The marquee draws from `public/photos/gallery/`** via `lib/gallery-photos.ts`,
+  read at build time, **hash-ordered** (alphabetical clustered near-identical
+  frames; random would break build reproducibility), capped at 12 per band, and
+  falling back to `<Hatch>` when the directory is absent — which is production.
+- ⚠️ **The marquee is split in two and therefore appears TWICE**, against §5 and
+  against the no-repeats budget. Seven sections, six families. Argued in
+  `_components/gallery-marquee.tsx`; the rest of the budget still holds.
+- **Activities** is Leadership (small) / Professional (large) over Social (large) /
+  Workshops (small). `ACTIVITIES` and `CELLS` are index-locked.
+- **Hero**: three plates, overlap cut to a quarter, pair fanned +1°/−1°.
+  ⚠️ That grew the hero to 764px, so it no longer fits a 790px viewport at 1440+.
 
 ### Decisions that need the officer
 

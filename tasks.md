@@ -8,7 +8,41 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ## 🏗️ IN PROGRESS — v2 visual redesign of the whole site (2026-08-17)
 
-Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 complete. ✅ Phase 1 (home page + header) is BUILT and AT THE REVIEW GATE.**
+Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 complete. ✅ Phase 1 (home page + header) COMPLETE — gate passed 2026-08-19 after four rounds of officer review. ⬅️ Phase 2 is NEXT.**
+
+### ⬅️ Phase 2 — the five content pages. NOT STARTED.
+
+`/about`, `/projects`, `/gallery`, `/officers`, `/contact`, plus the error and
+not-found boundaries. Presentational only; no route, action, `lib/` or schema
+change. `/attend`, `/leaderboard`, `/lookup` and `/admin` are **out of scope**.
+
+**Read before starting, in this order:**
+
+1. [`DESIGN.md`](DESIGN.md) — 🎨 the built v2 system and the design source of
+   truth again. Phase 2's job is to **execute** it, not extend it.
+2. `CLAUDE.md`'s Invariants — they outrank every design skill without exception.
+3. The **Phase 2 brief** in the v2 plan — scope, where each page stands today,
+   the decisions phase 2 owns, and the gate.
+4. `app/(public)/page.tsx` + `_components/home-hero.tsx` — the worked example.
+
+**The three things most likely to go wrong:**
+
+- 🪤 **All five pages already sit on the v2 grey ground.** Do not read "it has the
+  grey background" as "it has been done." They are still v1 compositions.
+- 🪤 **Any section carrying controls, chips or a table needs `ground="white"`.**
+  Four shared primitives (`controlClass`, the sticky `<THead>`, `FilterChip`, the
+  neutral `Banner`) fill with the page grey and go invisible on it. This already
+  bit once, on four pages at once.
+- 🔴 **No new page may invent a fact about the club.** Copy comes from
+  `lib/site.ts` and `lib/officers.ts`; any new string is officer-reviewed.
+  ⚠️ **Project descriptions and photographs are coming later** (officer,
+  2026-08-19) — build the shape, leave the placeholders.
+
+**One shared decision phase 2 owns:** all five pages carry `PageHero`
+(`components/ui/chevron-section.tsx`), which phase 1 deliberately left alone. Its
+`size="home"` branch is already unreachable. Rebuild it once and every page
+inherits, or replace it per page — **retire the dead branch either way.**
+
 
 ⚠️ **A v1 redesign was built and SCRAPPED.** It survives on the abandoned branch `redesign-stage-1` (tip `60ca71d`) as a record; `main` was never touched. It was rejected as bland, lacking depth, with image slots concentrated into one section and a scattered, same-ey layout. Each of those turned out to be a named rule in `design-taste-frontend` that v1 read too late or not at all. The root cause was process: v1 treated the skills as advisory and hand-rolled everything, against §2's *"do not invent CSS for things that have an official package."* The v1 plan, [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md), is **superseded**.
 
@@ -32,6 +66,35 @@ Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md)
 **Phase 1 is built and waiting on the officer.** Six files, presentational only. The layout-family budget was declared before any markup and is named per section in code comments: Asymmetric Split Hero → Kinetic Marquee → Editorial Manifesto → Bento Grid → Featured-plus-rest → Shared-rule logo plate. **Six sections, six families, none repeated.** Image slots now sit in every section (four in the hero, two flanking the mission) rather than concentrated in the marquee band.
 
 Measured at the gate: zero horizontal overflow at 390/768/1024/1280/1646, hero fits the viewport at every width, headline 2 lines everywhere, nav one line at 61px with 277/304px wordmark clearance at 1280, **0 of 21 reveals hidden with JS off**, every contrast pairing ≥4.5:1 on the composited ground, 1022 tests green.
+
+🖼️ **REAL PHOTOGRAPHS ARE LIVE ON THE HOME PAGE — LOCALLY ONLY, AND NOTHING IS COMMITTED (2026-08-19).** Read this first.
+
+`pictures/` (the officer's library, 126 images) and `public/photos/` (the web-sized derivatives) are both **gitignored**, and the code carrying the ~30 `src` values is uncommitted alongside them. 🔴 **They have to be committed together or not at all** — committing the code while the images stay ignored ships `src` values pointing at files that do not exist, which is worse than the placeholders it replaced. Two clean paths:
+
+1. **Commit the photographs too.** Needs the officer's sign-off on the people in them, because **the repository is public** and a face in a public git history is not something a later commit takes back.
+2. **Commit the plumbing with every `src` stripped.** Production keeps `<Hatch>` placeholders; the photographs stay a local preview.
+
+**The workflow, once it is set up:** drop a photo in `pictures/<page>/`, run `node scripts/build-photos.mjs`, refresh. `scripts/organise-pictures.mjs` sorts a messy `pictures/` into one folder per page and pools anything unnamed into `gallery/`.
+
+🪤 **HEIC does not decode without `heic-convert`, and `.metadata()` will not warn you** — the header read succeeds and only a real decode fails. 40% of the library is HEIC. This is written up in `docs/build-log.md`.
+
+**Where the home page stands (iteration 4, 2026-08-19):** hero is three plates — one wide at the front, a fanned pair below leaning **±4°**, genuinely overlapping and staggered, with the bounding-box arithmetic written out above `PLATES` because the previous overlap was two pixels by accident; the mission sheet sits on the grey page ground; the gallery strip is **split into two counter-scrolling bands**, both on the grey and carrying nothing but tiles; Activities is a four-cell bento ordered Leadership/Professional over Social/Workshops; Projects is a symmetric 2×2 that **still uses placeholders**, because pairing a photo to a named client is a factual claim.
+
+🐛 **The defect this iteration existed to find: `[data-revealed]` set `clip-path: inset(0 0 0 0)` on every revealed node.** That is not "no clip" — it is *clip to my own axis-aligned border box*, and a clip-path clips descendants, so the reveal wrapper was slicing the corners off the rotated plates. They rendered as polygons, not rectangles, and their frame was cut with them. Now `clip-path: none`, with `wipe` keeping its own `inset()` rule because it actually animates the property. ⚠️ **A first pass misdiagnosed the missing frame as a border-vs-rasterised-layer problem and moved it to an `outline`; that was reverted** — a plain `border` renders perfectly on a rotated plate once nothing is clipping it.
+
+🔓 **The public page ground is a flat grey (`#f2f2f3`) site-wide.** `bg-misa-panel` on the public layout's `<main>` — 🪤 not on `body`, which is what keeps `/admin` on the outgoing white system. `Section`'s `white` ground was renamed `page` and a real `white` took the name; `paper` and `.ground-paper` were retired. 🐛 The audit that made it safe: `controlClass`, the sticky `<THead>`, `FilterChip` and the neutral `Banner` all fill with the *same* `bg-misa-panel`, so `/attend`, `/lookup`, `/leaderboard` and the gallery filter bar took `ground="white"` rather than those four shared primitives being recoloured. **The grey is the background; cards stay white.**
+
+✂️ **All four seams around the gallery bands are 64px at desktop**, down from 112px. The mission and Activities gave up their `lg` steps. 📌 The bottom band's `padBottom` is one step larger than its `padTop`, because below it the navy Projects field starts immediately and there is no light neighbour to bring the other half.
+
+⚠️ **Open, minor (1):** `<Hatch tone="light">`'s lighter stripe is `#f2f2f3`, the grey's own colour, so a placeholder now reads as half-visible stripes in a frame rather than a distinct light box. Legible via the darker stripe, the hairline and the caption; possibly moot if the photography ships.
+
+🪤 **The hero's middle overlap must be measured ALONG THE SEAM, not read off the `left` values.** At ±4° the two tilted edges swing ±8px about their own centres, so a nominal 15px of overlap was really −2px at the bottom tip — a visible sliver of field. A 15px nudge on the bottom-left plate closed it; the seam now runs 45px at the top to 13px at the bottom. The lower pair also swapped stacking order (bottom-right over bottom-left), so `PLATES`' source order no longer matches paint order.
+
+⚠️ **Two things the officer should look at:**
+1. **The marquee now appears twice**, against §5's max-one-per-page and the budget's no-repeats rule. Argued and recorded, but it is the one exception on the page.
+2. **The hero no longer fits a 790px-tall viewport at 1440+** (764px tall). Reducing the plate overlap is what cost it; more overlap or a shorter plate is the only way back.
+
+📌 `PROJECT_PLACEHOLDER` in `lib/site.ts` is still a placeholder and still needs a real fourth project.
 
 🔄 **Iteration 1 landed** (officer review of the built page): depth generalised to the rest of the page (`ground-paper` + `paper-grid`, grounds now run field → white → paper → white → field → paper); the hero plates now **enlarge** on hover rather than nudging; plate borders made consistent via an opaque `--misa-plate-edge`, because `--misa-border` is an alpha colour and resolved differently over a plate than over the field; and Projects is a symmetric 2×2 with `PROJECT_PLACEHOLDER` in the fourth cell.
 
@@ -1477,6 +1540,12 @@ that should make someone pick it up — because an undated "later" is how these 
   - **Trigger:** the first member who pays in cash — realistically the first meeting of the term, so this is a launch-adjacent item rather than a someday one.
   - **It records a payment ROW, never a status flag.** `dues_paid_current_term` keeps deriving, and the edit/void/audit paths come for free. 🔓 The toggle version is unbuildable by design — migration 19 reserves `dues`, `dues_paid` and `dues_paid_current_term` as custom-field keys.
   - **One migration**, relaxing four columns that assumed Venmo: `venmo_txn_id` nullable with a **partial** unique index (still spanning voided rows) plus a `source` column, `import_batch_id` nullable, `imported_by`/`imported_at` kept and re-documented. ⚠️ **A comped membership is out of scope** — that is `amount_cents = 0`, a different concept, and must not ride in on a relaxed CHECK.
+- [ ] 📋 **Check-in location verification — flag check-ins whose network origin differs from the event's most common one** (requested 2026-08-19; plan in [`docs/checkin-location-verification.md`](docs/checkin-location-verification.md)). One migration, one new table, no new route — the flag is a pill on the existing `/admin/attendance` queue.
+  - **Trigger:** an officer actually seeing check-ins they believe are fake. Do not build it speculatively — it adds a network signal about every member to a system that currently holds none, and the cost only pays for itself against a problem someone has observed.
+  - 🔓 **It never stores an IP.** The modal algorithm needs equality and nothing else, so the row holds `sha256(PEPPER || event_id || ip)` — a server-only pepper because the repo is public, and the event id inside the digest so the table cannot trace a member across a semester.
+  - ⚠️ **Read *What this cannot catch* before agreeing to it.** It misses the likeliest form of the fraud entirely (a friend in the room checking in an absent member), cannot separate "in this room" from "elsewhere on campus wifi", and its false positives land on real attendees who are on cellular. It is worth a glance at a list, never evidence about a person.
+  - **Decide against §6's rotating per-event code first.** That mitigation is already written into the threat model, is stronger on the primary case, and adds no data about anybody. The two overlap enough that building both is probably redundant — `docs/checkin-location-verification.md` has the comparison table.
+  - ⚠️ **One blocking question up front:** confirm which forwarded-for header Vercel actually guarantees. `lib/request-ip.ts:36` reads the client-controlled end of `x-forwarded-for`; if that is spoofable here the whole check is defeatable by anyone reading this public repo, and an evadable check officers believe is worse than no check.
 - [x] ✅ **`shirt_size` — decided 2026-08-09: KEEP it, so `seed.sql` seeds it.** Production had carried the definition since the phase-4 walkthrough (8 options, directory column, inline-editable, no member holding a value), and phase 9's wipe-list fix meant the next re-seed would have **deleted a column somebody was using**. The officer chose to keep it, so the seed now creates it — same key, label and options as the remote — and the assert block expects **1 definition, not 0**.
   - 📌 **Nothing was applied to the database.** Production already had the row; the *seed* is what changed, to match it. This is the rare open item that closes by editing the repo alone.
   - 📌 **No member holds a value, on purpose.** Production has none either, and seeding one would manufacture the orphaned-option case for every developer and shift what every export fixture sees.

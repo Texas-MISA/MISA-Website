@@ -84,3 +84,30 @@ skills-lock.json
 .impeccable/*
 !.impeccable/design.json
 !.impeccable/config.json
+
+# Real photographs of members. THIS REPOSITORY IS PUBLIC.
+#
+# 🔓 **`public/photos/` IS NOW COMMITTED — officer decision, 2026-08-19.** The
+# officer was asked directly, with the tradeoff stated, and chose to publish so
+# the rest of the committee could review the redesign on the live site. What
+# they signed off on: 126 web-sized images, 9 of them referenced by `src` in
+# `lib/site.ts` and 117 forming the home marquee's pool.
+#
+# ⚠️ **This is the irreversible half, and it stays written down.** A third
+# party's FACE in a public git history is not something a later commit takes
+# back — `git rm` removes it from the tip and leaves it in every clone and in
+# every previous commit. Undoing this means rewriting history and
+# force-pushing, and it still does not reach forks or caches. Every one of these
+# is an identifiable student. **If a member asks to be removed, that is a
+# history rewrite, not a delete — plan for it accordingly.**
+#
+# 📌 `pictures/` stays ignored and is NOT part of that decision. It is the
+# officer's raw local library (originals, HEIC, unsorted), it is much larger,
+# and nothing serves from it — `scripts/build-photos.mjs` derives
+# `public/photos/` from it.
+#
+# 📌 A file under `public/` is fetchable at its own URL whether or not any page
+# links it. That is why the original `public/photos/` was DELETED rather than
+# unlinked in 2024-08-14, and it is why adding a photo here publishes it even
+# if no slot points at it yet.
+pictures/

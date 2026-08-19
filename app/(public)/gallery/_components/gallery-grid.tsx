@@ -56,7 +56,13 @@ export function GalleryGrid({
 
   return (
     <>
+      {/* 🪤 `ground="white"` because `FilterChip`'s resting fill is
+          `bg-misa-panel`, which is the public page ground's own colour since
+          2026-08-19 — an inactive chip on the page ground is an invisible
+          control. Only THIS section takes the white; the masonry below keeps
+          the grey, since its tiles are framed images that read against it. */}
       <Section
+        ground="white"
         padTop="sm"
         padBottom="xs"
         width="page"

@@ -176,7 +176,7 @@ export default function AboutPage() {
         </div>
       </Section>
 
-      <Partners ground="white" />
+      <Partners />
     </>
   );
 }

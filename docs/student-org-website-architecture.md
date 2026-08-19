@@ -1,8 +1,40 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.68
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next. 🏗️ A **v2 visual redesign is in progress** (phase 0 complete).
+**Version:** 1.69
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next. 🏗️ A **v2 visual redesign is in progress — phases 0 and 1 complete, phase 2 next.**
 **Last updated:** August 2026
+
+> **v1.69: the v2 redesign's phase 1 ships, and `DESIGN.md` comes back as v2.**
+> The home page and header were rebuilt on a new foundation: **five grounds**
+> (`page`/`white`/`panel`/`navy`/`field`) where v1 had two, a **four-step
+> elevation vocabulary**, a **second radius** for floating objects only, and
+> depth from **stacked planes** rather than drawn texture. The public page
+> ground became a **flat grey**, with white reserved for cards and for any
+> section carrying controls.
+>
+> 🔓 **`DESIGN.md` is un-retired and rewritten from what actually shipped.** It
+> was scheduled for phase 5; it moved up because phase 2 rebuilds five pages and
+> cannot be executed consistently against an undocumented system. The v1 file is
+> kept verbatim at `docs/design-v1-superseded.md`. ⚠️ `docs/invariants.md` is
+> **not** yet reconciled and still describes v1 for every surface v2 has not
+> reached — that is what phase 5 still owes.
+>
+> 🔓 **The no-photography rule is lifted, conditionally.** Its premise was
+> factual — the organization had not taken the photographs — and that changed.
+> Photographs are live on the home page **locally only**; the image files and the
+> code carrying their `src` values are both gitignored/uncommitted and 🔴 ship
+> together or not at all. The repository is public, so publishing faces is an
+> officer decision. Officer headshots and project cells stay placeholders for a
+> second reason: pairing a face or a photo to a named person or client is a
+> factual claim nobody supplied.
+>
+> 🐛 **One defect worth recording at the architecture level**, because it is a
+> class rather than an incident: `[data-revealed]` reset `clip-path` to
+> `inset(0 0 0 0)`, which reads as "no clip" and means *clip to my own
+> axis-aligned border box*. A clip-path clips **descendants**, so the reveal
+> wrapper silently sliced the corners off every rotated child. The reset is
+> `clip-path: none` now, with the one variant that animates the property keeping
+> its own rule.
 
 > **v1.68: the v2 visual redesign begins, and the design authority moves again.**
 > A v1 redesign was planned, built and **scrapped** (branch `redesign-stage-1`;
@@ -3758,6 +3790,11 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              never be redeemed
   event-options.ts           all-status event list, shared by queue filter,
                              resolution form, manual entry
+  gallery-photos.ts          galleryPhotos() — lists public/photos/gallery at
+                             build time for the home page's marquee. Imports
+                             node:fs, so it is server-only; returns [] when the
+                             directory is absent, which is the production case
+                             because public/photos/ is gitignored
   member-options.ts          bounded active-roster scan, shared by the
                              resolution form, manual entry, grant picker
   admin-profiles.ts          fetchOfficerNames — actor_id FKs auth.users,

@@ -508,56 +508,6 @@
     overflow: hidden;
   }
 
-  /* ── The drawn light ground ──────────────────────────────────────────────
-     🔓 The light counterpart to `.ground-field`, added so the depth does not
-     stop at the hero. The officer's note: the tab and grid at the top read
-     well, and the rest of the page should carry more of the same.
-
-     📌 Built from the palette exactly like the navy field is: Vellum
-     (`--misa-panel`) glowing off the top edge of the section and clearing to
-     Paper. No new hue, no third colour — the same two grounds the system
-     always had, with the boundary between them softened instead of hard.
-
-     📌 No focus-ring answer needed and that is not an oversight: this ground
-     stays light enough at every stop that the default navy ring holds. It is
-     the reason `field` needed `.on-navy` and this does not. */
-  .ground-paper {
-    background-color: var(--background);
-    background-image: radial-gradient(
-      110% 70% at 50% 0%,
-      color-mix(in srgb, var(--misa-panel) 92%, transparent),
-      transparent 72%
-    );
-  }
-
-  /* ── Depth on a light ground: a raised sheet ────────────────────────────
-     🔓 **Replaces the drafting grid** (officer, 2026-08-18: take the hash off
-     the white ground and find a different way to get depth there).
-
-     📌 The grid was a DRAWN texture — it put a pattern on the ground and asked
-     the pattern to imply space. This is the other family of answer entirely:
-     **stacked planes.** A white sheet, hairlined and lifted off the tinted
-     ground beneath it, so depth comes from two real surfaces at two real
-     heights rather than from a picture of depth. It is also the mechanism the
-     rest of the page already uses — the bento cards and the image plates are
-     both lifted surfaces — so the light grounds now read the way the white
-     cards do instead of carrying a private texture of their own.
-
-     🪤 It has to sit on a ground that is NOT white, or there is nothing for it
-     to be lifted off. `.ground-paper` supplies that, and the two are a pair: a
-     sheet on a plain white section is an invisible rectangle wearing a shadow.
-
-     🪤 Reaching for `--shadow-lift` with `var()` here is also what makes the
-     custom property exist. Tailwind tree-shakes a theme value only ever
-     reached through its utility, which is why `--shadow-lift` reads as an
-     empty string off `:root` while `shadow-lift` paints perfectly. */
-  .sheet {
-    background: var(--background);
-    border: 1px solid var(--misa-plate-edge);
-    border-radius: var(--radius-plate);
-    box-shadow: var(--shadow-lift);
-  }
-
   /* Placeholder hatch — 45°, 7px stripes. Two grounds, never mixed: a light
      box on white, a navy box on navy. */
   .hatch-light {
@@ -578,6 +528,38 @@
       var(--misa-hatch-b) 7px,
       var(--misa-hatch-b) 14px
     );
+  }
+
+  /* ── Depth on a light ground: a raised sheet ────────────────────────────
+     🔓 **Replaces the drafting grid** (officer, 2026-08-18: take the hash off
+     the white ground and find a different way to get depth there).
+
+     📌 The grid was a DRAWN texture — it put a pattern on the ground and asked
+     the pattern to imply space. This is the other family of answer entirely:
+     **stacked planes.** A white sheet, hairlined and lifted off the tinted
+     ground beneath it, so depth comes from two real surfaces at two real
+     heights rather than from a picture of depth. It is also the mechanism the
+     rest of the page already uses — the bento cards and the image plates are
+     both lifted surfaces — so the light grounds read the way the white cards do
+     instead of carrying a private texture of their own.
+
+     🪤 **It has to sit on a ground that is NOT white**, or it is an invisible
+     rectangle wearing a shadow. That used to mean opting into `.ground-paper`,
+     a gray-to-white radial; since 2026-08-19 the public page ground is a flat
+     grey (`bg-misa-panel` on the public layout's `<main>`) and supplies it
+     everywhere, so the radial was deleted. The one place a sheet still has
+     nothing to lift off is an explicitly WHITE section — `<Section
+     ground="white">`, which the control-bearing pages use.
+
+     🪤 Reaching for `--shadow-lift` with `var()` here is also what makes the
+     custom property exist. Tailwind tree-shakes a theme value only ever
+     reached through its utility, which is why `--shadow-lift` reads as an
+     empty string off `:root` while `shadow-lift` paints perfectly. */
+  .sheet {
+    background: var(--background);
+    border: 1px solid var(--misa-plate-edge);
+    border-radius: var(--radius-plate);
+    box-shadow: var(--shadow-lift);
   }
 
   /* 📌 The duotone treatment used to live here and was removed with the
@@ -757,9 +739,32 @@
     transition: clip-path 0.8s var(--ease-reveal) var(--reveal-delay, 0s);
   }
 
+  /* 🪤 **`clip-path: none`, NOT `inset(0 0 0 0)` — and the difference is the
+     whole of a shipped defect.** This reset used to read `inset(0 0 0 0)` for
+     every variant, which looks like "no clip" and is not: it is "clip to my own
+     axis-aligned border box", and a clip-path clips DESCENDANTS. That is a
+     visual no-op for ordinary content and a hard cut for a child that sticks
+     out of its parent's box — which a ROTATED child always does. The hero's
+     tilted plates were being sliced across all four corners by the reveal
+     wrapper around them, so they rendered as irregular polygons rather than
+     rectangles, and their frame was cut with them. It only appeared once the
+     node revealed, which is what made it read like a rendering bug rather than
+     a rule.
+
+     ⚠️ The reduced-motion block below already said `none`, which is why this
+     never reproduced with the query on. */
   html.js [data-reveal][data-revealed] {
     opacity: 1;
     transform: none;
+    clip-path: none;
+  }
+
+  /* 🪤 `wipe` is the ONE variant that animates `clip-path`, so it is the one
+     variant whose revealed state has to stay an interpolatable `inset()`.
+     `clip-path: none` is not interpolable from `inset(0 100% 0 0)`, so folding
+     this back into the rule above would make the wipe snap instead of draw.
+     Nothing that uses `wipe` contains a rotated child. */
+  html.js [data-reveal="wipe"][data-revealed] {
     clip-path: inset(0 0 0 0);
   }
 

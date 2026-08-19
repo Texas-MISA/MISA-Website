@@ -5,19 +5,20 @@ import { PARTNERS } from "@/lib/site";
 // The partner plate, shared by the home and About pages. Four cells with a
 // 1px grid gap over a hairline background, so the shared hairline reads as a
 // rule. Logos are full colour, never greyscaled.
+//
+// 🔓 `paper` (the gray-to-white radial) was retired on 2026-08-19 when the
+// public page ground became a flat grey; `page` paints nothing and inherits it,
+// which is what both callers want now. `panel` declares the same grey on the
+// section itself and stays for a caller that needs it independent of the page.
 const PARTNER_GROUND = {
+  page: "",
   panel: "bg-misa-panel",
   white: "bg-white",
-  // 🔓 Added in v2 phase 1: the drawn light ground, so the page's last section
-  // is not the one flat rectangle at the bottom of it. `.ground-paper` sets its
-  // own background-color, so it needs no `bg-*` alongside it — one would win
-  // the cascade and flatten the gradient.
-  paper: "ground-paper",
 } as const;
 
 export function Partners({
-  /** `paper` on the home page, `white` on About. */
-  ground = "panel",
+  /** Defaults to the page ground — the grey — on both callers. */
+  ground = "page",
 }: {
   ground?: keyof typeof PARTNER_GROUND;
 }) {

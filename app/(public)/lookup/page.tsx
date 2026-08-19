@@ -34,7 +34,9 @@ export default function LookupPage() {
         title="My Attendance"
         subhead="Enter your UT EID and the email we have on file, and you'll see where you stand this term."
       />
-      <Section pad="md" width="narrow">
+      {/* 🪤 White for the same reason /attend is: the lookup form's controls
+          fill with `bg-misa-panel`, which is now the page ground's own colour. */}
+      <Section ground="white" pad="md" width="narrow">
         <p className="leading-[1.65] text-misa-body">
           You&apos;ll see which events you attended, which you missed, anything
           still waiting on an officer, and whether your dues are paid.

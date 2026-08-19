@@ -5,6 +5,7 @@ import { LINK_EYEBROW } from "@/components/ui/button";
 import { Hatch } from "@/components/ui/hatch";
 import { Headline } from "@/components/ui/heading";
 import { Partners } from "@/components/ui/partners";
+import { PhotoSlot } from "@/components/ui/photo-slot";
 import { revealDelay } from "@/components/ui/reveal";
 import { Section } from "@/components/ui/section";
 import {
@@ -35,18 +36,27 @@ const PROJECT_CELLS = [...PROJECTS, PROJECT_PLACEHOLDER];
 // §4.7: a layout family may appear AT MOST ONCE, eight sections need at least
 // four different families, and no more than two consecutive image+text splits.
 // v1 reused two families across the page and that is most of what "scattered
-// and same-ey" described. Six sections, six families, none repeated:
+// and same-ey" described.
 //
 //   1. Hero .............. Asymmetric Split Hero + floating plate cluster
-//   2. Gallery band ...... Kinetic Marquee            (the page's only marquee)
-//   3. Mission ........... Editorial Manifesto statement
+//   2. Mission ........... Editorial Manifesto statement
+//   3. Gallery band ...... Kinetic Marquee (first half, scrolls left)
 //   4. Activities ........ Bento Grid
-//   5. Projects .......... Quadrant grid (2×2) on a shared-rule plate
-//   6. Partners .......... Shared-rule logo plate
+//   5. Gallery band ...... Kinetic Marquee (second half, scrolls right)
+//   6. Projects .......... Quadrant grid (2×2) on a shared-rule plate
+//   7. Partners .......... Shared-rule logo plate
 //
-// Each family is named again in its own section below, which is what makes the
-// count checkable by reading rather than arguable. Consecutive splits: the hero
-// is the only split and the marquee follows it, so the longest run is one.
+// ⚠️ **SEVEN sections, SIX families — the marquee now appears twice** (officer,
+// 2026-08-19), against §5's max-one-marquee-per-page and against the no-repeats
+// rule that v1 was scrapped for failing. This is the budget's one exception and
+// it is deliberate: the two bands are halves of ONE gallery strip, drawn from a
+// single pool with no photograph in both, at one tile size, counter-scrolling,
+// and they bracket Activities rather than repeating a device in two unrelated
+// places. The full argument lives in `_components/gallery-marquee.tsx`.
+//
+// 📌 The budget's other halves still hold: five families appear exactly once,
+// and the longest run of consecutive image+text splits is ONE (the hero), well
+// inside the cap of two.
 //
 // ── IMAGE SLOTS ─────────────────────────────────────────────────────────────
 // 🔓 The reversal that mattered most. v1 concentrated every slot into one band,
@@ -73,12 +83,7 @@ export default function HomePage() {
       {/* 1. LAYOUT FAMILY: Asymmetric Split Hero. See home-hero.tsx. */}
       <HomeHero />
 
-      {/* 2. LAYOUT FAMILY: Kinetic Marquee. The page's only marquee — §5 caps
-             it at one, and this is the section whose content genuinely earns
-             it: breadth that needs no single item to be looked at. */}
-      <GalleryMarquee />
-
-      {/* 3. LAYOUT FAMILY: Editorial Manifesto.
+      {/* 2. LAYOUT FAMILY: Editorial Manifesto.
            📌 Centred, per the officer (2026-08-14), and set at statement scale
            rather than as body copy in a 68ch column. Two plates flank it, so
            the section carries slots like every other one.
@@ -92,9 +97,11 @@ export default function HomePage() {
           image plate are lifted surfaces too, so the light grounds stop having
           a texture of their own.
 
-          🪤 The sheet needs `ground="paper"` under it. On a plain white
-          section it is an invisible rectangle wearing a shadow. */}
-      <Section ground="paper" padTop="lg" padBottom="md" width="page">
+          🪤 The sheet needs a ground that is not white under it, or it is an
+          invisible rectangle wearing a shadow. It used to name `ground="paper"`
+          for that; the public page ground is a flat grey now, so the default
+          supplies it and the prop is gone. */}
+      <Section padTop="lg" padBottom="xs" width="page">
         <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_minmax(0,1fr)] lg:items-center lg:gap-split">
           <div
             data-reveal="rise"
@@ -126,7 +133,11 @@ export default function HomePage() {
               className="lg:order-1"
             >
               <div className="plate border border-misa-plate-edge shadow-lift">
-                <Hatch caption={MISSION_SLOTS[0]} className="aspect-3/4" />
+                <PhotoSlot
+                  slot={MISSION_SLOTS[0]}
+                  ratio="aspect-3/4"
+                  sizes="(max-width: 1024px) 45vw, 20vw"
+                />
               </div>
             </div>
             <div
@@ -135,20 +146,48 @@ export default function HomePage() {
               className="lg:order-3"
             >
               <div className="plate border border-misa-plate-edge shadow-lift">
-                <Hatch caption={MISSION_SLOTS[1]} className="aspect-3/4" />
+                <PhotoSlot
+                  slot={MISSION_SLOTS[1]}
+                  ratio="aspect-3/4"
+                  sizes="(max-width: 1024px) 45vw, 20vw"
+                />
               </div>
             </div>
           </div>
         </div>
       </Section>
 
-      {/* 4. LAYOUT FAMILY: Bento Grid. See activities.tsx for the cell budget. */}
-      <Section padTop="lg" padBottom="lg" width="page">
+      {/* 3. LAYOUT FAMILY: Kinetic Marquee, first half. 🔓 Moved out from
+             under the hero and split in two (officer, 2026-08-19); the other
+             half sits below Activities.
+
+             ⚠️ Two marquee bands means the family appears TWICE, against §5's
+             max-one-per-page and the budget's no-repeats rule — the rule v1
+             was scrapped over. Kept because these are two halves of one
+             gallery: one pool, no photograph in both, one tile size, and they
+             bracket Activities rather than repeating a device at random. The
+             argument is written out in gallery-marquee.tsx. */}
+      <GalleryMarquee half="top" />
+
+      {/* 4. LAYOUT FAMILY: Bento Grid. See activities.tsx for the cell budget.
+
+           🔓 **`xs` on both edges, down from `lg`** (officer, 2026-08-19: the
+           empty space around the gallery bands is too big). A marquee band is
+           bracketed by this section on one side and the mission on the other,
+           and the seam was the neighbour's 80px plus the band's own 32px — 112px
+           of blank ground at each of the four boundaries. The bands keep their
+           own padding, which is now the white halo they sit in; the neighbours
+           give up theirs. */}
+      <Section padTop="xs" padBottom="xs" width="page">
         <Headline data-reveal="up">Activities</Headline>
         <Activities className="mt-9" />
       </Section>
 
-      {/* 5. LAYOUT FAMILY: Quadrant grid — a symmetric 2×2 on a shared-rule
+      {/* 5. LAYOUT FAMILY: Kinetic Marquee, second half. Counter-scrolls the
+             band above it; see the note there for why the family repeats. */}
+      <GalleryMarquee half="bottom" />
+
+      {/* 6. LAYOUT FAMILY: Quadrant grid — a symmetric 2×2 on a shared-rule
              plate. The page's one navy band, kept against §4.11's Page Theme
              Lock: that rule exists to stop accidental theme drift, and this
              full-bleed navy field is the identity rather than an accident.
@@ -245,10 +284,10 @@ export default function HomePage() {
         </div>
       </Section>
 
-      {/* 6. LAYOUT FAMILY: Shared-rule logo plate. Already the right shape, and
+      {/* 7. LAYOUT FAMILY: Shared-rule logo plate. Already the right shape, and
              shared with /about — so its internal drift (it predates <Section>
              and hardcodes its own gutter) is phase 2's, not phase 1's. */}
-      <Partners ground="paper" />
+      <Partners />
     </>
   );
 }

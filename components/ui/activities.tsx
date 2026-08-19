@@ -1,4 +1,4 @@
-import { Hatch } from "@/components/ui/hatch";
+import { PhotoSlot } from "@/components/ui/photo-slot";
 import { Title } from "@/components/ui/heading";
 import { revealDelay } from "@/components/ui/reveal";
 import { ACTIVITIES } from "@/lib/site";
@@ -35,18 +35,32 @@ import { ACTIVITIES } from "@/lib/site";
 // rebuilding it a phase 1 change rather than a phase 2 one.
 
 /**
- * Cell geometry, in `ACTIVITIES` order. A wide cell leads each row and a narrow
- * one closes it, alternating sides so the eye is not walked down a column.
+ * Cell geometry, in `ACTIVITIES` order. Two sizes only:
+ *
+ *   small   `col-span-2`, 4/3
+ *   large   `col-span-4`, 21/9
+ *
+ * 🔓 **Row one now opens SMALL and closes large; row two is the mirror**
+ * (officer, 2026-08-19). This used to be the other way round, and the comment
+ * here used to say "a wide cell leads each row" — it led one row and closed
+ * the other even then. Stated as the grid actually is:
+ *
+ *   +--------+ +------------------+   Leadership (small) | Professional (large)
+ *   +------------------+ +--------+   Social (large)     | Workshops (small)
+ *
+ * ✅ Both rows sum to the six declared columns: 2+4 and 4+2. A cell whose span
+ * does not complete its row wraps and leaves a hole, which is the failure the
+ * Bento Cell Count Rule is about.
  *
  * ⚠️ The wide cells are 21/9 rather than 16/9. At the `lg` span of 4/6 columns
  * a 16/9 slot stands over 500px tall on a wide viewport, which turns the cell
  * into an image with a caption underneath rather than a card.
  */
 const CELLS = [
-  { span: "lg:col-span-4", aspect: "aspect-21/9" },
-  { span: "lg:col-span-2", aspect: "aspect-4/3" },
   { span: "lg:col-span-2", aspect: "aspect-4/3" },
   { span: "lg:col-span-4", aspect: "aspect-21/9" },
+  { span: "lg:col-span-4", aspect: "aspect-21/9" },
+  { span: "lg:col-span-2", aspect: "aspect-4/3" },
 ] as const;
 
 export function Activities({ className = "" }: { className?: string }) {
@@ -75,7 +89,11 @@ export function Activities({ className = "" }: { className?: string }) {
           // one-off shadow gets invented instead.
           className={`plate flex flex-col border border-misa-plate-edge bg-white shadow-lift ${CELLS[i].span}`}
         >
-          <Hatch caption={activity.caption} className={CELLS[i].aspect} />
+          <PhotoSlot
+            slot={activity}
+            ratio={CELLS[i].aspect}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 60vw"
+          />
           <div className="flex flex-1 flex-col px-6 pt-5 pb-6">
             <Title className="mb-2.5 text-[22px] sm:text-[26px]">
               {activity.title}

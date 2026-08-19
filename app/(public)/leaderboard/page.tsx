@@ -156,7 +156,12 @@ export default async function LeaderboardPage() {
             : "Current-term standings for MISA members."
         }
       />
-      <Section pad="md" width="narrow">
+      {/* 🪤 White because `<Table>`'s sticky `<THead>` fills with
+          `bg-misa-panel` — on the grey page ground the header would dissolve
+          into it exactly when it matters, which is while the body scrolls under
+          it. The standings table IS this page's content, so the whole section
+          is the card. */}
+      <Section ground="white" pad="md" width="narrow">
         {/* 🔓 The three outcomes below are rendered as three DIFFERENT things,
             and that is the empty-vs-error invariant showing up in the layout
             rather than only in the types. Both used to be a muted `<p>`: a
