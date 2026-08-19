@@ -2,7 +2,7 @@
 
 The website and attendance system for **Texas MISA** — the Management Information Systems Association at UT Austin. This covers the public site at [txmisa.org](https://www.txmisa.org/) and the officer tooling that replaces tracking attendance in a spreadsheet.
 
-Deployed from `main` to **https://misa-website-beta.vercel.app**.
+Deployed from `main` to **https://www.txmisa.org**.
 
 ## What it does
 

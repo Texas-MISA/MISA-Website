@@ -24,7 +24,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository status
 
-**Stages 0–8 are COMPLETE. Stage 9 (launch) is next.** 26 migration files, through `…000025`; local and the remote are identical, and the next unclaimed number is 26. Next.js 16 deploys from `main` to https://misa-website-beta.vercel.app; the Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, migrated and seeded.
+**Stages 0–8 are COMPLETE. Stage 9 (launch) is next.** 26 migration files, through `…000025`; local and the remote are identical, and the next unclaimed number is 26. ⚠️ **PRODUCTION IS THE CLUB'S REAL PUBLIC DOMAIN, https://www.txmisa.org.** This file said `misa-website-beta.vercel.app` until 2026-08-19; that hostname is **dead and returns a Vercel 404**, and anyone reasoning from it will think a push to `main` lands somewhere private. It does not. The production deployment's aliases are `www.txmisa.org`, `misa-website-txmisa-jds-projects.vercel.app` and `misa-website-git-main-txmisa-jds-projects.vercel.app`; confirm with `npx vercel inspect <deployment-url>` rather than trusting a URL written in a doc. **A merge to `main` replaces the live club website for the public**, so treat it as a publish, not a preview — `git push origin <branch>` without merging gives a preview URL instead.
+
+Next.js 16 deploys from `main` to https://www.txmisa.org; the Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, migrated and seeded.
 
 What exists, in one pass:
 
