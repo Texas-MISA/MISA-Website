@@ -1,7 +1,7 @@
-import Link from "next/link";
-
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { RecoveryNav } from "@/components/ui/recovery-nav";
+import { Section } from "@/components/ui/section";
 
 // The app-wide 404: every URL that matches no route at all.
 //
@@ -10,7 +10,7 @@ import { SiteHeader } from "@/components/site-header";
 // `(public)` is a route GROUP, so it does not appear in the URL and therefore
 // does not participate in matching: an unmatched address belongs to no segment,
 // falls all the way to the root, and got Next's built-in 404 with no header, no
-// links and no way back. The (public) file only ever fired for a `notFound()`
+// links and no way back. The (public) file only ever fires for a `notFound()`
 // thrown by a page already inside that group.
 //
 // ⚠️ It renders inside app/layout.tsx, which carries the fonts and the
@@ -18,44 +18,31 @@ import { SiteHeader } from "@/components/site-header";
 // app/(public)/layout.tsx. So this renders them itself. That duplication is the
 // price of the root position; the alternative is a 404 that looks like a
 // different website.
+//
+// 🐛 **And it needs the page GROUND for the same reason, which it was missing.**
+// `bg-misa-panel` lives on `(public)/layout.tsx`'s `<main>` — deliberately not
+// on `body`, because `body` is shared with /admin, which is still on the v1
+// white system until phase 4. This file is outside that layout, so from
+// 2026-08-19 until v2 phase 2 the root 404 was the one public-looking page on
+// the site still rendering on white: full chrome, right type, wrong ground.
+// Anything else that ever renders outside `(public)/layout.tsx` and wants to
+// look like the public site has to bring the grey itself.
 
 export default function NotFound() {
   return (
     <div className="flex min-h-screen flex-col">
       <SiteHeader />
-      <main className="flex-1">
-        <section className="px-6 py-16 sm:py-20">
-          <div className="mx-auto max-w-2xl">
-            <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-              Page not found
-            </h1>
-            <p className="mt-4 text-misa-body">
-              That address doesn&apos;t exist. It may have moved, or the link
-              that sent you here may be out of date.
-            </p>
-            <nav
-              aria-label="Site sections"
-              className="mt-8 flex flex-wrap gap-3"
-            >
-              {[
-                ["/", "Home"],
-                ["/about", "About Us"],
-                ["/attend", "Check In"],
-                ["/leaderboard", "Leaderboard"],
-                ["/lookup", "My Attendance"],
-                ["/contact", "Contact Us"],
-              ].map(([href, label]) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="border border-misa-border px-3 py-1 text-xs font-semibold tracking-wider uppercase transition hover:bg-misa-panel"
-                >
-                  {label}
-                </Link>
-              ))}
-            </nav>
-          </div>
-        </section>
+      <main className="flex-1 bg-misa-panel">
+        <Section pad="lg" width="narrow">
+          <h1 className="font-display text-[34px] leading-[1.02] font-semibold tracking-[-0.02em] text-misa-blue sm:text-[42px]">
+            Page not found
+          </h1>
+          <p className="mt-4 text-lg leading-[1.65] text-misa-body">
+            That address doesn&apos;t exist. It may have moved, or the link that
+            sent you here may be out of date.
+          </p>
+          <RecoveryNav className="mt-8" />
+        </Section>
       </main>
       <SiteFooter />
     </div>

@@ -26,48 +26,50 @@ export const MISSION =
 
 // ── Image slots ──────────────────────────────────────────────────────────────
 
-// 📌 THE PUBLISHED SITE STILL HAS NO PHOTOGRAPHY, and that is a decision rather
-// than a gap (2026-08-14). Every image slot renders a hatched placeholder naming
-// the shot that belongs there — which is what the design handoff specifies for
-// the slots it had no photo for, applied to all of them. The four partner logos
-// in `public/partners/` remain the only images the site SERVES.
+// 🔓 **THE SITE PUBLISHES REAL PHOTOGRAPHS. The no-photography decision is
+// OVER** (officer, 2026-08-19). `public/photos/` is COMMITTED — 126 web-sized
+// images, tracked in git — and the `src` values below point at files that ship.
 //
-// 🔓 **The home page is the first exception, and only on the officer's machine**
-// (2026-08-18). `HERO_SLOTS` and `MISSION_SLOTS` below carry real `src` values
-// pointing at `public/photos/`, which is **gitignored** — so a clone, a CI run
-// and a Vercel deploy all still render placeholders. Publishing for real is a
-// separate, deliberate act of committing those files.
+// ⚠️ **This block used to say the opposite, and the correction is the point.**
+// Until v2 phase 2 it read "the published site still has no photography" and
+// "`public/photos/` is gitignored, so a clone, a CI run and a Vercel deploy all
+// still render placeholders." All of that was true when written on 2026-08-14
+// and none of it is true now. A comment describing a decision that has been
+// reversed is worse than no comment: the next reader plans around it.
 //
-// ⚠️ Note what has NOT changed: a file under `public/` is fetchable at its own
-// URL whether or not a page links it. That is why the original `public/photos/`
-// was DELETED rather than unlinked, and it is why the directory is ignored now
-// rather than merely unused.
+// 🔴 **The irreversible half, which has NOT changed.** The repository is public
+// and every one of these is an identifiable student. A face in a public git
+// history is not something a later commit takes back — `git rm` removes it from
+// the tip and leaves it in every clone and every previous commit. **If a member
+// asks to be removed, that is a history rewrite and a force-push, not a
+// delete**, and it still does not reach forks or caches. The full note lives in
+// `.gitignore`, next to the line that stopped ignoring them.
 //
-// Restoring a photo means: add the file, give the slot a `src`, and let
-// `components/ui/photo-slot.tsx` swap the <Hatch> for an <Image>. The design
-// handoff's README carries the treatment spec — duotone is
-// `filter: grayscale(1) contrast(1.05)` plus a navy `mix-blend-mode: color`
-// overlay, and officer headshots and the About mission cluster are deliberately
-// NOT duotoned. ⚠️ The home page currently renders its photographs UNTREATED;
-// duotone is a live option, not a thing that was skipped by accident.
+// 📌 A file under `public/` is fetchable at its own URL whether or not a page
+// links it. Adding a photograph here publishes it even if no slot points at it.
 //
-// 🪤 When photography does return, size the framed slots with next/image's
-// `fill`. An intrinsically sized <img> makes the frame grow to the photo's own
+// 📌 **A slot renders a photograph or a labelled `<Hatch>`, never a hole**, and
+// `components/ui/photo-slot.tsx` is the single place that swap happens. Giving a
+// slot a `src` is the whole of "put it on the site"; leaving `src` unset is a
+// deliberate, visible placeholder. Two families of slot are still deliberately
+// placeholder-only, for a reason photography does not answer:
+//
+//   - **Officer headshots** — the photo-to-name pairing was never supplied, and
+//     a real face under another real student's name is worse than an empty
+//     square. `Officer` has no `photo` field.
+//   - **Project cells** — pairing a photograph to a named client is a factual
+//     claim about the club that nobody made.
+//
+// ⚠️ The design handoff's README carries a duotone treatment spec
+// (`grayscale(1) contrast(1.05)` plus a navy `mix-blend-mode: color`), with
+// officer headshots and the About mission cluster as its full-colour
+// exceptions. **Nothing on the site applies it today** — the photographs render
+// untreated. That is a live option, not an oversight.
+//
+// 🪤 Size every framed slot with next/image's `fill`, which is what `PhotoSlot`
+// does. An intrinsically sized <img> makes the frame grow to the photo's own
 // height, and the About history portrait then leaves a large void beside the
-// column next to it — the handoff hit this in its own prototype and calls it
-// out. The gallery masonry is the one place that wants intrinsic heights.
-
-export type GalleryCategory =
-  "socials" | "workshops" | "professional" | "banquet";
-
-/** One placeholder slot: what belongs there, and how tall it stands. */
-export type Slot = {
-  /** Mono caption naming the intended shot. */
-  caption: string;
-  /** Pixel height, for slots the layout does not size itself. */
-  height?: number;
-  category: GalleryCategory;
-};
+// column next to it — the handoff hit this in its own prototype.
 
 // ── Home page slots (hero + mission) ─────────────────────────────────────────
 
@@ -92,25 +94,22 @@ export type ImageSlot = {
  * concentrating the slots into one band is the single thing v1 was most clearly
  * scrapped for. §4.8 wants slots in every section.
  *
- * ⚠️ The CAPTIONS are drawn from the vocabulary `GALLERY_ITEMS` already uses.
- * A caption names a shot, so an invented one ("case competition photo") would
- * assert an activity the club has not told us it runs — the same failure as
- * inventing a fact about the club, wearing a placeholder's clothes.
+ * ⚠️ The CAPTIONS come from a FIXED vocabulary — chapter, member, general
+ * meeting, workshop, social event, service day, networking night, banquet,
+ * junior director, project. A caption names a shot, so an invented one ("case
+ * competition photo") would assert an activity the club has not told us it runs
+ * — the same failure as inventing a fact about the club, wearing a
+ * placeholder's clothes. The vocabulary used to be anchored to `GALLERY_ITEMS`,
+ * which was deleted in v2 phase 2; the list above is now the whole of it.
  *
  * 📌 Content only. Aspect ratio, position and stacking order are composition and
  * live with the component, the same way `ACTIVITIES[].caption` is content while
  * `activities.tsx` owns the layout.
  *
- * 🔴 **PHOTOGRAPHS ARE LIVE ON THE HOME PAGE, LOCALLY ONLY** (officer,
- * 2026-08-18). `public/photos/` is **gitignored**, so these files exist on the
- * officer's machine and nowhere else — a deploy builds from the repo, so every
- * one of these slots renders as a `<Hatch>` again in production.
- *
- * 🔓 That is the safe default and it is not an accident. **This repository is
- * public**, and the `.gitignore` entry carries the reasoning: a third party's
- * face in a public git history is not something a later commit can take back.
- * Publishing for real means deliberately committing these files, and that needs
- * the officer's sign-off on the people in them rather than a git command.
+ * ✂️ This comment used to say the photographs were local-only and gitignored.
+ * They were committed on 2026-08-19 and they ship. See the block at the top of
+ * this file, and `.gitignore` for the half of that decision that cannot be
+ * undone by a later commit.
  *
  * ⚠️ **The pairings below are inferred from the photographs, not supplied.**
  * Nobody said which event each frame is from; the alt text is a careful reading
@@ -153,6 +152,94 @@ export const MISSION_SLOTS: readonly ImageSlot[] = [
     alt: "MISA members outside the UT Tower at dusk",
   },
 ];
+
+// ── About page slots ─────────────────────────────────────────────────────────
+
+/**
+ * 🔓 NEW in v2 phase 2. `/about` carried six `<Hatch>` placeholders and one
+ * page-local `BAND` array of captions hardcoded into the page file; both are
+ * replaced by this, so every About slot now goes through `PhotoSlot` and has a
+ * restore path in the one place the swap is supposed to happen.
+ *
+ * ⚠️ **THE PAIRINGS ARE INFERRED FROM THE PHOTOGRAPHS, NOT SUPPLIED**, exactly
+ * as `HERO_SLOTS`' are. Nobody said which event any frame is from. The alt text
+ * below is a careful reading of what is actually visible in each image and
+ * deliberately asserts **no date, no term and no person** — where a screen or a
+ * jersey in the frame states the occasion, the alt says so; where it does not,
+ * the alt describes the scene and stops. This wants an officer's eye before it
+ * is treated as a record. The slot-to-filename table is in the phase 2 handback.
+ *
+ * 📌 Content only. Every frame's SHAPE is set by the page, not by the file:
+ * `PhotoSlot` renders `fill` + `object-cover` into a ratio the composition
+ * chooses, so the pool's mix of 3:4 and 4:3 originals does not leak into the
+ * layout. Swapping any `src` below for another file needs no layout change.
+ */
+export const ABOUT_MISSION_SLOTS: readonly ImageSlot[] = [
+  {
+    caption: "chapter photo",
+    src: "/photos/gallery/misa-banquet-group-photo.jpg",
+    alt: "A large group of MISA members in formal dress at a chapter celebration",
+  },
+  {
+    caption: "general meeting photo",
+    src: "/photos/gallery/11-6-25-misa-makenna-morgan-06.jpg",
+    alt: "MISA members seated together in a lecture hall at a general meeting",
+  },
+];
+
+/** The portrait beside the history timeline. Portrait-shaped in the original. */
+export const ABOUT_HISTORY_SLOT: ImageSlot = {
+  caption: "member photo",
+  src: "/photos/gallery/9-21-25-misaphotos-makennamorgan-075.jpg",
+  alt: "Four MISA members in professional dress on the steps of a campus building",
+};
+
+/**
+ * The full-bleed band. Four frames, one row, edge to edge.
+ *
+ * 📌 The four are chosen to be four DIFFERENT kinds of evening — outdoors, a
+ * game night, a panel, intramural sport — because the band's whole job is to
+ * show the range the copy above it describes. Four photographs of the same room
+ * would be a wall, not a band.
+ */
+export const ABOUT_BAND_SLOTS: readonly ImageSlot[] = [
+  {
+    caption: "social event photo",
+    src: "/photos/gallery/100-1253.jpg",
+    alt: "MISA members sitting on a blanket on the lawn at an outdoor social",
+  },
+  {
+    caption: "social event photo",
+    src: "/photos/gallery/img-9880.jpg",
+    alt: "MISA members posing in front of a screen reading MISA Family Feud at a game night",
+  },
+  {
+    caption: "general meeting photo",
+    src: "/photos/gallery/20241015-180617.jpg",
+    alt: "MISA members seated in a classroom in front of a slide introducing a panel",
+  },
+  {
+    caption: "social event photo",
+    src: "/photos/gallery/img-2848.jpg",
+    alt: "A MISA intramural basketball team lined up on an indoor court",
+  },
+];
+
+// ── Contact page slot ────────────────────────────────────────────────────────
+
+/**
+ * 🔓 NEW in v2 phase 2, and it is the one slot on this page.
+ *
+ * `/contact` had **zero** image slots and zero motion — the only public page
+ * with neither, and §4.8 is blunt that a text-only page "is not minimalism, it
+ * is incomplete work". One photograph is the whole fix; a page whose job is
+ * "come talk to us" should show the people saying it.
+ */
+export const CONTACT_SLOT: ImageSlot = {
+  caption: "social event photo",
+  src: "/photos/gallery/20260411-103131-295ec3.jpg",
+  alt: "A group of MISA members outdoors on a covered deck at a chapter outing",
+};
 
 // ── Activities (home page) ───────────────────────────────────────────────────
 
@@ -337,53 +424,31 @@ export const WORK_WITH_MISA =
 
 // ── Gallery ──────────────────────────────────────────────────────────────────
 
-export const GALLERY_TERM = "Fall 2025";
+// ✂️ **The gallery's placeholder data was DELETED in v2 phase 2**, and what it
+// was is worth recording so nobody rebuilds it. `GALLERY_ITEMS` was eighteen
+// `{caption, height, category}` objects; `GALLERY_FILTERS` was five filter
+// chips; `GALLERY_FEATURE` was a single large slot; `GALLERY_TERM` was the
+// string `"Fall 2025"`. Two types, `Slot` and `GalleryCategory`, existed only to
+// hold them up.
+//
+// 🔴 **All of it described photographs that did not exist.** The eighteen
+// heights were a composition, not measurements. The categories were flagged in
+// this file as "a statement of intent rather than a record", and the filter
+// sorted on them. `GALLERY_FEATURE`'s caption asserted an end-of-year banquet in
+// Spring 2025 and `GALLERY_TERM` asserted Fall 2025 — two dates about the club
+// that nobody supplied.
+//
+// 🔓 `/gallery` now renders the **real pool**: whatever `scripts/build-photos.mjs`
+// has written into `public/photos/gallery/`, read at build time by
+// `lib/gallery-photos.ts`. There is nothing to keep here, because a real
+// photograph brings its own caption and its own size. **Do not reintroduce a
+// category filter without a real mapping from file to category** — inventing one
+// is the same failure wearing a filter bar.
 
-/** The single large slot above the grid. */
-export const GALLERY_FEATURE = {
-  slot: { caption: "banquet photo", category: "banquet" } as Slot,
-  caption: "End-of-year banquet · Spring 2025",
-} as const;
-
-export const GALLERY_FILTERS = [
-  { value: "all", label: "All" },
-  { value: "socials", label: "Socials" },
-  { value: "workshops", label: "Workshops" },
-  { value: "professional", label: "Professional" },
-  { value: "banquet", label: "Banquet" },
-] as const;
-
-/**
- * The masonry, in display order. Varied heights are the point — a masonry of
- * uniform boxes is a grid, and the column flow is what the design is after.
- *
- * ⚠️ The `category` values are what the gallery filter sorts on, and they are
- * a statement of intent rather than a record: these name shots that do not
- * exist yet. Nothing else reads the field.
- */
-export const GALLERY_ITEMS: readonly Slot[] = [
-  { caption: "social event photo", height: 240, category: "socials" },
-  { caption: "social event photo", height: 210, category: "socials" },
-  { caption: "member photo", height: 300, category: "socials" },
-  { caption: "workshop photo", height: 260, category: "workshops" },
-  { caption: "workshop photo", height: 200, category: "workshops" },
-  { caption: "general meeting photo", height: 230, category: "professional" },
-  { caption: "networking night photo", height: 280, category: "professional" },
-  { caption: "service day photo", height: 190, category: "socials" },
-  { caption: "banquet photo", height: 250, category: "banquet" },
-  { caption: "banquet photo", height: 210, category: "banquet" },
-  { caption: "IM sports photo", height: 200, category: "socials" },
-  { caption: "workshop photo", height: 240, category: "workshops" },
-  { caption: "resume review photo", height: 220, category: "professional" },
-  { caption: "chapter photo", height: 320, category: "socials" },
-  { caption: "game night photo", height: 190, category: "socials" },
-  { caption: "company visit photo", height: 260, category: "professional" },
-  { caption: "banquet photo", height: 230, category: "banquet" },
-  { caption: "social event photo", height: 200, category: "socials" },
-] as const;
-
-/** How many masonry items a page shows before "Load more". */
-export const GALLERY_PAGE_SIZE = 12;
+/** How many photographs the gallery shows before "Load more". */
+// 📌 Raised from 12 in v2 phase 2. Twelve was sized against eighteen
+// placeholders; against 117 real photographs it is ten clicks to the end.
+export const GALLERY_PAGE_SIZE = 24;
 
 export const INSTAGRAM_PROMPT =
   "We repost member photos on Instagram. Tag @texasmisa and your shot may end up here.";
