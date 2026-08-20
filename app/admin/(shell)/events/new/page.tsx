@@ -50,7 +50,7 @@ export default async function NewEventPage() {
             openEarlyMinutes: 15,
             closeLateMinutes: 15,
             points: 1,
-            category: "general_meeting",
+            category: "general_and_other",
             status: "draft",
           }}
         />

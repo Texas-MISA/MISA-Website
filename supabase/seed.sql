@@ -269,29 +269,29 @@ values
 insert into events (title, description, location, starts_at, ends_at, points, category, status, created_by)
 values
   -- Saturday 1 August — the term opens.
-  ('Semester Kickoff',      'First general meeting of the semester', 'UTC 3.102', '2026-08-01 10:00-05','2026-08-01 11:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #2',    null, 'UTC 3.102', '2026-08-01 13:00-05','2026-08-01 14:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Semester Kickoff',      'First general meeting of the semester', 'UTC 3.102', '2026-08-01 10:00-05','2026-08-01 11:00-05', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #2',    null, 'UTC 3.102', '2026-08-01 13:00-05','2026-08-01 14:00-05', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
   -- Sunday 2 August.
-  ('Resume Workshop',       'Bring a printed copy', 'GDC 2.216', '2026-08-02 10:00-05','2026-08-02 11:30-05', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #3',    null, 'UTC 3.102', '2026-08-02 13:00-05','2026-08-02 14:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Resume Workshop',       'Bring a printed copy', 'GDC 2.216', '2026-08-02 10:00-05','2026-08-02 11:30-05', 2, 'professional_dev','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #3',    null, 'UTC 3.102', '2026-08-02 13:00-05','2026-08-02 14:00-05', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
   -- Monday 3 August.
-  ('Case Competition',      'Flagship event', 'RLP 1.106', '2026-08-03 09:00-05','2026-08-03 13:00-05', 5, 'flagship','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #4',    null, 'UTC 3.102', '2026-08-03 14:00-05','2026-08-03 15:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Case Competition',      'Judged team competition', 'RLP 1.106', '2026-08-03 09:00-05','2026-08-03 13:00-05', 5, 'academic','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #4',    null, 'UTC 3.102', '2026-08-03 14:00-05','2026-08-03 15:00-05', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
   ('Welcome Social',        'Food provided', 'Gregory Plaza', '2026-08-03 18:00-05','2026-08-03 20:00-05', 1, 'social','published','00000000-0000-4000-8000-5eed00000001'),
   -- Tuesday 4 August.
-  ('General Meeting #5',    null, 'UTC 3.102', '2026-08-04 09:00-05','2026-08-04 10:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Alumni Panel',          null, 'UTC 4.132', '2026-08-04 11:00-05','2026-08-04 12:30-05', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
-  ('General Meeting #6',    null, 'UTC 3.102', '2026-08-04 18:00-05','2026-08-04 19:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #5',    null, 'UTC 3.102', '2026-08-04 09:00-05','2026-08-04 10:00-05', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Alumni Panel',          null, 'UTC 4.132', '2026-08-04 11:00-05','2026-08-04 12:30-05', 2, 'corporate','published','00000000-0000-4000-8000-5eed00000001'),
+  ('General Meeting #6',    null, 'UTC 3.102', '2026-08-04 18:00-05','2026-08-04 19:00-05', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
   -- Wednesday 5 August — the last elapsed day.
-  ('Interview Prep',        null, 'GDC 2.216', '2026-08-05 10:00-05','2026-08-05 11:30-05', 2, 'workshop','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Awards Banquet',        'Awards and closing', 'AT&T Center', '2026-08-05 18:00-05','2026-08-05 21:00-05', 3, 'flagship','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Interview Prep',        null, 'GDC 2.216', '2026-08-05 10:00-05','2026-08-05 11:30-05', 2, 'professional_dev','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Awards Banquet',        'Awards and closing', 'AT&T Center', '2026-08-05 18:00-05','2026-08-05 21:00-05', 3, 'special_events','published','00000000-0000-4000-8000-5eed00000001'),
   -- Cancelled: keeps its attendance history but is excluded from totals (§4.6).
   -- Exempt from the overlap constraint, so it may share an afternoon.
   ('Rained Out Tabling',    'Cancelled due to weather', 'Speedway', '2026-08-02 15:00-05','2026-08-02 18:00-05', 1, 'social','cancelled','00000000-0000-4000-8000-5eed00000001'),
   -- Still to come, so the schedule UI has both and the member detail page has
   -- an *upcoming* event to paint (attended / missed / upcoming, §4.5).
-  ('Fall Kickoff',          'First meeting of the fall', 'UTC 3.102', '2026-09-01 18:00-05','2026-09-01 19:00-05', 1, 'general_meeting','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Fall Info Session',     'Not announced yet', 'TBD', '2026-09-08 18:00-05','2026-09-08 19:00-05', 1, 'general_meeting','draft','00000000-0000-4000-8000-5eed00000001');
+  ('Fall Kickoff',          'First meeting of the fall', 'UTC 3.102', '2026-09-01 18:00-05','2026-09-01 19:00-05', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Fall Info Session',     'Not announced yet', 'TBD', '2026-09-08 18:00-05','2026-09-08 19:00-05', 1, 'general_and_other','draft','00000000-0000-4000-8000-5eed00000001');
 
 -- @chunk attendance-bulk
 -- Deterministic pseudo-randomness so the seed is reproducible.

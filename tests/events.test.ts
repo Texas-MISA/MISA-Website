@@ -35,7 +35,7 @@ const SERIES_BASE: Omit<SeriesSpec, "firstDate" | "untilDate" | "weekdays"> = {
   description: null,
   location: "UTC 3.102",
   points: 1,
-  category: "general_meeting",
+  category: "general_and_other",
   seriesId: "00000000-0000-4000-8000-000000000001",
 };
 
@@ -508,7 +508,7 @@ describe("duplicateDraft", () => {
     checkin_opens_at: "2026-10-27T22:45:00.000Z",
     checkin_closes_at: "2026-10-28T00:15:00.000Z",
     points: 2,
-    category: "general_meeting",
+    category: "general_and_other",
   };
 
   it("defaults to the same wall time seven civil days later, across DST", () => {
@@ -532,7 +532,7 @@ describe("duplicateDraft", () => {
       closeLateMinutes: 15,
     });
     expect(draft.points).toBe(2);
-    expect(draft.category).toBe("general_meeting");
+    expect(draft.category).toBe("general_and_other");
     expect(draft.title).toBe("General Meeting");
   });
 

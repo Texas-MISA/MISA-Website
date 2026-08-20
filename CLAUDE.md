@@ -15,16 +15,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | [`docs/design-v1-superseded.md`](docs/design-v1-superseded.md) | The v1 design system, kept verbatim for its reasoning. **Historical.** Where it and `DESIGN.md` disagree, `DESIGN.md` wins. |
 | [`docs/invariants.md`](docs/invariants.md) | The long form of the Invariants below, with the measurements and failures behind each rule. **The short form here is the rule; that file is the evidence.** |
 | [`docs/operations.md`](docs/operations.md) | Dev-server, Supabase CLI and test-suite traps in full. |
+| [`docs/local-testing-plan.md`](docs/local-testing-plan.md) | 📋 **Where testing happens now that production is empty: the LOCAL stack.** Why re-seeding a git branch would re-seed *production* instead, what a seeded local stack must count, the nine walkthrough passes in dependency order, and the three things a green local run cannot prove. |
 | [`docs/dues-and-membership.md`](docs/dues-and-membership.md) | Stage 6.5 spec, including the real Venmo CSV format — and the plan for **manual dues entry**, which is written down but NOT BUILT. |
 | [`docs/attend-confirmation-flow.md`](docs/attend-confirmation-flow.md) | `/attend`'s first-time confirmation and the accepted membership-oracle tradeoff. |
 | [`docs/checkin-location-verification.md`](docs/checkin-location-verification.md) | 📋 **NOT BUILT.** Flagging check-ins whose network origin differs from the event's modal one. Stores a peppered, per-event digest and **never an IP address**; advisory only. Its *What this cannot catch* section is the part to read — the mechanism misses the likeliest form of the fraud, and it overlaps §6's rotating venue code enough that building both is probably redundant. |
+| [`docs/rsvp-events.md`](docs/rsvp-events.md) | 📋 **NOT BUILT.** A second kind of event, where officers tick people off an RSVP list instead of members using `/attend`. The parts to read before agreeing to it: the "cannot use `/attend`" rule is **three SQL changes, not a form check**, and the penalty disclaimer is the first thing in this system that would make points **cost** something — which is the stated trigger to re-open §9 #5/#6/#9/#10/#12 together. |
 | [`docs/existing-site-inventory.md`](docs/existing-site-inventory.md) | What was reproduced from the old Squarespace site and what is a placeholder. |
 | [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md) | 🏗️ **THE CURRENT PLAN, and it is PART-BUILT.** ✅ Phases 0–1 complete (home page + header, gate passed 2026-08-19). ⬅️ **Phase 2 is next** — `/about`, `/projects`, `/gallery`, `/officers`, `/contact` and the error boundaries — and the file carries a **Phase 2 brief** written to be executed from a cold start. Phases 3 (`/attend`, `/leaderboard`, `/lookup`), 4 (`/admin`) and 5 (reconcile `docs/invariants.md`) follow. ⚠️ **v1 was built and scrapped**; it survives on the abandoned branch `redesign-stage-1` as a record of what not to repeat. |
 | [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md) | 📋 **SUPERSEDED by v2 above**, and kept for its reasoning rather than its decisions. The plan for a complete redesign of the public site — its design **and** its information architecture, with new pages in scope. `/attend`, `/leaderboard`, `/lookup` and `/admin` are frozen; the data layer is untouched. Carries the rule that **no new page may invent a fact about the club**, and the four decisions the officer owns. |
 
 ## Repository status
 
-**Stages 0–8 are COMPLETE. Stage 9 (launch) is next.** 26 migration files, through `…000025`; local and the remote are identical, and the next unclaimed number is 26. ⚠️ **PRODUCTION IS THE CLUB'S REAL PUBLIC DOMAIN, https://www.txmisa.org.** This file said `misa-website-beta.vercel.app` until 2026-08-19; that hostname is **dead and returns a Vercel 404**, and anyone reasoning from it will think a push to `main` lands somewhere private. It does not. The production deployment's aliases are `www.txmisa.org`, `misa-website-txmisa-jds-projects.vercel.app` and `misa-website-git-main-txmisa-jds-projects.vercel.app`; confirm with `npx vercel inspect <deployment-url>` rather than trusting a URL written in a doc. **A merge to `main` replaces the live club website for the public**, so treat it as a publish, not a preview — `git push origin <branch>` without merging gives a preview URL instead.
+**Stages 0–8 are COMPLETE. Stage 9 (launch) is next.** 28 migration files, through `…000027`; local and the remote are identical again as of 2026-08-19, and the next unclaimed number is 28. 🪤 **26 and 27 were written by two sessions at once and both claimed 26 for a few minutes** — the collision surfaced as a 23505 on `schema_migrations_pkey` during `db reset`, which is the loud failure the "next unclaimed number" note exists to make unnecessary. ⚠️ **PRODUCTION IS THE CLUB'S REAL PUBLIC DOMAIN, https://www.txmisa.org.** This file said `misa-website-beta.vercel.app` until 2026-08-19; that hostname is **dead and returns a Vercel 404**, and anyone reasoning from it will think a push to `main` lands somewhere private. It does not. The production deployment's aliases are `www.txmisa.org`, `misa-website-txmisa-jds-projects.vercel.app` and `misa-website-git-main-txmisa-jds-projects.vercel.app`; confirm with `npx vercel inspect <deployment-url>` rather than trusting a URL written in a doc. **A merge to `main` replaces the live club website for the public**, so treat it as a publish, not a preview — `git push origin <branch>` without merging gives a preview URL instead.
 
 Next.js 16 deploys from `main` to https://www.txmisa.org; the Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, migrated and seeded.
 
@@ -37,7 +39,9 @@ What exists, in one pass:
 
 🖼️ **Photographs exist on the home page LOCALLY ONLY and are NOT committed (2026-08-19).** `pictures/` and `public/photos/` are gitignored; so is nothing else about them, which means the uncommitted code carrying their `src` values must be committed **with** the image files or not at all — otherwise production serves ~30 broken images instead of the `<Hatch>` placeholders. The repository is public, so publishing faces is an officer decision, not a git command. Workflow and traps: `docs/build-log.md`; the scripts are `scripts/organise-pictures.mjs` and `scripts/build-photos.mjs`. 🪤 HEIC needs `heic-convert` — libvips does AVIF only, and `.metadata()` succeeds on a file that cannot be decoded.
 
-**Production is purely fabricated data** and matches `seed.sql` exactly: 32 members / 15 events / 202 present + 5 pending + 1 rejected / 6 adjustments / 29 leaderboard / 0 dues payments / 1 custom field definition, `app_settings.current_term` unpinned. The repo is public — seed and test data must stay obviously fake.
+🧹 **PRODUCTION IS EMPTY AND IS NO LONGER THE SEED (2026-08-19).** It was wiped by `bash scripts/wipe-remote.sh` ahead of the real Fall 2026 schedule being entered, so the Stage 9 "clear production before launch" item is **done**. Current state: **0 members / 0 events / 0 attendance / 0 adjustments / 0 dues / 0 field definitions / 0 presets**, both views empty, `app_settings.current_term` still unpinned (derives `Fall 2026`). What survived, deliberately: the **three real officer logins** (`auth.users` + `admin_profiles`, roles intact), all **4 `officer_invites`**, and the **8 `admin_audit` rows whose `entity_type` is `officer_invite` or `officer`** — the record of who was granted access and by whom. The other 13 audit rows, which described the wiped test data, were deleted.
+
+⚠️ **Production had already drifted from `seed.sql` before the wipe, and nothing on screen said so** — it held 33 members, 16 events, 209 attendance rows and **9 dues payments** against a documented 0, because walkthroughs wrote to it. Read the counts before believing any documented figure about the remote; `seed.sql` describes **local** after a `db reset`, which is still the fabricated 32/15/208 and must stay that way for the test suite. The repo is public — seed and test data must stay obviously fake.
 
 ## Next.js version
 
@@ -65,6 +69,9 @@ npx supabase db query --linked "<sql>"  # ad-hoc SQL against the remote
 npx supabase gen types typescript --linked > lib/types/database.ts
 bash scripts/seed-remote.sh             # apply seed.sql to the remote (no Docker needed)
 bash scripts/seed-remote.sh --force     # ...even if the project has a real officer signed up
+bash scripts/wipe-remote.sh             # EMPTY the remote's club data, keeping officer access
+                                        # and the officer-turnover audit trail. NOT seed-remote:
+                                        # that one re-inserts the fabricated fixtures
 
 # 🪤 When the Supabase CLI will not run but the containers are fine, talk to
 # Postgres directly. This takes MULTI-LINE SQL and heredocs, unlike `db query`,
@@ -220,6 +227,9 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - **The database must stay disposable.** Every schema change is a file in `supabase/migrations/`, never applied only through the dashboard.
 - **`seed.sql` must not use trailing inline comments** — `scripts/seed-remote.sh` flattens each chunk onto one line. 🪤 The stripper is `grep -v -E` rather than `sed`, because sed's `.*` failed to match a comment containing an emoji and half-seeded production.
 - 🔓 **Re-seeding a project with a real officer on it needs `bash scripts/seed-remote.sh --force`**, which names the project ref, prints current row counts, and requires the operator to type the ref back. Never get past the guard by editing a copy of `seed.sql`. Officer logins survive a re-seed.
+- 🔴 **Emptying production is `scripts/wipe-remote.sh`, NOT `seed-remote.sh --force`** — and the difference is the whole point. `--force` wipes *and re-inserts the 32 fabricated members*, so using it to "clear production for launch" leaves production holding the seed again. `wipe-remote.sh` deletes and inserts nothing. ⚠️ It carries the same guard (names the ref, prints counts, requires the ref typed back) and there is no undo: the public leaderboard empties the moment it finishes.
+- **`wipe-remote.sh` accounts for ALL TWELVE tables in `public`, in four groups** — deleted, kept, untouched-config, untouched-transient — for the same reason `seed.sql`'s wipe list exists: **the accounting IS the definition of "this database is empty", and a table missing from it is drift nobody can see.** A migration that adds a table has to place it. 🪤 `app_settings` is untouched on purpose: `current_term` is *configuration*, and a wipe that silently unpinned a term an officer set is exactly the failure this file keeps recording.
+- 🪤 **The `admin_audit` delete ships its three statements in ONE `db query` call**, so `disable trigger` / `delete` / `enable trigger` run in one implicit transaction. Split across calls, a failed delete leaves `admin_audit_no_delete` **permanently disabled** with nothing on screen saying so. The script's `verify` step asserts `tgenabled <> 'D'` for exactly this reason.
 - **The seeded semester must sit in the term the clock is in, and completed events must be in the past** — attendance can only hang off events with `starts_at < now()`. **An unasserted fixture is an optional fixture**; the assert block is the only thing standing between "the seed ran" and "the seed produced what the docs say".
 
 ### Rendering, errors and framework behaviour
@@ -416,6 +426,13 @@ lib/
                         restore path are written down
   officers.ts           officer roster. No `photo` field, deliberately
 scripts/create-officer.mjs  officer bootstrap / password reset / revoke
+scripts/wipe-remote.sh  EMPTIES the linked project's club data — the "testing is
+                        over, real data starts now" button, and the OPPOSITE of
+                        seed-remote.sh rather than a mode of it. Keeps officer
+                        sign-ins, officer_invites, and the admin_audit rows about
+                        invites and officer access; leaves app_settings and
+                        checkin_throttle alone. Its header accounts for all twelve
+                        public tables, and that accounting is the invariant
 scripts/organise-pictures.mjs  sorts the officers LOCAL picture library into one
                         folder per page; unnamed files pool into gallery/. Moves,
                         never overwrites — the directory is gitignored, so there

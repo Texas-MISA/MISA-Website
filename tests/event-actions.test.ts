@@ -62,7 +62,7 @@ describe("series creation", () => {
       description: null,
       location: "UTC 3.102",
       points: 1,
-      category: "general_meeting",
+      category: "general_and_other",
       seriesId,
     });
 
@@ -484,7 +484,7 @@ describe("duplicateDraft against a stored row", () => {
       ends: at(slot, 19),
       status: "published",
       points: 3,
-      category: "workshop",
+      category: "professional_dev",
       checkinOpensAt: at(slot, 17.75),
       checkinClosesAt: at(slot, 19.25),
     });
@@ -514,7 +514,7 @@ describe("duplicateDraft against a stored row", () => {
     expect(inserted!.status).toBe("draft");
     expect(inserted!.series_id).toBeNull();
     expect(inserted!.points).toBe(3);
-    expect(inserted!.category).toBe("workshop");
+    expect(inserted!.category).toBe("professional_dev");
 
     const window = effectiveWindow(inserted!);
     expect(window.opens.getTime()).toBe(

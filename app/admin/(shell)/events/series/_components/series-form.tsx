@@ -196,7 +196,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
         <Field label="Category" error={fieldErrors?.category}>
           <select
             name="category"
-            defaultValue="general_meeting"
+            defaultValue="general_and_other"
             className={inputClass}
           >
             <option value="">None</option>

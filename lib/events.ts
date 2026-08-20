@@ -11,14 +11,23 @@
  */
 export const CENTRAL = "America/Chicago";
 
-/** The vocabulary the admin UI offers. `events.category` stays free text in
- * the database (§4.1) — this is the app's list, not a constraint. */
+/**
+ * The vocabulary the admin UI offers — the club's own list, set 2026-08-19.
+ *
+ * ⚠️ **Mirrors the `events_category_valid` CHECK constraint**, and the two must
+ * move together. `events.category` was free text until migration 22 pinned it;
+ * the comment here said otherwise for a while, which is exactly how a select box
+ * ends up offering an option that takes a 23514 on save. Adding a value is a
+ * migration first, this array second.
+ */
 export const EVENT_CATEGORIES = [
-  "general_meeting",
-  "workshop",
+  "projects",
+  "academic",
   "social",
-  "flagship",
-  "other",
+  "professional_dev",
+  "corporate",
+  "special_events",
+  "general_and_other",
 ] as const;
 
 export type EventCategory = (typeof EVENT_CATEGORIES)[number];
@@ -181,9 +190,30 @@ export function formatDay(at: string): string {
   }).format(new Date(at));
 }
 
-/** "general_meeting" -> "General meeting". */
+const CATEGORY_LABELS: Record<EventCategory, string> = {
+  projects: "Projects",
+  academic: "Academic",
+  social: "Social",
+  professional_dev: "Professional Dev",
+  corporate: "Corporate",
+  special_events: "Special Events",
+  general_and_other: "General and other",
+};
+
+/**
+ * "professional_dev" -> "Professional Dev".
+ *
+ * An explicit table rather than a derivation, because the labels are not a
+ * function of the slugs — "Professional Dev" and "Special Events" both carry a
+ * capital the old `replace(/_/g, " ")` rule cannot produce. The derivation is
+ * kept as the FALLBACK so a value the migration did not translate still renders
+ * as words instead of as a slug: the row is wrong, and the screen should say so
+ * legibly rather than crash or blank.
+ */
 export function formatCategory(category: string | null): string {
   if (!category) return "—";
+  const label = CATEGORY_LABELS[category as EventCategory];
+  if (label) return label;
   const spaced = category.replace(/_/g, " ");
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }

@@ -1,8 +1,49 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.69
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** Stage 9 (launch) is next. 🏗️ A **v2 visual redesign is in progress — phases 0 and 1 complete, phase 2 next.**
+**Version:** 1.71
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0 and 1 complete, phase 2 next.**
 **Last updated:** August 2026
+
+> **v1.71: the event categories are the club's, not the developer's.**
+>
+> Migration 27 replaces the vocabulary migration 22 pinned — `general_meeting`,
+> `workshop`, `social`, `flagship`, `other` — with **projects · academic ·
+> social · professional_dev · corporate · special_events · general_and_other**,
+> requested 2026-08-19. The old list was invented while building the admin UI
+> and described no schedule the club actually ran.
+>
+> Two things to carry forward. **`events.category` is not free text**, whatever
+> `lib/events.ts` used to claim in a comment: it has been a CHECK constraint
+> since migration 22, so the vocabulary lives in the schema *and* in
+> `EVENT_CATEGORIES`, and a change to one without the other hands the officer a
+> select box that 23514s on save. And **`general_meeting` is the lossy step in
+> the translation** — the new list has no seat for a weekly general meeting, so
+> the migration folds it into `general_and_other`. Production held 0 events when
+> this ran, so the remap exists for local seeds and for any database that
+> drifted, not for real data.
+>
+> **v1.70: production is emptied of the fabricated seed, and the command this
+> document prescribed for doing it was wrong.**
+>
+> Stage 9's "clear production before launch" item is **done** — `0` members,
+> events, attendance, adjustments, dues, field definitions and presets, with
+> both views empty. Officer sign-ins, `officer_invites` and the eight
+> `admin_audit` rows recording who was granted access were kept deliberately;
+> the fabricated `seed.officer@example.edu` account was deleted.
+>
+> 🔴 **The correction that matters more than the wipe.** §Stage 9 said to clear
+> production with `bash scripts/seed-remote.sh --force`. `--force` skips only
+> the *guard* chunk — every insert chunk still runs — so following it would have
+> re-filled production with 32 fabricated members at counts plausible enough to
+> pass a glance. **Clearing and re-seeding were reading like two modes of one
+> command.** `scripts/wipe-remote.sh` is new, deletes and inserts nothing, and
+> carries the same typed-ref guard.
+>
+> ⚠️ **Production had already drifted from `seed.sql` and nothing surfaced it**
+> — 33 members, 16 events, 209 attendance rows and 9 dues payments against a
+> documented 0. The generalisable rule now written into `CLAUDE.md`: a
+> documented count about the *remote* is a claim to re-check, not a fact.
+> `seed.sql`'s numbers describe **local after a `db reset`**.
 
 > **v1.69: the v2 redesign's phase 1 ships, and `DESIGN.md` comes back as v2.**
 > The home page and header were rebuilt on a new foundation: **five grounds**
@@ -2240,7 +2281,10 @@ create table events (
   checkin_opens_at   timestamptz,   -- defaults to starts_at if null
   checkin_closes_at  timestamptz,   -- defaults to ends_at if null
   points             integer not null default 1,
-  category           text,          -- 'general_meeting' | 'workshop' | 'social' | 'flagship' | ...
+  category           text,          -- 'projects' | 'academic' | 'social' | 'professional_dev'
+                                  -- | 'corporate' | 'special_events' | 'general_and_other'
+                                  -- Pinned by events_category_valid since migration 22;
+                                  -- vocabulary replaced by migration 27 (2026-08-19).
   -- Derived from starts_at, never set by hand. See 4.7.
   term               text generated always as (term_of(starts_at)) stored,
   status             text not null default 'draft'
@@ -3506,7 +3550,9 @@ Three phases, each merged to `main` on completion.
 - **What it costs, stated plainly:** last year's standings do not carry over, so the leaderboard opens empty and nobody's accumulated points survive the switch. That is a real loss for anyone near the top of the old sheet, and it is worth telling members rather than letting them discover it.
 - **What it buys:** the migration was the one part of Stage 9 whose effort could not be estimated — the old estimate literally hedged on "how clean the existing data is" — and the one that would have imported the exact ambiguity §1.2 says this system exists to end: unmatched names, guessed events, arithmetic nobody can re-derive. Every migrated row would have to be trusted at precisely the level the spreadsheet was.
 - **Nothing needs building.** `/admin/members/import` (Stage 6 phase 7b) already takes a CSV of current members, create-only and matched by header name. There is deliberately **no** importer for historical attendance or point adjustments, and this decision is why one was never written.
-- ⚠️ **It does mean production must be CLEARED of the seed before launch.** Production currently *is* the fabricated seed (32 members, 15 events, 208 attendance rows). Starting fresh means `bash scripts/seed-remote.sh --force` and then a real roster import — real data sitting alongside fabricated data is worse than either alone.
+- ✅ **Production was CLEARED on 2026-08-19 and this item is DONE.** `bash scripts/wipe-remote.sh` emptied it: 0 members, 0 events, 0 attendance, 0 adjustments, 0 dues, 0 field definitions, both views empty. The three real officer logins, the four `officer_invites` and the eight `admin_audit` rows about invites and officer access survived by design; the fabricated `seed.officer@example.edu` account was deleted. The real roster import and the real schedule follow.
+- 🔴 **The command written here until 2026-08-19 was wrong, and would have re-seeded rather than cleared.** It said `bash scripts/seed-remote.sh --force`, but `--force` skips only the *guard* chunk — the seed then re-inserts all 32 fabricated members, 15 events and 208 attendance rows. Following it to "clear production for launch" would have left production holding the seed, and the counts would have looked plausible enough to pass a glance. `scripts/wipe-remote.sh` was written for this and inserts nothing.
+- ⚠️ **Production had drifted from the seed before the wipe.** It held 33 members, 16 events, 209 attendance and **9 dues payments** against a documented 0 — walkthroughs wrote to it. Any figure a doc states about the *remote* is a claim to re-check, not a fact; `seed.sql`'s counts describe **local** after a `db reset`.
 
 **Exit criteria:** one full event runs on the system with no manual intervention.
 **Effort:** 1–2 days. The open-ended part was the migration; without it this is domain setup, the handoff guide, and one event.
