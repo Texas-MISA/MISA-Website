@@ -376,6 +376,13 @@ scope** and must not be touched.
 
 ### Where the five pages actually are today
 
+⚠️ **This subsection describes the pages BEFORE the phase ran, and two of its
+instructions were reversed by it.** `/gallery`'s filter section did not keep its
+`ground="white"` — the chips were deleted along with the invented categories they
+sorted, so the reason for the white ground went with them. And the pages were
+rebuilt from the home page's vocabulary rather than restyled in place. Read the
+Phase 2 record below for what actually shipped.
+
 All five still use **`PageHero`** (`components/ui/chevron-section.tsx`) and a
 stack of `<Section>`s. They already sit on the v2 grey page ground, so **do not
 read "it has the grey background" as "it has been done."**

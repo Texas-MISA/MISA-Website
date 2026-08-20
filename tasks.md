@@ -8,41 +8,82 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ## 🏗️ IN PROGRESS — v2 visual redesign of the whole site (2026-08-17)
 
-Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 complete. ✅ Phase 1 (home page + header) COMPLETE — gate passed 2026-08-19 after four rounds of officer review. ⬅️ Phase 2 is NEXT.**
+Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 complete. ✅ Phase 1 (home page + header) COMPLETE — gate passed 2026-08-19 after four rounds of officer review. ✅ Phase 2 (the five content pages) BUILT and measured, awaiting officer review. ⬅️ Phase 3 is NEXT.**
 
-### ⬅️ Phase 2 — the five content pages. NOT STARTED.
+🌿 **PHASE 2 LIVES ON THE BRANCH `v2-phase-2`, NOT ON `main`** (officer, 2026-08-19). It is 2 commits ahead of `main` and 0 behind, so it merges as a fast-forward. ⚠️ **Do not merge it without the officer** — a merge to `main` replaces the live club website at https://www.txmisa.org.
+
+### ✅ Phase 2 — the five content pages. BUILT, awaiting review.
 
 `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, plus the error and
-not-found boundaries. Presentational only; no route, action, `lib/` or schema
-change. `/attend`, `/leaderboard`, `/lookup` and `/admin` are **out of scope**.
+not-found boundaries. 15 code files plus 3 docs. No route, action, migration or
+schema change; the only `lib/` changes are copy constants and one build-time read.
 
-**Read before starting, in this order:**
+🔴 **The instruction that shaped it: rebuild each page FROM THE HOME PAGE, not
+from its own v1 layout. The exact words are kept and nothing else is.** A first
+pass evolved each existing composition and was thrown away. The shared devices
+are the drawn navy `field` under the 60×60 grid, floating `.plate` photographs
+leaning only at `lg`, the raised white `.sheet`, the bento grid, and one
+shared-rule plate per page. `DESIGN.md` carries the per-page family tables.
 
-1. [`DESIGN.md`](DESIGN.md) — 🎨 the built v2 system and the design source of
-   truth again. Phase 2's job is to **execute** it, not extend it.
-2. `CLAUDE.md`'s Invariants — they outrank every design skill without exception.
-3. The **Phase 2 brief** in the v2 plan — scope, where each page stands today,
-   the decisions phase 2 owns, and the gate.
-4. `app/(public)/page.tsx` + `_components/home-hero.tsx` — the worked example.
+**What it decided:**
 
-**The three things most likely to go wrong:**
+- **`PageHero` rebuilt ONCE**, on `ground="field"` and left-aligned, with its
+  dead `size="home"` and `tagline` props deleted. ⚠️ **Eight pages render it** —
+  the five above plus `/attend`, `/lookup` and `/leaderboard`, which are phase 3.
+  They inherit it, were not redesigned, and were measured at the gate.
+- **`Partners` folded onto `<Section>`**, which phase 1 deferred here because
+  `/about` shares it.
+- 🔓 **`/gallery` shows the 117 real photographs.** `GALLERY_ITEMS`,
+  `GALLERY_FILTERS`, `GALLERY_FEATURE` and `GALLERY_TERM` are deleted with the
+  `Slot` and `GalleryCategory` types: they asserted a term, a date and a taxonomy
+  nobody supplied, and the page's one control sorted on the invented one.
+- **`/about` and `/contact` got real photographs.** Officer headshots and project
+  cells stay placeholders, for the reason photography does not answer.
 
-- 🪤 **All five pages already sit on the v2 grey ground.** Do not read "it has the
-  grey background" as "it has been done." They are still v1 compositions.
-- 🪤 **Any section carrying controls, chips or a table needs `ground="white"`.**
-  Four shared primitives (`controlClass`, the sticky `<THead>`, `FilterChip`, the
-  neutral `Banner`) fill with the page grey and go invisible on it. This already
-  bit once, on four pages at once.
-- 🔴 **No new page may invent a fact about the club.** Copy comes from
-  `lib/site.ts` and `lib/officers.ts`; any new string is officer-reviewed.
-  ⚠️ **Project descriptions and photographs are coming later** (officer,
-  2026-08-19) — build the shape, leave the placeholders.
+**Seven defects found by measuring rather than looking:**
 
-**One shared decision phase 2 owns:** all five pages carry `PageHero`
-(`components/ui/chevron-section.tsx`), which phase 1 deliberately left alone. Its
-`size="home"` branch is already unreachable. Rebuild it once and every page
-inherits, or replace it per page — **retire the dead branch either way.**
+- 🐛 **`--misa-muted` on the grey page ground is 4.33:1 and FAILS AA.**
+  `DESIGN.md` recorded 4.63:1 and called it the smallest margin in the system;
+  both halves were wrong. The rule that replaces the number: **muted may sit on
+  Paper, never on Vellum.** Three public sites fixed. ⚠️ `/attend`, `/lookup`,
+  `/leaderboard` and `/officer-invite` have the same pairing in places and were
+  left standing — **that is phase 3's to fix.**
+- 🐛 `/about`'s rotated plates came out **1px apart**: at ±3° in a 3:2 frame each
+  plate's bounding box grows `0.0168w` per side and ate the whole 16px gap. The
+  home hero's "two pixels by accident", recurring. Arithmetic now written down.
+- 🐛 `/projects`' lead bento cell was **550px of bare hatch** at full page width.
+- 🐛 The term `Pill` stretched to full card width — a flex COLUMN stretches its
+  children across the cross axis and `Pill` is `inline-flex`.
+- 🐛 The root `app/not-found.tsx` was still rendering **on white**, since the page
+  ground lives on `(public)/layout.tsx`'s `<main>` and that file is outside it.
+- 🐛 The 404 recovery nav's `hover:bg-misa-panel` had silently stopped doing
+  anything the day the page ground became that colour.
+- 🐛 `/officers`' trailing-row centring was a hardcoded `i === 10` beside a
+  comment reading "Fourteen cards"; it is derived from `OFFICERS.length` now.
 
+**Measured at the gate:** `scrollWidth − clientWidth === 0` at 390/768/1024/1280/1646
+on all five plus `/`, `/attend`, `/lookup`, `/leaderboard` and the 404. **0 of 57**
+reveals hidden with JS off; **0 of 57** fail the revealed-state contract. Every
+contrast pairing ≥ 4.5:1, smallest **4.84:1**. Gallery: 0 of 24 tiles mis-sized,
+Load more 24 → 48 with 0 appended tiles hidden. Lint, `tsc`, `build` clean;
+**1024 tests, 34 files.**
+
+🪤 **The browser automation tab runs at `visibilityState: "hidden"`, which
+invalidates any reveal measurement taken through it** — no IntersectionObserver
+callbacks, no CSS transitions. An early pass reported "17 of 22 reveals stuck
+hidden" on the *shipped* home page. Measure the revealed-state CONTRACT instead:
+inject `transition: none`, set `data-revealed`, read computed styles. Layout
+measurements stay valid in a hidden tab; anything time- or paint-based does not.
+
+⚠️ **A real-device mobile check is still outstanding.** The widths are
+same-origin iframe probes, which are a layout measurement and not a device.
+
+🔴 **Handback, needing the officer:** eight `/about` and `/contact`
+slot-to-filename pairings to confirm or swap (inferred from the photographs, not
+supplied); `/gallery`'s 117 photographs share ONE generic alt string, and real
+descriptions need somebody who was in the room; project photographs and
+descriptions; officer headshots, still blocked on the photo-to-name pairing
+rather than on photography.
 
 ⚠️ **A v1 redesign was built and SCRAPPED.** It survives on the abandoned branch `redesign-stage-1` (tip `60ca71d`) as a record; `main` was never touched. It was rejected as bland, lacking depth, with image slots concentrated into one section and a scattered, same-ey layout. Each of those turned out to be a named rule in `design-taste-frontend` that v1 read too late or not at all. The root cause was process: v1 treated the skills as advisory and hand-rolled everything, against §2's *"do not invent CSS for things that have an official package."* The v1 plan, [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md), is **superseded**.
 
@@ -67,12 +108,14 @@ inherits, or replace it per page — **retire the dead branch either way.**
 
 Measured at the gate: zero horizontal overflow at 390/768/1024/1280/1646, hero fits the viewport at every width, headline 2 lines everywhere, nav one line at 61px with 277/304px wordmark clearance at 1280, **0 of 21 reveals hidden with JS off**, every contrast pairing ≥4.5:1 on the composited ground, 1022 tests green.
 
-🖼️ **REAL PHOTOGRAPHS ARE LIVE ON THE HOME PAGE — LOCALLY ONLY, AND NOTHING IS COMMITTED (2026-08-19).** Read this first.
+🖼️ ~~**REAL PHOTOGRAPHS ARE LIVE ON THE HOME PAGE — LOCALLY ONLY, AND NOTHING IS COMMITTED.**~~ ✅ **RESOLVED THE SAME DAY: the officer took path 1 and the photographs were COMMITTED (2026-08-19).**
 
-`pictures/` (the officer's library, 126 images) and `public/photos/` (the web-sized derivatives) are both **gitignored**, and the code carrying the ~30 `src` values is uncommitted alongside them. 🔴 **They have to be committed together or not at all** — committing the code while the images stay ignored ships `src` values pointing at files that do not exist, which is worse than the placeholders it replaced. Two clean paths:
+`public/photos/` now holds **126 tracked images**, live on the home page and — since v2 phase 2 — on `/about`, `/contact` and `/gallery`. `pictures/` (the officer's raw library) stays gitignored and nothing serves from it.
 
-1. **Commit the photographs too.** Needs the officer's sign-off on the people in them, because **the repository is public** and a face in a public git history is not something a later commit takes back.
-2. **Commit the plumbing with every `src` stripped.** Production keeps `<Hatch>` placeholders; the photographs stay a local preview.
+The two paths this entry was weighing, kept because the reasoning still applies to the next batch:
+
+1. **Commit the photographs too.** ✅ **This is what happened.** It needed the officer's sign-off on the people in them, because **the repository is public** and a face in a public git history is not something a later commit takes back. 🔴 **That half is permanent: a removal request is a history rewrite and a force-push, and even that does not reach forks or caches.**
+2. ~~**Commit the plumbing with every `src` stripped.**~~ Not taken. Production would have kept `<Hatch>` placeholders and the photographs would have stayed a local preview.
 
 **The workflow, once it is set up:** drop a photo in `pictures/<page>/`, run `node scripts/build-photos.mjs`, refresh. `scripts/organise-pictures.mjs` sorts a messy `pictures/` into one folder per page and pools anything unnamed into `gallery/`.
 

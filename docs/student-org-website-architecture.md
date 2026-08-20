@@ -1,9 +1,17 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.71
+**Version:** 1.72
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0 and 1 complete, phase 2 next.**
 **Last updated:** August 2026
 
+> **v1.72: v2 phase 2 rebuilt the five content pages from the home page.**
+>
+> `/about`, `/projects`, `/gallery`, `/officers` and `/contact` are rebuilt, on
+> the branch `v2-phase-2` and awaiting officer review. `PageHero` moved to
+> `ground="field"` and is inherited by three phase-3 pages; `/gallery` reads the
+> real photo pool and four invented constants were deleted; `--misa-muted` on the
+> grey page ground was found to fail AA at 4.33:1 against a documented 4.63:1.
+>
 > **v1.71: the event categories are the club's, not the developer's.**
 >
 > Migration 27 replaces the vocabulary migration 22 pinned — `general_meeting`,
@@ -3676,12 +3684,17 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
     page.tsx                 landing
     /about, /gallery, /officers, /projects, /contact
                              The five designed pages (landing, about, projects,
-                             gallery, officers) follow the v1.58 handoff section
-                             by section. /gallery/_components/gallery-grid.tsx
-                             is the one client component among them: the filter
-                             chips and Load more are presentational in the
-                             prototype and need real behaviour, over the static
-                             manifest in lib/site.ts. The home page's
+                             gallery, officers) were REBUILT in v2 phase 2 from
+                             the home page's vocabulary, not from the v1.58
+                             handoff, which is now historical reference.
+                             /gallery/_components/gallery-grid.tsx is still the
+                             one client component among them, but it is Load
+                             more ONLY now — the filter chips went with
+                             GALLERY_ITEMS, whose categories described shots
+                             that did not exist. It renders the real pool,
+                             passed in as a prop because lib/gallery-photos.ts
+                             imports node:fs and cannot cross into a client
+                             component. The home page's
                              _components hold gallery-marquee.tsx and
                              upcoming-events.tsx — the latter KEPT BUT
                              UNMOUNTED since v1.61, so no designed page queries

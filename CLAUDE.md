@@ -21,7 +21,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | [`docs/checkin-location-verification.md`](docs/checkin-location-verification.md) | 📋 **NOT BUILT.** Flagging check-ins whose network origin differs from the event's modal one. Stores a peppered, per-event digest and **never an IP address**; advisory only. Its *What this cannot catch* section is the part to read — the mechanism misses the likeliest form of the fraud, and it overlaps §6's rotating venue code enough that building both is probably redundant. |
 | [`docs/rsvp-events.md`](docs/rsvp-events.md) | 📋 **NOT BUILT.** A second kind of event, where officers tick people off an RSVP list instead of members using `/attend`. The parts to read before agreeing to it: the "cannot use `/attend`" rule is **three SQL changes, not a form check**, and the penalty disclaimer is the first thing in this system that would make points **cost** something — which is the stated trigger to re-open §9 #5/#6/#9/#10/#12 together. |
 | [`docs/existing-site-inventory.md`](docs/existing-site-inventory.md) | What was reproduced from the old Squarespace site and what is a placeholder. |
-| [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md) | 🏗️ **THE CURRENT PLAN, and it is PART-BUILT.** ✅ Phases 0–1 complete (home page + header, gate passed 2026-08-19). ⬅️ **Phase 2 is next** — `/about`, `/projects`, `/gallery`, `/officers`, `/contact` and the error boundaries — and the file carries a **Phase 2 brief** written to be executed from a cold start. Phases 3 (`/attend`, `/leaderboard`, `/lookup`), 4 (`/admin`) and 5 (reconcile `docs/invariants.md`) follow. ⚠️ **v1 was built and scrapped**; it survives on the abandoned branch `redesign-stage-1` as a record of what not to repeat. |
+| [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md) | 🏗️ **THE CURRENT PLAN, and it is PART-BUILT.** ✅ Phases 0–1 complete (home page + header, gate passed 2026-08-19). ✅ **Phase 2 built** — `/about`, `/projects`, `/gallery`, `/officers`, `/contact` and the error boundaries, rebuilt from the home page's vocabulary rather than evolved from their v1 layouts, and awaiting officer review; the file carries the **Phase 2 record**. ⬅️ **Phase 3 is next** (`/attend`, `/leaderboard`, `/lookup`), then 4 (`/admin`) and 5 (reconcile `docs/invariants.md`). ⚠️ **v1 was built and scrapped**; it survives on the abandoned branch `redesign-stage-1` as a record of what not to repeat. |
 | [`docs/frontend-redesign-plan.md`](docs/frontend-redesign-plan.md) | 📋 **SUPERSEDED by v2 above**, and kept for its reasoning rather than its decisions. The plan for a complete redesign of the public site — its design **and** its information architecture, with new pages in scope. `/attend`, `/leaderboard`, `/lookup` and `/admin` are frozen; the data layer is untouched. Carries the rule that **no new page may invent a fact about the club**, and the four decisions the officer owns. |
 
 ## Repository status
@@ -37,7 +37,7 @@ What exists, in one pass:
 - **Officer turnover** — officers are added by an expiring single-use invite link from `/admin/officers` (migrations 24–25), not by running `scripts/create-officer.mjs` with the production service key. The script stays as the bootstrap and recovery path. Nothing is emailed; the officer copies the link and sends it themselves.
 - **Stage 8** hardened the boundary (migration 22 closed a live hole where any signed-up user could read every member's name, EID and email), added the attendance and adjustment archives (migration 23), and fixed the empty-vs-error conflation across `lib/` and every detail page.
 
-🖼️ **Photographs exist on the home page LOCALLY ONLY and are NOT committed (2026-08-19).** `pictures/` and `public/photos/` are gitignored; so is nothing else about them, which means the uncommitted code carrying their `src` values must be committed **with** the image files or not at all — otherwise production serves ~30 broken images instead of the `<Hatch>` placeholders. The repository is public, so publishing faces is an officer decision, not a git command. Workflow and traps: `docs/build-log.md`; the scripts are `scripts/organise-pictures.mjs` and `scripts/build-photos.mjs`. 🪤 HEIC needs `heic-convert` — libvips does AVIF only, and `.metadata()` succeeds on a file that cannot be decoded.
+🖼️ **Photographs ARE COMMITTED and they ship (officer decision, 2026-08-19).** `public/photos/` holds 126 tracked web-sized images, live on the home page and — since v2 phase 2 — on `/about`, `/contact` and `/gallery`. `pictures/` (the officer's raw library) stays gitignored and nothing serves from it. 🔴 **The irreversible half:** the repository is public and every one is an identifiable student, so a removal request is a git history rewrite and a force-push, not a delete, and even that does not reach forks or caches. Workflow and traps: `docs/build-log.md`; the scripts are `scripts/organise-pictures.mjs` and `scripts/build-photos.mjs`. 🪤 HEIC needs `heic-convert` — libvips does AVIF only, and `.metadata()` succeeds on a file that cannot be decoded.
 
 🧹 **PRODUCTION IS EMPTY AND IS NO LONGER THE SEED (2026-08-19).** It was wiped by `bash scripts/wipe-remote.sh` ahead of the real Fall 2026 schedule being entered, so the Stage 9 "clear production before launch" item is **done**. Current state: **0 members / 0 events / 0 attendance / 0 adjustments / 0 dues / 0 field definitions / 0 presets**, both views empty, `app_settings.current_term` still unpinned (derives `Fall 2026`). What survived, deliberately: the **three real officer logins** (`auth.users` + `admin_profiles`, roles intact), all **4 `officer_invites`**, and the **8 `admin_audit` rows whose `entity_type` is `officer_invite` or `officer`** — the record of who was granted access and by whom. The other 13 audit rows, which described the wiped test data, were deleted.
 
@@ -256,10 +256,10 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - 🔓 **The scroll reveal's revealed state is `clip-path: none`, NOT `inset(0 0 0 0)`, and the difference is a shipped defect.** `inset(0 0 0 0)` looks like "no clip" and is not — it is "clip to my own axis-aligned border box", and a clip-path clips DESCENDANTS. Harmless for ordinary content; a hard cut for a child that sticks out of its parent's box, which a **rotated** child always does. The hero's tilted plates were sliced across all four corners by the reveal wrapper around them, so they rendered as irregular polygons and their frame was cut with them. ⚠️ **`wipe` is the one variant that must keep an `inset()`**, because it animates `clip-path` and `none` is not interpolable from `inset(0 100% 0 0)` — it carries its own `[data-reveal="wipe"][data-revealed]` rule. 🪤 **A plate that looks unframed is this bug, not a border bug** — the `border` on `.plate` is correct and was innocent. Look for what is clipping the plate before reaching for an outline or an inset shadow.
 - 🪤 **Global CSS must live inside a Tailwind cascade layer.** v4's `@import "tailwindcss"` emits utilities into `@layer utilities`, and an **unlayered rule beats every layered one regardless of specificity** — a bare `a { color: … }` overrode `text-white` on every link and rendered the header's Check In button navy-on-navy. Element defaults go in `@layer base`, decorative classes in `@layer components`.
 - 🪤 **The scroll reveal's hidden state is scoped to `html.js`**, a class an inline script in `app/layout.tsx` sets during HTML parsing. Without the scoping a visitor with JavaScript off gets a blank page; without the inline script (an effect instead) the content paints and then blanks. `components/ui/reveal.tsx` is the **server-safe** half and must never gain `"use client"` — the observer is the separate `reveal-observer.tsx`, mounted once in the public layout so animated sections stay Server Components.
-- 🔓 **THE NO-PHOTOGRAPHY RULE IS LIFTED, CONDITIONALLY** (2026-08-18/19). Its premise was factual, not aesthetic — the organization had not taken the photographs — and the fact changed. Real photographs are live on the home page **locally only**: `pictures/` and `public/photos/` are gitignored and the code carrying the ~30 `src` values is uncommitted alongside them. 🔴 **They ship together or not at all** — committing the code while the images stay ignored serves broken images instead of placeholders, and the repository is public, so publishing faces is an officer decision, not a git command. What replaces the rule is narrower and binds: **a slot renders a photograph or a labelled `<Hatch>`, never a hole**, and `components/ui/photo-slot.tsx` is the single place that swap happens. ⚠️ **Officer headshots and project cells stay placeholders** for a second, independent reason — pairing a face or a photograph to a named person or client is a factual claim nobody supplied. The four partner logos remain the only images committed to the repo.
+- 🔓 **THE NO-PHOTOGRAPHY RULE IS LIFTED, CONDITIONALLY** (2026-08-18/19). Its premise was factual, not aesthetic — the organization had not taken the photographs — and the fact changed. Real photographs are **committed and live** on the home page, `/about`, `/contact` and `/gallery`. 🔴 **The repository is public and a face in its history cannot be taken back by a later commit**, which is the part that still binds. What replaces the rule is narrower: **a slot renders a photograph or a labelled `<Hatch>`, never a hole**, and `components/ui/photo-slot.tsx` is the single place that swap happens. ⚠️ **Officer headshots and project cells stay placeholders** for a second, independent reason — pairing a face or a photograph to a named person or client is a factual claim nobody supplied. The four partner logos remain the only images committed to the repo.
 - ⚠️ **Officer headshots carry a SECOND, independent reason.** Even with photography restored, the handoff's own README flags its headshots' photo-to-name pairing as never supplied — a real face against another real student's name is worse than an empty labelled square. `Officer` has no `photo` field; adding one answers only half the question.
 - 🪤 **When photography returns, size framed slots with next/image's `fill`.** An intrinsically sized `<img>` makes the frame grow to the photo's own height, and the About history portrait then leaves a large void beside the column next to it — the handoff hit this in its own prototype. The gallery masonry is the one place that wants intrinsic heights.
-- ⚠️ **`GALLERY_ITEMS[].category` in `lib/site.ts` is a statement of intent, not a record.** The gallery filter sorts on it, and it describes shots that do not exist yet. Nothing else reads it.
+- ✂️ **`GALLERY_ITEMS`, `GALLERY_FILTERS`, `GALLERY_FEATURE` and `GALLERY_TERM` were DELETED in v2 phase 2**, along with the `Slot` and `GalleryCategory` types. Between them they asserted a term, a date and a taxonomy nobody supplied, and the gallery's one control sorted on the invented one. `/gallery` reads the real pool instead. 🔴 **Do not reintroduce a category filter without a real file-to-category mapping** — inventing one is the same failure wearing a filter bar.
 - 🪤 **A marquee needs enough copies to cover the VIEWPORT, and "duplicate twice, translate ‑50%" only does that when one group is wider than the screen.** Neither home-page track is: measured at a 1646px viewport, the groups are 1360px and 1272px, so each cycle ended with ~300px of bare ground and a snap. **The translate distance is one group width in pixels** (`--marquee-shift`, computed by the component), never a percentage — a percentage silently couples the distance to the copy count. Copies come from `Math.ceil(MAX_VIEWPORT / groupWidth) + 1`; `MAX_VIEWPORT` (4000) is a **real ceiling**, not a margin, and is documented at its definition. 📌 No pause on hover: the tracks are full-width, so a resting mouse froze a row and read as breakage. 📌 **The band's navy ground was removed on request (2026-08-15)** — the tiles are `Hatch`'s **light** tone, the "See all photos" link is navy, and the section carries no `.on-navy`. Those move together with the background, per the never-mixed rule. 🔓 **Since 2026-08-19 the band sits on the flat grey PAGE ground and carries nothing but the strip.** Two things were tried and reversed the same day: an explicit white band behind the tiles, and a "See all photos" card riding the top band. `/gallery` is in the header nav, which is where a destination present on every page belongs. 📌 **Every seam around a band is 64px at desktop**, and the bottom band's `padBottom` is a step larger (`md`) than its `padTop` for a structural reason: below it the navy Projects field starts immediately, so there is no light neighbour to contribute the other 32px.
 
 ## Design skill precedence
@@ -292,19 +292,27 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         as lifted WHITE surfaces. 🐛 Four shared primitives fill
                         with bg-misa-panel (controlClass, the sticky THead,
                         FilterChip, the neutral Banner), so /attend, /lookup,
-                        /leaderboard and the gallery filter bar take
-                        ground="white" rather than those primitives being
-                        recoloured — all four are shared with /admin; _components/ holds page-private
+                        /leaderboard and /contact's form take ground="white"
+                        rather than those primitives being recoloured — all four
+                        are shared with /admin. 📌 The gallery's filter bar was
+                        the fourth such section and went with the chips in v2
+                        phase 2; _components/ holds page-private
                         pieces (leading underscore = not a route) — the home
                         page's home-hero.tsx (v2 phase 1: the Asymmetric Split
                         Hero and its floating plate cluster — replaces PageHero
-                        on the HOME PAGE ONLY; the other nine public pages still
-                        use PageHero, so chevron-section.tsx is untouched until
-                        phase 2), gallery-marquee.tsx and upcoming-events.tsx
-                        (KEPT BUT UNMOUNTED; remounting it also restores the
-                        page's force-dynamic), and
-                        /gallery's gallery-grid.tsx, the one client component
-                        the five designed pages need (filter chips + load more).
+                        on the HOME PAGE ONLY). 🔓 PageHero itself was REBUILT in
+                        v2 phase 2 (ground="field", left-aligned, dead size/
+                        tagline props deleted) and EIGHT pages render it: the
+                        five content pages plus /attend, /lookup and
+                        /leaderboard, which are phase 3 and inherit it. Also
+                        gallery-marquee.tsx and upcoming-events.tsx (KEPT BUT
+                        UNMOUNTED; remounting it also restores the page's
+                        force-dynamic), and /gallery's gallery-grid.tsx, still
+                        the one client component among these pages — now Load
+                        more ONLY, over a photo list passed in as a prop.
+                        🪤 Its tiles carry NO data-reveal: the observer scans
+                        once per pathname, so an appended tile would sit at
+                        opacity 0 forever.
                         📌 /contact is ROUTED BUT UNLINKED from the desktop nav:
                         the handoff drops it, and the About FAQ band and the
                         footer address are the contact paths it puts in its
@@ -381,12 +389,22 @@ lib/
                         deliberately uncapped
   member-options.ts     fetchMemberOptions — bounded roster scan (MEMBER_SCAN_LIMIT)
   event-options.ts      fetchEventOptions — labels formatted server-side
-  gallery-photos.ts     galleryPhotos() — the home marquee's pool, read off
+  gallery-photos.ts     galleryPhotos() (paths, for the home marquee) and
+                        galleryPhotoEntries() (paths PLUS each file's real
+                        pixel dimensions, for /gallery's masonry). Both read
                         public/photos/gallery at BUILD time. ⚠️ Imports
-                        node:fs, so it must never reach a Client Component.
-                        📌 An empty result is a valid answer: public/photos/
-                        is gitignored, so production has no gallery and the
-                        band falls back to labelled <Hatch> placeholders
+                        node:fs, so it must never reach a Client Component —
+                        /gallery's grid IS a client component and takes the
+                        list as a PROP for exactly this reason.
+                        🪤 Dimensions come from a hand-rolled JPEG/PNG header
+                        parse, deliberately NOT sharp, which is not a declared
+                        dependency of this project. A masonry has to know each
+                        tile's height before the image loads; the alternatives
+                        were inventing it (what the page used to do) or forcing
+                        one ratio and cropping 62 of 117 portraits against
+                        their grain.
+                        📌 An empty result is still a valid answer, and the
+                        <Hatch> fallback stays reachable
   merge.ts              merge core: planMerge, mergeNotes, mergedCustomFields,
                         rankDuplicateCandidates. MIN_DUPLICATE_SCORE is NOT
                         MIN_SUGGESTION_SCORE — measured against constructed shapes
@@ -479,7 +497,12 @@ components/             site-header.tsx (5-item nav incl. Admin, absolutely
                                     thin; see the invariant), chip.tsx
                           feedback  banner.tsx (Banner + ReadError — ONE status
                                     language for the whole app), pill.tsx,
-                                    empty-state.tsx (never a <Hatch>)
+                                    empty-state.tsx (never a <Hatch>),
+                                    recovery-nav.tsx (the row of ways out on
+                                    BOTH 404s — it was written out verbatim in
+                                    two files, and its hover silently stopped
+                                    working the day the page ground became the
+                                    colour it filled with)
                           data      table.tsx (Table/THead/Tr/Th/Td, with the row
                                     hover none of the eight admin tables had)
                           content   partners.tsx, kpi-plate.tsx, activities.tsx,
