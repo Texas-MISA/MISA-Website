@@ -64,7 +64,7 @@ planned. Every value here was read off the running application on 2026-08-19.
 | Surface | State |
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
-| `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ⏳ **NOT YET REBUILT** (phase 2). Running v1 inside v2 grounds. |
+| `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
 | `/attend`, `/leaderboard`, `/lookup` | ⏳ **NOT YET REBUILT** (phase 3). Never had a design; they wear the shared primitives. |
 | `/admin` | ⏳ **NOT YET REBUILT** (phase 4), and governed by scanability rather than expression. |
 
@@ -168,6 +168,15 @@ the fill, the focus-ring answer and the section's own padding together.
 | `field` | `.ground-field` + `.on-navy` | **white** | The drawn navy radial — heroes, feature bands |
 
 **The page ground itself is `bg-misa-panel` on the public layout's `<main>`.**
+
+🔓 **`PageHero` moved from a flat `bg-misa-blue` to `ground="field"` in phase 2**,
+so the site has ONE navy hero treatment rather than two. ⚠️ **Eight pages render
+it** — the five phase-2 pages plus `/attend`, `/lookup` and `/leaderboard`, which
+are phase 3. Those three inherit any change to it and were measured at the phase-2
+gate rather than assumed. Its dead `size="home"` and `tagline` props were deleted.
+It is also **left-aligned** now: §4.3's anti-centre bias binds at
+`DESIGN_VARIANCE 8`, and a centred hero repeated across eight pages was the
+largest v1 tell still standing.
 
 - 🪤 **It is on `<main>`, not on `body`.** `body` is shared with `/admin`, which
   still runs v1 and must stay white until phase 4. `<Section>` has zero admin
@@ -303,6 +312,7 @@ Barlow (`--font-sans`) and Barlow Condensed (`--font-display`). Unchanged.
 | Role | Size | Weight / leading / tracking |
 |---|---|---|
 | Hero headline | `34 / 44 / 38 / 48 / 56` px at base/`sm`/`lg`/`xl`/`2xl` | 600, `0.94`, `-0.02em` |
+| Page-hero headline | `34 → 44 → 52` px at base/`sm`/`lg` | 600, `0.96`, `-0.02em`, `text-balance` |
 | `Headline` | `30 → 42` px at `sm` | 600, `1`, `-0.02em` |
 | `Title` | `26 → 34` px at `sm` | 600, `1.02`, `-0.015em` |
 | Card title | `22 → 26` px | 600, `1.05` |
@@ -400,8 +410,42 @@ they bracket Activities rather than repeating a device in two unrelated places.
 both are cells on a shared-rule plate. A **third** shared-rule plate breaks the
 budget.
 
-📌 **Families still unspent, for phases 2–3:** stacked editorial, index/table of
-contents, full-bleed feature, timeline, offset two-column, card masonry.
+### The five content pages, as built in phase 2
+
+**The budget is PER PAGE, not per site.** A family used on the home page may be
+reused on `/about`; a family may not appear twice on `/about`. Every section
+names its family in a comment at the top, so the count is a grep rather than a
+memory.
+
+🔴 **Phase 2 built these from the HOME PAGE's vocabulary rather than evolving
+each page's own v1 layout** (officer, mid-phase: keep the exact words and nothing
+else). The shared devices are the drawn navy `field` under the grid overlay,
+floating `.plate` photographs leaning only at `lg`, the raised white `.sheet`,
+the bento grid, and one shared-rule plate per page.
+
+| Page | Sections | Families | Consecutive splits |
+|---|---|---|---|
+| `/about` | 7 | page hero · plate cluster over a sheet · shared-rule plate on the field · full-bleed feature · disclosure index · navy strip · shared-rule logo plate | 0 |
+| `/projects` | 4 | page hero · statement on a sheet · bento (3 cells) · shared-rule stat plate on the field | 0 |
+| `/gallery` | 3 | page hero · card masonry · navy field band | 0 |
+| `/officers` | 3 | page hero · uniform plate grid · navy field band | 0 |
+| `/contact` | 3 | page hero · shared-rule plate (3 cells) · form on white beside a leaning plate | 1 |
+
+**Eyebrow count is ZERO on all five**, against caps of 3/2/1/1/1. Two components
+were corrected to keep that honest rather than to game it: `/about`'s
+`HISTORY_CARDS` labels are `<Title>` (they head a paragraph), and the role label
+in `OfficerCard` plus `/contact`'s channel labels are plain `<dt>`-style data
+labels rather than `<Eyebrow>` — which also removed a real bug, since
+`<Eyebrow className="text-misa-muted">` put two competing `text-*` utilities on
+one element.
+
+⚠️ **`/about` carries two shared-rule plates** (the history stats and Partners).
+That is the same tight spot the home page records between Projects and Partners.
+They stay distinguishable — navy stat cells on a drawn field against white logo
+cells on grey — and a third would break the budget.
+
+📌 **Families still unspent, for phase 3:** stacked editorial, split-screen
+scroll, sticky-stack, horizontal pan.
 
 ---
 
@@ -529,8 +573,21 @@ Real photographs are live on the home page **locally only**.
   commit.** A navy ring on a navy field is not subtle — it is no indicator.
 - **Contrast is measured per pairing, on the ground the text actually sits on,
   compositing any alpha.** Annotation Grey passed everywhere until a field's
-  ground changed under it. On the grey page ground, `--misa-muted` (`#6f7275`)
-  measures **4.63:1** — the smallest margin in the system.
+  ground changed under it.
+- 🐛 **`--misa-muted` (`#6f7275`) on the grey page ground measures 4.33:1 and
+  FAILS AA. This file previously recorded it as 4.63:1 and called it "the
+  smallest margin in the system"; both halves were wrong.** Recomputed in phase 2
+  against a formula validated on the WCAG reference pairs (`#767676` on white =
+  4.54, black on white = 21.00). The three public places it had landed on grey —
+  `/gallery`'s count, `/about`'s FAQ marker and the public error boundary — now
+  use `--misa-secondary` (`#4a4d50`, **7.60:1**).
+  ⚠️ **Muted is still fine on white** (4.84:1) and that is where the header, the
+  footer, `KpiPlate` and `OfficerCard` use it. The rule is narrow and worth
+  stating exactly: **`--misa-muted` may sit on Paper, never on Vellum.**
+  ⚠️ `/attend`, `/lookup`, `/leaderboard` and `officer-invite` also put muted on
+  grey in places. They are phase 3 and were left standing rather than touched
+  from outside their phase; the smallest margin on the five phase-2 pages is now
+  **4.84:1**.
 - **A gradient is not one ground.** Measure at both ends.
 - **Reduced motion** is honoured: all reveals resolve, marquees stop.
 - **The skip link** is the first focusable thing in the document.

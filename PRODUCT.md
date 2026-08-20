@@ -114,13 +114,16 @@ Durable constraints future work must preserve:
   accept all majors & years!" is the register. Not corporate, not ironic.
 - All public copy lives in `lib/site.ts` and `lib/officers.ts` and is the source
   of truth for wording. It is never hardcoded into a page.
-- ⏳ **A v2 visual redesign is underway, and `DESIGN.md` is RETIRED for its
-  duration** (2026-08-17). Only the **colour scheme** (navy `#16305c` and white)
-  and this file's content commitments are fixed; type, layout, depth, shape,
-  grounds and motion are all open. The plan is
+- 🏗️ **A v2 visual redesign is underway.** ✅ `DESIGN.md` is **un-retired and is
+  the design source of truth again** as of 2026-08-19: it was rewritten from what
+  phase 1 actually shipped, three phases early, because phase 2 rebuilt five
+  pages and could not be executed consistently against an undocumented system.
+  Phases 1 (home page + header) and 2 (`/about`, `/projects`, `/gallery`,
+  `/officers`, `/contact`) are built; phase 3 is `/attend`, `/leaderboard` and
+  `/lookup`, phase 4 is `/admin`. The plan is
   [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md), and
-  `design-taste-frontend` is the primary design authority while it runs.
-  `DESIGN.md` still describes what is on screen today and is replaced at phase 5.
+  `design-taste-frontend` leads on the public visual UI while it runs —
+  constrained by `DESIGN.md`, which it no longer gets to re-pick.
 - **The design handoff at `docs/Texas MISA website UI mockups/` is historical
   reference**: desktop-only, covers five public pages and none of `/admin`,
   `/attend`, `/leaderboard` or `/lookup`, and authors no breakpoints or
@@ -148,13 +151,22 @@ Real:
 
 Deliberately absent — must not be fabricated or worked around:
 
-- **There is no photography.** Every image slot on every page — marquee tiles,
-  the About cluster, the gallery, officer headshots, project cards — renders a
-  labelled hatched placeholder. This is a decision, not a backlog item; the
-  photo directory was deleted rather than left unlinked. Any proposal that
-  introduces hero imagery, stock photography or generated imagery is refused.
-- Officer headshots carry a second, independent blocker: the photo-to-name
-  pairing was never supplied, so restoring photography would not unblock them.
+- ~~**There is no photography.**~~ 🔓 **REVERSED 2026-08-19 by officer decision.**
+  The premise was factual rather than aesthetic — the organization had not
+  supplied the photographs — and the fact changed. `public/photos/` is committed:
+  126 web-sized images, live on the home page, `/about`, `/contact` and
+  `/gallery`. 🔴 **The repository is public and every one is an identifiable
+  student**, so a removal request is a git history rewrite, not a delete.
+  What replaces the rule is narrower and still binds: **a slot renders a
+  photograph or a labelled placeholder, never a hole**
+  (`components/ui/photo-slot.tsx` is the single swap), and **no stock, generated
+  or borrowed imagery** stands in for a photograph the club has not taken.
+- **Officer headshots and project cards are still placeholders, and photography
+  did not unblock them.** The photo-to-name pairing was never supplied, and
+  pairing a photograph to a named client is a factual claim nobody made. Both are
+  a second, independent blocker.
+- ⚠️ **`/gallery`'s 117 photographs carry one generic alt string.** Real
+  descriptions need somebody who was in the room.
 - No testimonials, member counts, placement statistics, awards or press exist.
   Do not invent them.
 - Production data is entirely fabricated seed data and must stay obviously fake.

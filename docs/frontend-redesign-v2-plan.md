@@ -341,8 +341,8 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 |---|---|
 | **0** | Amend `CLAUDE.md` precedence. Install the three packages. Re-skin shadcn out of default state. Define the elevation vocabulary and the radius scale. Read §0, §4, §5, §10, §12 in full. |
 | **1** | ✅ **COMPLETE, gate passed 2026-08-19.** Home page + header. Record below. |
-| **2** | ⬅️ **NEXT.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Brief below. |
-| **3** | `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched |
+| **2** | ✅ **BUILT, awaiting officer review.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Record below. |
+| **3** | ⬅️ **NEXT.** `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched |
 | **4** | `/admin` under scanability rules, screen by screen, suite green between screens |
 | **5** | ~~Replace `DESIGN.md`~~ ✅ **done early, 2026-08-19.** What remains: reconcile `docs/invariants.md` for every invariant retired, each with its replacement argued; final record in `build-log.md` and `tasks.md` |
 
@@ -359,7 +359,7 @@ this standing until the section that owns them is rebuilt.
 
 ---
 
-## Phase 2 brief — the five content pages (NOT STARTED)
+## Phase 2 brief — the five content pages (BUILT — record follows this section)
 
 **Scope:** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, plus the
 error and not-found boundaries. Presentational only — no route, action, `lib/` or
@@ -427,6 +427,142 @@ Same bar phase 1 was held to: zero horizontal overflow at 390/768/1024/1280/1646
 every contrast pairing measured on the composited ground, 0 reveals hidden with
 JS off, `npm run lint`, `npm run build` and the full suite green, and a browser
 walkthrough of all five pages. Then stop for the officer.
+
+
+---
+
+## Phase 2 record (2026-08-19) — the five content pages
+
+**Built and measured; waiting on the officer.** 15 files, presentational only.
+`app/actions/`, `supabase/` and `proxy.ts` untouched; the only `lib/` changes are
+copy constants and one build-time read.
+
+### The instruction that changed the phase halfway through
+
+🔴 **"These pages should follow the home page, not each existing page. The exact
+words only are kept, not any formatting."** The first pass evolved each page from
+its own v1 composition, which was the wrong reading. Every page was then rebuilt
+out of the home page's vocabulary: the drawn navy `field` under the 60×60 grid,
+the floating `.plate` leaning only at `lg`, the raised `.sheet`, the bento, and
+one shared-rule plate per page. `DESIGN.md` carries the per-page family tables.
+
+### What was decided in the phase
+
+- **`PageHero` is rebuilt once, not replaced per page.** It has EIGHT call sites,
+  not five: `/attend`, `/lookup` and `/leaderboard` render it too. They inherit
+  the new hero and were added to every measurement at the gate; they were not
+  redesigned. Its `size="home"` and `tagline` props were provably dead and are
+  deleted.
+- **`Partners` folded onto `<Section>`.** Phase 1 deferred it here because
+  `/about` shares it. It had its own gutter, an off-scale `sm:pb-22` (88px,
+  matching no pad step), a duplicate three-key ground map and a verbatim copy of
+  `Headline`'s class string. It also had no width cap, so the logo row spread
+  past 1400px while every other band stopped there.
+- 🔓 **`/gallery` shows the 117 real photographs.** `GALLERY_ITEMS`,
+  `GALLERY_FILTERS`, `GALLERY_FEATURE` and `GALLERY_TERM` are deleted along with
+  the `Slot` and `GalleryCategory` types. Between them they asserted a term, a
+  date and a taxonomy nobody supplied, and the filter chips sorted on the
+  invented one. **Do not restore a category filter without a real
+  file-to-category mapping.**
+- **`/about` and `/contact` got real photographs**; the slot-to-filename table is
+  the handback below. **Officer headshots and project cells stay placeholders**,
+  for the reason photography does not answer.
+
+### Defects found by measuring rather than looking
+
+- 🐛 **`--misa-muted` on the grey page ground is 4.33:1 and fails AA.**
+  `DESIGN.md` recorded 4.63:1 and called it the smallest margin in the system;
+  both halves were wrong. Found by recomputing against a formula validated on the
+  WCAG reference pairs. Three public sites moved to `--misa-secondary` (7.60:1).
+  ⚠️ Phase 3's pages carry the same pairing in places and were left standing.
+- 🐛 **The `/about` plate cluster's rotated boxes came out 1px apart.** At ±3° in
+  a 3:2 frame each plate's bounding box grows `0.0168w` per side, so two
+  neighbours ate the whole 16px `gap-tile`. This is the home-page hero's "two
+  pixels by accident" repeating in a different section. `lg:gap-x-12` and the
+  arithmetic are now written above the cluster; measured 33/34px after.
+- 🐛 **`/projects`' lead bento cell was a 1284×550 sheet of bare hatch.** A 21:9
+  frame at full page width, while the photograph is still a placeholder, reads as
+  an error rather than as a pending shot. Reshaped to large-left plus two
+  stacked, which closes the row exactly: 631 + 20 + 546 = 1197 against the lead's
+  1197.
+- 🐛 **The term `Pill` stretched to the full card width** in the two stacked
+  cells. A flex COLUMN stretches its children across the cross axis and `Pill` is
+  `inline-flex`; `self-start` fixes it. It appeared in two cells and not the
+  third, which is what made it findable at all.
+- 🐛 **The root `app/not-found.tsx` was still rendering on white.** The page
+  ground lives on `(public)/layout.tsx`'s `<main>` and that file is outside it,
+  so since 2026-08-19 it had been the one public-looking page on the wrong
+  ground.
+- 🐛 **The 404 recovery nav's `hover:bg-misa-panel` had silently stopped doing
+  anything** the day the page ground became that same colour. Extracted to
+  `components/ui/recovery-nav.tsx`, which also de-duplicates a destination list
+  that was written out verbatim in two files.
+- **`/officers`' trailing-row centring was a hardcoded `i === 10`**, hand-tuned
+  for thirteen officers, sitting beside a comment that read "Fourteen cards". It
+  is derived from `OFFICERS.length` now.
+
+### Premises this phase falsified
+
+- ⚠️ **"Presentational only" did not survive `/gallery` intact.** A masonry has
+  to know each tile's height before the image loads. There are three ways to get
+  that number: invent it (what the page did, and what phase 2 deleted everywhere
+  else), force one ratio and crop (measured against the real pool: 62 of 117 are
+  portrait, 39 landscape and 16 near-panoramic, so any single ratio crops the
+  majority against their own grain), or read the file. `galleryPhotoEntries()`
+  reads the JPEG/PNG header at build time — 25 lines, `node:fs` only, and
+  deliberately **not `sharp`**, which is not a declared dependency of this
+  project. Measured after: 0 of 24 tiles disagree with their file's real ratio.
+- 🪤 **The browser automation tab runs at `visibilityState: "hidden"`, and that
+  invalidates any reveal measurement taken through it.** A hidden tab fires no
+  IntersectionObserver callbacks and advances no CSS transition, so a first pass
+  reported "17 of 22 reveals stuck hidden" on the *shipped* home page. The reveal
+  system was fine. **Measure the revealed-state CONTRACT instead**: inject
+  `transition: none`, set `data-revealed`, read computed styles. Layout
+  measurements (`scrollWidth`) stay valid in a hidden tab; anything time-based or
+  paint-based does not.
+
+### Measured at the gate
+
+`scrollWidth − clientWidth === 0`, document and body, at **390 / 768 / 1024 /
+1280 / 1646** on all five pages, plus `/`, `/attend`, `/lookup`, `/leaderboard`
+and the 404 — every page that inherits the rebuilt `PageHero` or `Partners`.
+No-JS: **0 of 57** reveals hidden across the five. Revealed-state contract: **0
+of 57** fail. Contrast: every pairing at or above 4.5:1 on the composited ground,
+smallest **4.84:1**. Gallery: 0 of 24 tiles mis-sized; Load more 24 → 48 → "48 of
+117", with 0 appended tiles hidden and 0 carrying `data-reveal`. Lint, `tsc` and
+`build` clean; **1024 tests pass across 34 files**.
+
+⚠️ **A real-device mobile check is still outstanding.** The widths above are
+same-origin iframe probes, which are a layout measurement and not a device.
+
+### Photography this phase needs (handback)
+
+**Confirm or swap these eight pairings.** ⚠️ They are inferred from the
+photographs, not supplied. Nobody said which event any frame is from, and the alt
+text is a careful reading of what is visible that deliberately asserts no date,
+no term and no person.
+
+| Slot | File |
+|---|---|
+| About, mission plate 1 | `misa-banquet-group-photo.jpg` |
+| About, mission plate 2 | `11-6-25-misa-makenna-morgan-06.jpg` |
+| About, mission plate 3 | `9-21-25-misaphotos-makennamorgan-075.jpg` |
+| About, band 1 | `100-1253.jpg` |
+| About, band 2 | `img-9880.jpg` |
+| About, band 3 | `20241015-180617.jpg` |
+| About, band 4 | `img-2848.jpg` |
+| Contact | `20260411-103131-295ec3.jpg` |
+
+🔴 **`/gallery`'s 117 photographs share ONE alt string**, "Photograph from a MISA
+event". It is true of all of them and useful to nobody. Real descriptions need
+somebody who was in the room; a generated one would be a confident guess about
+identifiable students.
+
+⚠️ **Project photographs and descriptions**, per the officer's 2026-08-19 note.
+Giving a `PROJECTS` entry a `src` and an `alt` is the whole of filling each cell.
+
+⚠️ **Officer headshots** remain blocked on the photo-to-name pairing, not on
+photography.
 
 ---
 
