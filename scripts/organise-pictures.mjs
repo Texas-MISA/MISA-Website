@@ -28,7 +28,15 @@ import path from "node:path";
 
 const ROOT = path.join(process.cwd(), "pictures");
 
-/** Files the officer named after a slot. These are the page's own images. */
+/**
+ * Files the officer named after a slot. These are the page's own images.
+ *
+ * 🪤 **A name that is not in here is swept into `gallery/`**, which is the
+ * marquee's pool — so an unnamed CLIENT photograph would end up scrolling past
+ * in a band of member photos. That is why the four project files are listed
+ * even though they already sit in `pictures/projects/`: they were dropped at
+ * the root of `pictures/` once and the next one will be too.
+ */
 const NAMED_TO_PAGE = {
   "homepage top main.JPG": "home",
   "homepage top 2.JPG": "home",
@@ -39,6 +47,10 @@ const NAMED_TO_PAGE = {
   "professional dev.jpeg": "home",
   "social events.HEIC": "home",
   "tech workshops.jpg": "home",
+  "pepsico.png": "projects",
+  "casa de luz.jpg": "projects",
+  "cap metro.jpg": "projects",
+  "chicago crime.jpg": "projects",
 };
 
 /** Saved copies of the old live site. Not photographs. */

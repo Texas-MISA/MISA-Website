@@ -25,11 +25,38 @@ import { Wordmark } from "@/components/ui/wordmark";
 // ⚠️ That headroom is spent, not infinite. Adding an item to either group
 // means re-measuring at the xl breakpoint (1280) as well as at a wide
 // viewport, where the left group is the tight one.
+//
+// 🔓 **RE-MEASURED 2026-08-23**, after two changes that moved this in opposite
+// directions: `/projects` left the nav (four items, not five) and the wordmark
+// became the real logo, growing from 48px wide to 82px. The pieces are
+// viewport-independent — left group 225px, right cluster 272px, wordmark 82px,
+// 32px gutter — so the clearance at any width is arithmetic from those:
+//
+//   1280   342px left   295px right    ← the tight one, and the number to beat
+//   1450   427px left   380px right
+//   1646   525px left   478px right    (measured live: 518 / 471)
+//
+// 📌 Compare the previous figures, 285 left / 312 right at 1280. The left gained
+// 57px by losing a nav item; the right LOST 17px, which is exactly half the
+// wordmark's 34px growth, since it is centred. Both sides have room, but note
+// the right is now the tighter of the two — it was the looser one before.
 
-/** Public pages, left of the wordmark. */
+/**
+ * Public pages, left of the wordmark.
+ *
+ * ✂️ **`/projects` was UNLISTED on 2026-08-23 (officer, temporary).** The route
+ * still exists and still renders; it is simply not linked from anywhere, and it
+ * carries `robots: { index: false, follow: false }` so a crawler does not put it
+ * back. Relisting it is this line, the `MOBILE_NAV` entry below, the `robots`
+ * key in `app/(public)/projects/page.tsx`, and the "All projects →" link on the
+ * home page's projects band — four places, all commented.
+ *
+ * 🪤 The nav is one item lighter than the 285/312px wordmark clearance was
+ * measured against, so this direction is safe without re-measuring. Growing it
+ * back to five is NOT: re-measure at 1280 before adding an item.
+ */
 const SITE_NAV = [
   { href: "/about", label: "About" },
-  { href: "/projects", label: "Projects" },
   { href: "/gallery", label: "Gallery" },
   { href: "/officers", label: "Officers" },
   // 📌 Officer sign-in, in the nav as of the design overhaul. It goes to
@@ -58,9 +85,20 @@ const MEMBER_NAV = [
 /**
  * One list for the mobile panel, which stacks and has no wordmark to clear —
  * so it can carry Contact, which the desktop nav has no room for.
+ *
+ * 🐛 **This used to be `SITE_NAV.slice(0, 4)`, and unlisting `/projects` broke
+ * it silently.** The slice meant "the site pages, without Admin" only because
+ * Admin happened to sit at index 4; with one item gone it swept Admin in and
+ * the panel rendered it twice — a duplicate React key on a list nobody looks at
+ * on desktop. Dropping Admin BY HREF says what was meant and survives the next
+ * edit to either list.
+ *
+ * 📌 `/projects` is unlisted here too. The mobile sheet is a nav like any other
+ * and unlisting it in one place only would leave the page reachable from a
+ * phone and not a laptop.
  */
 const MOBILE_NAV = [
-  ...SITE_NAV.slice(0, 4),
+  ...SITE_NAV.filter((item) => item.href !== "/admin/login"),
   { href: "/contact", label: "Contact" },
   ...MEMBER_NAV,
   { href: "/attend", label: "Check In" },

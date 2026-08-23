@@ -1,9 +1,57 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.72
+**Version:** 1.74
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0 and 1 complete, phase 2 next.**
 **Last updated:** August 2026
 
+> **v1.74: the officer roster is replaced, the real logo landed, and the page heroes are centred.**
+>
+> Three officer instructions, 2026-08-23, on the `v2-phase-2` branch.
+>
+> **The roster** is replaced wholesale from the officer's saved copy of the live
+> page — a full turnover, with two new roles (**Client Project Lead**, **Data
+> Project Lead**) replacing Project Vice President and Junior Director Vice
+> President. 🔓 **Officer headshots ship for eleven of the thirteen**, which
+> satisfies the rule that kept them blank rather than waiving it: the objection
+> was that the photo-to-name pairing had never been supplied, and it now has
+> been. 🪤 That pairing was read off the saved page's **CSS grid geometry**, not
+> its DOM order — a Squarespace fluid-engine page positions sibling blocks by
+> `grid-area` and every `alt` was empty. 🔴 **Two officers share one photograph on
+> the source page and neither can be attributed, so both keep the labelled
+> placeholder** — this is the one open question in the change. `Officer.linkedin`
+> is now optional too: the updated page carries no per-officer links at all.
+>
+> **The wordmark** is the organization's real logo, replacing the CSS
+> construction that stood in for it since Stage 2. 🪤 It is applied as a CSS
+> **mask** over `background: currentColor`, because the supplied file is white
+> artwork and the mark must be navy on the public header and white on the admin
+> chrome — an `<img>` would have broken the one-component-two-grounds invariant.
+> ⚠️ It is 34px wider than what it replaced, so §10's nav clearance was
+> re-measured: **342px left, 295px right at 1280**, and the right is now the
+> tighter side.
+>
+> **`PageHero` is centred**, reversing a phase 2 decision on the officer's
+> instruction. One component, so all eight pages that render it moved together;
+> the home page's hero is a split and stays uncentred.
+>
+> **v1.73: `/projects` is unlisted and the home page's projects band is two cells.**
+>
+> Officer instruction, 2026-08-23, on the `v2-phase-2` branch, and **temporary**
+> — every part is written to be reversed and each of the four touch points names
+> the others. The route still resolves and the page still renders; it is linked
+> from nowhere and carries `robots: { index: false, follow: false }`. See the §5
+> route table entry, which also records how this differs from `/contact`'s older
+> and weaker unlisting.
+>
+> The home page's band went from four cells (three projects plus a labelled
+> placeholder) to two: **PepsiCo and Casa de Luz**, each carrying the full
+> `/projects` description rather than a one-line summary, because with
+> `/projects` unlisted there is no page behind the band to go on to.
+> `PROJECT_PLACEHOLDER` is deleted. 🔓 **Both cells carry real photographs, which
+> narrows a standing rule**: the objection was pairing a *MISA* photograph to a
+> named client — these are photographs *of the client*, where the pairing is the
+> subject rather than a claim laid over it. CapMetro keeps its `<Hatch>`.
+>
 > **v1.72: v2 phase 2 rebuilt the five content pages from the home page.**
 >
 > `/about`, `/projects`, `/gallery`, `/officers` and `/contact` are rebuilt, on
@@ -388,6 +436,10 @@
 > items. Re-measured after the change: **285px clearance at 1280, 460px at
 > 1646.** The 🪤 still stands — the wordmark wins the z-order, so an
 > overflowing item disappears silently rather than wrapping.
+>
+> ⚠️ **Those numbers are v1.58's and are superseded — see v1.74**, where the nav
+> dropped to four items and the wordmark grew to the real logo. Current figures
+> at 1280 are **342px left, 295px right**.
 >
 > ⚠️ **`/contact` is routed but unlinked.** The handoff has no Contact page and
 > no Contact nav item; the About FAQ band and the footer address are what it
@@ -2986,6 +3038,20 @@ $$;
 /gallery               Event photos                                (static)
 /officers              Officer roster with LinkedIn links          (static)
 /projects              Past and current client projects            (static)
+                       ✂️ UNLISTED, TEMPORARILY (officer, 2026-08-23). The
+                       route resolves and the page renders; it is linked from
+                       nowhere and carries robots noindex/nofollow. This is a
+                       different mechanism from /contact below: Contact is
+                       merely absent from the DESKTOP nav and still in the
+                       mobile sheet, whereas /projects is absent from both and
+                       de-indexed as well. 🔓 Relisting is exactly four places
+                       — SITE_NAV and MOBILE_NAV in components/site-header.tsx,
+                       the robots key in app/(public)/projects/page.tsx, and the
+                       "All projects →" link on the home page's projects band.
+                       🪤 While it is unlisted, the home page's two-cell band is
+                       the club's ONLY public statement about the projects
+                       programme, which is why those cells carry the full
+                       descriptions rather than one-line summaries
 /contact               Contact details and form                    (static)
                        ⚠️ ROUTED BUT UNLINKED from the desktop nav since the
                        v1.58 UI overhaul — the design handoff has no Contact
@@ -3986,10 +4052,15 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              `components.json` now redirects here; never point
                              it back. See the build log for the full list of
                              what that one command clobbered
-  site-header.tsx            the 5-item nav (About · Projects · Gallery ·
-                             Officers · Admin), the absolutely centred wordmark,
-                             and the navy Check In button. Client only for the
-                             active-link pathname and the mobile sheet
+  site-header.tsx            the 4-item nav (About · Gallery · Officers ·
+                             Admin), the absolutely centred wordmark, and the
+                             navy Check In button. Client only for the
+                             active-link pathname and the mobile sheet.
+                             ✂️ Projects left the nav in v1.73 (unlisted,
+                             temporarily). 🪤 MOBILE_NAV drops Admin BY HREF,
+                             not by slice index — the old slice(0,4) meant
+                             "without Admin" only while Admin sat at index 4,
+                             and removing a page swept it back in
   site-footer.tsx            socials row + the org address. NO officer sign-in
                              link since v1.58 — it is the nav's Admin item
   /ui                        EVERY shared primitive, used by both halves of the
@@ -4031,10 +4102,16 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                                        activities.tsx, officer-card.tsx,
                                        hatch.tsx (the labelled placeholder box,
                                        and since v1.59 what EVERY image slot on
-                                       the site renders), wordmark.tsx (its
-                                       exclamation dot is the one rounded thing
-                                       in the codebase, and it is a full stop
-                                       rather than a corner)
+                                       the site renders), wordmark.tsx — 🔓 THE
+                                       REAL LOGO since v1.74, replacing the CSS
+                                       construction whose exclamation dot used
+                                       to be the one rounded thing in the
+                                       codebase. 🪤 The supplied PNG is WHITE
+                                       artwork on alpha, so it is applied as a
+                                       CSS MASK over background: currentColor
+                                       rather than as an <img> — that is what
+                                       keeps ONE component working on white
+                                       AND navy
                              motion    reveal.tsx (server-safe helper) and
                                        reveal-observer.tsx (the client
                                        IntersectionObserver, mounted ONCE in the

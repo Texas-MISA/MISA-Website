@@ -11,6 +11,15 @@
         ],
         "createdAt": "2026-08-17T07:23:55.707Z",
         "reason": "The .hero-grid overlay is the handoff README's explicit spec (60x60px, two 1px rgba(255,255,255,.06) gradients) carried over from the live site, and DESIGN.md's north star is 'The Drawing Set' - the grid IS graph paper showing through a blueprint surface, which is the exception this rule names. Not user-confirmed; evidence is the handoff README plus DESIGN.md Overview."
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "app/globals.css"
+        ],
+        "createdAt": "2026-08-23T16:50:46.485Z",
+        "reason": "False positive: the two hits are CSS mask-image url() references to /misa-logo.png in .wordmark, not <img> src attributes. The asset exists at public/misa-logo.png (480x251, verified rendering navy on the public header and white on the admin login)."
       }
     ]
   }

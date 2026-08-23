@@ -22,6 +22,19 @@ import {
 export const metadata: Metadata = {
   title: "Projects",
   description: "Turning classroom knowledge into real-world impact.",
+  // ✂️ **UNLISTED, temporarily (officer, 2026-08-23).** The page still renders
+  // and the route still resolves; it is simply linked from nowhere. `noindex`
+  // is the other half of that — a page dropped from the nav but left indexable
+  // stays in search results for as long as the cache lives, which outlives the
+  // deploy that unlisted it (the same reason `/leaderboard` carries this).
+  //
+  // 📌 `follow: false` too, because the page links out to `mailto:` and nothing
+  // here needs crawling on its way somewhere else.
+  //
+  // 🔓 **Relisting is four places**: this key, `SITE_NAV` and `MOBILE_NAV` in
+  // `components/site-header.tsx`, and the "All projects →" link on the home
+  // page's projects band. All four carry a comment pointing at the others.
+  robots: { index: false, follow: false },
 };
 
 // /projects, rebuilt from scratch in v2 phase 2.
@@ -67,14 +80,21 @@ export const metadata: Metadata = {
 // carrying each term is a data pill on a card and the stat labels are stat
 // labels; neither is a micro-label above a section headline.
 //
-// ⚠️ **PROJECT PHOTOGRAPHS AND DESCRIPTIONS ARE COMING LATER** (officer,
-// 2026-08-19). Every cell renders a labelled `<Hatch>` through `PhotoSlot`,
-// because pairing a photograph to a NAMED CLIENT is a factual claim about the
-// club that nobody supplied. The shape is built; giving a `PROJECTS` entry a
-// `src` and an `alt` is the whole of filling it.
+// 🔓 **TWO OF THE THREE PHOTOGRAPHS LANDED on 2026-08-23** (officer), which is
+// the restore path this comment used to describe: give a `PROJECTS` entry a
+// `src` and an `alt` and `PhotoSlot` swaps the labelled `<Hatch>` for the real
+// image. CapMetro is still a `<Hatch>` and the page is correct either way — the
+// mixed state is exactly what `PhotoSlot` exists to make survivable.
 //
-// 📌 `PROJECT_PLACEHOLDER` is the home page's fourth quadrant cell and is not
-// used here. This page renders exactly the projects that exist.
+// 📌 What made the pairing acceptable is that these are photographs OF THE
+// CLIENT rather than of the club: a PepsiCo campus sign, the Casa de Luz
+// kitchen. The objection the placeholder answered was pairing a MISA photograph
+// to a named client, which asserts something nobody supplied. See `PROJECTS` in
+// `lib/site.ts`.
+//
+// 📌 This page renders exactly the projects that exist, and always did — the
+// home page's fourth "project to be confirmed" cell was never here, and it no
+// longer exists there either.
 
 /** The lead commission, and the two beneath it. */
 const [FEATURED, ...REST] = PROJECTS;

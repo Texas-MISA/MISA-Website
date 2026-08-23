@@ -37,10 +37,13 @@ export const metadata: Metadata = {
 // larger than another's is a claim about the people on it. Equal cells, one
 // varying property (nothing), and the composition carried by the grid itself.
 //
-// ⚠️ **Headshots stay placeholders, and photography did not unblock them.** The
-// design handoff records that the photo-to-name pairing "was never supplied", so
-// a real face under another real student's name is the failure on offer. Full
-// reasoning is on `HEADSHOT` in `components/ui/officer-card.tsx`.
+// 🔓 **HEADSHOTS LANDED on 2026-08-23, for eleven of the thirteen.** The rule
+// that kept them blank was that the photo-to-name pairing "was never supplied";
+// the officer supplied it, from the live site's own officers page. Two cards
+// still render the labelled placeholder because that page shows ONE image file
+// on two officers' cards and neither can be attributed — `lib/officers.ts` has
+// the full note. 📌 A grid that is eleven photographs and two labelled squares
+// is the intended state of `PhotoSlot`, not a half-finished one.
 
 /**
  * How many cards sit in a row at `xl`.
@@ -100,8 +103,14 @@ export default function OfficersPage() {
              between cards — the plates do that work, the way the bento cells do
              on the home page. */}
       <Section padTop="sm" padBottom="md" width="page">
+        {/* ✂️ **The year came OFF this heading on 2026-08-23**, when the roster
+            was replaced with the current one. It read "2025–26 Officer Team",
+            which the new roster makes false, and the source page carries no
+            year anywhere — so putting one back would be inventing a fact about
+            the club rather than reading one. 📌 Restoring it is editing this
+            line once the officer says which academic year this team is. */}
         <Headline data-reveal="up" className="mb-7">
-          2025–26 Officer Team
+          Officer Team
         </Headline>
 
         <ul className="grid grid-cols-2 gap-card sm:grid-cols-3 xl:grid-cols-10">

@@ -508,6 +508,42 @@
     overflow: hidden;
   }
 
+  /* The wordmark, painted through a MASK rather than drawn as an <img>.
+     `components/ui/wordmark.tsx` owns the box; this owns how it is filled.
+
+     🔓 **The real logo file finally landed (officer, 2026-08-23)**, replacing
+     the CSS construction that stood in for it — `wordmark.tsx` had said "swap in
+     the real asset when it lands" since Stage 2.
+
+     🪤 **The asset is WHITE artwork on transparency, and the site needs it in
+     two colours** — navy on the white public header, white on the navy admin
+     chrome and login. A plain <img> can be one of those, and the invariant it
+     would break is explicit: the wordmark draws in `currentColor` precisely so
+     one component serves both grounds. So the PNG is used as a MASK and the
+     fill is `background: currentColor`: the alpha channel is already exactly
+     the shape, and the colour keeps coming from the caller. Recolouring the
+     file and shipping two of them was the alternative, and it puts the colour
+     decision in a build step where nobody would look for it.
+
+     🪤 `-webkit-` first: unprefixed `mask-*` is Safari 15.4+, and the prefixed
+     properties are still what older WebKit reads. Both are set on every line —
+     a mask that silently does not apply paints a solid navy RECTANGLE the size
+     of the logo, which is a loud failure rather than a missing one. */
+  .wordmark {
+    background-color: currentColor;
+
+    -webkit-mask-image: url("/misa-logo.png");
+    mask-image: url("/misa-logo.png");
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-position: center;
+    /* `contain`, so the box may be sized by height alone and the width follows
+       the artwork's own 1.912 ratio without the glyph ever being stretched. */
+    -webkit-mask-size: contain;
+    mask-size: contain;
+  }
+
   /* Placeholder hatch — 45°, 7px stripes. Two grounds, never mixed: a light
      box on white, a navy box on navy. */
   .hatch-light {

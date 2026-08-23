@@ -32,12 +32,12 @@ Next.js 16 deploys from `main` to https://www.txmisa.org; the Supabase project (
 
 What exists, in one pass:
 
-- **Public** — `app/(public)/` is the **design handoff** (`docs/Texas MISA website UI mockups/`), not the old Squarespace site: navy `#16305c` on white, Barlow + Barlow Condensed, square corners, hairline borders. Home, `/about`, `/projects`, `/gallery` and `/officers` follow the five prototypes, **with every image slot a labelled placeholder** — the site publishes no photography; `/contact` survives as a route but leaves the desktop nav. `/attend` (the check-in form), `/leaderboard` (Stage 7 phase 1) and `/lookup` (phase 2, the member's own history behind an EID **and** email gate) are undesigned by the handoff and carry the same language. Copy lives in `lib/site.ts` and `lib/officers.ts` — edit those, never hardcode into pages.
+- **Public** — `app/(public)/` is the **design handoff** (`docs/Texas MISA website UI mockups/`), not the old Squarespace site: navy `#16305c` on white, Barlow + Barlow Condensed, square corners, hairline borders. Home, `/about`, `/projects`, `/gallery` and `/officers` follow the five prototypes. ✂️ **`/projects` is UNLISTED as of 2026-08-23 (officer, temporary)** — the route resolves and the page renders, it is linked from nowhere, and it carries `robots: { index: false, follow: false }`. **Relisting it is exactly four places**, each commented and each naming the others: `SITE_NAV` and `MOBILE_NAV` in `components/site-header.tsx`, the `robots` key in `app/(public)/projects/page.tsx`, and the "All projects →" link on the home page's projects band. 🪤 While it is unlisted the home page's two-cell band is the club's **only** public statement about the projects programme, which is why those cells carry the full `/projects` descriptions rather than one-line summaries. `/contact` is unlisted from the desktop nav for a different and older reason (the handoff drops it) and is still in the mobile sheet. `/attend` (the check-in form), `/leaderboard` (Stage 7 phase 1) and `/lookup` (phase 2, the member's own history behind an EID **and** email gate) are undesigned by the handoff and carry the same language. Copy lives in `lib/site.ts` and `lib/officers.ts` — edit those, never hardcode into pages.
 - **Officers** — `/admin` covers events, the attendance queue and review, the points ledger, the member directory (custom fields, filters, presets, roster import, merge, CSV/xlsx export), dues, and `/admin/officers`.
 - **Officer turnover** — officers are added by an expiring single-use invite link from `/admin/officers` (migrations 24–25), not by running `scripts/create-officer.mjs` with the production service key. The script stays as the bootstrap and recovery path. Nothing is emailed; the officer copies the link and sends it themselves.
 - **Stage 8** hardened the boundary (migration 22 closed a live hole where any signed-up user could read every member's name, EID and email), added the attendance and adjustment archives (migration 23), and fixed the empty-vs-error conflation across `lib/` and every detail page.
 
-🖼️ **Photographs ARE COMMITTED and they ship (officer decision, 2026-08-19).** `public/photos/` holds 126 tracked web-sized images, live on the home page and — since v2 phase 2 — on `/about`, `/contact` and `/gallery`. `pictures/` (the officer's raw library) stays gitignored and nothing serves from it. 🔴 **The irreversible half:** the repository is public and every one is an identifiable student, so a removal request is a git history rewrite and a force-push, not a delete, and even that does not reach forks or caches. Workflow and traps: `docs/build-log.md`; the scripts are `scripts/organise-pictures.mjs` and `scripts/build-photos.mjs`. 🪤 HEIC needs `heic-convert` — libvips does AVIF only, and `.metadata()` succeeds on a file that cannot be decoded.
+🖼️ **Photographs ARE COMMITTED and they ship (officer decision, 2026-08-19).** `public/photos/` holds 141 tracked web-sized images, live on the home page and — since v2 phase 2 — on `/about`, `/contact` and `/gallery`, plus the project cells and 11 officer headshots since 2026-08-23. `pictures/` (the officer's raw library) stays gitignored and nothing serves from it. 🔴 **The irreversible half:** the repository is public and every one is an identifiable student, so a removal request is a git history rewrite and a force-push, not a delete, and even that does not reach forks or caches. ⚠️ **`public/photos/projects/` (4 files, added 2026-08-23) is the one set that is NOT students** — they are the clients' own premises and staff, and the same irreversibility applies to those faces with none of the club's consent behind them. Two of the four are live; `cap-metro.jpg` and `chicago-crime.jpg` are built and unreferenced. Workflow and traps: `docs/build-log.md`; the scripts are `scripts/organise-pictures.mjs` and `scripts/build-photos.mjs`. 🪤 HEIC needs `heic-convert` — libvips does AVIF only, and `.metadata()` succeeds on a file that cannot be decoded.
 
 🧹 **PRODUCTION IS EMPTY AND IS NO LONGER THE SEED (2026-08-19).** It was wiped by `bash scripts/wipe-remote.sh` ahead of the real Fall 2026 schedule being entered, so the Stage 9 "clear production before launch" item is **done**. Current state: **0 members / 0 events / 0 attendance / 0 adjustments / 0 dues / 0 field definitions / 0 presets**, both views empty, `app_settings.current_term` still unpinned (derives `Fall 2026`). What survived, deliberately: the **three real officer logins** (`auth.users` + `admin_profiles`, roles intact), all **4 `officer_invites`**, and the **8 `admin_audit` rows whose `entity_type` is `officer_invite` or `officer`** — the record of who was granted access and by whom. The other 13 audit rows, which described the wiped test data, were deleted.
 
@@ -245,7 +245,7 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - **React 19 resets an uncontrolled `<form action={…}>` once the action resolves.** Echo submitted values back in server state and drive every `defaultValue` from them — pass a **string, never `undefined`**. The reset clears checkboxes too, so selection state mirrored outside the form must be reset alongside it. Prefer **controlled selects with a reset-during-render resync** where a stale value could be saved back.
 - **Never put `formAction` on a submit button whose `name`/`value` you read** — React drops the submitter's name from the FormData. And **one carrier per field name**: a hidden input earlier in the form wins `formData.get()`.
 - **A control's enabled state comes from the live form, not the server's copy of the row.** Server state is the authority on what *is*; the form is the authority on what the officer is *about to do*.
-- 📌 **Officer sign-in is the "Admin" NAV item** (`/admin/login`, not `/admin` — both land in the same place, but this skips a redirect and is honest about the destination). It moved out of the footer in the UI overhaul, where the design handoff put it in the nav: the reason it was a footer link was that the header had no room, and the redesign spends the room the other way — the socials moved to the footer and Contact left the nav, so the left group is five short uppercase items instead of eight plus four icons. 🪤 **The nav still cannot grow without measuring**: the wordmark is absolutely centred and wins the z-order, so an overflowing item silently disappears rather than breaking the layout. Measured after the overhaul at **1280: 285px clearance left of the wordmark, 312px right**; at 1646 the left group ends at x=331 against a wordmark starting at x=791. Re-measure both when adding an item.
+- 📌 **Officer sign-in is the "Admin" NAV item** (`/admin/login`, not `/admin` — both land in the same place, but this skips a redirect and is honest about the destination). It moved out of the footer in the UI overhaul, where the design handoff put it in the nav: the reason it was a footer link was that the header had no room, and the redesign spends the room the other way — the socials moved to the footer and Contact left the nav, so the left group is four short uppercase items instead of eight plus four icons. ✂️ **It was five until 2026-08-23**, when `/projects` was unlisted. 🪤 **The nav still cannot grow without measuring**: the wordmark is absolutely centred and wins the z-order, so an overflowing item silently disappears rather than breaking the layout. 🔓 **RE-MEASURED 2026-08-23 at 1280: 342px clearance left, 295px right** — the old figures were 285 / 312, and two changes moved them in opposite directions. The left gained 57px from `/projects` leaving the nav; the right **lost 17px**, which is exactly half the 34px the wordmark grew when it became the real logo (48px → 82px wide), because the mark is centred. ⚠️ **The right is now the tighter side**, where it used to be the looser one. The pieces are viewport-independent — left group 225px, right cluster 272px, wordmark 82px, 32px gutter — so the clearance at any width is arithmetic from those rather than a fresh browser session. **Relisting `/projects` spends part of the left's headroom; any sixth item needs a fresh measurement at 1280.**
 
 ### Design and content
 
@@ -256,8 +256,8 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - 🔓 **The scroll reveal's revealed state is `clip-path: none`, NOT `inset(0 0 0 0)`, and the difference is a shipped defect.** `inset(0 0 0 0)` looks like "no clip" and is not — it is "clip to my own axis-aligned border box", and a clip-path clips DESCENDANTS. Harmless for ordinary content; a hard cut for a child that sticks out of its parent's box, which a **rotated** child always does. The hero's tilted plates were sliced across all four corners by the reveal wrapper around them, so they rendered as irregular polygons and their frame was cut with them. ⚠️ **`wipe` is the one variant that must keep an `inset()`**, because it animates `clip-path` and `none` is not interpolable from `inset(0 100% 0 0)` — it carries its own `[data-reveal="wipe"][data-revealed]` rule. 🪤 **A plate that looks unframed is this bug, not a border bug** — the `border` on `.plate` is correct and was innocent. Look for what is clipping the plate before reaching for an outline or an inset shadow.
 - 🪤 **Global CSS must live inside a Tailwind cascade layer.** v4's `@import "tailwindcss"` emits utilities into `@layer utilities`, and an **unlayered rule beats every layered one regardless of specificity** — a bare `a { color: … }` overrode `text-white` on every link and rendered the header's Check In button navy-on-navy. Element defaults go in `@layer base`, decorative classes in `@layer components`.
 - 🪤 **The scroll reveal's hidden state is scoped to `html.js`**, a class an inline script in `app/layout.tsx` sets during HTML parsing. Without the scoping a visitor with JavaScript off gets a blank page; without the inline script (an effect instead) the content paints and then blanks. `components/ui/reveal.tsx` is the **server-safe** half and must never gain `"use client"` — the observer is the separate `reveal-observer.tsx`, mounted once in the public layout so animated sections stay Server Components.
-- 🔓 **THE NO-PHOTOGRAPHY RULE IS LIFTED, CONDITIONALLY** (2026-08-18/19). Its premise was factual, not aesthetic — the organization had not taken the photographs — and the fact changed. Real photographs are **committed and live** on the home page, `/about`, `/contact` and `/gallery`. 🔴 **The repository is public and a face in its history cannot be taken back by a later commit**, which is the part that still binds. What replaces the rule is narrower: **a slot renders a photograph or a labelled `<Hatch>`, never a hole**, and `components/ui/photo-slot.tsx` is the single place that swap happens. ⚠️ **Officer headshots and project cells stay placeholders** for a second, independent reason — pairing a face or a photograph to a named person or client is a factual claim nobody supplied. The four partner logos remain the only images committed to the repo.
-- ⚠️ **Officer headshots carry a SECOND, independent reason.** Even with photography restored, the handoff's own README flags its headshots' photo-to-name pairing as never supplied — a real face against another real student's name is worse than an empty labelled square. `Officer` has no `photo` field; adding one answers only half the question.
+- 🔓 **THE NO-PHOTOGRAPHY RULE IS LIFTED, CONDITIONALLY** (2026-08-18/19). Its premise was factual, not aesthetic — the organization had not taken the photographs — and the fact changed. Real photographs are **committed and live** on the home page, `/about`, `/contact`, `/gallery` and — since 2026-08-23 — the project cells on the home page and `/projects`. 🔴 **The repository is public and a face in its history cannot be taken back by a later commit**, which is the part that still binds. What replaces the rule is narrower: **a slot renders a photograph or a labelled `<Hatch>`, never a hole**, and `components/ui/photo-slot.tsx` is the single place that swap happens. 🔓 **Officer headshots landed 2026-08-23, for ELEVEN of the thirteen, and the rule was SATISFIED rather than waived.** The objection was never "no faces on officer cards" — it was that the handoff shipped headshots while recording that the photo-to-name pairing was never supplied. The officer supplied it, from the live site's own officers page; `lib/officers.ts` documents that the pairing was read off that page's **CSS grid geometry** rather than its DOM order, because a Squarespace fluid-engine grid orders blocks by position and not by document order. 🔴 **Two cards still render `<Hatch>` and that is deliberate**: the source page shows ONE image file on both Daniel Chen's card and Sanya Pillai's, and nothing attributes it — shipping it twice would put a real student's face under another real student's name. 🔓 **Project cells got photographs the same way, and the distinction is the useful part**: the objection was pairing a *MISA* photograph to a named client. The two that shipped are photographs **of the client** — a PepsiCo campus sign, the Casa de Luz kitchen — where the pairing is the subject rather than a claim laid over it. CapMetro has no photograph and still renders its `<Hatch>`.
+- 🔓 **The officer-headshot rule was SATISFIED on 2026-08-23, and the shape of it still binds.** It was a second, independent reason: even with photography restored, the handoff's own README flagged its headshots' photo-to-name pairing as never supplied, and a real face against another real student's name is worse than an empty labelled square. The officer then supplied the pairing, so 11 of 13 cards carry a photograph. ⚠️ **What the rule leaves behind is the test, not the outcome: a headshot ships only when something ATTRIBUTES it.** `Officer.photo` is optional for exactly that reason — the two officers who share one unattributable image file on the source page still render `<Hatch>`, and that is the rule working rather than a gap.
 - 🪤 **When photography returns, size framed slots with next/image's `fill`.** An intrinsically sized `<img>` makes the frame grow to the photo's own height, and the About history portrait then leaves a large void beside the column next to it — the handoff hit this in its own prototype. The gallery masonry is the one place that wants intrinsic heights.
 - ✂️ **`GALLERY_ITEMS`, `GALLERY_FILTERS`, `GALLERY_FEATURE` and `GALLERY_TERM` were DELETED in v2 phase 2**, along with the `Slot` and `GalleryCategory` types. Between them they asserted a term, a date and a taxonomy nobody supplied, and the gallery's one control sorted on the invented one. `/gallery` reads the real pool instead. 🔴 **Do not reintroduce a category filter without a real file-to-category mapping** — inventing one is the same failure wearing a filter bar.
 - 🪤 **A marquee needs enough copies to cover the VIEWPORT, and "duplicate twice, translate ‑50%" only does that when one group is wider than the screen.** Neither home-page track is: measured at a 1646px viewport, the groups are 1360px and 1272px, so each cycle ended with ~300px of bare ground and a snap. **The translate distance is one group width in pixels** (`--marquee-shift`, computed by the component), never a percentage — a percentage silently couples the distance to the copy count. Copies come from `Math.ceil(MAX_VIEWPORT / groupWidth) + 1`; `MAX_VIEWPORT` (4000) is a **real ceiling**, not a margin, and is documented at its definition. 📌 No pause on hover: the tracks are full-width, so a resting mouse froze a row and read as breakage. 📌 **The band's navy ground was removed on request (2026-08-15)** — the tiles are `Hatch`'s **light** tone, the "See all photos" link is navy, and the section carries no `.on-navy`. Those move together with the background, per the never-mixed rule. 🔓 **Since 2026-08-19 the band sits on the flat grey PAGE ground and carries nothing but the strip.** Two things were tried and reversed the same day: an explicit white band behind the tiles, and a "See all photos" card riding the top band. `/gallery` is in the header nav, which is where a destination present on every page belongs. 📌 **Every seam around a band is 64px at desktop**, and the bottom band's `padBottom` is a step larger (`md`) than its `padTop` for a structural reason: below it the navy Projects field starts immediately, so there is no light neighbour to contribute the other 32px.
@@ -301,10 +301,18 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         page's home-hero.tsx (v2 phase 1: the Asymmetric Split
                         Hero and its floating plate cluster — replaces PageHero
                         on the HOME PAGE ONLY). 🔓 PageHero itself was REBUILT in
-                        v2 phase 2 (ground="field", left-aligned, dead size/
-                        tagline props deleted) and EIGHT pages render it: the
-                        five content pages plus /attend, /lookup and
-                        /leaderboard, which are phase 3 and inherit it. Also
+                        v2 phase 2 (ground="field", dead size/tagline props
+                        deleted) and EIGHT pages render it: the five content
+                        pages plus /attend, /lookup and /leaderboard, which are
+                        phase 3 and inherit it. 🔓 **CENTRED as of 2026-08-23
+                        (officer), reversing phase 2's left-alignment** — one
+                        component, so all eight moved together. §4.3's
+                        anti-centre bias is a bias, not a prohibition, and the
+                        home hero is still a split rather than a centred stack,
+                        so the front door does not open on one. 🪤 Centring is
+                        text-center PLUS mx-auto on BOTH blocks: they carry
+                        max-w measures, and centred text inside an off-centre
+                        column reads as a bug. Also
                         gallery-marquee.tsx and upcoming-events.tsx (KEPT BUT
                         UNMOUNTED; remounting it also restores the page's
                         force-dynamic), and /gallery's gallery-grid.tsx, still
@@ -442,7 +450,14 @@ lib/
                         (with logo paths), and the GALLERY_* placeholder slots.
                         Its header is where the no-photography decision and the
                         restore path are written down
-  officers.ts           officer roster. No `photo` field, deliberately
+  officers.ts           officer roster — REPLACED WHOLESALE 2026-08-23 from the
+                        officer's saved copy of the live page. 🔓 `photo` and
+                        `linkedin` are BOTH optional now: 11 of 13 have a
+                        headshot (two share one file on the source page and
+                        neither can be attributed), and only the 7 returning
+                        officers have a LinkedIn, because the new page carries
+                        no per-officer links at all. Its header records how the
+                        name→photo pairing was established
 scripts/create-officer.mjs  officer bootstrap / password reset / revoke
 scripts/wipe-remote.sh  EMPTIES the linked project's club data — the "testing is
                         over, real data starts now" button, and the OPPOSITE of
@@ -455,10 +470,16 @@ scripts/organise-pictures.mjs  sorts the officers LOCAL picture library into one
                         folder per page; unnamed files pool into gallery/. Moves,
                         never overwrites — the directory is gitignored, so there
                         is no git checkout behind it
-scripts/build-photos.mjs  pictures/{home,gallery} -> public/photos/*, web-sized.
-                        Re-run after adding a photo. 🪤 HEIC needs heic-convert:
-                        libvips ships HEIF for AVIF only, and .metadata() reads
-                        the header fine so a probe will NOT reveal the failure
+scripts/build-photos.mjs  pictures/{home,projects,officers,gallery} ->
+                        public/photos/*,
+                        web-sized. Re-run after adding a photo. 🪤 HEIC needs
+                        heic-convert: libvips ships HEIF for AVIF only, and
+                        .metadata() reads the header fine so a probe will NOT
+                        reveal the failure. 📌 `projects` is its own set rather
+                        than pooling into `gallery` because those are CLIENT
+                        photographs, and gallery is the marquee's pool — a
+                        client's office sign scrolling past in a band of member
+                        photos is a category error
 supabase/migrations/    versioned SQL
 supabase/seed.sql
 components/shadcn/      🏗️ shadcn/ui components, added on demand with
@@ -467,8 +488,12 @@ components/shadcn/      🏗️ shadcn/ui components, added on demand with
                         alias is `components/ui`, and `shadcn init` used it to
                         overwrite this project's own button.tsx, which 45 files
                         import. Never point it back
-components/             site-header.tsx (5-item nav incl. Admin, absolutely
-                        centred wordmark, navy Check In), site-footer.tsx
+components/             site-header.tsx (4-item nav incl. Admin — was 5 until
+                        /projects was unlisted 2026-08-23 — absolutely centred
+                        wordmark, navy Check In. 🪤 MOBILE_NAV drops Admin BY
+                        HREF, not by slice index: the old slice(0,4) meant "no
+                        Admin" only while Admin sat at index 4, and unlisting a
+                        page swept it back in), site-footer.tsx
                         (socials row + address; NO officer link — it is in the
                         nav now). ui/ holds every shared primitive, and BOTH
                         halves of the app use it — /admin used to import two
@@ -508,13 +533,29 @@ components/             site-header.tsx (5-item nav incl. Admin, absolutely
                           content   partners.tsx, kpi-plate.tsx, activities.tsx,
                                     officer-card.tsx, hatch.tsx (the labelled
                                     placeholder box — every image slot is one),
-                                    wordmark.tsx (draws in currentColor so it
-                                    works on white AND navy; its exclamation dot
-                                    is the one rounded thing in the codebase)
+                                    wordmark.tsx — 🔓 THE REAL LOGO as of
+                                    2026-08-23, replacing the CSS construction
+                                    that stood in for it since Stage 2. 🪤 The
+                                    supplied PNG is WHITE artwork on alpha and
+                                    the site needs the mark in two colours, so
+                                    it is applied as a MASK over
+                                    `background: currentColor` rather than as an
+                                    <img> — that keeps the invariant that ONE
+                                    component works on white AND navy. Sized by
+                                    height (43px, matching what it replaced);
+                                    the width grew 48px → 82px, so the header's
+                                    wordmark clearance was re-measured
                           motion    reveal.tsx (server-safe revealDelay) +
                                     reveal-observer.tsx (the client observer)
-public/                 partners/ (4 logos) and NOTHING ELSE. photos/ was
-                        deleted with the photography — see the invariant
+public/                 partners/ (4 logos); misa-logo.png (the real wordmark,
+                        white artwork on alpha, used as a CSS MASK so it still
+                        paints in currentColor — see .wordmark in globals.css);
+                        and photos/, which is COMMITTED and served: home/ (9),
+                        projects/ (4, of which 2 are wired up), officers/ (11),
+                        gallery/ (117). ⚠️ photos/ is GENERATED by
+                        build-photos.mjs from the gitignored pictures/ — do not
+                        hand-edit, and read the photography invariant before
+                        adding to it
 tests/                  Vitest — integration tests against the local stack
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()

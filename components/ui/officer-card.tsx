@@ -10,27 +10,40 @@ import type { ImageSlot } from "@/lib/site";
 // `margin-top: auto`, so the links align across a row no matter how many lines
 // a role title wraps to.
 //
-// 🔓 **The headshot goes through `PhotoSlot` as of v2 phase 2**, where it used
-// to hardcode a `<Hatch>`. Nothing about the decision changed — it still renders
-// the labelled placeholder, because the slot below carries no `src` — but the
-// restore path now exists in the one place the swap is supposed to happen. A
-// hardcoded `<Hatch>` is a slot a photograph can never reach without an edit.
+// 🔓 **The headshot goes through `PhotoSlot` as of v2 phase 2**, and as of
+// 2026-08-23 it actually carries a photograph for eleven of the thirteen.
 //
-// ⚠️ **Officer headshots stay placeholders for a reason photography does not
-// answer.** The rest of the site got its photographs on 2026-08-19; these did
-// not, and would not have. The design handoff ships headshots but records that
-// the photo-to-name pairing "was never supplied", and a real student's face
-// under another real student's name is a worse failure than an empty labelled
-// square. `Officer` has no `photo` field, deliberately — adding one answers
-// only half the question. ⚠️ When a pairing does land, an officer headshot is
-// NOT duotoned; it and the About mission cluster are the full-colour exceptions.
-const HEADSHOT: ImageSlot = { caption: "officer headshot" };
+// 🔓 **The rule that kept these blank is SATISFIED, not waived.** It was never
+// "no faces on officer cards" — it was that the design handoff shipped headshots
+// while recording that the photo-to-name pairing "was never supplied", and a
+// real student's face under another real student's name is a worse failure than
+// an empty labelled square. The officer has now supplied the pairing, from the
+// live site's own page; `lib/officers.ts` documents how it was read off that
+// page's grid geometry rather than its DOM order.
+//
+// 🔴 **So `photo` is OPTIONAL and the `<Hatch>` fallback is load-bearing, not
+// legacy.** Two officers share one image file on the source page and neither can
+// be attributed, so both still render the placeholder. A card that could only
+// draw a photograph would have forced a guess there.
+//
+// ⚠️ An officer headshot is NOT duotoned; it and the About mission cluster are
+// the full-colour exceptions.
+function headshot(officer: Officer): ImageSlot {
+  return {
+    caption: "officer headshot",
+    src: officer.photo,
+    // ⚠️ The alt describes the photograph, and the only thing known about it is
+    // who it is of — these came out of the saved page with an EMPTY alt on every
+    // one. "Headshot of <name>" is the honest whole of it.
+    alt: officer.photo ? `Headshot of ${officer.name}` : undefined,
+  };
+}
 
 export function OfficerCard({ officer }: { officer: Officer }) {
   return (
     <div className="plate flex h-full flex-col border border-misa-plate-edge bg-white shadow-lift">
       <PhotoSlot
-        slot={HEADSHOT}
+        slot={headshot(officer)}
         ratio="aspect-square"
         // Five across the 1400px page at `xl`, three at `sm`, two on a phone.
         sizes="(max-width: 640px) 45vw, (max-width: 1280px) 30vw, 18vw"
@@ -60,14 +73,29 @@ export function OfficerCard({ officer }: { officer: Officer }) {
         <p className="text-[12px] leading-[1.3] font-medium tracking-[0.14em] text-misa-muted uppercase">
           {officer.role}
         </p>
-        <a
-          href={officer.linkedin}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-auto pt-3 font-display text-xs leading-none font-semibold tracking-[0.1em] text-misa-blue uppercase transition-colors duration-(--dur-hover) hover:text-misa-blue-dark"
-        >
-          LinkedIn →<span className="sr-only"> profile for {officer.name}</span>
-        </a>
+        {/* 🪤 **The link is CONDITIONAL, and the `mt-auto` moved off it onto a
+            spacer for that reason.** It used to be the flex column's last child
+            and carried `mt-auto`, which is what pushed every card's link to the
+            same baseline regardless of how many lines a role wrapped to. Drop
+            the link on a card with no LinkedIn and that alignment leaves with
+            it, so the six link-less cards would let their role text float
+            instead of settling at the bottom. The spacer keeps the column's
+            shape whether or not there is a link in it.
+            📌 The updated officers page carries no per-officer LinkedIn at all;
+            see the note in `lib/officers.ts` for why six of thirteen have
+            none and why a plausible-looking URL is not an acceptable filler. */}
+        <div className="mt-auto" />
+        {officer.linkedin && (
+          <a
+            href={officer.linkedin}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="pt-3 font-display text-xs leading-none font-semibold tracking-[0.1em] text-misa-blue uppercase transition-colors duration-(--dur-hover) hover:text-misa-blue-dark"
+          >
+            LinkedIn →
+            <span className="sr-only"> profile for {officer.name}</span>
+          </a>
+        )}
       </div>
     </div>
   );

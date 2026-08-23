@@ -10,7 +10,82 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 complete. ✅ Phase 1 (home page + header) COMPLETE — gate passed 2026-08-19 after four rounds of officer review. ✅ Phase 2 (the five content pages) BUILT and measured, awaiting officer review. ⬅️ Phase 3 is NEXT.**
 
-🌿 **PHASE 2 LIVES ON THE BRANCH `v2-phase-2`, NOT ON `main`** (officer, 2026-08-19). It is 2 commits ahead of `main` and 0 behind, so it merges as a fast-forward. ⚠️ **Do not merge it without the officer** — a merge to `main` replaces the live club website at https://www.txmisa.org.
+🌿 **PHASE 2 LIVES ON THE BRANCH `v2-phase-2`, NOT ON `main`** (officer, 2026-08-19). It is ahead of `main` and 0 behind, so it merges as a fast-forward. ⚠️ **Do not merge it without the officer** — a merge to `main` replaces the live club website at https://www.txmisa.org.
+
+### 🔓 Officer roster replaced, real logo, centred page heroes (2026-08-23)
+
+Three officer instructions, same branch, same day as the projects change below.
+
+- **The officer roster is REPLACED WHOLESALE**, from the officer's saved copy of
+  the live Squarespace page. Full turnover: six new people, seven returning in
+  different roles, six gone. Two new roles — **Client Project Lead** and **Data
+  Project Lead** — replace Project Vice President and Junior Director Vice
+  President.
+- 🪤 **The name→photo pairing came off the page's CSS GRID GEOMETRY, not its DOM
+  order**, and that is the part worth remembering. A Squarespace fluid-engine
+  page positions the image, the name and the role as three *sibling* blocks with
+  `grid-area` rules in a `<style>` tag; document order does not match reading
+  order. Every `alt` was empty. It was then checked by eye against a rendered
+  contact sheet.
+- 🔴 **Two officers share ONE photograph on the source page** — Daniel Chen and
+  Sanya Pillai, the same asset uuid referenced twice. One is wrong and nothing
+  attributes it, so **both render the labelled `<Hatch>`** rather than putting a
+  real student's face under another student's name. ⬅️ **Needs an officer's
+  answer**; the fix is then two lines (copy the file to
+  `pictures/officers/<slug>.JPG`, rebuild, add one `photo` key).
+- ⚠️ **The new page carries NO per-officer LinkedIn links** — only MISA's own
+  company page. `linkedin` is optional now: the seven returning officers keep the
+  URLs the old roster had (same people), and the six new ones have none. A
+  plausible-looking URL would point a public link at a stranger.
+- ✂️ **"2025–26 Officer Team" lost its year.** The new roster makes it false and
+  the source page names no year anywhere. ⬅️ **Tell me the academic year** and it
+  goes back in one line.
+- 🔓 **The real logo replaced the CSS wordmark**, which had said "swap in the
+  real asset when it lands" since Stage 2. 🪤 The file is **white artwork on
+  alpha** and the site needs the mark in navy *and* white, so it is applied as a
+  CSS **mask** over `background: currentColor` — an `<img>` would have forced
+  either a second recoloured file or a `tone` prop, and both move the colour
+  decision away from the caller. Sized by height (43px, matching what it
+  replaced); width grew 48 → 82px.
+- 🔓 **`PageHero` is CENTRED**, reversing phase 2's left-alignment. One component,
+  so all eight pages that render it moved together.
+- **Verified:** `tsc`, lint and `npm run build` clean; all 13 officer cards
+  render with the right role; the logo confirmed navy on the public header and
+  white on the admin login; all eight chevron heroes centred.
+
+### ✂️ Home-page projects band cut to two, and `/projects` UNLISTED (2026-08-23)
+
+Officer instruction, on the same branch. **Temporary** — every part of it is
+written to be reversed.
+
+- **`/projects` is unlisted, not deleted.** The route resolves, the page renders,
+  it is linked from nowhere, and it carries `robots: { index: false, follow: false }`.
+  🔓 **Relisting is exactly four places**, each commented and each naming the
+  others: `SITE_NAV` and `MOBILE_NAV` in `components/site-header.tsx`, the
+  `robots` key in `app/(public)/projects/page.tsx`, and the "All projects →" link
+  on the home page's band.
+- **The band went from four cells to two** — PepsiCo and Casa de Luz. The fourth
+  was `PROJECT_PLACEHOLDER`, which is deleted; `lib/site.ts` keeps a comment
+  recording what it was and why it named no client, because that reasoning still
+  binds if a filler cell is ever needed again. CapMetro is still in `PROJECTS`
+  and still on `/projects`.
+- **The cells carry the FULL `/projects` descriptions**, not the one-line
+  summaries, and `summary` is deleted from `PROJECTS` rather than left to rot on
+  one side. 🪤 With `/projects` unlisted, this band is the club's only public
+  statement about the projects programme — there is no page behind it to go on
+  to, which is the whole reason the longer text belongs here.
+- 🔓 **The project cells got real photographs, which reverses a standing rule** —
+  see the photography invariant in `CLAUDE.md`. The distinction is that these are
+  photographs **of the client**, not of MISA.
+- 🐛 **`MOBILE_NAV` was `SITE_NAV.slice(0, 4)`, and unlisting a page broke it
+  silently.** The slice meant "without Admin" only because Admin sat at index 4;
+  one item shorter, it swept Admin in and the panel rendered it twice. It now
+  drops Admin by href.
+- ⚠️ **The two photographs are the lowest-resolution images on the site** —
+  1048px and 850px wide into a 699 CSS px slot. Fine at 1×, soft at 2×. They were
+  adequate for the 4-up band's ~350px cells. **Higher-resolution originals are
+  the only fix**; nothing in code helps. `cap-metro.jpg` (1600px) and
+  `chicago-crime.jpg` (1140px) are built and unreferenced.
 
 ### ✅ Phase 2 — the five content pages. BUILT, awaiting review.
 
@@ -27,7 +102,9 @@ shared-rule plate per page. `DESIGN.md` carries the per-page family tables.
 
 **What it decided:**
 
-- **`PageHero` rebuilt ONCE**, on `ground="field"` and left-aligned, with its
+- **`PageHero` rebuilt ONCE**, on `ground="field"` and left-aligned *(⚠️ the
+  alignment was reversed to CENTRED on 2026-08-23 — see the entry above; the
+  rest of this bullet still holds)*, with its
   dead `size="home"` and `tagline` props deleted. ⚠️ **Eight pages render it** —
   the five above plus `/attend`, `/lookup` and `/leaderboard`, which are phase 3.
   They inherit it, were not redesigned, and were measured at the gate.
@@ -110,7 +187,7 @@ Measured at the gate: zero horizontal overflow at 390/768/1024/1280/1646, hero f
 
 🖼️ ~~**REAL PHOTOGRAPHS ARE LIVE ON THE HOME PAGE — LOCALLY ONLY, AND NOTHING IS COMMITTED.**~~ ✅ **RESOLVED THE SAME DAY: the officer took path 1 and the photographs were COMMITTED (2026-08-19).**
 
-`public/photos/` now holds **126 tracked images**, live on the home page and — since v2 phase 2 — on `/about`, `/contact` and `/gallery`. `pictures/` (the officer's raw library) stays gitignored and nothing serves from it.
+`public/photos/` now holds **141 tracked images** — home 9, projects 4, officers 11, gallery 117 — live on the home page and, since v2 phase 2, on `/about`, `/contact` and `/gallery`, plus the project cells and the officer headshots since 2026-08-23. `pictures/` (the officer's raw library) stays gitignored and nothing serves from it. ⚠️ The 4 files in `public/photos/projects/` are the **clients'** premises and staff rather than students — the same irreversibility applies to those faces, with none of the club's consent behind them.
 
 The two paths this entry was weighing, kept because the reasoning still applies to the next batch:
 
@@ -137,7 +214,7 @@ The two paths this entry was weighing, kept because the reasoning still applies 
 1. **The marquee now appears twice**, against §5's max-one-per-page and the budget's no-repeats rule. Argued and recorded, but it is the one exception on the page.
 2. **The hero no longer fits a 790px-tall viewport at 1440+** (764px tall). Reducing the plate overlap is what cost it; more overlap or a shorter plate is the only way back.
 
-📌 `PROJECT_PLACEHOLDER` in `lib/site.ts` is still a placeholder and still needs a real fourth project.
+✂️ ~~`PROJECT_PLACEHOLDER` in `lib/site.ts` is still a placeholder and still needs a real fourth project.~~ **Resolved by deletion on 2026-08-23**: the band was cut to two cells, so there is no fourth cell to fill. `lib/site.ts` keeps a comment recording what the constant was and why it named no client.
 
 🔄 **Iteration 1 landed** (officer review of the built page): depth generalised to the rest of the page (`ground-paper` + `paper-grid`, grounds now run field → white → paper → white → field → paper); the hero plates now **enlarge** on hover rather than nudging; plate borders made consistent via an opaque `--misa-plate-edge`, because `--misa-border` is an alpha colour and resolved differently over a plate than over the field; and Projects is a symmetric 2×2 with `PROJECT_PLACEHOLDER` in the fourth cell.
 
@@ -292,7 +369,7 @@ Decisions confirmed with the officer before starting, and each one diverges from
 
 - **Follow the mockup nav exactly** — `Admin` is a header nav item now (→ `/admin/login`) and the footer sign-in link is gone. 🔓 **This reverses a documented invariant**, so it is rewritten in `CLAUDE.md` and argued in doc v1.58 rather than left to go stale. The footer link existed because the header had no room; the redesign frees it by moving the socials down and dropping Contact from the nav. **Re-measured: 285px clearance at 1280, 460px at 1646.**
 - ⚠️ **`/contact` stays a route but leaves the desktop nav.** The handoff has no Contact page. The mobile sheet still carries it.
-- ⚠️ **Officer headshots stay placeholders.** The bundle ships them; its README says the pairing was never supplied. `Officer.photo` is optional and unset.
+- ⚠️ **Officer headshots stay placeholders** *(true through phase 2 only — 🔓 superseded 2026-08-23, when the officer supplied the pairing and 11 of 13 got a photograph; see the entry at the top)*. The bundle ships them; its README says the pairing was never supplied. `Officer.photo` is optional and unset.
 - **The design language extends to the pages the handoff never drew** — `/attend`, `/lookup`, `/leaderboard`, `/contact`, `/officer-invite`, plus the public error and not-found boundaries. Logic untouched: `/leaderboard` keeps `force-dynamic` and its noindex, `/lookup` keeps its noindex, the invite page keeps no help text and no client-side length rule. `/admin` inherits the new tokens only.
 
 Two traps found by breaking, both now invariants:

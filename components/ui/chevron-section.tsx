@@ -20,11 +20,23 @@ import { Section } from "@/components/ui/section";
 // answers the focus ring — a navy ring on a navy field is not subtle, it is no
 // indicator.
 //
-// 🔓 **Left-aligned, where it used to be centred.** §4.3's anti-centre bias
-// binds at DESIGN_VARIANCE 8, and a centred hero repeated across eight pages
-// was the largest v1 tell still standing. The home page answers the same rule
-// with a split; this answers it with alignment, because a page hero has one
-// text block and nothing to split against.
+// 🔓 **CENTRED AGAIN as of 2026-08-23, on the officer's instruction**, and this
+// reverses a phase 2 decision rather than drifting from one — so the argument it
+// overrides is kept here rather than deleted. Phase 2 made this hero
+// left-aligned because §4.3's anti-centre bias binds at DESIGN_VARIANCE 8, and a
+// centred hero repeated across eight pages was the largest v1 tell still
+// standing; the home page answers that rule with a split, and this answered it
+// with alignment, having one text block and nothing to split against.
+//
+// 📌 The bias is a bias, not a prohibition, and the officer owns the call. Note
+// what still answers it: the home page's hero is a split and is NOT centred, so
+// the site's front door does not open on a centred stack. What changed is the
+// interior pages, which now read as one consistent family.
+//
+// 🪤 **Centring is `text-center` PLUS `mx-auto` on both blocks.** The h1 and the
+// subhead carry `max-w` measures, and a constrained block with centred text
+// still sits hard left inside its parent — the text would centre within a column
+// that is itself off-centre, which looks like a bug rather than a choice.
 //
 // ✂️ **`size` and `tagline` are DELETED.** Both were dead: the home page moved
 // to `HomeHero` in phase 1, and grep confirmed no call site passed either. The
@@ -69,7 +81,7 @@ export function PageHero({
         aria-hidden="true"
         className="hero-grid pointer-events-none absolute inset-0"
       />
-      <div className="relative">
+      <div className="relative text-center">
         {/* 🪤 **`text-balance` is right HERE and wrong on the home hero**, and the
             difference is worth stating. That headline carries an explicit `<br />`
             saying where its two lines break, and balance re-wraps and ignores it.
@@ -82,7 +94,7 @@ export function PageHero({
             split — its column only ever gets wider. */}
         <h1
           data-reveal="rise"
-          className="max-w-[18ch] font-display text-[34px] leading-[0.96] font-semibold tracking-[-0.02em] text-balance text-white sm:text-[44px] lg:text-[52px]"
+          className="mx-auto max-w-[18ch] font-display text-[34px] leading-[0.96] font-semibold tracking-[-0.02em] text-balance text-white sm:text-[44px] lg:text-[52px]"
         >
           {title}
         </h1>
@@ -90,7 +102,7 @@ export function PageHero({
           <p
             data-reveal="up"
             style={revealDelay(0.08)}
-            className="mt-[18px] max-w-[56ch] text-lg leading-normal text-white/80 sm:text-xl"
+            className="mx-auto mt-[18px] max-w-[56ch] text-lg leading-normal text-white/80 sm:text-xl"
           >
             {subhead}
           </p>

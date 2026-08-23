@@ -119,6 +119,21 @@ Recreated as a placeholder-tile grid to be filled with real photos later.
 "Meet the MISA Officers!" + 3-column grid of light-gray cards: circular
 photo, serif name, role, oval slate-blue LINKEDIN button.
 
+⚠️ **THE ROSTER BELOW IS THE ONE THIS SITE WAS BUILT FROM, AND IT IS NO LONGER
+CURRENT.** The live page turned over and `lib/officers.ts` was replaced wholesale
+on 2026-08-23 — six new people, seven returning in different roles, six gone, and
+two new roles (Client Project Lead, Data Project Lead) replacing Project Vice
+President and Junior Director Vice President. This file is an **inventory of what
+was reproduced**, so the table is kept as the record of that; **read
+`lib/officers.ts` for who the officers are.**
+
+📌 Two things worth carrying forward from the comparison. The old page gave every
+officer a LinkedIn URL and **the new one gives none** — only MISA's company page
+— which is why `Officer.linkedin` is optional and why the seven returning
+officers' URLs were carried over from this table rather than re-scraped. And the
+new page supplies the **photo-to-name pairing** this one never did, which is what
+unblocked the headshots.
+
 | Name | Role | LinkedIn |
 |---|---|---|
 | Brianna Zhang | President | linkedin.com/in/briannazhang85 |

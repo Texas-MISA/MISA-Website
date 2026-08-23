@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Turn the officer's picture library into the web-sized files the site serves.
 //
-//   pictures/home/*     ->  public/photos/home/*.jpg     (slot images, 1600px)
-//   pictures/gallery/*  ->  public/photos/gallery/*.jpg  (marquee pool, 800px)
+//   pictures/home/*      ->  public/photos/home/*.jpg      (slot images, 1600px)
+//   pictures/projects/*  ->  public/photos/projects/*.jpg  (slot images, 1600px)
+//   pictures/officers/*  ->  public/photos/officers/*.jpg  (headshots, 800px)
+//   pictures/gallery/*   ->  public/photos/gallery/*.jpg   (marquee pool, 800px)
 //
 // Re-run it after adding, renaming or replacing anything in `pictures/`. That
 // is the whole workflow: drop a photo in a folder, run this, refresh.
@@ -29,6 +31,21 @@ const SETS = [
   // Slot images carry the page. 1600px covers a 2x display at the largest
   // rendered size (the hero's wide plate is ~470 CSS px).
   { from: "home", to: "home", max: 1600 },
+  // Project cells are slot images too, and the widest of them — /projects'
+  // lead cell is ~790 CSS px at the 1400px page — so they take the same 1600.
+  // 🪤 These are CLIENT photographs, not photographs of the club, and they are
+  // the reason `pictures/projects/` has its own set rather than pooling into
+  // `gallery/`: the marquee pool is "everything not spoken for", and a client's
+  // office sign scrolling past in a band of member photos is a category error.
+  { from: "projects", to: "projects", max: 1600 },
+  // Officer headshots are square cells ~252 CSS px wide at the 1400px page
+  // (18vw, five across) and ~175px on a phone, so 800 covers 2x everywhere.
+  // 🪤 **The filename IS the name-to-face pairing.** These come out of a saved
+  // Squarespace export where the files are called `headshot+updated.JPG` and
+  // `Screenshot+2026-01-27+at+5.29.41 PM.png`; they are copied into
+  // `pictures/officers/` as `<name-slug>.<ext>` first, precisely so that the
+  // one thing this pipeline must never get wrong is legible in `ls`.
+  { from: "officers", to: "officers", max: 800 },
   // Marquee tiles render at 260 and 200 CSS px, so 800 is already generous.
   // Shipping 1600px into a strip that scrolls past is bandwidth for nothing.
   { from: "gallery", to: "gallery", max: 800 },

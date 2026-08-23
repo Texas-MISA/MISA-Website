@@ -392,7 +392,7 @@ read "it has the grey background" as "it has been done."**
 | `/about` | `PageHero` + mission + history + FAQ + `<Partners />` | `Hatch` slots throughout; the FAQ band is a contact path, since `/contact` left the nav |
 | `/projects` | `PageHero` + summary + project list + CTA | ⚠️ **Descriptions and photographs are coming later** (officer, 2026-08-19). Build the shape; leave the placeholders. |
 | `/gallery` | `PageHero` + `GalleryGrid` (the one client component: filter chips + load more) | 🪤 Its filter section already carries `ground="white"` — `FilterChip` fills with the page grey. Keep it. |
-| `/officers` | `PageHero` + a card grid | ⚠️ Headshots stay `Hatch`. `Officer` has no `photo` field, deliberately. |
+| `/officers` | `PageHero` + a card grid | ⚠️ Headshots stayed `Hatch` **through phase 2**. 🔓 Superseded 2026-08-23: the roster was replaced and 11 of 13 now carry a photograph; `Officer.photo` exists and is optional. Two unattributable cards still render `<Hatch>`. |
 | `/contact` | `PageHero` + contact details | 📌 **Routed but unlinked** from the desktop nav; still in the mobile sheet. |
 
 ### What phase 2 has to decide

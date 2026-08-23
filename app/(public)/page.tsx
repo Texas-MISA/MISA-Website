@@ -1,34 +1,34 @@
-import Link from "next/link";
-
 import { Activities } from "@/components/ui/activities";
-import { LINK_EYEBROW } from "@/components/ui/button";
-import { Hatch } from "@/components/ui/hatch";
 import { Headline } from "@/components/ui/heading";
 import { Partners } from "@/components/ui/partners";
 import { PhotoSlot } from "@/components/ui/photo-slot";
 import { revealDelay } from "@/components/ui/reveal";
 import { Section } from "@/components/ui/section";
-import {
-  MISSION,
-  MISSION_SLOTS,
-  PROJECT_PLACEHOLDER,
-  PROJECTS,
-  PROJECTS_SUMMARY,
-} from "@/lib/site";
+import { MISSION, MISSION_SLOTS, PROJECTS, PROJECTS_SUMMARY } from "@/lib/site";
 
 import { GalleryMarquee } from "./_components/gallery-marquee";
 import { HomeHero } from "./_components/home-hero";
 
 /**
- * The four cells of the projects quadrant: the three real projects and one
- * labelled slot.
+ * The clients the band shows, in order.
  *
- * 🔴 **Delete the placeholder the moment a fourth project exists** — add it to
- * `PROJECTS` and this list needs no change. The placeholder names no client,
- * term or scope on purpose: a plausible fourth client would be inventing a fact
- * about the club, and that is the one error here nobody would ever catch.
+ * 🔓 **Was all three projects plus a labelled fourth cell; cut to these two on
+ * the officer's instruction, 2026-08-23.** They are the two engagements that
+ * have a real photograph, and they are the whole band while `/projects` is
+ * unlisted — see the section comment below for why that matters.
+ *
+ * 📌 Named rather than sliced. `PROJECTS.slice(0, 2)` would pick the same two
+ * today and would silently pick different ones the day somebody reorders the
+ * array; naming them makes the selection survive an edit at the other end of
+ * the codebase, and makes a typo a build error rather than an empty band.
  */
-const PROJECT_CELLS = [...PROJECTS, PROJECT_PLACEHOLDER];
+const FEATURED_CLIENTS = ["PepsiCo", "Casa de Luz"] as const;
+
+const PROJECT_CELLS = FEATURED_CLIENTS.map((client) => {
+  const project = PROJECTS.find((p) => p.client === client);
+  if (!project) throw new Error(`No project in PROJECTS named "${client}".`);
+  return project;
+});
 
 // The home page, rebuilt in v2 phase 1.
 //
@@ -43,7 +43,7 @@ const PROJECT_CELLS = [...PROJECTS, PROJECT_PLACEHOLDER];
 //   3. Gallery band ...... Kinetic Marquee (first half, scrolls left)
 //   4. Activities ........ Bento Grid
 //   5. Gallery band ...... Kinetic Marquee (second half, scrolls right)
-//   6. Projects .......... Quadrant grid (2×2) on a shared-rule plate
+//   6. Projects .......... Paired grid on a shared-rule plate
 //   7. Partners .......... Shared-rule logo plate
 //
 // ⚠️ **SEVEN sections, SIX families — the marquee now appears twice** (officer,
@@ -62,7 +62,7 @@ const PROJECT_CELLS = [...PROJECTS, PROJECT_PLACEHOLDER];
 // 🔓 The reversal that mattered most. v1 concentrated every slot into one band,
 // which is exactly backwards, and the hero and mission carried none at all.
 // Every section now carries slots: 4 in the hero, ~11 per marquee group, 2
-// flanking the mission, 4 in the bento, 4 in the projects band. Partners is the
+// flanking the mission, 4 in the bento, 2 in the projects band. Partners is the
 // one exception and always was, because its four logos are real images.
 //
 // ── WHAT DID NOT CHANGE ─────────────────────────────────────────────────────
@@ -187,23 +187,31 @@ export default function HomePage() {
              band above it; see the note there for why the family repeats. */}
       <GalleryMarquee half="bottom" />
 
-      {/* 6. LAYOUT FAMILY: Quadrant grid — a symmetric 2×2 on a shared-rule
-             plate. The page's one navy band, kept against §4.11's Page Theme
-             Lock: that rule exists to stop accidental theme drift, and this
-             full-bleed navy field is the identity rather than an accident.
+      {/* 6. LAYOUT FAMILY: Paired grid on a shared-rule plate. The page's one
+             navy band, kept against §4.11's Page Theme Lock: that rule exists
+             to stop accidental theme drift, and this full-bleed navy field is
+             the identity rather than an accident.
 
-             🔓 **Was "Featured + rest" (one wide lead plus two). Changed to a
-             symmetric 2×2 on the officer's instruction, 2026-08-17.** The
-             fourth cell is `PROJECT_PLACEHOLDER`, because `PROJECTS` holds
-             three and a plausible fourth client would be inventing a fact
-             about the club.
+             🔓 **Was a symmetric 2×2 — three projects and a labelled fourth
+             cell. Cut to TWO on the officer's instruction, 2026-08-23**, and
+             `/projects` was unlisted in the same change. So this band is now
+             the club's only public statement about the projects programme,
+             which is why its two cells carry the FULL descriptions from
+             `/projects` rather than the one-line summaries they used to: there
+             is no longer a page behind the band for a reader to go on to.
+
+             ✂️ **The "All projects →" link went with it.** A link to an
+             unlisted page is worse than no link — it is the one path a reader
+             is most likely to take out of this section, and unlisting means it
+             should not be taken. Put it back the moment `/projects` returns to
+             the nav; that and `FEATURED_CLIENTS` above are the whole revert.
 
              ⚠️ **This is the closest two families on the page come to each
              other**, and it is worth stating rather than hoping nobody
-             notices: Partners is also four cells on a shared-rule plate. They
-             stay distinguishable — this is a 2×2 of image-and-text cards, that
-             is a single row of bare logos — but the budget has less slack than
-             it did, and a third shared-rule plate would break it.
+             notices: Partners is also cells on a shared-rule plate. They stay
+             distinguishable — this is image-and-text cards, that is a single
+             row of bare logos — but the budget has less slack than it did, and
+             a third shared-rule plate would break it.
 
              📌 Grouping mechanism: ONE plate showing through `gap: 1px`, never
              a border per cell. Two adjacent borders read as a double rule.
@@ -223,18 +231,7 @@ export default function HomePage() {
           className="hero-grid pointer-events-none absolute inset-0"
         />
         <div className="relative">
-          <div
-            data-reveal="up"
-            className="flex flex-wrap items-baseline justify-between gap-4"
-          >
-            <Headline>Client &amp; Data Projects</Headline>
-            <Link
-              href="/projects"
-              className={`${LINK_EYEBROW} text-white/75 hover:text-white`}
-            >
-              All projects →
-            </Link>
-          </div>
+          <Headline data-reveal="up">Client &amp; Data Projects</Headline>
           <p
             data-reveal="up"
             style={revealDelay(0.05)}
@@ -243,14 +240,15 @@ export default function HomePage() {
             {PROJECTS_SUMMARY}
           </p>
 
-          {/* The 2×2. Every cell is the same shape, which is what "symmetric"
-              asks for: image on top, term, client, one line of scope. */}
-          {/* 🪤 `auto-rows-fr` is what makes "symmetric" true at EVERY width,
-              not just most. Grid rows size independently, so at 768 the
-              summaries wrapped to different line counts and the top row came
-              out 22px taller than the bottom one — left/right symmetry held
-              and the quadrant still read lopsided. Equal-fraction rows force
-              all four cells to one height. */}
+          {/* Two cells of one shape: photograph on top, term, client, the full
+              description. */}
+          {/* 🪤 `auto-rows-fr` is what keeps the pair level at EVERY width, not
+              just most. Grid rows size independently, so two descriptions that
+              wrap to different line counts leave one cell taller than its
+              neighbour and the shared rule between them stops reading as one
+              plate. Equal-fraction rows force both cells to one height — and
+              this matters MORE now than it did at four cells, because the
+              descriptions are paragraphs rather than single lines. */}
           <ul className="grid auto-rows-fr gap-px border border-white/30 bg-white/30 sm:grid-cols-2">
             {PROJECT_CELLS.map((project, i) => (
               <li
@@ -262,10 +260,15 @@ export default function HomePage() {
                 // neighbours.
                 className="flex flex-col bg-misa-blue"
               >
-                <Hatch
-                  caption={project.caption}
+                {/* 🪤 `PhotoSlot`, not a bare `<Image>`: it keeps the labelled
+                    `<Hatch>` reachable for a cell whose `src` is unset, which
+                    is the state CapMetro is still in. `tone="navy"` is what
+                    that fallback would need on this ground. */}
+                <PhotoSlot
+                  slot={project}
+                  ratio="aspect-3/2"
                   tone="navy"
-                  className="aspect-3/2"
+                  sizes="(max-width: 640px) 100vw, 50vw"
                 />
                 <div className="flex-1 px-5 pt-4.5 pb-5.5">
                   <p className="text-[11px] leading-none font-medium tracking-[0.14em] text-white/60 uppercase">
@@ -274,9 +277,12 @@ export default function HomePage() {
                   <h3 className="mt-2.5 mb-1.5 font-display text-[26px] leading-[1.05] font-semibold">
                     {project.client}
                   </h3>
-                  <p className="text-sm leading-[1.55] text-white/80">
-                    {project.summary}
-                  </p>
+                  {/* 📌 Body size, not `text-sm`. These are the full
+                      descriptions from `/projects` now, and 14px is a caption
+                      size — a four-line paragraph set at it reads as fine
+                      print, which is the wrong weight for the only public
+                      account of the projects programme. */}
+                  <p className="leading-[1.65] text-white/80">{project.body}</p>
                 </div>
               </li>
             ))}

@@ -174,9 +174,16 @@ so the site has ONE navy hero treatment rather than two. ⚠️ **Eight pages re
 it** — the five phase-2 pages plus `/attend`, `/lookup` and `/leaderboard`, which
 are phase 3. Those three inherit any change to it and were measured at the phase-2
 gate rather than assumed. Its dead `size="home"` and `tagline` props were deleted.
-It is also **left-aligned** now: §4.3's anti-centre bias binds at
-`DESIGN_VARIANCE 8`, and a centred hero repeated across eight pages was the
-largest v1 tell still standing.
+🔓 **It is CENTRED as of 2026-08-23 (officer), reversing phase 2's
+left-alignment.** Phase 2 left-aligned it because §4.3's anti-centre bias binds
+at `DESIGN_VARIANCE 8` and a centred hero repeated across eight pages was the
+largest v1 tell still standing. That argument is recorded rather than deleted,
+because this is a reversal and not drift. 📌 The bias is a bias, not a
+prohibition: the home page's hero is a **split** and stays uncentred, so the
+site's front door does not open on a centred stack — what changed is the interior
+pages, which now read as one family. 🪤 Centring is `text-center` **plus**
+`mx-auto` on both the headline and the subhead: each carries a `max-w` measure,
+and centred text inside an off-centre column reads as a bug rather than a choice.
 
 - 🪤 **It is on `<main>`, not on `body`.** `body` is shared with `/admin`, which
   still runs v1 and must stay white until phase 4. `<Section>` has zero admin
@@ -242,7 +249,11 @@ does not get added; a fifth step is a change to this list.
   4px is deliberately almost nothing — at 8px the page becomes a different design
   system.
 - **1px is the only border weight.** A coloured border-left above 1px is refused.
-- **The wordmark's exclamation dot is the one rounded thing** outside that rule.
+- ✂️ **"The wordmark's exclamation dot is the one rounded thing" no longer
+  applies** — the real logo replaced the CSS construction on 2026-08-23, and the
+  dot is now the robot glyph inside a raster mask rather than a `rounded-full`
+  span. The mark still has curves; they are simply not a CSS radius any more, so
+  the radius rule above has no exception left.
 
 ### Named Rules
 
@@ -312,7 +323,7 @@ Barlow (`--font-sans`) and Barlow Condensed (`--font-display`). Unchanged.
 | Role | Size | Weight / leading / tracking |
 |---|---|---|
 | Hero headline | `34 / 44 / 38 / 48 / 56` px at base/`sm`/`lg`/`xl`/`2xl` | 600, `0.94`, `-0.02em` |
-| Page-hero headline | `34 → 44 → 52` px at base/`sm`/`lg` | 600, `0.96`, `-0.02em`, `text-balance` |
+| Page-hero headline | `34 → 44 → 52` px at base/`sm`/`lg` | 600, `0.96`, `-0.02em`, `text-balance`, **centred** |
 | `Headline` | `30 → 42` px at `sm` | 600, `1`, `-0.02em` |
 | `Title` | `26 → 34` px at `sm` | 600, `1.02`, `-0.015em` |
 | Card title | `22 → 26` px | 600, `1.05` |
@@ -377,8 +388,12 @@ Roles, not sizes. `components/ui/section.tsx` owns the vertical rhythm.
   border per cell.** Two adjacent borders read as a double rule. Cells stay
   **opaque**, or the container shows through the whole card instead of the seam.
 - 📌 **The nav cannot grow without measuring.** The wordmark is absolutely centred
-  and wins the z-order, so an overflowing item silently disappears. Measured at
-  1280: 285px clearance left, 312px right.
+  and wins the z-order, so an overflowing item silently disappears. 🔓
+  **Re-measured 2026-08-23 at 1280: 342px left, 295px right** (was 285 / 312).
+  Two changes moved it in opposite directions — `/projects` left the nav, and the
+  wordmark became the real logo and grew 48px → 82px wide. ⚠️ **The right is now
+  the tighter side**; it was the looser one before, and it lost exactly half the
+  wordmark's growth because the mark is centred.
 
 ---
 
@@ -398,7 +413,7 @@ The home page, as built:
 | 3 | Gallery band | Kinetic Marquee (scrolls left) | `page` |
 | 4 | Activities | Bento Grid, 4 cells | `page` |
 | 5 | Gallery band | Kinetic Marquee (scrolls right) | `page` |
-| 6 | Projects | Quadrant grid 2×2 on a shared-rule plate | `field` |
+| 6 | Projects | Paired grid (2 cells) on a shared-rule plate | `field` |
 | 7 | Partners | Shared-rule logo plate | `page` |
 
 ⚠️ **Seven sections, six families — the marquee appears twice**, which is the
@@ -554,12 +569,27 @@ Real photographs are live on the home page **locally only**.
 - 🪤 **HEIC needs `heic-convert`.** libvips ships HEIF for AVIF only, and
   `.metadata()` succeeds on a file that cannot be decoded — a probe will not
   reveal the failure. 40% of the library is HEIC.
-- ⚠️ **Officer headshots stay placeholders for a second, independent reason.**
-  The handoff never supplied the photo-to-name pairing, and a real face against
-  another student's name is worse than an empty labelled square. `Officer` has no
-  `photo` field.
-- ⚠️ **Project cells stay placeholders too.** Pairing a photograph to a named
-  client is a factual claim about the club.
+- 🔓 **Officer headshots landed 2026-08-23 — eleven of thirteen — and the rule
+  was SATISFIED, not waived.** It was never "no faces on officer cards": the
+  handoff shipped headshots while recording that the photo-to-name pairing "was
+  never supplied", and a real face against another student's name is worse than
+  an empty labelled square. The officer supplied the pairing, off the live site's
+  own officers page. 🔴 **Two cards still render `<Hatch>` on purpose** — that
+  page shows one image file on two officers' cards and nothing attributes it. So
+  `Officer.photo` is OPTIONAL and the fallback is load-bearing: a card that could
+  only draw a photograph would have forced a guess there.
+- 🔓 **Project cells got photographs on 2026-08-23**, and the distinction that
+  made it acceptable is the useful part. The objection was never "a photograph
+  next to a client name"; it was pairing a **MISA** photograph to a named client,
+  which asserts that this team did this work for these people — a factual claim
+  nobody supplied. These are photographs **of the client** (a PepsiCo campus
+  sign, the Casa de Luz kitchen), where the pairing is the subject rather than a
+  claim laid over it. CapMetro has no photograph and still renders its `<Hatch>`;
+  the mixed state is what `PhotoSlot` is for.
+- ⚠️ **The two project photographs are the lowest-resolution images on the
+  site** — 1048px and 850px wide, against a 699 CSS px slot. Fine at 1× and soft
+  at 2×. They were sized for the 4-up band's ~350px cells and the band is now
+  2-up. Higher-resolution originals are the fix; nothing in code helps.
 - **Treatment spec** (duotone: `grayscale(1) contrast(1.05)` plus a navy
   `mix-blend-mode: color` overlay) lives in the handoff README. Not currently
   applied.

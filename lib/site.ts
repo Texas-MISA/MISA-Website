@@ -367,57 +367,73 @@ export const PROJECTS_INTRO =
 export const PROJECTS_SUMMARY =
   "Student teams collaborate on real-world consulting projects with major organizations including PepsiCo, CapMetro, and several local Austin businesses — hands-on exposure to consulting, project management, and cross-functional teamwork.";
 
+/**
+ * The client engagements. Each entry is also an `ImageSlot` — `caption`, `src`,
+ * `alt` — so `PhotoSlot` renders it directly.
+ *
+ * 🔓 **The photographs are the CLIENT'S, not the club's** (officer, 2026-08-23),
+ * which is a different kind of image from everything else in this file and worth
+ * naming. Every other slot shows MISA members; these show the organisation the
+ * team worked with. That is what makes them safe to pair with a named client —
+ * the pairing is the subject of the photograph rather than a claim laid over it,
+ * which is the objection that kept these cells as placeholders until now.
+ *
+ * ⚠️ **`body` is the only description.** There used to be a one-line `summary`
+ * for the home page card and a longer `body` for `/projects`; the officer asked
+ * for the longer text in both (2026-08-23), so the short one is gone rather than
+ * left behind for a future edit to update on one side only.
+ *
+ * 📌 CapMetro keeps its `<Hatch>`. `public/photos/projects/cap-metro.jpg` is
+ * built and waiting; giving it a `src` is a one-line change when the officer
+ * says so.
+ */
 export const PROJECTS = [
   {
     client: "PepsiCo",
     term: "Spring 2024",
-    /** One line, for the home page card. */
-    summary: "Facility and corporate communication tool.",
     body: "A facility and corporate communication tool, scoped and prototyped with the client team over a single semester. Students ran discovery with facility staff, mapped the existing communication flow, and delivered a working prototype and handoff documentation.",
     skills: ["Discovery", "Prototyping", "Handoff"],
     caption: "project photo / product shot",
+    src: "/photos/projects/pepsico.jpg",
+    alt: "The PepsiCo sign on the roof of the company's corporate campus, seen through trees",
   },
   {
     client: "Casa de Luz",
     term: "Spring 2024",
-    summary: "Customer engagement and marketing analysis.",
     body: "Customer engagement and marketing analysis for the Austin restaurant. The team gathered and cleaned customer data, segmented the audience, and returned a set of concrete marketing recommendations the owners could act on.",
     skills: ["Data cleaning", "Segmentation", "Recommendations"],
     caption: "project photo / dashboard shot",
+    src: "/photos/projects/casa-de-luz.jpg",
+    alt: "Kitchen staff at Casa de Luz behind a counter of freshly prepared vegetables",
   },
   {
     client: "CapMetro",
     term: "Spring 2024",
-    summary: "Transit data analysis for an Austin agency.",
     body: "Transit data analysis with Austin's public transportation agency — turning operational data into reporting that non-technical stakeholders could read and use.",
     skills: ["Data analysis", "Reporting"],
     caption: "project photo / report shot",
   },
 ] as const;
 
-/**
- * 🔴 **A PLACEHOLDER, not a project. Replace it with a real one.**
- *
- * The home page's projects band is laid out as a symmetric 2×2 (officer's
- * call, 2026-08-17) and `PROJECTS` holds three. This fills the fourth cell
- * until a fourth project exists.
- *
- * ⚠️ It deliberately names no client, no term and no scope. A plausible-looking
- * fourth client would be **inventing a fact about the club**, which is the one
- * thing no page here may do — and unlike a wrong colour, nobody would ever spot
- * it. So it reads as an empty commission in the same voice `<Hatch>` uses for a
- * photograph that has not been taken: labelled, obviously pending, and useless
- * to anyone trying to mistake it for a real engagement.
- *
- * 📌 Swapping it out is deleting this constant and adding a fourth entry to
- * `PROJECTS`; the band renders whatever the array holds and needs no change.
- */
-export const PROJECT_PLACEHOLDER = {
-  term: "Term to be confirmed",
-  client: "Fourth project",
-  summary: "Client and scope to be added.",
-  caption: "project photo / fourth project",
-} as const;
+// ✂️ **`PROJECT_PLACEHOLDER` was DELETED on 2026-08-23**, and what it was is
+// worth recording so nobody rebuilds it by accident.
+//
+// It was a fourth `{term, client, summary, caption}` object reading "Fourth
+// project / Client and scope to be added", and it existed for one structural
+// reason: the home page's projects band was a symmetric 2×2 (officer, 2026-08-17)
+// and `PROJECTS` held three. It filled the empty cell.
+//
+// 🔴 **The reason it named no client, term or scope still stands even though the
+// constant is gone.** A plausible-looking fourth client would be *inventing a
+// fact about the club*, which is the one thing no page here may do — and unlike
+// a wrong colour, nobody would ever catch it. If the band ever needs a filler
+// cell again, it gets that voice: labelled, obviously pending, and useless to
+// anyone trying to mistake it for a real engagement.
+//
+// 📌 It is gone because the band is no longer a 2×2. The officer cut it to the
+// two projects that have photographs (2026-08-23), so there is no empty cell
+// left to fill — and an unreferenced placeholder is how a page grows a cell
+// nobody meant to ship.
 
 export const WORK_WITH_MISA =
   "Organizations bring a real problem; a student team spends a semester on it. If your team has a scoped project and someone who can meet with students regularly, we would like to hear from you.";
