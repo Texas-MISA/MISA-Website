@@ -33,7 +33,41 @@ import { headers } from "next/headers";
  * at the call sites rather than derived from anything that might move.
  */
 export async function hashClientIp(scope: string): Promise<string> {
-  const forwarded = (await headers()).get("x-forwarded-for");
-  const ip = forwarded?.split(",")[0]?.trim() || "unknown";
+  const ip = (await clientIp()) ?? "unknown";
   return createHash("sha256").update(`${scope}:${ip}`).digest("hex");
+}
+
+/**
+ * The requesting client's public IP, or null when the platform did not supply
+ * one (local dev, and any request that did not come through Vercel's edge).
+ *
+ * 🔓 THIS MODULE'S ENTIRE SURFACE USED TO BE "you cannot get the address out of
+ * me", and this export deliberately widens it. Added for check-in location
+ * verification (§6), which has to classify the address's network before it can
+ * hash it — see docs/checkin-location-verification.md. Justified only because
+ * both consumers sit inside one call and neither persists what they are given:
+ * the address is classified, it is hashed, and it is discarded. **A third
+ * caller is a design review, not a refactor.**
+ *
+ * ⚠️ Never store, log or return this value. `checkin_origin` holds a peppered
+ * digest and a four-value label, and nothing anywhere holds an address.
+ *
+ * 📌 `x-vercel-forwarded-for` first. It carries the identical value to
+ * `x-forwarded-for`, but it is the one a reverse proxy placed IN FRONT of
+ * Vercel could not overwrite. Nothing about this deployment needs the
+ * distinction today; it costs a `??` and removes a way to be wrong later.
+ *
+ * 🔓 The spoofing question this feature blocked on is settled: Vercel
+ * "overwrite[s] the X-Forwarded-For header and do[es] not forward external
+ * IPs… to prevent IP spoofing", and supplying your own needs the Enterprise
+ * Trusted Proxy add-on. So a hand-rolled `curl -H 'X-Forwarded-For: …'` cannot
+ * move this. ⚠️ That makes the HEADER unforgeable — it does not make the check
+ * unevadable. Joining the venue's wifi defeats it completely.
+ */
+export async function clientIp(): Promise<string | null> {
+  const store = await headers();
+  const forwarded =
+    store.get("x-vercel-forwarded-for") ?? store.get("x-forwarded-for");
+  // The client is the FIRST entry; anything after it is proxy chain.
+  return forwarded?.split(",")[0]?.trim() || null;
 }

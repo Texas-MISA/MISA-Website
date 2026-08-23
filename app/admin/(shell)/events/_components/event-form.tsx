@@ -1,7 +1,7 @@
 "use client";
 
 import { BUTTON_OUTLINE, BUTTON_PRIMARY } from "@/components/ui/button";
-import { controlClass } from "@/components/ui/field";
+import { CHECKBOX, controlClass } from "@/components/ui/field";
 
 import Link from "next/link";
 import { useActionState } from "react";
@@ -37,6 +37,7 @@ export type EventFormValues = {
   points: number;
   category: string;
   status: string;
+  verifyOrigin: boolean;
 };
 
 export function EventForm({ initial }: { initial: EventFormValues }) {
@@ -66,6 +67,9 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
           points: String(initial.points),
           category: initial.category,
           status: initial.status,
+          // "on" / "" rather than a boolean, because `v` mirrors the raw
+          // strings the server echoes back on an invalid or unconfirmed save.
+          verifyOrigin: initial.verifyOrigin ? "on" : "",
         };
 
   return (
@@ -246,6 +250,36 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
           </Field>
         )}
       </div>
+
+      {/* Check-in location verification (§6). Spec:
+          docs/checkin-location-verification.md.
+
+          On by default, and flippable long AFTER the event — origins are
+          captured on every check-in regardless of this box, so turning it on a
+          week later lights up an event that already happened with no backfill.
+          That asymmetry is also why /attend discloses the capture. */}
+      {/* 🪤 A bare <label>, NOT wrapped in <Field>. Field renders a <label> of
+          its own around whatever it is given, and nested <label> elements are
+          invalid HTML with undefined click-target behaviour — plus its
+          required `label` prop would render an empty <span> above the control.
+          Field is for a labelled input; a checkbox IS its own label. */}
+      <label className="flex max-w-3xl items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          name="verifyOrigin"
+          defaultChecked={v.verifyOrigin === "on"}
+          className={`${CHECKBOX} mt-0.5`}
+        />
+        <span>
+          <span className="font-medium">Check where check-ins came from</span>
+          <span className="block text-misa-muted">
+            Compares each check-in against the network most attendees used, and
+            marks the ones that differ. Advisory only — it never rejects a
+            check-in or withholds points, and a member on cellular data is
+            never marked. You can turn this on or off after the event.
+          </span>
+        </span>
+      </label>
 
       <div className="flex flex-wrap items-center gap-4">
         {isCreate ? (

@@ -137,7 +137,23 @@ const endAfterStart = (data: { startTime: string; endTime: string }) =>
   data.endTime > data.startTime;
 
 export const eventSchema = z
-  .object({ ...eventBase, date: civilDate })
+  .object({
+    ...eventBase,
+    date: civilDate,
+    // Check-in location verification (§6, migration 28). Presence is the
+    // signal, matching the check-in action's first-time checkbox: an unchecked
+    // box sends nothing at all.
+    //
+    // 🪤 DELIBERATELY NOT IN `eventBase`, which seriesSchema also spreads. The
+    // series form has no such control, so an absent value would parse as false
+    // and every series-created event would silently ship with verification
+    // OFF — the opposite of the column's `default true`. Left out of the insert
+    // entirely, a series event takes the database default, which is correct.
+    verifyOrigin: z
+      .string()
+      .optional()
+      .transform((v) => typeof v === "string" && v.length > 0),
+  })
   .refine(endAfterStart, {
     message: "End time must be after the start time",
     path: ["endTime"],

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import type { OriginRecord } from "@/lib/network-classify";
 import type { Database } from "@/lib/types/database";
 
 // Check-in resolution core (§4.2, §4.3). Deliberately free of next/* and
@@ -82,6 +83,23 @@ export type CheckinInput = {
   confirmed: boolean;
 };
 
+/**
+ * Builds the origin row for a check-in once resolution knows which event it
+ * landed on — `null` for an orphan, which records a network kind but no digest
+ * because the event id is inside the hash.
+ *
+ * 🪤 A FACTORY RATHER THAN A VALUE, and that is the whole point. Building the
+ * record needs `node:crypto` (lib/checkin-origin.ts), and this module must stay
+ * importable from a Client Component because the check-in form imports
+ * ORPHAN_WINDOW_HOURS from it. The Server Action closes over the address and
+ * passes the closure in; nothing heavier crosses the boundary.
+ *
+ * 📌 Optional throughout. Omitted, no origin is recorded and check-in behaves
+ * exactly as it did before the feature existed — which is what the test suite
+ * and `/admin/attendance/new` both rely on.
+ */
+export type OriginFactory = (eventId: string | null) => OriginRecord;
+
 export type CheckinResult =
   | { status: "present"; eventTitle: string }
   | { status: "pending" }
@@ -138,7 +156,8 @@ const UNIQUE_VIOLATION = "23505";
 export async function resolveCheckin(
   db: Client,
   input: CheckinInput,
-  now: Date
+  now: Date,
+  makeOrigin?: OriginFactory
 ): Promise<CheckinResult> {
   const ts = now.toISOString();
   const normalized = normalizeEid(input.eid);
@@ -222,17 +241,21 @@ export async function resolveCheckin(
       };
     }
 
-    const inserted = await db.from("attendance").insert({
-      event_id: event.id,
-      member_id: memberId,
-      submitted_name: input.fullName,
-      submitted_eid: input.eid,
-      submitted_email: input.email,
-      submitted_at: ts,
-      // Both links resolved, so present — satisfies present_requires_resolution
-      // by construction.
-      status: "present",
-    });
+    const inserted = await db
+      .from("attendance")
+      .insert({
+        event_id: event.id,
+        member_id: memberId,
+        submitted_name: input.fullName,
+        submitted_eid: input.eid,
+        submitted_email: input.email,
+        submitted_at: ts,
+        // Both links resolved, so present — satisfies present_requires_resolution
+        // by construction.
+        status: "present",
+      })
+      .select("id")
+      .single();
     if (inserted.error) {
       if (inserted.error.code === UNIQUE_VIOLATION) {
         // attendance_one_per_event: same (event_id, normalized_eid)
@@ -242,6 +265,7 @@ export async function resolveCheckin(
       console.error("attendance insert failed:", inserted.error.message);
       return { status: "error" };
     }
+    await recordOrigin(db, inserted.data.id, makeOrigin?.(event.id));
     return { status: "present", eventTitle: event.title };
   }
 
@@ -266,20 +290,71 @@ export async function resolveCheckin(
     return { status: "duplicate", prior: "pending" };
   }
 
-  const inserted = await db.from("attendance").insert({
-    event_id: null,
-    member_id: memberId,
-    submitted_name: input.fullName,
-    submitted_eid: input.eid,
-    submitted_email: input.email,
-    submitted_at: ts,
-    status: "pending",
-  });
+  const inserted = await db
+    .from("attendance")
+    .insert({
+      event_id: null,
+      member_id: memberId,
+      submitted_name: input.fullName,
+      submitted_eid: input.eid,
+      submitted_email: input.email,
+      submitted_at: ts,
+      status: "pending",
+    })
+    .select("id")
+    .single();
   if (inserted.error) {
     console.error("orphan insert failed:", inserted.error.message);
     return { status: "error" };
   }
+  // No event, so no digest — but the network kind is still recorded, which is
+  // what tells an officer who later assigns this row whether the submitter was
+  // on campus.
+  await recordOrigin(db, inserted.data.id, makeOrigin?.(null));
   return { status: "pending" };
+}
+
+/**
+ * Store one check-in's origin. Never throws, never fails a check-in.
+ *
+ * 🪤 FAIL OPEN, and it is not negotiable. This sits in the one unauthenticated
+ * write path, and it is an ADVISORY signal: a member standing in a room must
+ * never be turned away because a secondary insert failed. Same doctrine as
+ * checkRateLimit, and for the same reason. The failure is logged and the
+ * check-in proceeds; the officer's screen reads "origin unknown", which is a
+ * real state rather than an error.
+ */
+async function recordOrigin(
+  db: Client,
+  attendanceId: string,
+  origin: OriginRecord | undefined
+): Promise<void> {
+  if (!origin) return;
+  // 🪤 The try/catch is the load-bearing half, not the error check below it.
+  //
+  // This runs AFTER the attendance row is already written, so a throw here
+  // escapes into submitCheckin's house try/catch and returns `error` to a
+  // member whose check-in actually SUCCEEDED — who then retries and is told
+  // they are a duplicate. Relying on the caller to catch turns an advisory
+  // insert into a way to lose a member's attendance from their point of view.
+  // PostgREST failures normally arrive as `error` rather than as a rejection,
+  // which is exactly why the rejection path is the one that would ship
+  // unnoticed.
+  try {
+    const { error } = await db.from("checkin_origin").insert({
+      attendance_id: attendanceId,
+      origin_hash: origin.originHash,
+      network_type: origin.networkType,
+    });
+    if (error) {
+      console.error("checkin_origin insert failed (check-in unaffected):", error.message);
+    }
+  } catch (e) {
+    console.error(
+      "checkin_origin insert threw (check-in unaffected):",
+      e instanceof Error ? e.message : String(e)
+    );
+  }
 }
 
 /**

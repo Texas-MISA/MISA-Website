@@ -1,7 +1,8 @@
 "use server";
 
 import { checkRateLimit, resolveCheckin, type CheckinResult } from "@/lib/checkin";
-import { hashClientIp } from "@/lib/request-ip";
+import { buildOriginRecord } from "@/lib/checkin-origin";
+import { clientIp, hashClientIp } from "@/lib/request-ip";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { checkinSchema } from "@/lib/validation";
 
@@ -126,13 +127,32 @@ export async function submitCheckin(
       return { status: "rate_limited", submitted };
     }
 
+    // Check-in location verification (§6). The address is read HERE, classified
+    // and hashed inside the closure, and discarded when this call returns — it
+    // is never stored, logged or echoed. What lands in the database is a
+    // peppered, event-scoped digest and a four-value network label.
+    //
+    // 🔓 Capture runs on EVERY check-in, regardless of the event's
+    // verify_origin flag. That flag gates DERIVATION on the officer's review
+    // screen, not collection, and the asymmetry is deliberate: it is what lets
+    // an officer turn verification on a week after an event and have the flags
+    // appear with no backfill. It is also why /attend discloses this.
+    //
+    // 🪤 A missing address yields an `unknown` kind and NO digest — never a
+    // hash of some placeholder string. In local dev nobody has the header, so a
+    // shared literal would give every check-in one digest and form a confident,
+    // entirely fictional venue mode.
+    const ip = await clientIp();
+    const makeOrigin = (eventId: string | null) => buildOriginRecord(eventId, ip);
+
     // The confirm step re-derives everything from scratch — event window,
     // member lookup, duplicate checks — and never trusts that the payload
     // matches what was previewed.
     const result = await resolveCheckin(
       db,
       { ...parsed.data, declaredNew, confirmed: step === "confirm" },
-      now
+      now,
+      makeOrigin
     );
     return { ...result, submitted };
   } catch (e) {

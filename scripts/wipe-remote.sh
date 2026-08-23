@@ -10,6 +10,12 @@
 #           member_field_definitions, member_filter_presets, the admin_audit
 #           rows about any of those, and the fabricated seed.officer account.
 #
+#           checkin_origin, which has no delete of its own: its PK is an
+#           attendance_id ON DELETE CASCADE, so it empties with attendance.
+#           Named anyway, because the accounting IS the definition and a table
+#           that vanishes by cascade is exactly the kind that goes unnoticed.
+#           The verify step counts it for the same reason.
+#
 # KEPT      auth.users + admin_profiles for every real officer — sign-ins are
 #           never touched, so nobody has to be re-invited;
 #           officer_invites, whole;
@@ -28,7 +34,7 @@
 #           same call seed.sql makes — it is not seed data and it expires on
 #           its own.
 #
-# 📌 That accounts for all twelve tables in `public`. Keep it that way: per the
+# 📌 That accounts for all thirteen tables in `public`. Keep it that way: per the
 # rule seed.sql's wipe list carries, a table missing from this accounting is
 # drift nobody can see. Any migration adding a table has to decide which of the
 # four groups above it lands in.
@@ -89,7 +95,7 @@ custom field definitions|delete from member_field_definitions;
 members|delete from members;
 audit rows about test data|alter table admin_audit disable trigger admin_audit_no_delete; delete from admin_audit where entity_type not in ('officer_invite','officer'); alter table admin_audit enable trigger admin_audit_no_delete;
 fabricated seed officer|delete from auth.users where id = '00000000-0000-4000-8000-5eed00000001'::uuid;
-verify|do $$ declare n int; begin select (select count(*) from members)+(select count(*) from events)+(select count(*) from attendance)+(select count(*) from point_adjustments)+(select count(*) from dues_payments)+(select count(*) from member_field_definitions)+(select count(*) from member_filter_presets) into n; if n <> 0 then raise exception 'wipe incomplete: % club rows remain', n; end if; if exists (select 1 from admin_audit where entity_type not in ('officer_invite','officer')) then raise exception 'admin_audit still holds test-data rows'; end if; if not exists (select 1 from admin_profiles) then raise exception 'no officer profile survives - refusing to report success'; end if; if exists (select 1 from auth.users where id = '00000000-0000-4000-8000-5eed00000001') then raise exception 'seed officer survived the wipe'; end if; if not exists (select 1 from pg_trigger where tgname = 'admin_audit_no_delete' and tgenabled <> 'D') then raise exception 'admin_audit_no_delete was left DISABLED'; end if; end $$;
+verify|do $$ declare n int; begin select (select count(*) from members)+(select count(*) from events)+(select count(*) from attendance)+(select count(*) from point_adjustments)+(select count(*) from dues_payments)+(select count(*) from member_field_definitions)+(select count(*) from member_filter_presets)+(select count(*) from checkin_origin) into n; if n <> 0 then raise exception 'wipe incomplete: % club rows remain', n; end if; if exists (select 1 from admin_audit where entity_type not in ('officer_invite','officer')) then raise exception 'admin_audit still holds test-data rows'; end if; if not exists (select 1 from admin_profiles) then raise exception 'no officer profile survives - refusing to report success'; end if; if exists (select 1 from auth.users where id = '00000000-0000-4000-8000-5eed00000001') then raise exception 'seed officer survived the wipe'; end if; if not exists (select 1 from pg_trigger where tgname = 'admin_audit_no_delete' and tgenabled <> 'D') then raise exception 'admin_audit_no_delete was left DISABLED'; end if; end $$;
 PLAN
 
 for step in "${STEPS[@]}"; do

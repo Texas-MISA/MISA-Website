@@ -22,6 +22,22 @@ export default defineConfig({
   test: {
     include: ["tests/**/*.test.ts"],
     environment: "node",
+    // The check-in origin pepper (docs/checkin-location-verification.md).
+    //
+    // 📌 A FIXTURE, NOT A SECRET, and it is committed on purpose so the digest
+    // tests run for everybody rather than skipping silently on a fresh clone.
+    // It protects nothing: the addresses these tests hash are literals in
+    // tests/checkin-origin.test.ts.
+    //
+    // 🔓 The REAL pepper is a Vercel environment variable and a line in
+    // .env.local, and it must never appear in this repository — an unpeppered
+    // or known-peppered SHA-256 of an IPv4 address is reversible on a laptop,
+    // and this repo is public. Set here rather than in tests/global-setup.ts
+    // because lib/checkin-origin.ts reads process.env at MODULE LOAD, which
+    // can run before a global setup's mutation is visible to a worker.
+    env: {
+      CHECKIN_ORIGIN_PEPPER: "test-pepper-not-a-secret-see-vitest-config",
+    },
     // Verifies the local Supabase stack is up and exports its keys.
     globalSetup: "./tests/global-setup.ts",
     // Integration tests round-trip the local stack; generous but bounded.

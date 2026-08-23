@@ -195,6 +195,35 @@ export type Database = {
           },
         ]
       }
+      checkin_origin: {
+        Row: {
+          attendance_id: string
+          created_at: string
+          network_type: string
+          origin_hash: string | null
+        }
+        Insert: {
+          attendance_id: string
+          created_at?: string
+          network_type: string
+          origin_hash?: string | null
+        }
+        Update: {
+          attendance_id?: string
+          created_at?: string
+          network_type?: string
+          origin_hash?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkin_origin_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: true
+            referencedRelation: "attendance"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       checkin_throttle: {
         Row: {
           id: number
@@ -322,6 +351,7 @@ export type Database = {
           term: string | null
           title: string
           updated_at: string
+          verify_origin: boolean
         }
         Insert: {
           category?: string | null
@@ -340,6 +370,7 @@ export type Database = {
           term?: string | null
           title: string
           updated_at?: string
+          verify_origin?: boolean
         }
         Update: {
           category?: string | null
@@ -358,6 +389,7 @@ export type Database = {
           term?: string | null
           title?: string
           updated_at?: string
+          verify_origin?: boolean
         }
         Relationships: []
       }
@@ -665,6 +697,7 @@ export type Database = {
           term: string | null
           title: string
           updated_at: string
+          verify_origin: boolean
         }[]
         SetofOptions: {
           from: "*"

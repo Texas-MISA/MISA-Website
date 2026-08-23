@@ -48,7 +48,8 @@ type FieldName =
   | "closeLateMinutes"
   | "points"
   | "category"
-  | "status";
+  | "status"
+  | "verifyOrigin";
 
 /**
  * The raw strings the officer submitted, echoed back so the form can restore
@@ -147,13 +148,14 @@ export async function saveEvent(
       points: fields.points,
       category: fields.category,
       status: fields.status,
+      verify_origin: fields.verifyOrigin,
     };
 
     if (!id) {
       const { data, error } = await db
         .from("events")
         .insert({ ...values, created_by: officer.userId })
-        .select("id, title, starts_at, ends_at, points, status, term")
+        .select("id, title, starts_at, ends_at, points, status, term, verify_origin")
         .single();
 
       if (error) return insertError(error);
@@ -171,7 +173,7 @@ export async function saveEvent(
       const { data: current, error: readError } = await db
         .from("events")
         .select(
-          "id, title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, updated_at"
+          "id, title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, updated_at, verify_origin"
         )
         .eq("id", id)
         .single();
@@ -233,7 +235,7 @@ export async function saveEvent(
         .update(values)
         .eq("id", id)
         .eq("updated_at", current.updated_at)
-        .select("id, title, starts_at, ends_at, points, status, term")
+        .select("id, title, starts_at, ends_at, points, status, term, verify_origin")
         .maybeSingle();
 
       if (error) return insertError(error);
@@ -363,7 +365,7 @@ export async function deleteEvent(
 
     const { data: before, error: readError } = await db
       .from("events")
-      .select("id, title, starts_at, ends_at, status, points, category")
+      .select("id, title, starts_at, ends_at, status, points, category, verify_origin")
       .eq("id", id)
       .single();
     if (readError || !before) {
@@ -723,7 +725,7 @@ export async function duplicateEvent(
     const { data: source, error: readError } = await db
       .from("events")
       .select(
-        "title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category"
+        "title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, verify_origin"
       )
       .eq("id", id)
       .single();
@@ -785,6 +787,7 @@ function echo(formData: FormData): SubmittedEventValues {
     points: read("points", "1"),
     category: read("category"),
     status: read("status", "draft"),
+    verifyOrigin: read("verifyOrigin"),
   };
 }
 

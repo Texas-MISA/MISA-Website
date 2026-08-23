@@ -492,7 +492,7 @@ describe("duplicateDraft against a stored row", () => {
     const { data: row } = await db
       .from("events")
       .select(
-        "title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category"
+        "title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, verify_origin"
       )
       .eq("id", source.id)
       .single();

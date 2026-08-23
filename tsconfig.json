@@ -1,6 +1,12 @@
 {
   "compilerOptions": {
-    "target": "ES2017",
+    // Raised from create-next-app's ES2017 default on 2026-08-22, for the
+    // BigInt literals lib/network-classify.ts uses to compare IPv6 addresses
+    // (128 bits does not fit in a JS number). Safe, and narrower than it looks:
+    // `noEmit` is true, so this file never transpiles anything — SWC does — and
+    // `lib` already includes esnext, so no type surface changes. All it does is
+    // stop TS rejecting `123n` as downlevel syntax.
+    "target": "ES2020",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,

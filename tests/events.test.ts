@@ -509,6 +509,7 @@ describe("duplicateDraft", () => {
     checkin_closes_at: "2026-10-28T00:15:00.000Z",
     points: 2,
     category: "general_and_other",
+    verify_origin: true,
   };
 
   it("defaults to the same wall time seven civil days later, across DST", () => {
@@ -534,6 +535,14 @@ describe("duplicateDraft", () => {
     expect(draft.points).toBe(2);
     expect(draft.category).toBe("general_and_other");
     expect(draft.title).toBe("General Meeting");
+  });
+
+  // 🪤 verify_origin defaults to true in the database, so a duplicate that
+  // dropped it would silently re-enable check-in verification on a copy of an
+  // event the officer had turned it off for.
+  it("carries verify_origin, in both directions", () => {
+    expect(duplicateDraft(source).verify_origin).toBe(true);
+    expect(duplicateDraft({ ...source, verify_origin: false }).verify_origin).toBe(false);
   });
 
   it("is always a draft and never joins the source's series", () => {
