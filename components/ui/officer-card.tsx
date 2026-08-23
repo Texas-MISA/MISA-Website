@@ -11,7 +11,7 @@ import type { ImageSlot } from "@/lib/site";
 // a role title wraps to.
 //
 // 🔓 **The headshot goes through `PhotoSlot` as of v2 phase 2**, and as of
-// 2026-08-23 it actually carries a photograph for twelve of the thirteen.
+// 2026-08-23 it carries a photograph for all thirteen.
 //
 // 🔓 **The rule that kept these blank is SATISFIED, not waived.** It was never
 // "no faces on officer cards" — it was that the design handoff shipped headshots

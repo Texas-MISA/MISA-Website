@@ -574,10 +574,13 @@ Real photographs are live on the home page **locally only**.
   handoff shipped headshots while recording that the photo-to-name pairing "was
   never supplied", and a real face against another student's name is worse than
   an empty labelled square. The officer supplied the pairing, off the live site's
-  own officers page. 🔴 **One card still renders `<Hatch>` on purpose** — that
-  page shows one image file on two officers' cards and nothing attributes it. So
-  `Officer.photo` is OPTIONAL and the fallback is load-bearing: a card that could
-  only draw a photograph would have forced a guess there.
+  own officers page. 🔴 **All thirteen carry one as of 2026-08-23** — the two
+  that waited did so because the page showed a single image file on both cards
+  with nothing attributing it, and both were resolved out of band: one attributed
+  by the officer, the other supplied as a genuine separate photograph. So
+  `Officer.photo` STAYS OPTIONAL and the fallback stays load-bearing even with
+  nothing currently using it — a card that could only draw a photograph would
+  force a guess the moment a fourteenth officer arrives without one.
 - 🔓 **Project cells got photographs on 2026-08-23**, and the distinction that
   made it acceptable is the useful part. The objection was never "a photograph
   next to a client name"; it was pairing a **MISA** photograph to a named client,

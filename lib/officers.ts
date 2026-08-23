@@ -20,8 +20,9 @@
 // 🔴 **`photo` is optional and `<Hatch>` is still the correct rendering when it
 // is absent.** The old rule was that headshots stay placeholders because the
 // handoff never supplied the photo-to-name pairing; the officer has now supplied
-// it, so the rule is satisfied rather than waived. Where it is STILL not
-// supplied — see Daniel Chen and Sanya Pillai below — the placeholder stands.
+// it, so the rule is satisfied rather than waived. All thirteen carry one as of
+// 2026-08-23; `photo` stays optional because the NEXT officer will not, and the
+// placeholder is what they must get rather than somebody else's face.
 //
 // ⚠️ **`linkedin` is optional, and that is a fact about the new page, not an
 // omission here.** The updated page carries no per-officer LinkedIn links at all
@@ -137,13 +138,21 @@ export const OFFICERS: Officer[] = [
     role: "Social Director",
     photo: "/photos/officers/lucas-san-jose.jpg",
   },
-  // 🔴 **NO PHOTO, and the reason CHANGED on 2026-08-23 — read the Daniel Chen
-  // note above.** The one photograph that ever appeared on this card is the
-  // shared file the officer has now attributed to him. She has no photograph in
-  // the source at all, so the placeholder is the correct rendering rather than
-  // an unresolved question. Supplying one means adding a real file to
-  // `pictures/officers/sanya-pillai.<ext>`, not reusing his.
-  { name: "Sanya Pillai", role: "Academic Director" },
+  // ✅ **SUPPLIED 2026-08-23, and by the route this comment asked for.** The
+  // note that stood here said the placeholder would stand until someone added
+  // a real file to `pictures/officers/sanya-pillai.<ext>` — *not* by reusing
+  // the shared photograph attributed to Daniel Chen. The officer supplied a
+  // genuine, different photograph, so the card draws it.
+  //
+  // 📌 **`photo` stays OPTIONAL even though all thirteen now have one.** The
+  // optionality IS the rule, not a leftover of it: the next officer added to
+  // this roster arrives without a photograph, and must render `<Hatch>` rather
+  // than borrow somebody else's.
+  {
+    name: "Sanya Pillai",
+    role: "Academic Director",
+    photo: "/photos/officers/sanya-pillai.jpg",
+  },
   {
     name: "Kayana Rajan",
     role: "Finance Director",
