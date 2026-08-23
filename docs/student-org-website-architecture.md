@@ -11,7 +11,7 @@
 > **The roster** is replaced wholesale from the officer's saved copy of the live
 > page — a full turnover, with two new roles (**Client Project Lead**, **Data
 > Project Lead**) replacing Project Vice President and Junior Director Vice
-> President. 🔓 **Officer headshots ship for eleven of the thirteen**, which
+> President. 🔓 **Officer headshots ship for twelve of the thirteen**, which
 > satisfies the rule that kept them blank rather than waiving it: the objection
 > was that the photo-to-name pairing had never been supplied, and it now has
 > been. 🪤 That pairing was read off the saved page's **CSS grid geometry**, not

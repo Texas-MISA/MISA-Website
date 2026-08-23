@@ -574,7 +574,7 @@ Real photographs are live on the home page **locally only**.
   handoff shipped headshots while recording that the photo-to-name pairing "was
   never supplied", and a real face against another student's name is worse than
   an empty labelled square. The officer supplied the pairing, off the live site's
-  own officers page. 🔴 **Two cards still render `<Hatch>` on purpose** — that
+  own officers page. 🔴 **One card still renders `<Hatch>` on purpose** — that
   page shows one image file on two officers' cards and nothing attributes it. So
   `Officer.photo` is OPTIONAL and the fallback is load-bearing: a card that could
   only draw a photograph would have forced a guess there.

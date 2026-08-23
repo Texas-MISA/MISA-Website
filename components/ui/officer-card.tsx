@@ -1,6 +1,6 @@
 import { PhotoSlot } from "@/components/ui/photo-slot";
 
-import type { Officer } from "@/lib/officers";
+import { SHOW_OFFICER_LINKEDIN, type Officer } from "@/lib/officers";
 import type { ImageSlot } from "@/lib/site";
 
 // One officer. Every card is identical — there is no separate exec-board
@@ -11,7 +11,7 @@ import type { ImageSlot } from "@/lib/site";
 // a role title wraps to.
 //
 // 🔓 **The headshot goes through `PhotoSlot` as of v2 phase 2**, and as of
-// 2026-08-23 it actually carries a photograph for eleven of the thirteen.
+// 2026-08-23 it actually carries a photograph for twelve of the thirteen.
 //
 // 🔓 **The rule that kept these blank is SATISFIED, not waived.** It was never
 // "no faces on officer cards" — it was that the design handoff shipped headshots
@@ -85,7 +85,10 @@ export function OfficerCard({ officer }: { officer: Officer }) {
             see the note in `lib/officers.ts` for why six of thirteen have
             none and why a plausible-looking URL is not an acceptable filler. */}
         <div className="mt-auto" />
-        {officer.linkedin && (
+        {/* 🔓 Gated by SHOW_OFFICER_LINKEDIN, which is OFF (officer, 2026-08-23).
+            The flag lives in lib/officers.ts beside the URLs it hides, and the
+            URLs are still there — see the note on the constant. */}
+        {SHOW_OFFICER_LINKEDIN && officer.linkedin && (
           <a
             href={officer.linkedin}
             target="_blank"

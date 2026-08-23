@@ -39,6 +39,27 @@ export type Officer = {
   photo?: string;
 };
 
+/**
+ * 🔓 **TEMPORARY (officer, 2026-08-23): every per-officer LinkedIn link is
+ * HIDDEN.** Flip this to `true` to bring them all back — that is the whole of
+ * it, and it is the only switch.
+ *
+ * 📌 **The URLs are deliberately still in the data below.** Hiding is a render
+ * decision; deleting seven real profile URLs would mean re-sourcing them from
+ * a page that, as the note above records, no longer carries per-officer links
+ * at all. Nothing is lost while this is off.
+ *
+ * 🪤 **Layout is already safe either way.** `OfficerCard` has always rendered
+ * the link conditionally — six of thirteen officers never had one — and it
+ * carries a `mt-auto` spacer precisely so a card without a link keeps the same
+ * shape. Turning every link off exercises a path that was already live on
+ * nearly half the grid.
+ *
+ * 📌 MISA's OWN LinkedIn (the company page in `lib/site.ts`, linked from the
+ * footer) is untouched. This is about individual people's profiles.
+ */
+export const SHOW_OFFICER_LINKEDIN = false;
+
 export const OFFICERS: Officer[] = [
   {
     name: "Labeeb Kibria",
@@ -70,21 +91,25 @@ export const OFFICERS: Officer[] = [
     linkedin: "https://www.linkedin.com/in/averywiley/",
     photo: "/photos/officers/avery-wiley.jpg",
   },
-  // 🔴 **NO PHOTO, DELIBERATELY — and this is the one entry to read before
-  // "fixing" it.** The saved page shows the SAME image file
-  // (`headshot+updated.JPG`, one asset referenced twice) on both Daniel Chen's
-  // card and Sanya Pillai's. One of those two is right and the source gives no
-  // way to tell which: the alt text is empty, the uuid is identical, and there
-  // is no third photograph of either person. Shipping it under both names would
-  // put a real student's face under another real student's name, which is the
-  // exact failure this file has been written against since it was created — so
-  // both render the labelled placeholder until an officer says whose it is.
+  // ✅ **RESOLVED 2026-08-23 BY THE OFFICER, and the way it was resolved is the
+  // point.** The saved page showed the SAME image file (`headshot+updated.JPG`,
+  // one asset referenced twice) on both this card and Sanya Pillai's, with an
+  // empty alt and an identical uuid — so the source could not say which of the
+  // two it was, and both rendered the placeholder rather than risk putting a
+  // real student's face under another real student's name.
   //
-  // 📌 Fixing it is two lines: copy
-  // `pictures/Officers — …_files/headshot+updated.JPG` to
-  // `pictures/officers/<name-slug>.JPG`, run `node scripts/build-photos.mjs`,
-  // and add the `photo` key to whichever of the two it belongs to.
-  { name: "Daniel Chen", role: "Logistics Director" },
+  // The officer settled it out of band, by renaming the file to `daniel chen`
+  // in the saved export. That is the attribution the rule was waiting for: it
+  // did not come from the page, it came from someone who knows.
+  //
+  // 🔴 **Which means Sanya Pillai keeps her placeholder, and NOT because the
+  // question is still open.** It is now answered, and the answer is that this
+  // photograph is not hers. Do not copy it onto her entry.
+  {
+    name: "Daniel Chen",
+    role: "Logistics Director",
+    photo: "/photos/officers/daniel-chen.jpg",
+  },
   {
     name: "Shreya Venkatachalam",
     role: "Special Events Director",
@@ -112,7 +137,12 @@ export const OFFICERS: Officer[] = [
     role: "Social Director",
     photo: "/photos/officers/lucas-san-jose.jpg",
   },
-  // 🔴 See the Daniel Chen note above — same shared photograph, same reason.
+  // 🔴 **NO PHOTO, and the reason CHANGED on 2026-08-23 — read the Daniel Chen
+  // note above.** The one photograph that ever appeared on this card is the
+  // shared file the officer has now attributed to him. She has no photograph in
+  // the source at all, so the placeholder is the correct rendering rather than
+  // an unresolved question. Supplying one means adding a real file to
+  // `pictures/officers/sanya-pillai.<ext>`, not reusing his.
   { name: "Sanya Pillai", role: "Academic Director" },
   {
     name: "Kayana Rajan",
