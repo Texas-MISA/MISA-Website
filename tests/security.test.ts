@@ -277,7 +277,8 @@ describe.each(ROLES)("$label cannot write to any table", ({ client }) => {
     expect(tables).toContain("members");
     expect(tables).toContain("admin_audit");
     expect(tables).toContain("dues_payments");
-    expect(tables.length).toBeGreaterThanOrEqual(11);
+    expect(tables.length).toBeGreaterThanOrEqual(12);
+    expect(tables).toContain("checkin_origin");
     // The dropped table is filtered out, and that filtering is deliberate.
     expect(declaredTables()).toContain("_stage0_check");
     expect(tables).not.toContain("_stage0_check");
@@ -361,6 +362,78 @@ describe.each(ROLES)("$label cannot write to any table", ({ client }) => {
       if (error === null && (data ?? []).length > 0) readable.push(table);
     }
     expect(readable.sort()).toEqual([...READABLE_TABLES].sort());
+  });
+});
+
+describe.each(ROLES)("$label cannot touch checkin_origin", ({ client }) => {
+  // 🪤 CALLED OUT SEPARATELY BECAUSE THE GENERIC SWEEP PASSES FOR THE WRONG
+  // REASON HERE. Every probe above filters on `id`, and this table's primary
+  // key is `attendance_id` — so the DELETE probe comes back 42703 ("column
+  // checkin_origin.id does not exist"), which satisfies `error !== null` while
+  // proving nothing about permissions. Same family as the empty-payload trap
+  // this file already warns about: assert the refusal you mean.
+  //
+  // Verified by hand before this was written: with the correct column the
+  // answer is 42501, not 42703.
+  it("is refused a DELETE with 42501, not a column error", async () => {
+    const role = await client();
+    const { error } = await role
+      .from("checkin_origin")
+      .delete()
+      .neq("attendance_id", "00000000-0000-0000-0000-000000000000");
+    expect(error?.code).toBe("42501");
+  });
+
+  it("is refused an INSERT with 42501", async () => {
+    const role = await client();
+    const { error } = await role.from("checkin_origin").insert({
+      attendance_id: "00000000-0000-0000-0000-000000000001",
+      network_type: "campus",
+    });
+    expect(error?.code).toBe("42501");
+  });
+
+  // 🔓 The privacy assertion that matters most. An origin digest sitting beside
+  // a member's identity is the thing this whole feature is built not to leak,
+  // and anon HOLDS `select` on this table — migration 22's narrowed default
+  // privileges grant it. RLS is the only thing keeping the rows invisible, so
+  // an empty 200 here is the property under test, not an accident.
+  //
+  // 🪤 Writes its own fixture. seed.sql inserts no origin rows on purpose, so
+  // probing the table as it ships would assert "you cannot see" against a table
+  // where there is nothing to see — the assertion would pass forever and mean
+  // nothing.
+  it("reads no rows even though anon holds SELECT on the table", async () => {
+    const db = testClient();
+    const { data: host } = await db
+      .from("attendance")
+      .select("id")
+      .limit(1)
+      .single();
+    expect(host, "seed has no attendance row to hang a fixture on").toBeTruthy();
+
+    const { error: seedError } = await db.from("checkin_origin").insert({
+      attendance_id: host!.id,
+      origin_hash: "security-test-digest",
+      network_type: "campus",
+    });
+    expect(seedError).toBeNull();
+
+    try {
+      const role = await client();
+      const { data, error } = await role.from("checkin_origin").select("*");
+      expect(error).toBeNull();
+      expect((data ?? []).length).toBe(0);
+
+      // Guards the guard: the row really is there, as service role.
+      const { data: visible } = await db
+        .from("checkin_origin")
+        .select("origin_hash")
+        .eq("attendance_id", host!.id);
+      expect((visible ?? []).length).toBe(1);
+    } finally {
+      await db.from("checkin_origin").delete().eq("attendance_id", host!.id);
+    }
   });
 });
 

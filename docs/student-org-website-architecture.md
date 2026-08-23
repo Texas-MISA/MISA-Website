@@ -1,10 +1,12 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.74
+**Version:** 1.75
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0 and 1 complete, phase 2 next.**
 **Last updated:** August 2026
 
-> **v1.74: the officer roster is replaced, the real logo landed, and the page heroes are centred.**
+> **v1.75: the officer roster is replaced, the real logo landed, the page heroes are centred, and check-in location verification shipped.**
+>
+> 📌 1.74 and 1.73 were developed in parallel on two branches and both came off 1.72; this is the merge of the two, not a third round of changes. §9 gains entries 14 and 15 from the 1.73 side, §6's *Check-in on behalf of someone else* row is rewritten there, and §11 loses the rotating venue code.
 >
 > Three officer instructions, 2026-08-23, on the `v2-phase-2` branch.
 >
@@ -2922,6 +2924,7 @@ Events are editable at any point, including after attendance exists. That flexib
 | Narrow the check-in window | Existing `present` rows may now fall outside it | **Not retroactive.** Recorded attendance is a fact; the window is only consulted at resolution time. Warn, don't revoke. |
 | Move `starts_at` / `ends_at` | Same as above | Allowed with the same warning |
 | Move `starts_at` **across a term boundary** | The event and all its attendance silently move to the other term's leaderboard | `term` is generated from `starts_at` (§4.7), so this happens automatically with no prompt. Detect it in the edit form — compare `term_of(old)` with `term_of(new)` — and warn explicitly, since rescheduling a July meeting into August moves every attendee's points between semesters |
+| Toggle `verify_origin` | None. It changes what the officer's review screen **derives**, never what was recorded | Allowed at any time, including long after the event, with no warning. 🔓 Origins are captured on every check-in regardless of this flag, which is precisely what makes turning it on afterwards work — see §9 #14. It is an ordinary audited event edit |
 | Delete an event with attendance | Would orphan real records | Blocked. Offer `status = 'cancelled'` instead, which preserves history and removes it from the upcoming list |
 
 Cancelled events are excluded from leaderboard totals but remain visible in a member's attendance history, so someone who attended an event that was later cancelled can still see they were there.
@@ -3161,7 +3164,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | A signed-in non-officer reads the roster | 🔓 **This was live, and Stage 8 phase 1 closed it (migration 22).** `member_directory` carries every member's name, EID and email; migration 15 revoked it from `anon` and **granted it to `authenticated`** on the understanding that `authenticated` means "an officer". It does not — it is the role any holder of a valid user JWT gets, and `disable_signup` was `false` on production, so it was one confirmed email away for anyone. What distinguishes an officer is an `admin_profiles` row, and **that check lives in `lib/auth.ts`, in the application; PostgREST never runs it.** Reproduced on the local stack before the fix (a signed-up user with no profile read back a real EID), then revoked. Nothing read the view that way — every module touching member data uses the service-role client. ⚠️ The general lesson, which is migration 15's lesson one role over: **a grant to `authenticated` is a grant to the public whenever signup is open.** |
 | `grant all` includes TRUNCATE, which RLS cannot restrain | 🔓 Found in Stage 8's audit. RLS covers SELECT/INSERT/UPDATE/DELETE and **nothing else**, and `admin_audit`'s append-only triggers are `before update` and `before delete` — so TRUNCATE slipped past both while migration 12 handed it to `anon` with `all privileges`. Not reachable (PostgREST exposes no TRUNCATE verb and the API roles are NOLOGIN), but migration 12's stated doctrine — "granting anon DML changes nothing, RLS is the boundary" — **is false for exactly this verb**, on exactly the table where it matters most. Migration 22 narrows anon/authenticated to `select` and adds a statement-level `before truncate` trigger behind that, because a grant can be re-widened by a later migration and a trigger has to be dropped on purpose. |
 | Spam / bot submissions | Honeypot field, per-IP rate limit on the check-in action, submissions rejected outside any open window |
-| Check-in on behalf of someone else | Accepted risk for v1 — same as a paper sign-in sheet. Mitigate later with a rotating per-event code displayed at the venue. |
+| Check-in on behalf of someone else | **Partially mitigated 2026-08-22 by check-in location verification** (migration 28; spec `docs/checkin-location-verification.md`). ✂️ **The rotating per-event venue code this row used to name is DROPPED** — the two overlap enough that building both was redundant, and the officer chose the one that needs no screen at the venue and works retroactively. What ships: each event's most common check-in origin is treated as the venue, and check-ins from elsewhere are surfaced to officers as a pill. ⚠️ **Advisory only, and it misses the likeliest form of the fraud entirely** — a friend in the room checking in an absent member is on the venue origin by construction. 🔓 It also creates a documented public bypass: cellular is never flagged, so turning off wifi defeats it. That is the accepted price of not flagging real attendees whose phone had not joined the wifi, and it is correct only while nothing gates on the flag. 🔓 **No IP is stored** — a peppered, event-scoped digest and a four-value network label, and the event id inside the digest is what stops the table tracing a member across a semester. |
 | Attendance data enumeration | `/lookup` requires EID **and** matching email before returning history. 🔓 **Built as ONE query carrying both predicates** (`findMemberByBoth`, Stage 7 phase 2), never `lib/checkin.ts`'s ordered fallback — that shape resolves on the EID *or* the email, which would silently reduce this to the EID-alone gate the row below accepts only for check-in. Two tests exist purely to fail if someone "makes it more forgiving". The email side goes through `escapeIlike`, so a `%` is a literal rather than a wildcard past half the gate. |
 | `/lookup` distinguishing its failures | 🔓 **One `unmatched` outcome and one message for every miss** — never "no such EID" versus "that email doesn't match". Splitting them would hand back a *strictly stronger* oracle than check-in's: confirm the EID first, then walk the email, on the page that reveals dues status. The one-message rule is what keeps the double gate meaningful rather than decorative. |
 | Roster PII exposure | Emails and EIDs never returned to unauthenticated clients under any route. `/lookup` is the closest case and holds it **by construction**: the profile it returns carries the member's name and their own aggregates, and no identifier the caller did not already supply — not the stored email, not the stored EID. A test asserts the serialized response contains neither. |
@@ -3637,7 +3640,6 @@ Three phases, each merged to `main` on completion.
 Not commitments — a parking lot, roughly ordered by value per unit of effort.
 
 - QR code per event linking to a pre-filled check-in
-- Rotating per-event check-in code to prevent remote check-ins
 - Email the member automatically when their pending submission is approved or rejected
 - Member-initiated attendance appeal from `/lookup`, which opens a pending row directly in the review queue
 - Email reminders before events and end-of-semester standing summaries
@@ -3735,6 +3737,22 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
     **Revisit if `admin` ever means something.** The role column exists and is set, and this decision is what keeps it decorative. The moment an `admin` can do something an `officer` cannot, this and the four Stage 5 decisions above should be re-read together — same trigger, same reason: these are all social until they are not.
 
 ---
+
+### Resolved at migration 28 (2026-08-22)
+
+Two, and they earn a place here on the bar #12 and #13 set: the first changes what the system **stores about a member**, and the second is a privacy disclosure the public site now makes.
+
+14. **Whether to verify where a check-in came from, and how** — ✅ **Yes, by the modal origin per event, advisory only — and §6's rotating venue code is DROPPED rather than built alongside it.** The two overlap enough that building both was redundant, and the comparison is in `docs/checkin-location-verification.md`. The code is stronger on the primary case (an absent member checking themselves in) and adds no data about anybody; it was rejected anyway because it needs a screen at the venue every event, an officer to run it, and a screenshot in the group chat defeats it — while the modal origin needs nothing at the venue and, crucially, **works retroactively**.
+
+    🔓 **What it costs, stated plainly, because this is the first thing the system stores about a member's network.** A peppered digest and a four-value connection label per check-in. The digest is scoped to the event, so one address at two events produces two unrelated values and the table cannot trace a member across a semester — that property is the whole justification, and it is why the event id must never be "optimised" out of the hash. The label (`campus` / `cellular` / `other` / `unknown`) **is** joinable across events, which is about a bit and a half per check-in and is the price of the cellular exemption below.
+
+    ⚠️ **It is advisory and must stay so.** It rejects no check-in, withholds no points, moves no row, and writes no audit entry by itself. It misses the likeliest form of the fraud entirely — a friend in the room checking in an absent member is on the venue origin by construction — and it cannot separate "in this room" from "elsewhere on campus wifi" unless the university NATs per building, which is unmeasured. 🔓 **Cellular is never flagged**, which removes the largest class of false positives (real attendees whose phone had not joined the wifi) and creates a **documented public bypass**: turn off wifi and the check cannot see you. That trade is correct only while nothing gates on the flag; **if anything ever does, that rule is the first to reopen**.
+
+    📌 The per-event toggle defaults to **on** and gates *derivation*, not collection — see #15.
+
+15. **Whether `/attend` discloses the capture** — ✅ **Yes, in one plain sentence, in the unconditional present tense.** The recommendation was already "yes" when the toggle was per-event; it became unavoidable once capture was made unconditional. `events.verify_origin` controls whether the officer's review screen *derives* flags, not whether origins are *recorded* — and that asymmetry is deliberate, because it is exactly what lets an officer turn verification on a week after an event and see the flags appear with no backfill. So the sentence describes collection that always happens; hedging it with "we may" or naming the toggle would be describing the wrong thing. It also says what is stored rather than merely that something is, because "we note the network you used" invites the reading that an address is kept, and none ever is. The site is public and the repository is public: a check-in form that quietly profiled the network you submitted from would be a worse surprise than the sentence is a deterrent.
+
+    📌 **Retention is still open.** The digests are meaningful only within one event, so they should not outlive it by much — the recommendation is an opportunistic purge of `checkin_origin` rows older than one term, in the style of `checkin_throttle`'s prune, so no scheduled job is added. Nothing has been built.
 
 ### Still open
 
@@ -3890,7 +3908,42 @@ One decision, and it earns a place here on exactly the bar #12 set: it changes t
                              out check-ins behind a venue's NAT.
                              ⚠️ Imports next/headers, so it must never be
                              imported by checkin.ts, which a Client Component
-                             imports
+                             imports.
+                             🔓 Also exports clientIp(), which returns the RAW
+                             address — added for check-in location
+                             verification, which must classify a network
+                             before it can hash it. This module's surface used
+                             to be "you cannot get the address out of me";
+                             a THIRD caller is a design review, not a refactor
+  network-classify.ts        classifyNetwork(ip) and normalizeOrigin(ip) —
+                             which network an address belongs to, and the
+                             canonical string it contributes to a digest.
+                             Pure: no node:*, no next/*, no dependencies, so
+                             it is safe in any bundle and is where OriginRecord
+                             is declared for that reason.
+                             🔓 Returns `other` — the ONLY label the review
+                             screen flags — only when matching nothing actually
+                             means something. UT announces no IPv6, so an IPv6
+                             address matching no campus range returns
+                             `unknown`, not `other`: calling it `other` would
+                             flag a member sitting in the room over a gap in a
+                             table. Self-corrects if UT's v6 space is ever added
+  network-prefixes.generated.ts
+                             GENERATED — do not hand-edit. The CIDR table, from
+                             scripts/build-network-table.mjs. Committed rather
+                             than fetched, so the app has no runtime dependency
+                             and makes no request-time call
+  checkin-origin.ts          the origin digest, the venue mode and the flag
+                             derivation (migration 28). Spec:
+                             docs/checkin-location-verification.md.
+                             🔓 event_id is INSIDE the hash, so one address at
+                             two events gives two unrelated digests and the
+                             table cannot trace a member across a semester.
+                             Being unjoinable is the feature.
+                             ⚠️ Imports node:crypto, so like request-ip.ts it
+                             must never be imported by a Client Component —
+                             which is why resolveCheckin takes a FACTORY rather
+                             than importing this
   auth.ts                    getOfficer / requireOfficer
   officer-invites.ts         the invite core (migration 24). Pure, same
                              contract as events.ts and dues.ts. Mints the

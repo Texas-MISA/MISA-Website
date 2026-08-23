@@ -15,6 +15,14 @@
 -- `checkin_throttle` is deliberately NOT wiped: IP-keyed rate-limit state with
 -- a ten-minute window, not seed data, and it expires on its own.
 --
+-- `checkin_origin` gets no delete of its own and is not missing from the list:
+-- its primary key is an attendance_id ON DELETE CASCADE, so `delete from
+-- attendance` below empties it. Named here anyway, because the list is the
+-- definition and a table that vanishes by cascade is the kind that otherwise
+-- goes unnoticed. The seed inserts no origin rows — the fixtures have no
+-- request behind them, and inventing digests would put fake evidence about
+-- fake people into a public repository for no gain.
+--
 -- Every identity here is fabricated. Emails use example.edu (RFC 2606
 -- reserved, can never resolve) and EIDs are synthetic. Never replace
 -- this with a real roster export — this repository is public.

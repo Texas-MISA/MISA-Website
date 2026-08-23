@@ -37,3 +37,35 @@ Stage 4 added `tests/events.test.ts` (pure — DST, half-open windows, edit-impa
 `tests/helpers.ts`'s `getTestOfficer()` creates one officer and **never deletes it**: `admin_audit` rows can't be deleted (P0001 from the append-only trigger), `admin_audit.actor_id` has no cascade, so an officer who has written any audit row is undeletable. Audit rows are likewise left behind by `cleanup()`. That is safe only because the local stack is disposable and `global-setup.ts` refuses any non-local URL.
 
 Test identities are obviously fake (`T3-…` IDs, `example.edu`); fixture events live in 2030, each test in its own 7-day slot so no 48-hour orphan window reaches a neighbour's events.
+
+## Check-in location verification (migration 28)
+
+**`CHECKIN_ORIGIN_PEPPER` must be set wherever check-ins are recorded.** Any long
+random string: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`.
+It goes in `.env.local` for dev and in **Vercel's project env vars** for
+production; `.env.example` documents it.
+
+🪤 **Missing is silent, not broken.** No digest is computed, no check-in fails,
+and every row on the officer's review screen reads *origin unknown* — so the
+symptom is a feature that appears to work and finds nothing. The event page's
+summary line names the variable when it is absent, which is the only thing
+standing between that and a mystery.
+
+⚠️ **Rotating it orphans every digest already stored.** That only matters inside
+an event that has not been reviewed yet, since digests are event-scoped anyway.
+
+**Refreshing the network prefix table:**
+
+```bash
+node scripts/build-network-table.mjs      # rewrites lib/network-prefixes.generated.ts
+```
+
+Fetches UT's and the carriers' announced prefixes from RIPEstat, merges them,
+and writes the committed table with a `GENERATED_AT` date. Needs network access;
+**refuses to write rather than emitting an empty table** if an ASN returns
+nothing, because an empty `cellular` list silently flags every member on a phone.
+
+🪤 **Nothing detects staleness.** `GENERATED_AT` is the only signal, and a stale
+table fails toward *flagging real attendees* — a carrier's new block reads
+`other`, and `other` is the one label that gets flagged. Re-run it when a whole
+carrier starts reading `other`.

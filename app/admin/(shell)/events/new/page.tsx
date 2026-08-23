@@ -52,6 +52,10 @@ export default async function NewEventPage() {
             points: 1,
             category: "general_and_other",
             status: "draft",
+            // Mirrors events.verify_origin's `default true`. The two are
+            // separate statements of one decision, so moving one without the
+            // other is a silent disagreement between the form and the schema.
+            verifyOrigin: true,
           }}
         />
       </div>

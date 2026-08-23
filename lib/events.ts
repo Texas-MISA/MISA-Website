@@ -332,6 +332,11 @@ export type EventDraft = {
   category: string | null;
   status: EventStatus;
   series_id: string | null;
+  // Check-in location verification (§6, migration 28). Carried so a DUPLICATE
+  // is faithful: the column defaults to true, so omitting it would silently
+  // re-enable verification on a copy of an event the officer had turned it off
+  // for. expandSeries leaves it unset on purpose and takes that default.
+  verify_origin?: boolean;
 };
 
 export type SeriesSpec = {
@@ -424,6 +429,7 @@ export type EventSourceRow = EventWindowRow & {
   location: string | null;
   points: number;
   category: string | null;
+  verify_origin: boolean;
 };
 
 /**
@@ -469,6 +475,7 @@ export function duplicateDraft(
     category: source.category,
     status: "draft",
     series_id: null,
+    verify_origin: source.verify_origin,
   };
 }
 

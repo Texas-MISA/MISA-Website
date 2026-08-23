@@ -216,3 +216,95 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
   - ⚠️ **`MAX_VIEWPORT` (4000px) is a real ceiling, not a safety margin.** Past it there are not enough copies and the gap returns. Documented at its definition, the way `MEMBER_SCAN_LIMIT` and `RATE_LIMIT_MAX` are.
   - 📌 **No pause on hover.** The handoff only suggested one, and the tracks span the full width — so a mouse resting anywhere over the band froze that row, which reads as the animation being broken. The `prefers-reduced-motion: reduce` rule stays; that one is an accessibility requirement rather than a nicety.
   - 🪤 **Verify this numerically, not by watching it.** The check that would have caught it: pause the animation at points across a full cycle (negative `animation-delay` plus `animationPlayState: paused`) and assert the track's right edge is never left of `window.innerWidth`. Watching a 38-second loop and seeing nothing wrong is what shipped the bug.
+
+## Check-in location verification (added 2026-08-22, migration 28)
+
+The short form is in `CLAUDE.md`; the spec and the threat model are
+[`checkin-location-verification.md`](checkin-location-verification.md). What
+follows is the evidence — the numbers that decided each rule, and the failures
+that produced it.
+
+**`event_id` must stay inside the hash.** `sha256(PEPPER || event_id ||
+normalize(ip))`. Without the event id every digest is joinable, and the table
+stops answering *"same network as everyone else, this once"* and starts
+answering *"where was this member all semester"*. That single property is why
+storing anything here was acceptable at all. It also has a cost worth knowing:
+because digests cannot be compared across events, **you cannot retrospectively
+measure whether the campus NATs per building** — that has to be checked out of
+band, by loading a what-is-my-IP page on UT wifi in two buildings.
+
+**The pepper cannot live in the repository.** IPv4 is 4.3 billion addresses, so
+an unpeppered SHA-256 of one is a rainbow table a laptop builds in seconds, and
+this repository is public. `lib/request-ip.ts` gets away with a known scope
+string because its hashes key a bucket that expires in ten minutes and link to
+nobody; these sit beside a member's identity. ⚠️ A **missing** pepper is safe
+rather than broken — nothing is hashed, every row reads *origin unknown* — which
+is exactly why it needed a visible symptom: `ORIGIN_CAPTURE_ENABLED` was
+declared and never read, so a production deploy without the variable would have
+shown "not enough check-ins came from one network" forever with nothing pointing
+at the cause.
+
+**The carrier table could not be hand-written, and the measurement is the
+argument.** The plan assumed "a few dozen prefixes". Against RIPEstat: AT&T
+Mobility (AS20057) announces **1,633** IPv4 prefixes, Verizon's Cellco (AS6167)
+**3,842**, T-Mobile (AS21928) **538**, Cellco's AS22394 **289** — ~6,300,
+against UT's AS18 at **8**. A wrong `cellular` entry is worse than a missing one
+because it hands a free pass to whoever falls inside it on the strength of a
+fabricated fact. 📌 Merging the overlapping announcements collapses 6,302
+prefixes to **137 v4 + 32 v6 ranges in 7KB**, which is why the generated file is
+small enough to commit and why the original size estimate was misleading.
+
+**UT announces no IPv6, and that is why `other` is a narrow answer.** AS18 is
+eight IPv4 prefixes and nothing else, so `CAMPUS_V6` is empty. `other` is the
+only label the review screen flags, so returning it asserts *"confidently not
+the university's"* — an assertion only available when that address family has
+campus data to have missed. A student on campus wifi over IPv6 matches nothing
+**because there is nothing to match against**, and calling that `other` would
+flag someone sitting in the room. Hence: an empty campus table for a family
+yields `unknown`. 📌 The generalisable rule — *"matched nothing" and "we have
+nothing to match with" are different answers, and a lookup table that cannot
+tell them apart will state the first while meaning the second.*
+
+**An IPv4-mapped address must be folded on the parsed value.** The first
+implementation matched `/^::ffff:…/`, which is one spelling of two: the
+uncompressed `0:0:0:0:0:ffff:128.83.140.7` fell through to the IPv6 branch,
+landed in the empty `CAMPUS_V6`, and produced a **v6 digest for a v4 client** —
+one client, two digests, silently outside its own venue mode. The test is
+`v6 >> 32n === 0xffffn`. 📌 *Structure covers every spelling; a regex covers the
+one you thought of.*
+
+**Window membership must not compare the raw strings.** PostgREST renders
+`submitted_at` with microseconds (`…23:12:32.506781+00:00`) and a whole-second
+`starts_at` without any (`…23:00:00+00:00`), so `>=` compares two different
+shapes. It happens to give the right answer **only because `.` (0x2E) sorts
+after `+` (0x2B)** in ASCII — nothing declares that, and a non-UTC offset would
+break it silently. `withinCheckinWindow` parses instead. Millisecond truncation
+is acceptable here because the case the filter exists for is an orphan an
+officer approved onto the event *hours* outside its window.
+
+**The origin insert needs its own try/catch, not the caller's.** It runs after
+the attendance row is written, so a rejection — as opposed to a returned
+`{ error }` — escapes into `submitCheckin`'s house try/catch and returns `error`
+to a member whose check-in **succeeded**, who then retries and is told they are
+a duplicate. PostgREST failures normally arrive as `{ error }`, which is
+precisely why the rejection path is the one that ships unnoticed: the
+returned-error case is the one anybody writes a test for.
+
+**An officer-entered row has no origin, and must not say "unknown".** Capture
+never runs for `admin_manual`, deliberately — those rows carry the officer's own
+network, and ten walk-ins typed from one laptop would either *become* the venue
+mode or get the whole batch flagged. The consequence is that `deriveOriginFlag`
+needs a source check **above** the missing-record check: without it every
+officer-entered row was badged *Origin unknown*, which claims the system tried
+to determine an origin and failed rather than that the concept does not apply.
+
+**A security sweep that filters on `id` proves nothing about a table keyed on
+something else.** `tests/security.test.ts`'s generic DELETE probe filters
+`.neq("id", …)`; `checkin_origin`'s primary key is `attendance_id`, so the probe
+returned **42703** ("column does not exist"), which satisfies `error !== null`
+while testing nothing. Verified by hand against the running PostgREST that the
+real answer is **42501** on both INSERT and DELETE, and an empty **200** on
+SELECT — anon *holds* `select` on this table via migration 22's narrowed default
+privileges, so **RLS is the only thing hiding the rows**. Same family as the
+empty-payload trap: assert the refusal you mean, and give the assertion
+something real to be non-vacuous about.
