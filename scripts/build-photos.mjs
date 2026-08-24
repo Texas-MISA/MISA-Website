@@ -77,6 +77,31 @@ const SETS = [
   { from: "gallery", to: "gallery", max: 800 },
 ];
 
+/**
+ * Per-file crop overrides, in SOURCE pixels, applied before the square resize.
+ *
+ * 🪤 **The escape hatch the `north` note above says to reach for, and it exists
+ * because a crop strategy cannot fix a FRAMING problem.** `north` guarantees
+ * the head is in the frame; it cannot make a full-length shot against a
+ * building look like the twelve tight portraits beside it. Karthik Kasa's
+ * replacement photograph is a good picture and a bad thumbnail: his head fills
+ * about 22% of the frame where everyone else's fills about half, and dropping
+ * it into the grid unedited reads as a mistake.
+ *
+ * 🔴 **A rect here is tied to the EXACT file it was measured against.** Replace
+ * `pictures/officers/<slug>.<ext>` and this entry is silently wrong — it will
+ * still crop, just not where you meant. Delete the entry when you replace the
+ * file, then re-measure only if the default still looks off.
+ *
+ * Keyed by output slug. `size` is the square's edge; `left`/`top` its origin.
+ */
+const CROPS = {
+  // Measured off the 1206x1118 source: head spans y≈349–601, face centred at
+  // x≈568. A 560px square with the eyes about 40% down puts him at roughly the
+  // same head-to-frame ratio as the rest of the grid.
+  "karthik-kasa": { left: 288, top: 226, size: 560 },
+};
+
 const IMAGE = /\.(jpe?g|png|heic|heif|webp|gif|tiff?)$/i;
 
 const HEIC = /\.hei[cf]$/i;
@@ -190,6 +215,26 @@ async function main() {
           // square the source can fill without being upscaled. Every output is
           // square by construction, and a small source stays small rather than
           // being blown up.
+          const crop = CROPS[s];
+          if (crop) {
+            // Explicit rect wins over the strategy entirely — `.extract()` runs
+            // after `.rotate()`, so the numbers are in upright source space.
+            pipeline = pipeline
+              .extract({
+                left: crop.left,
+                top: crop.top,
+                width: crop.size,
+                height: crop.size,
+              })
+              .resize(Math.min(crop.size, set.max), Math.min(crop.size, set.max), {
+                fit: "cover",
+              });
+            await pipeline.jpeg({ quality: 76, mozjpeg: true }).toFile(dest);
+            bytes += fs.statSync(dest).size;
+            n++;
+            continue;
+          }
+
           const meta = await sharp(input).metadata();
           // 🪤 Dimensions are PRE-rotation. An EXIF orientation of 5–8, or an
           // explicit quarter-turn from a decoded HEIC, swaps them — and taking
