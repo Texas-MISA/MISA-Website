@@ -674,3 +674,42 @@ entire composition.
 ⚠️ **`docs/invariants.md` has not yet been reconciled with this file.** That is
 scheduled for phase 5, and until then it describes v1 for the surfaces v2 has not
 reached — which is most of them.
+
+---
+
+## Design invariants (moved from CLAUDE.md, 2026-08-25)
+
+Rules about photography, headshots, the marquee, gallery, the nav, and design
+skill precedence. Engineering/correctness rules (cascade layer, clip-path, reveal
+scope) stayed in `CLAUDE.md`; invariants with evidence are in `docs/invariants.md`.
+
+### Photography and image slots
+
+- 🔓 **THE NO-PHOTOGRAPHY RULE IS LIFTED, CONDITIONALLY** (2026-08-18/19). Real photographs are **committed and live** on the home page, `/about`, `/contact`, `/gallery`, the project cells, and all 13 officer headshots since 2026-08-23. 🔴 The repository is public and a face in its history cannot be taken back — a removal request is a git history rewrite, not a delete. What replaces the rule: **a slot renders a photograph or a labelled `<Hatch>`, never a hole**, and `components/ui/photo-slot.tsx` is the single place that swap happens.
+- ⚠️ **`public/photos/projects/` (4 files) is the one set that is NOT students** — they are the clients' own premises and staff. Two of the four are live; `cap-metro.jpg` and `chicago-crime.jpg` are built and unreferenced. The irreversibility applies to those faces with none of the club's consent behind them.
+- 🔓 **Officer headshots landed 2026-08-23 for ALL THIRTEEN.** The pairing was read off the live Squarespace page's **CSS grid geometry** (not DOM order). 🔴 Sanya Pillai keeps her placeholder — the shared photograph is attributed to Daniel Chen, and it must never be copied onto her entry. 🔓 All thirteen cards now carry a photograph; `Officer.photo` stays optional so the fourteenth officer arrives without one.
+- ✂️ **Per-officer LinkedIn links are HIDDEN temporarily** (`SHOW_OFFICER_LINKEDIN` in `lib/officers.ts`). The seven URLs stay in the data.
+- 🪤 **Officer headshots are cropped SQUARE BY THE PIPELINE, not by the card.** `scripts/build-photos.mjs` crops with `position: "north"`. `CROPS` in the same file is the per-officer escape hatch for framing problems. 🔴 A rect is tied to the exact file it was measured against — replace the file and delete the entry.
+- 🪤 **`withoutEnlargement: true` silently defeats `fit: "cover"`.** The square edge is computed per image as `min(width, height, max)`.
+- 🪤 **When photography returns, size framed slots with `next/image`'s `fill`.** An intrinsically sized `<img>` makes the frame grow to the photo's own height.
+- ✂️ **`GALLERY_ITEMS`, `GALLERY_FILTERS`, `GALLERY_FEATURE` and `GALLERY_TERM` were DELETED in v2 phase 2.** Do not reintroduce a category filter without a real file-to-category mapping.
+
+### Marquee geometry
+
+- 🪤 **A marquee needs enough copies to cover the VIEWPORT.** `Math.ceil(MAX_VIEWPORT / groupWidth) + 1`; `MAX_VIEWPORT` (4000) is a real ceiling. The translate distance is `--marquee-shift`, one group width in pixels — never a percentage. No pause on hover. Verify by pausing animation across a full cycle, not by watching it.
+
+### Nav clearance
+
+- 🪤 **The site header's nav cannot grow without measuring at 1280.** The wordmark is absolutely centred and wins the z-order; an overflowing item disappears silently. 🔓 **RE-MEASURED 2026-08-23: 342px clearance left, 295px right.** Left group 225px, right cluster 272px, wordmark 82px, 32px gutter. Right is now the tighter side. Relisting `/projects` spends part of the left; any sixth item needs a fresh measurement.
+
+### Design skill precedence
+
+- **The Invariants in `CLAUDE.md` outrank all four skills, without exception.**
+- 📌 **`DESIGN.md` is the design source of truth for the WHOLE site.** The handoff is historical reference — desktop-only, no breakpoints, no interaction states.
+- 🔓 **`design-taste-frontend` IS PRIMARY for the public visual UI during the v2 redesign** (officer's call, 2026-08-17). It owns composition, layout family, image strategy, and its §14 Final Pre-Flight gate. `DESIGN.md` constrains the skill: it does not re-pick grounds, elevation, radii, or palette.
+- **No aesthetic skill is primary anywhere** outside the active redesign. `impeccable`'s "redesign replaces" path is out of scope for the whole site.
+- ⚠️ **Skill conflicts are settled in `DESIGN.md`; don't relitigate them.** Refused: dark mode, real imagery, eyebrow ban, mono-as-costume, 65–75ch measure, one-marquee-per-page, em-dash ban, "no oversized H1". Adopted: no coloured border-left above 1px, entrance variety, themed browser surfaces, emil's easing and durations.
+- **Animation and motion: `emil-design-eng` always wins** on easing, duration, and whether to animate at all. The scroll reveal is the house pattern.
+- **Pre-ship review: run `web-design-guidelines`.** Its accessibility findings override aesthetic preference.
+- **`impeccable`'s hook** runs after every Edit/Write (`.claude/settings.local.json`, machine-local, gitignored). It injects context only.
+- If two skills conflict and nothing above settles it, ask. Don't average them.
