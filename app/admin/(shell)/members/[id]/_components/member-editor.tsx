@@ -11,6 +11,7 @@ import {
 } from "@/app/actions/members";
 import { fieldValue, type FieldDefinition } from "@/lib/members";
 
+import { SectionHeading } from "@/components/ui/page-header";
 import { MemberFieldCell } from "../../_components/member-field-cell";
 
 // The member detail page's editable half (§7 Stage 6 phase 4).
@@ -65,7 +66,7 @@ export function MemberEditor({
   return (
     <>
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Custom fields</h2>
+        <SectionHeading>Custom fields</SectionHeading>
 
         {live.length === 0 && archivedHeld.length === 0 ? (
           <p className="mt-4 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
@@ -154,7 +155,7 @@ function NotesEditor({
 
   return (
     <section className="mt-12 max-w-3xl">
-      <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Officer notes</h2>
+      <SectionHeading>Officer notes</SectionHeading>
       <p className="mt-2 text-sm text-misa-secondary">
         Visible to officers only. Never shown on the public site or the
         leaderboard.

@@ -11,6 +11,7 @@ import {
 } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
 import { EventForm } from "../_components/event-form";
 import { EventStatusPill } from "../_components/event-table";
 import {
@@ -160,28 +161,29 @@ export default async function EventDetailPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          {event.title}
-        </h1>
-        <EventStatusPill status={event.status} />
-      </div>
-      <p className="mt-3 text-misa-body">
-        {formatEventRange(event.starts_at, event.ends_at)} Central ·{" "}
-        {event.term} · {event.points}{" "}
-        {event.points === 1 ? "point" : "points"}
-      </p>
-      {event.series_id && (
-        <p className="mt-1 text-sm text-misa-secondary">
-          Part of a recurring series.{" "}
-          <Link
-            href={`/admin/events?series=${event.series_id}`}
-            className="text-misa-blue underline underline-offset-4"
-          >
-            See the whole series
-          </Link>
-        </p>
-      )}
+      <PageHeader
+        title={event.title}
+        badge={<EventStatusPill status={event.status} />}
+        description={
+          <>
+            {formatEventRange(event.starts_at, event.ends_at)} Central ·{" "}
+            {event.term} · {event.points}{" "}
+            {event.points === 1 ? "point" : "points"}
+          </>
+        }
+      >
+        {event.series_id && (
+          <p className="mt-1 text-sm text-misa-secondary">
+            Part of a recurring series.{" "}
+            <Link
+              href={`/admin/events?series=${event.series_id}`}
+              className="text-misa-blue underline underline-offset-4"
+            >
+              See the whole series
+            </Link>
+          </p>
+        )}
+      </PageHeader>
 
       <div className="mt-8">
         {/* ⚠️ Fail SAFE when the count is unknown. A failed attendance read
@@ -197,7 +199,7 @@ export default async function EventDetailPage({
       </div>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Details</h2>
+        <SectionHeading>Details</SectionHeading>
         <div className="mt-4">
           <EventForm
             initial={{
@@ -223,9 +225,9 @@ export default async function EventDetailPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading>
           Check-ins ({attendanceFailed ? "—" : rows.length})
-        </h2>
+        </SectionHeading>
         {/* 🪤 The rows go quiet when there is nothing to compare against, so
             this line is the only thing that distinguishes "everyone was at the
             venue" from "we never worked out what the venue was". Without it an

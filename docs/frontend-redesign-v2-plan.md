@@ -342,8 +342,8 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 | **0** | Amend `CLAUDE.md` precedence. Install the three packages. Re-skin shadcn out of default state. Define the elevation vocabulary and the radius scale. Read §0, §4, §5, §10, §12 in full. |
 | **1** | ✅ **COMPLETE, gate passed 2026-08-19.** Home page + header. Record below. |
 | **2** | ✅ **BUILT, awaiting officer review.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Record below. |
-| **3** | ⬅️ **NEXT.** `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched |
-| **4** | `/admin` under scanability rules, screen by screen, suite green between screens |
+| **3** | ⏸️ **DEFERRED, not skipped.** `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched. Taken out of order on the officer's instruction (2026-08-27): phase 4 was asked for first. ⚠️ **Its debt is still outstanding** — the `--misa-muted`-on-grey AA failure on those three pages is phase 3's, and phase 4 must not silently absorb it. |
+| **4** | 🏗️ **IN PROGRESS (2026-08-27), branch `v2-phase-4-admin`.** `/admin` under scanability rules, screen by screen, suite green between screens. Brief below. |
 | **5** | ~~Replace `DESIGN.md`~~ ✅ **done early, 2026-08-19.** What remains: reconcile `docs/invariants.md` for every invariant retired, each with its replacement argued; final record in `build-log.md` and `tasks.md` |
 
 📌 **Do not pre-suppress detector findings.** v1 added ten `design-system-font-size`
@@ -356,6 +356,102 @@ against the ramp that actually ships, or not at all.
 first scan, and it is not v2's doing: `app/(public)/_components/upcoming-events.tsx:87`
 sets `text-[21px]`, which is off the documented ramp today. Leave findings like
 this standing until the section that owns them is rebuilt.
+
+---
+
+## Phase 4 brief — `/admin` (IN PROGRESS)
+
+**Scope:** every screen under `app/admin/`, plus `/admin/login` and the two admin
+error boundaries. Presentational only — no route, Server Action, `lib/`, view or
+schema change. Branch `v2-phase-4-admin`, cut from the roster-terms commit so the
+screens being styled are the **term-aware** ones migration 29 produced.
+
+### Mode is Operate, not Persuade
+
+📌 `DESIGN.md` already says it: `/admin` is *"governed by scanability rather than
+expression."* `PRODUCT.md` says who and where — **~13 officers, at a desk, on a
+laptop, between classes, all semester.** That settles most of the arguments this
+phase could otherwise have. Density is a feature; wide tables and multi-column
+filter bars are correct; brand lives in precise details, not in composition.
+
+⚠️ **`design-taste-frontend` is NOT primary here.** It is primary for the *public
+visual UI* (`DESIGN.md` §Design skill precedence), and `/admin` is not that. The
+layout-family budget, the eyebrow cap and the image-slot strategy are public-page
+instruments and do not apply to a filter bar. What governs instead: `DESIGN.md`'s
+grounds/elevation/type/shape system, the `CLAUDE.md` Invariants above it, and
+`impeccable`'s Operate + craft-floor mechanics for the table and form work.
+
+🪤 **Two craft-floor rules are overridden here, both already settled in
+`DESIGN.md` and not to be relitigated.** Its blanket eyebrow ban is **refused**
+(the `Th` label style and `Eyebrow` are load-bearing), and its
+"monospace as costume" refusal does not reach `/admin`'s identifiers — an EID is
+transcribed by hand off a phone screen, which is data, not flavour.
+
+### What the audit found before anything was designed
+
+Counted, not guessed:
+
+- 🐛 **`PageHeader` and `SectionHeading` have ZERO call sites in the entire
+  repository.** Both were written *for* `/admin` — their own doc comments say
+  "thirteen admin pages open with the same three elements … written out longhand
+  every time" and "the `font-display text-xl font-bold` that appears 38 times" —
+  and neither was ever wired up. `Panel` has exactly one call site, on `/attend`.
+  **Three primitives were built to end this drift and the drift was never ended.**
+- **25 admin pages repeat one identical h1 class string, verbatim.**
+  `/admin/login` is the single outlier and is off the ramp (`text-3xl`, different
+  tracking).
+- **42 h2s: 38 identical at `text-[22px]`, plus 3 `text-xl` and 1 `text-lg`.**
+  Those four are drift the swap fixes rather than preserves.
+- 43 of 76 admin `.tsx` files already import from `components/ui/`. **The control
+  vocabulary is adopted; the page-level structure is not.** That is the whole gap.
+
+### The ground, and the ordering constraint that governs the phase
+
+`/admin` moves onto the v2 system the same way the public side did: **the page
+ground becomes Vellum `#f2f2f3` and content regions become white surfaces.**
+`DESIGN.md`'s sentence carries over unchanged — *the grey is the background;
+cards stay white.*
+
+🔴 **This CANNOT land before the screens are wrapped, and the reason is a bug
+rather than a preference.** Five shared primitives fill with `bg-misa-panel` —
+`controlClass` (every input), `table.tsx`'s sticky `<THead>`, `chip.tsx`'s
+resting `FilterChip`, `banner.tsx`'s neutral variant, and `Tr`'s
+`hover:bg-misa-panel/70`. On a Vellum page ground **every one of them is the same
+colour as what is behind it**: inputs disappear, the sticky head stops separating
+from the rows scrolling under it, and row hover does nothing. `--misa-muted` also
+measures **4.33:1 on Vellum and fails AA** — the defect phase 2 found and fixed on
+three public pages.
+
+📌 So the order is fixed, and it is the opposite of the tempting one:
+**wrap every screen in white surfaces FIRST, flip the ground LAST.** A white panel
+on the still-white page is invisible and harmless, so every intermediate commit
+stays shippable; the flip is then one line and every screen is already correct.
+🪤 The reverse order gives a branch that looks finished and is measurably broken.
+
+### Constraints specific to this phase
+
+- 🔴 **The markup invariants under *What must not regress* bind hardest here**,
+  because `/admin` is where every one of them lives: the React 19 form reset and
+  its string `defaultValue`s, one carrier per field name, no `formAction` on a
+  submit button whose `name` is read, the row-level CAS token in
+  `directory-row.tsx` and `member-editor.tsx`, and selection's two modes.
+- 🪤 **`<Section>` has ZERO admin call sites and keeps them.** It owns the public
+  gutter and vertical rhythm, which `/admin` does not share. `Panel` is the admin
+  surface; the shell owns the ground.
+- **Identifiers stay monospace.** Engineering-set rule #5.
+- 🪤 **`/admin` has no scroll reveal and gains none.** `reveal-observer` is
+  mounted in the *public* layout only, so a `data-reveal` on an admin node would
+  sit at `opacity: 0` forever. Operate mode bans page-load choreography anyway.
+- **`npm test` green between screen groups**, per the phase table.
+
+### The gate
+
+`npm run lint`, `npx tsc --noEmit`, `npm run build`, the full suite, zero
+horizontal overflow at 1024/1280/1646 (admin is a laptop surface — 390 is not a
+target, but nothing may overflow), every contrast pairing measured on the
+composited ground it actually sits on, and a browser walkthrough of every screen
+against local seed data. Then `web-design-guidelines` as the pre-ship review.
+Then stop for the officer.
 
 ---
 

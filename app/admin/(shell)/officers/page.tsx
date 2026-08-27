@@ -11,6 +11,7 @@ import {
 } from "@/lib/officer-roster";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
 import { InviteCreateForm } from "./_components/invite-create-form";
 import {
   RestoreAccessButton,
@@ -66,28 +67,22 @@ export default async function OfficersPage() {
 
   return (
     <div className="space-y-12">
-      <header>
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Officers
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm text-misa-secondary">
-          Invite someone by sending them a link, or take access away when
-          somebody leaves. Removing access keeps their account and everything
-          they did — the audit trail still names them.
-        </p>
-      </header>
+      <PageHeader
+        title="Officers"
+        description="Invite someone by sending them a link, or take access away when somebody leaves. Removing access keeps their account and everything they did — the audit trail still names them."
+      />
 
       <section aria-labelledby="invite-heading">
-        <h2 id="invite-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading id="invite-heading">
           Invite an officer
-        </h2>
+        </SectionHeading>
         <InviteCreateForm />
       </section>
 
       <section aria-labelledby="current-heading">
-        <h2 id="current-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading id="current-heading">
           Current officers
-        </h2>
+        </SectionHeading>
 
         {roster === null ? (
           <ReadError what="the officer list" className="mt-4" />
@@ -137,9 +132,9 @@ export default async function OfficersPage() {
       </section>
 
       <section aria-labelledby="pending-heading">
-        <h2 id="pending-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading id="pending-heading">
           Outstanding invitations
-        </h2>
+        </SectionHeading>
 
         {invites === null ? (
           <ReadError what="the invitation list" className="mt-4" />
@@ -187,9 +182,9 @@ export default async function OfficersPage() {
 
       {inactive && inactive.length > 0 ? (
         <section aria-labelledby="history-heading">
-          <h2 id="history-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
+          <SectionHeading id="history-heading">
             Past invitations
-          </h2>
+          </SectionHeading>
           <ul className="mt-4 divide-y divide-misa-hairline border border-misa-hairline">
             {inactive.slice(0, 15).map((invite) => (
               <li key={invite.id} className="px-4 py-3">
@@ -209,9 +204,9 @@ export default async function OfficersPage() {
       ) : null}
 
       <section aria-labelledby="noaccess-heading">
-        <h2 id="noaccess-heading" className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading id="noaccess-heading">
           Accounts without access
-        </h2>
+        </SectionHeading>
         <p className="mt-2 max-w-2xl text-sm text-misa-secondary">
           Accounts that exist but can&apos;t get in — former officers, and anyone
           who signed up without being granted access. Giving one access needs no

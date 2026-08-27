@@ -9,6 +9,8 @@ import { formatInstant } from "@/lib/events";
 import { formatPointCategory, signedPoints } from "@/lib/points";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
+import { Pill } from "@/components/ui/pill";
 import { VoidForm } from "./_components/void-form";
 
 // One adjustment, its history, and the only mutation it will ever accept.
@@ -87,25 +89,20 @@ export default async function AdjustmentDetailPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Adjustment
-        </h1>
-        {voided && (
-          <span className="border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-            voided
-          </span>
-        )}
-      </div>
-
-      <p className="mt-3 text-sm">
-        <Link href={backToLedger} className="underline">
-          ← Back to the ledger
-        </Link>
-      </p>
+      <PageHeader
+        back={{ href: backToLedger, label: "Back to the ledger" }}
+        title="Adjustment"
+        badge={
+          voided ? (
+            <Pill tone="critical" size="md">
+              voided
+            </Pill>
+          ) : null
+        }
+      />
 
       <section className="mt-10 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">What was awarded</h2>
+        <SectionHeading>What was awarded</SectionHeading>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Member">
             {adjustment.members ? (
@@ -161,9 +158,9 @@ export default async function AdjustmentDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading>
           {voided ? "How it was voided" : "Void this adjustment"}
-        </h2>
+        </SectionHeading>
 
         {voided ? (
           <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
@@ -191,7 +188,7 @@ export default async function AdjustmentDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
+        <SectionHeading>History</SectionHeading>
         <div className="mt-4">
           <AuditTrail entityType="point_adjustment" entityId={adjustment.id} />
         </div>

@@ -6,6 +6,7 @@ import { requireOfficer } from "@/lib/auth";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FieldDefinition } from "@/lib/members";
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
 
 // Officer-defined custom fields (§7 Stage 6 phase 4).
 //
@@ -30,23 +31,15 @@ export default async function MemberFieldsPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Custom fields
-        </h1>
-        <Link
-          href="/admin/members/fields/new"
-          className={BUTTON_PRIMARY_SM}
-        >
-          NEW FIELD
-        </Link>
-      </div>
-
-      <p className="mt-3 text-sm">
-        <Link href="/admin/members" className="underline">
-          ← Back to the directory
-        </Link>
-      </p>
+      <PageHeader
+        back={{ href: "/admin/members", label: "Back to the directory" }}
+        title="Custom fields"
+        action={
+          <Link href="/admin/members/fields/new" className={BUTTON_PRIMARY_SM}>
+            NEW FIELD
+          </Link>
+        }
+      />
 
       <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
         Dropdowns officers can set on any member — t-shirt size, committee,
@@ -55,7 +48,7 @@ export default async function MemberFieldsPage() {
       </p>
 
       <section className="mt-10">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Live</h2>
+        <SectionHeading>Live</SectionHeading>
         <div className="mt-4">
           {live.length === 0 ? (
             <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
@@ -70,7 +63,7 @@ export default async function MemberFieldsPage() {
 
       {archived.length > 0 && (
         <section className="mt-12">
-          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Archived</h2>
+          <SectionHeading>Archived</SectionHeading>
           <p className="mt-2 max-w-2xl text-sm text-misa-secondary">
             No longer offered anywhere.{" "}
             <span className="font-medium">

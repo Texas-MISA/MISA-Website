@@ -6,6 +6,7 @@ import { fetchFieldDefinitions } from "@/lib/member-fields";
 import { importColumns, MAX_ROSTER_IMPORT_ROWS } from "@/lib/member-import";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
 import { RosterImportForm } from "./_components/roster-import-form";
 
 // Roster CSV import (§7 Stage 6 phase 7b).
@@ -38,27 +39,23 @@ export default async function MemberImportPage() {
 
   return (
     <div>
-      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-        Import members
-      </h1>
-
-      <p className="mt-3 text-sm">
-        <Link href="/admin/members" className="underline">
-          ← Back to the directory
-        </Link>
-      </p>
-
-      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
-        Upload a CSV. Nothing is saved until you confirm, and{" "}
-        <span className="font-medium">
-          people already on the roster are never changed
-        </span>{" "}
-        — those rows are listed and skipped, so re-importing the same file adds
-        nothing.
-      </p>
+      <PageHeader
+        back={{ href: "/admin/members", label: "Back to the directory" }}
+        title="Import members"
+        description={
+          <>
+            Upload a CSV. Nothing is saved until you confirm, and{" "}
+            <span className="font-medium">
+              people already on the roster are never changed
+            </span>{" "}
+            — those rows are listed and skipped, so re-importing the same file
+            adds nothing.
+          </>
+        }
+      />
 
       <div className="mt-8 border border-misa-border bg-misa-panel px-4 py-4">
-        <h2 className="font-display text-[18px] leading-[1.1] font-semibold">Columns</h2>
+        <SectionHeading level="sub">Columns</SectionHeading>
         <p className="mt-2 text-sm text-misa-secondary">
           Columns are matched <span className="font-medium">by header name</span>
           , so the order does not matter and extra columns are ignored. A file

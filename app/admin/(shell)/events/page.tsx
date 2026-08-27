@@ -5,6 +5,7 @@ import Link from "next/link";
 import { requireOfficer } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { EventFilters } from "./_components/event-filters";
 import { EventTable, type EventListRow } from "./_components/event-table";
 import { SeriesActions } from "./_components/series-actions";
@@ -133,17 +134,14 @@ export default async function AdminEventsPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Events
-        </h1>
-        <Link
-          href="/admin/events/new"
-          className={BUTTON_PRIMARY_SM}
-        >
-          NEW EVENT
-        </Link>
-      </div>
+      <PageHeader
+        title="Events"
+        action={
+          <Link href="/admin/events/new" className={BUTTON_PRIMARY_SM}>
+            NEW EVENT
+          </Link>
+        }
+      />
 
       <div className="mt-6">
         <EventFilters

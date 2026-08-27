@@ -19,6 +19,8 @@ import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { fetchMemberOptions } from "@/lib/member-options";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
+import { Pill } from "@/components/ui/pill";
 import { PaymentEditor } from "./_components/payment-editor";
 import { PaymentSuggestions } from "./_components/payment-suggestions";
 import { VoidPaymentForm } from "./_components/void-payment-form";
@@ -169,22 +171,17 @@ export default async function PaymentDetailPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Payment
-        </h1>
-        {voided && (
-          <span className="border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-            voided
-          </span>
-        )}
-      </div>
-
-      <p className="mt-3 text-sm">
-        <Link href={backToLedger} className="underline">
-          ← Back to the ledger
-        </Link>
-      </p>
+      <PageHeader
+        back={{ href: backToLedger, label: "Back to the ledger" }}
+        title="Payment"
+        badge={
+          voided ? (
+            <Pill tone="critical" size="md">
+              voided
+            </Pill>
+          ) : null
+        }
+      />
 
       {!voided && review.needsReview && (
         <p className="mt-6 max-w-3xl border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm">
@@ -198,7 +195,7 @@ export default async function PaymentDetailPage({
       )}
 
       <section className="mt-10 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">What arrived</h2>
+        <SectionHeading>What arrived</SectionHeading>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Amount">
             <span className={voided ? "line-through" : ""}>
@@ -256,9 +253,9 @@ export default async function PaymentDetailPage({
 
       {review.noMember && !voided && (
         <section className="mt-12 max-w-3xl">
-          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
+          <SectionHeading>
             Who might have sent this
-          </h2>
+          </SectionHeading>
           <p className="mt-2 text-sm text-misa-secondary">
             Ranked from the payer&apos;s name and the note. Nothing is
             preselected — pick below once you are sure.
@@ -273,7 +270,7 @@ export default async function PaymentDetailPage({
       )}
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Who it credits</h2>
+        <SectionHeading>Who it credits</SectionHeading>
 
         {voided ? (
           <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
@@ -347,9 +344,9 @@ export default async function PaymentDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading>
           {voided ? "How it was voided" : "Void this payment"}
-        </h2>
+        </SectionHeading>
 
         {voided ? (
           <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
@@ -373,7 +370,7 @@ export default async function PaymentDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
+        <SectionHeading>History</SectionHeading>
         <div className="mt-4">
           <AuditTrail entityType="dues_payment" entityId={payment.id} />
         </div>

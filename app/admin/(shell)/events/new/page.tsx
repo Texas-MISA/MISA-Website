@@ -4,6 +4,7 @@ import Link from "next/link";
 import { requireOfficer } from "@/lib/auth";
 import { toCentralFields } from "@/lib/events";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { EventForm } from "../_components/event-form";
 
 // Create a single event (§5). Recurring series get their own screen in the
@@ -21,22 +22,18 @@ export default async function NewEventPage() {
 
   return (
     <div className="max-w-3xl">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          New event
-        </h1>
-        <Link
-          href="/admin/events/series"
-          className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
-        >
-          Create a recurring series instead
-        </Link>
-      </div>
-
-      <p className="mt-3 text-misa-body">
-        Times are Central. Save as a draft to keep it officer-only, or publish
-        it straight to the public schedule.
-      </p>
+      <PageHeader
+        title="New event"
+        action={
+          <Link
+            href="/admin/events/series"
+            className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+          >
+            Create a recurring series instead
+          </Link>
+        }
+        description="Times are Central. Save as a draft to keep it officer-only, or publish it straight to the public schedule."
+      />
 
       <div className="mt-8">
         <EventForm

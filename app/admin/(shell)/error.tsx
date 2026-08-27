@@ -4,6 +4,7 @@ import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
 
 import Link from "next/link";
 import { useEffect } from "react";
+import { PageHeader } from "@/components/ui/page-header";
 
 // The admin segment error boundary (Stage 8 phase 3). Catches a throw in any
 // admin page or nested layout and renders INSIDE the shell, so the nav survives
@@ -37,9 +38,10 @@ export default function AdminError({
 
   return (
     <div className="max-w-2xl">
-      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-        Something went wrong
-      </h1>
+      {/* Title only. `description` is the 14px screen-descriptor step, and the
+          most important sentence on an error screen is not the place to spend
+          two points of legibility on consistency. */}
+      <PageHeader title="Something went wrong" />
       <p className="mt-4 text-misa-body">
         This screen failed to load. Nothing has been changed — this is a read
         failing, not an action half-finishing.

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
@@ -7,6 +6,7 @@ import { fetchEventOptions } from "@/lib/event-options";
 import { fetchMemberOptions } from "@/lib/member-options";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { GrantForm } from "./_components/grant-form";
 
 // Awarding points outside of attendance (§4.2). One grant covers any number of
@@ -49,21 +49,11 @@ export default async function NewGrantPage({
           className="mb-6"
         />
       )}
-      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-        Grant points
-      </h1>
-
-      <p className="mt-3 text-sm">
-        <Link href={backToLedger} className="underline">
-          ← Back to the ledger
-        </Link>
-      </p>
-
-      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
-        For points that did not come from a check-in. Everyone picked here gets
-        the same points, category, and reason, recorded as separate rows in the
-        ledger under your name.
-      </p>
+      <PageHeader
+        back={{ href: backToLedger, label: "Back to the ledger" }}
+        title="Grant points"
+        description="For points that did not come from a check-in. Everyone picked here gets the same points, category, and reason, recorded as separate rows in the ledger under your name."
+      />
 
       <div className="mt-8">
         <GrantForm

@@ -11,9 +11,9 @@
 // against a member's name would claim more than the data can carry. The
 // strongest tone available is `caution`, which means "worth a glance".
 
-import { Pill } from "@/components/ui/pill";
 import type { PillTone } from "@/components/ui/pill";
 import { ORIGIN_FLAG_LABEL, type OriginFlag } from "@/lib/checkin-origin";
+import { Pill } from "@/components/ui/pill";
 
 function toneFor(flag: OriginFlag): PillTone {
   if (flag === "at_venue") return "affirm";

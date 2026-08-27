@@ -14,6 +14,7 @@ import {
   formatEventRange,
   type EventWarning,
 } from "@/lib/events";
+import { SectionHeading } from "@/components/ui/page-header";
 
 // Create and edit share one form: the fields are identical, and the only
 // difference is whether an `id` is posted. Client Component for
@@ -358,9 +359,9 @@ function ImpactWarnings({
       role="alert"
       className="border border-misa-caution/45 bg-misa-caution-wash px-4 py-4"
     >
-      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">
+      <SectionHeading level="sub">
         Check this before saving
-      </h2>
+      </SectionHeading>
       <ul className="mt-3 flex flex-col gap-3 text-sm">
         {warnings.map((warning, index) => (
           <li key={index}>{describeWarning(warning)}</li>

@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
@@ -8,6 +7,7 @@ import { toCentralFields } from "@/lib/events";
 import { fetchMemberOptions } from "@/lib/member-options";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { ManualEntryForm } from "./_components/manual-entry-form";
 
 // Officer-entered attendance (§4.2) — someone who was there and never used the
@@ -54,21 +54,11 @@ export default async function NewAttendancePage({
           className="mb-6"
         />
       )}
-      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-        Add a check-in
-      </h1>
-
-      <p className="mt-3 text-sm">
-        <Link href={backToQueue} className="underline">
-          ← Back to the queue
-        </Link>
-      </p>
-
-      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
-        For someone who attended but never submitted the form. This is recorded
-        as present immediately, so it needs both an event and a member, and it
-        stays marked as entered by an officer.
-      </p>
+      <PageHeader
+        back={{ href: backToQueue, label: "Back to the queue" }}
+        title="Add a check-in"
+        description="For someone who attended but never submitted the form. This is recorded as present immediately, so it needs both an event and a member, and it stays marked as entered by an officer."
+      />
 
       <div className="mt-8">
         <ManualEntryForm

@@ -21,6 +21,8 @@ import { rankDuplicateCandidates } from "@/lib/merge";
 import { formatPointCategory, signedPoints } from "@/lib/points";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
+import { Pill } from "@/components/ui/pill";
 import { MemberEditor } from "./_components/member-editor";
 import { MergePanel, type DuplicateHint } from "./_components/merge-panel";
 
@@ -284,30 +286,24 @@ export default async function MemberDetailPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          {member.full_name}
-        </h1>
-        <div className="flex items-center gap-2">
-          {member.source === "self_checkin" && (
-            <span
+      <PageHeader
+        back={{ href: backToDirectory, label: "Back to the directory" }}
+        title={member.full_name}
+        badge={
+          member.source === "self_checkin" ? (
+            <Pill
+              tone="neutral"
+              size="md"
               title="Created by the check-in form rather than an officer"
-              className="border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase"
             >
               self-registered
-            </span>
-          )}
-        </div>
-      </div>
-
-      <p className="mt-3 text-sm">
-        <Link href={backToDirectory} className="underline">
-          ← Back to the directory
-        </Link>
-      </p>
+            </Pill>
+          ) : null
+        }
+      />
 
       <section className="mt-10 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Who this is</h2>
+        <SectionHeading>Who this is</SectionHeading>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="EID">{member.eid}</Row>
           <Row label="Email">
@@ -336,9 +332,9 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading>
           {term ? `This term — ${term}` : "This term"}
-        </h2>
+        </SectionHeading>
         <p className="mt-2 text-sm text-misa-secondary">
           Every figure below is scoped to the current term, denominators
           included. A grant made in a past term counts for nothing here.
@@ -368,7 +364,7 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">All-time</h2>
+        <SectionHeading>All-time</SectionHeading>
         {/* These two are the only columns in member_directory that are NOT
             term-scoped, and sitting beside term-scoped figures in a table is
             what made that ambiguous. Here they are labelled and set apart. */}
@@ -425,9 +421,9 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading>
           {term ? `Events this term — ${term}` : "Events this term"}
-        </h2>
+        </SectionHeading>
         <p className="mt-2 max-w-3xl text-sm text-misa-secondary">
           Published events only; a cancelled event credits nobody.{" "}
           <span className="font-medium">
@@ -502,7 +498,7 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Point adjustments</h2>
+        <SectionHeading>Point adjustments</SectionHeading>
         {adjustmentsFailed ? (
           <ReadError what="this member's point adjustments" className="mt-4 max-w-3xl" />
         ) : adjustmentRows.length === 0 ? (
@@ -573,7 +569,7 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Dues</h2>
+        <SectionHeading>Dues</SectionHeading>
 
         {/* The status comes from the view's own boolean rather than being
             re-derived from the payments below, so this page and the directory
@@ -714,7 +710,7 @@ export default async function MemberDetailPage({
       />
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
+        <SectionHeading>History</SectionHeading>
         <div className="mt-4">
           {/* `id` from the route rather than member.id: every column of the
               view is nullable in the generated types, and this one is the

@@ -16,6 +16,7 @@ import {
 } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { DuesFilters } from "./_components/dues-filters";
 import { DuesTable, type DuesLedgerRow } from "./_components/dues-table";
 
@@ -316,23 +317,15 @@ export default async function AdminDuesPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Dues
-        </h1>
-        <Link
-          href="/admin/dues/import"
-          className={BUTTON_PRIMARY_SM}
-        >
-          IMPORT A STATEMENT
-        </Link>
-      </div>
-
-      <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
-        Every payment reconciled from a Venmo statement. A member counts as
-        official for a term when a live payment covers it — nothing here is
-        ticked by hand, and voiding a payment takes that status away again.
-      </p>
+      <PageHeader
+        title="Dues"
+        action={
+          <Link href="/admin/dues/import" className={BUTTON_PRIMARY_SM}>
+            IMPORT A STATEMENT
+          </Link>
+        }
+        description="Every payment reconciled from a Venmo statement. A member counts as official for a term when a live payment covers it — nothing here is ticked by hand, and voiding a payment takes that status away again."
+      />
 
       {/* The number an officer acts on, so it sits in the header rather than
           behind a filter. It is counted across the whole table, not across the

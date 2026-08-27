@@ -1,4 +1,6 @@
+import { Notice, ReadError } from "@/app/admin/(shell)/_components/notice";
 import { StatusPill } from "@/app/admin/(shell)/_components/status-pill";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 import { formatInstant } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -41,56 +43,50 @@ async function fetchRecentCheckins(): Promise<
 export async function RecentCheckins() {
   const result = await fetchRecentCheckins();
 
+  // 🔓 A failed read renders as an ERROR, not as an empty list. This used to be
+  // the same blue `info` panel as "no check-ins yet", which is the empty-vs-error
+  // conflation Stage 8 phase 3 corrected everywhere else and banner.tsx names
+  // outright: never reuse `info` for a failed read.
   if (result.kind === "error") {
-    return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
-        Couldn&apos;t load recent check-ins.
-      </p>
-    );
+    return <ReadError what="recent check-ins" />;
   }
   if (result.rows.length === 0) {
-    return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
-        No check-ins yet.
-      </p>
-    );
+    return <Notice>No check-ins yet.</Notice>;
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[36rem] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-misa-border text-left">
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Name</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">EID</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Submitted</th>
-            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.rows.map((row) => (
-            <tr key={row.id} className="border-b border-misa-hairline transition-colors duration-150 hover:bg-misa-panel/70">
-              <td className="py-2 pr-4">{row.submitted_name}</td>
-              <td className="py-2 pr-4 font-mono text-xs">
-                {row.submitted_eid}
-              </td>
-              <td className="py-2 pr-4">
-                {row.events?.title ?? (
-                  <span className="text-misa-muted">unmatched</span>
-                )}
-              </td>
-              <td className="py-2 pr-4 whitespace-nowrap">
-                {formatInstant(row.submitted_at)} CT
-              </td>
-              <td className="py-2">
-                <StatusPill status={row.status} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table minWidth="min-w-[36rem]">
+      <THead>
+        <Tr hover={false}>
+          <Th>Name</Th>
+          <Th>EID</Th>
+          <Th>Event</Th>
+          <Th>Submitted</Th>
+          <Th>Status</Th>
+        </Tr>
+      </THead>
+      <tbody>
+        {result.rows.map((row) => (
+          <Tr key={row.id}>
+            <Td>{row.submitted_name}</Td>
+            {/* Monospace: an EID is read off a phone screen by hand, and it is
+                where `l` has to be distinguishable from `1`. */}
+            <Td className="font-mono text-xs">{row.submitted_eid}</Td>
+            <Td>
+              {row.events?.title ?? (
+                <span className="text-misa-muted">unmatched</span>
+              )}
+            </Td>
+            <Td className="whitespace-nowrap">
+              {formatInstant(row.submitted_at)} CT
+            </Td>
+            <Td>
+              <StatusPill status={row.status} />
+            </Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
 

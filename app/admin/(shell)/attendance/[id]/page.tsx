@@ -21,6 +21,7 @@ import { formatInstant } from "@/lib/events";
 import { fetchMemberOptions } from "@/lib/member-options";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
 import { ResolutionForm } from "./_components/resolution-form";
 import {
   buildEventSuggestions,
@@ -250,21 +251,14 @@ export default async function SubmissionDetailPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Submission
-        </h1>
-        <StatusPill status={submission.status} />
-      </div>
-
-      <p className="mt-3 text-sm">
-        <Link href={backToQueue} className="underline">
-          ← Back to the queue
-        </Link>
-      </p>
+      <PageHeader
+        back={{ href: backToQueue, label: "Back to the queue" }}
+        title="Submission"
+        badge={<StatusPill status={submission.status} />}
+      />
 
       <section className="mt-10 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">As it was submitted</h2>
+        <SectionHeading>As it was submitted</SectionHeading>
         <p className="mt-2 text-sm text-misa-secondary">
           Exactly what the member typed. Nothing here has been corrected or
           normalized.
@@ -302,7 +296,7 @@ export default async function SubmissionDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Where it stands</h2>
+        <SectionHeading>Where it stands</SectionHeading>
         <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Event">
             {submission.events ? (
@@ -349,7 +343,7 @@ export default async function SubmissionDetailPage({
 
       {!submission.event_id && (
         <section className="mt-12 max-w-3xl">
-          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Which event?</h2>
+          <SectionHeading>Which event?</SectionHeading>
           <p className="mt-2 text-sm text-misa-secondary">
             Ranked by how close the submission was to each event&apos;s
             check-in window. Suggestions only — nothing is selected, and
@@ -372,7 +366,7 @@ export default async function SubmissionDetailPage({
 
       {!submission.member_id && (
         <section className="mt-12 max-w-3xl">
-          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Which member?</h2>
+          <SectionHeading>Which member?</SectionHeading>
           <p className="mt-2 text-sm text-misa-secondary">
             Closest roster matches on email, EID, and name. The
             highlighted character is where the submitted ID first differs.
@@ -390,7 +384,7 @@ export default async function SubmissionDetailPage({
       )}
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Resolving this</h2>
+        <SectionHeading>Resolving this</SectionHeading>
         <p className="mt-2 text-sm text-misa-secondary">
           Correct whatever the member mistyped, set both links, and approve —
           one save. Nothing above is preselected; the choice is yours.
@@ -426,7 +420,7 @@ export default async function SubmissionDetailPage({
       </section>
 
       <section className="mt-12 max-w-3xl">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
+        <SectionHeading>History</SectionHeading>
         <div className="mt-4">
           <AuditTrail entityType="attendance" entityId={submission.id} />
         </div>

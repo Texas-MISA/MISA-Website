@@ -10,6 +10,7 @@ import {
 } from "@/app/actions/events";
 import { formatEventRange } from "@/lib/events";
 import { BUTTON_QUIET_SM } from "@/components/ui/button";
+import { SectionHeading } from "@/components/ui/page-header";
 
 // Publish or cancel a whole series (§7 Stage 4).
 //
@@ -41,7 +42,7 @@ export function SeriesActions({
 
   return (
     <div className="border border-misa-blue/35 bg-misa-panel px-4 py-4">
-      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">This series</h2>
+      <SectionHeading level="sub">This series</SectionHeading>
 
       {publishState.status === "conflicts" && (
         <div role="alert" className="mt-3 text-sm">

@@ -11,6 +11,7 @@ import {
   type PreviewRow,
   type PreviewState,
 } from "@/app/actions/dues";
+import { SectionHeading } from "@/components/ui/page-header";
 
 // The two-step import (§7 Stage 6.5 phase 2).
 //
@@ -213,7 +214,7 @@ function Problem({ state }: { state: PreviewState | CommitState }) {
 function Summary({ counts }: { counts: ImportCounts }) {
   return (
     <div className="border border-misa-border px-4 py-4">
-      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">Before you import</h2>
+      <SectionHeading level="sub">Before you import</SectionHeading>
       <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <Stat label="New payments" value={counts.fresh} />
         <Stat label="Already recorded" value={counts.duplicate} />
@@ -340,7 +341,7 @@ function Done({
 }) {
   return (
     <div className="border border-misa-border px-4 py-4">
-      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">Imported</h2>
+      <SectionHeading level="sub">Imported</SectionHeading>
       <p className="mt-2 text-sm">
         {counts.fresh} payment{counts.fresh === 1 ? "" : "s"} recorded
         {counts.duplicate > 0 &&

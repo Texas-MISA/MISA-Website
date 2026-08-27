@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AuditTrail } from "@/app/admin/(shell)/_components/audit-trail";
@@ -8,6 +7,8 @@ import { fetchFieldDefinitions } from "@/lib/member-fields";
 import { customFieldColumn } from "@/lib/members";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
+import { Pill } from "@/components/ui/pill";
 import { FieldArchive } from "./_components/field-archive";
 import { FieldForm } from "../_components/field-form";
 
@@ -32,22 +33,17 @@ export default async function MemberFieldPage({
 
   return (
     <div className="max-w-3xl">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          {definition.label}
-        </h1>
-        {definition.archivedAt && (
-          <span className="border border-misa-border px-2 py-1 text-[11px] uppercase tracking-[0.12em]">
-            archived
-          </span>
-        )}
-      </div>
-
-      <p className="mt-3 text-sm">
-        <Link href="/admin/members/fields" className="underline">
-          ← Back to custom fields
-        </Link>
-      </p>
+      <PageHeader
+        back={{ href: "/admin/members/fields", label: "Back to custom fields" }}
+        title={definition.label}
+        badge={
+          definition.archivedAt ? (
+            <Pill tone="neutral" size="md">
+              archived
+            </Pill>
+          ) : null
+        }
+      />
 
       <p className="mt-6 text-sm text-misa-secondary">
         {holders === 0
@@ -58,16 +54,16 @@ export default async function MemberFieldPage({
       </p>
 
       <section className="mt-10">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Settings</h2>
+        <SectionHeading>Settings</SectionHeading>
         <div className="mt-4">
           <FieldForm definition={definition} />
         </div>
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading>
           {definition.archivedAt ? "Restore" : "Archive"}
-        </h2>
+        </SectionHeading>
         <div className="mt-4">
           <FieldArchive
             id={definition.id}
@@ -78,7 +74,7 @@ export default async function MemberFieldPage({
       </section>
 
       <section className="mt-12">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">History</h2>
+        <SectionHeading>History</SectionHeading>
         <div className="mt-4">
           <AuditTrail entityType="member_field" entityId={definition.id} />
         </div>

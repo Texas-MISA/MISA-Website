@@ -4,6 +4,7 @@ import Link from "next/link";
 import { requireOfficer } from "@/lib/auth";
 import { toCentralFields } from "@/lib/events";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { SeriesForm } from "./_components/series-form";
 
 // Recurring series creation (§7 Stage 4). This is the feature that makes the
@@ -18,24 +19,18 @@ export default async function NewSeriesPage() {
 
   return (
     <div className="max-w-3xl">
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          New recurring series
-        </h1>
-        <Link
-          href="/admin/events/new"
-          className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
-        >
-          Create a single event instead
-        </Link>
-      </div>
-
-      <p className="mt-3 text-misa-body">
-        Every occurrence is created as a draft sharing one series, so you can
-        review the whole schedule before any of it goes public. Times are
-        Central and stay Central — a 6pm meeting is still 6pm after the
-        November clock change.
-      </p>
+      <PageHeader
+        title="New recurring series"
+        action={
+          <Link
+            href="/admin/events/new"
+            className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+          >
+            Create a single event instead
+          </Link>
+        }
+        description="Every occurrence is created as a draft sharing one series, so you can review the whole schedule before any of it goes public. Times are Central and stay Central — a 6pm meeting is still 6pm after the November clock change."
+      />
 
       <div className="mt-8">
         <SeriesForm defaultDate={today} />

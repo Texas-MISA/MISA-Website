@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { requireOfficer } from "@/lib/auth";
 import { MAX_IMPORT_ROWS } from "@/lib/dues";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { ImportForm } from "./_components/import-form";
 
 // Venmo statement import (§7 Stage 6.5 phase 2).
@@ -24,17 +25,21 @@ export default async function DuesImportPage() {
 
   return (
     <div>
-      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-        Import payments
-      </h1>
-
-      <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
-        Upload a Venmo statement CSV. Nothing is saved until you confirm, and{" "}
-        <span className="font-medium">
-          importing the same statement twice is safe
-        </span>{" "}
-        — payments already recorded are skipped, so overlapping months are fine.
-      </p>
+      <PageHeader
+        back={{ href: "/admin/dues", label: "Back to the ledger" }}
+        title="Import payments"
+        description={
+          <>
+            Upload a Venmo statement CSV. Nothing is saved until you confirm,
+            and{" "}
+            <span className="font-medium">
+              importing the same statement twice is safe
+            </span>{" "}
+            — payments already recorded are skipped, so overlapping months are
+            fine.
+          </>
+        }
+      />
 
       <div className="mt-8">
         <ImportForm maxRows={MAX_IMPORT_ROWS} />

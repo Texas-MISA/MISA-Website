@@ -10,8 +10,8 @@
 // so a value this component has never heard of must render as ITSELF in the
 // neutral tone rather than disappear into an "unknown" branch.
 
-import { Pill } from "@/components/ui/pill";
 import type { PillTone } from "@/components/ui/pill";
+import { Pill } from "@/components/ui/pill";
 
 function toneFor(status: string): PillTone {
   if (status === "present") return "affirm";

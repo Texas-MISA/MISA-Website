@@ -11,6 +11,7 @@ import {
   formatCategory,
   MAX_SERIES_EVENTS,
 } from "@/lib/events";
+import { SectionHeading } from "@/components/ui/page-header";
 
 // Client Component for useActionState. Weekdays are checkboxes sharing one
 // name, so they arrive as a repeated form field and the action reads them with
@@ -43,9 +44,9 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
         role="status"
         className="border border-misa-affirm/45 bg-misa-affirm-wash px-6 py-6"
       >
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">
+        <SectionHeading>
           {state.count} draft {state.count === 1 ? "event" : "events"} created
-        </h2>
+        </SectionHeading>
         <p className="mt-2 leading-6 text-misa-body">
           They share one series and none of them are public yet. Review the
           schedule, then publish the whole series at once.

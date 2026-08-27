@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
@@ -10,6 +9,7 @@ import { parseMemberFilter } from "@/lib/filters";
 import { presetSummary } from "@/lib/presets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { PresetRow } from "./_components/preset-row";
 
 // Saved directory filters (§7 Stage 6 phase 7a) — rename and delete.
@@ -80,21 +80,18 @@ export default async function MemberPresetsPage() {
           className="mb-6"
         />
       )}
-      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-        Saved views
-      </h1>
-
-      <p className="mt-3 text-sm">
-        <Link href="/admin/members" className="underline">
-          ← Back to the directory
-        </Link>
-      </p>
-
-      <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
-        Named filters, <span className="font-medium">shared by every officer</span>
-        . Save a new one from the directory once you have narrowed the list; this
-        page is for renaming and clearing out the ones nobody uses.
-      </p>
+      <PageHeader
+        back={{ href: "/admin/members", label: "Back to the directory" }}
+        title="Saved views"
+        description={
+          <>
+            Named filters,{" "}
+            <span className="font-medium">shared by every officer</span>. Save a
+            new one from the directory once you have narrowed the list; this
+            page is for renaming and clearing out the ones nobody uses.
+          </>
+        }
+      />
 
       <div className="mt-10">
         {presetsFailed ? (

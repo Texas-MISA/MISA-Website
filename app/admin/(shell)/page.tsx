@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { requireOfficer } from "@/lib/auth";
 
+import { PageHeader, SectionHeading } from "@/components/ui/page-header";
 import { PendingBadge } from "./_components/pending-badge";
 import { RecentCheckins } from "./_components/recent-checkins";
 
@@ -18,15 +19,13 @@ export default async function AdminDashboardPage() {
 
   return (
     <div>
-      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-        Dashboard
-      </h1>
-      <p className="mt-3 text-misa-body">
-        Signed in as {officer.email}.
-      </p>
+      <PageHeader
+        title="Dashboard"
+        description={`Signed in as ${officer.email}.`}
+      />
 
       <section className="mt-10">
-        <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Needs review</h2>
+        <SectionHeading>Needs review</SectionHeading>
         <div className="mt-4">
           <PendingBadge />
         </div>
@@ -34,7 +33,7 @@ export default async function AdminDashboardPage() {
 
       <section className="mt-10">
         <div className="flex items-baseline justify-between gap-4">
-          <h2 className="font-display text-[22px] leading-[1.05] font-semibold">Recent check-ins</h2>
+          <SectionHeading>Recent check-ins</SectionHeading>
           <Link
             href="/admin/events"
             className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"

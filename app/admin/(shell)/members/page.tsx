@@ -21,6 +21,7 @@ import type { FieldDefinition } from "@/lib/members";
 import { presetSummary } from "@/lib/presets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { ExportToolbar } from "./_components/export-toolbar";
 import { MemberFilters } from "./_components/member-filters";
 import { MemberTable, type MemberRow } from "./_components/member-table";
@@ -345,29 +346,29 @@ export default async function AdminMembersPage({
           className="mb-6"
         />
       )}
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Members
-        </h1>
-        {/* Not admin-nav entries: admin-nav.tsx marks an item active with
-            pathname.startsWith, so links there would light "Members" up
-            alongside them. This is the same in-page idiom the events form uses
-            for "Create a recurring series instead". */}
-        <div className="flex flex-wrap items-baseline gap-4 text-sm">
-          <Link
-            href="/admin/members/import"
-            className="underline underline-offset-4"
-          >
-            Import CSV
-          </Link>
-          <Link
-            href="/admin/members/fields"
-            className="underline underline-offset-4"
-          >
-            Custom fields ({fields.length})
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Members"
+        action={
+          // Not admin-nav entries: admin-nav.tsx marks an item active with
+          // pathname.startsWith, so links there would light "Members" up
+          // alongside them. This is the same in-page idiom the events form uses
+          // for "Create a recurring series instead".
+          <div className="flex flex-wrap items-baseline gap-4 text-sm">
+            <Link
+              href="/admin/members/import"
+              className="underline underline-offset-4"
+            >
+              Import CSV
+            </Link>
+            <Link
+              href="/admin/members/fields"
+              className="underline underline-offset-4"
+            >
+              Custom fields ({fields.length})
+            </Link>
+          </div>
+        }
+      />
 
       {/* The scope stated in words, because the control alone does not say what
           it does to the NUMBERS. Every figure in the table is that term's. */}

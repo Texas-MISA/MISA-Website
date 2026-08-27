@@ -19,6 +19,7 @@ import {
 } from "@/lib/export-ledgers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { AttendanceFilters } from "./_components/attendance-filters";
 import type { SubmissionRow } from "./_components/attendance-table";
 import { ReviewQueue } from "./_components/review-queue";
@@ -117,23 +118,18 @@ export default async function AdminAttendancePage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Attendance
-        </h1>
-        <Link
-          href={`/admin/attendance/new${suffix}`}
-          className={BUTTON_PRIMARY_SM}
-        >
-          ADD A CHECK-IN
-        </Link>
-      </div>
-
-      <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
-        Every submission the check-in form has produced. A pending row is
-        missing its event link, its member link, or both — open one to see what
-        the member typed and what it most likely meant.
-      </p>
+      <PageHeader
+        title="Attendance"
+        action={
+          <Link
+            href={`/admin/attendance/new${suffix}`}
+            className={BUTTON_PRIMARY_SM}
+          >
+            ADD A CHECK-IN
+          </Link>
+        }
+        description="Every submission the check-in form has produced. A pending row is missing its event link, its member link, or both — open one to see what the member typed and what it most likely meant."
+      />
 
       {eventsFailed && (
         <ReadError

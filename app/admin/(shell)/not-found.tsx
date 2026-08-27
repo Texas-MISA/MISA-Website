@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageHeader } from "@/components/ui/page-header";
 
 // The admin 404 (Stage 8 phase 3). The single highest-value file of the phase:
 // it covers all six `notFound()` call sites at once — members/[id],
@@ -23,9 +24,7 @@ import Link from "next/link";
 export default function AdminNotFound() {
   return (
     <div className="max-w-2xl">
-      <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-        Not found
-      </h1>
+      <PageHeader title="Not found" />
       <p className="mt-4 text-misa-body">
         That record doesn&apos;t exist. It may have been deleted, or merged into
         another one — a merged member&apos;s link stops working, and the merge is

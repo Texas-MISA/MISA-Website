@@ -18,6 +18,7 @@ import {
 } from "@/lib/export-ledgers";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { PointFilters, type OfficerOption } from "./_components/point-filters";
 import { PointsTable, type LedgerRow } from "./_components/points-table";
 
@@ -222,24 +223,18 @@ export default async function AdminPointsPage({
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-4">
-        <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
-          Points
-        </h1>
-        <Link
-          href={`/admin/points/new${suffix}`}
-          className={BUTTON_PRIMARY_SM}
-        >
-          GRANT POINTS
-        </Link>
-      </div>
-
-      <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
-        Points awarded outside of event attendance — volunteering, recruiting,
-        competition placings, and corrections. Every one carries a reason and
-        the officer who made it. A voided adjustment stays here, struck through,
-        and stops counting immediately.
-      </p>
+      <PageHeader
+        title="Points"
+        action={
+          <Link
+            href={`/admin/points/new${suffix}`}
+            className={BUTTON_PRIMARY_SM}
+          >
+            GRANT POINTS
+          </Link>
+        }
+        description="Points awarded outside of event attendance — volunteering, recruiting, competition placings, and corrections. Every one carries a reason and the officer who made it. A voided adjustment stays here, struck through, and stops counting immediately."
+      />
 
       <div className="mt-6">
         <PointFilters

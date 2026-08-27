@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 
 import { signOut } from "@/app/actions/auth";
 import { BUTTON_ON_NAVY_SM } from "@/components/ui/button";
-import { Pill } from "@/components/ui/pill";
 import { Wordmark } from "@/components/ui/wordmark";
+import { Pill } from "@/components/ui/pill";
 
 // Persistent admin nav (§7 Stage 4). Client Component only for the active-link
 // pathname, matching components/site-header.tsx — the pages stay server-

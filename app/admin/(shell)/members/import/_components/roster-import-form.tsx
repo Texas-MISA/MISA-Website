@@ -12,6 +12,7 @@ import {
   type PreviewState,
 } from "@/app/actions/member-import";
 import type { ImportCounts } from "@/lib/member-import";
+import { SectionHeading } from "@/components/ui/page-header";
 
 // The two-step roster import (§7 Stage 6 phase 7b), modelled directly on
 // /admin/dues/import's form. Three things are copied deliberately rather than
@@ -217,7 +218,7 @@ function Summary({
 }) {
   return (
     <div className="border border-misa-border px-4 py-4">
-      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">Before you import</h2>
+      <SectionHeading level="sub">Before you import</SectionHeading>
       <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <Stat label="New members" value={counts.fresh} />
         <Stat label="Already on the roster" value={counts.existing} />
@@ -320,7 +321,7 @@ function Done({
 }) {
   return (
     <div className="border border-misa-border px-4 py-4">
-      <h2 className="font-display text-[18px] leading-[1.1] font-semibold">Imported</h2>
+      <SectionHeading level="sub">Imported</SectionHeading>
       <p className="mt-2 text-sm">
         {counts.fresh} member{counts.fresh === 1 ? "" : "s"} added
         {counts.existing > 0 &&
