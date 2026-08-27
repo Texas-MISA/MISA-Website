@@ -35,7 +35,7 @@ import type { TermEventState } from "@/lib/members";
 
 const INITIAL: LookupState = { status: "idle" };
 
-const EMPTY: SubmittedValues = { eid: "", email: "" };
+const EMPTY: SubmittedValues = { eid: "" };
 
 export function LookupForm() {
   const [state, formAction, pending] = useActionState(lookupMember, INITIAL);
@@ -93,12 +93,11 @@ function LookupFields({
 
   return (
     <form action={action} className="flex flex-col gap-5" noValidate>
-      {/* 🔓 ONE message for every miss. Never "no such EID" versus "that email
-          doesn't match": §6 accepts that check-in makes roster membership
-          probeable with an EID alone, and this page shows dues status only
-          because its gate is strictly narrower than that. Two distinguishable
-          failures would let someone confirm an EID and then walk the email,
-          which is a stronger oracle than the one that was accepted.
+      {/* 🔓 ONE message for every miss, and it MATTERS MORE now than when it
+          was written. The gate was EID + matching email until 2026-08-25; it is
+          now the EID alone, so this message is most of what stands between a
+          script and confirming who is on the roster. Never split it into "no
+          such EID" versus anything else.
 
           ⚠️ The TONE is `info` for the same reason. A miss here is not an
           error — most of the time it is a typo or somebody who has genuinely
@@ -107,10 +106,9 @@ function LookupFields({
           confusion running in the other direction. */}
       {state.status === "unmatched" && (
         <Banner role="alert">
-          We couldn&apos;t match that EID and email to a member. Both have to
-          match the same person — check them for a typo and try again. If
-          you&apos;ve never checked in to a MISA event, you won&apos;t be on the
-          roster yet.
+          We couldn&apos;t match that EID to a member. Check it for a typo and
+          try again. If you&apos;ve never checked in to a MISA event, you
+          won&apos;t be on the roster yet.
         </Banner>
       )}
       {state.status === "rate_limited" && (
@@ -138,23 +136,6 @@ function LookupFields({
           spellCheck={false}
           defaultValue={submitted.eid}
           aria-invalid={fieldErrors?.eid ? true : undefined}
-        />
-      </Field>
-
-      <Field
-        label="Email"
-        error={fieldErrors?.email?.[0]}
-        hint="The email we have on file for you. Both fields have to match the same member."
-      >
-        <Input
-          type="email"
-          spellCheck={false}
-          name="email"
-          required
-          autoComplete="email"
-          inputMode="email"
-          defaultValue={submitted.email}
-          aria-invalid={fieldErrors?.email ? true : undefined}
         />
       </Field>
 
@@ -356,7 +337,8 @@ function Result({
         </h3>
         {/* 🔓 The one surface in the whole system that shows dues status to an
             unauthenticated caller, and it is allowed here only because the gate
-            is EID AND matching email (§6). It must never reach /leaderboard. */}
+            is the EID alone since 2026-08-25 (§6). It must never reach
+            /leaderboard. */}
         <p className="mt-2 text-sm text-misa-muted">
           {profile.duesPaidCurrentTerm ? (
             <>

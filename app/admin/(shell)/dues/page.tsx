@@ -49,7 +49,7 @@ const TERM_SCAN_LIMIT = 1000;
  * string literal, so a concatenation widens it to plain `string` and collapses
  * every field access at once — this has bitten twice already. */
 const LEDGER_COLUMNS =
-  "id, paid_at, amount_cents, note, payer_name, member_id, start_term, terms_covered, covered_terms, voided_at, members(id, full_name, active)" as const;
+  "id, paid_at, amount_cents, note, payer_name, member_id, start_term, terms_covered, covered_terms, voided_at, members(id, full_name)" as const;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -78,7 +78,7 @@ type RawPayment = {
   terms_covered: number | null;
   covered_terms: string[] | null;
   voided_at: string | null;
-  members: { id: string; full_name: string; active: boolean } | null;
+  members: { id: string; full_name: string } | null;
 };
 
 async function fetchLedger(
@@ -152,7 +152,6 @@ async function fetchLedger(
       note: row.note,
       memberId: row.member_id,
       memberName: row.members?.full_name ?? null,
-      memberActive: row.members?.active ?? true,
       coveredTerms: row.covered_terms,
       startTerm: row.start_term,
       voided: row.voided_at !== null,

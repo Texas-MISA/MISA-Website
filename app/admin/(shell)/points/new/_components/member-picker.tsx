@@ -60,7 +60,7 @@ export function MemberPicker({
   // hidden input, so the officer sees the same count they picked and the server
   // gets the same list it would have got.
   const picked = [...selected].map(
-    (id) => byId.get(id) ?? { id, label: "unknown member", active: false }
+    (id) => byId.get(id) ?? { id, label: "unknown member" }
   );
 
   const needle = query.trim().toLowerCase();
@@ -130,7 +130,7 @@ export function MemberPicker({
         {available.length === 0 ? (
           <li className="px-3 py-2 text-misa-muted">
             {members.length === 0
-              ? "No active members on the roster."
+              ? "Nobody on the roster yet."
               : needle === ""
                 ? "Everyone is selected."
                 : "No members match that."}

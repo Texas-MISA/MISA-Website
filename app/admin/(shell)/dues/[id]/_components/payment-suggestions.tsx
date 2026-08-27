@@ -44,9 +44,6 @@ export function PaymentSuggestions({
         >
           <p className="text-sm">
             <strong>{suggestion.member.fullName}</strong>
-            {!suggestion.member.active && (
-              <span className="ml-2 text-xs text-misa-muted">inactive</span>
-            )}
           </p>
           <p className="mt-1 font-mono text-xs">{suggestion.member.eid}</p>
           <p className="mt-1 text-xs text-misa-secondary">

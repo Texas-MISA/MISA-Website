@@ -53,15 +53,19 @@ export const checkinSchema = z.object({
 
 export type CheckinFields = z.infer<typeof checkinSchema>;
 
-// Member self-service lookup (§7 Stage 7). The same two identity fields
-// check-in validates, with the same rules — reused via `.pick()` rather than
-// restated, so a change to what counts as a valid EID cannot apply to one
-// unauthenticated endpoint and not the other.
+// Member self-service lookup (§7 Stage 7). The same EID field check-in
+// validates, with the same rules — reused via `.pick()` rather than restated,
+// so a change to what counts as a valid EID cannot apply to one unauthenticated
+// endpoint and not the other.
 //
-// 🔓 The DIFFERENCE is not here: /attend resolves EID *or* email, and /lookup
-// requires both to name the same member. That is a property of the query, not
-// of the schema — see findMemberByBoth in lib/lookup.ts.
-export const lookupSchema = checkinSchema.pick({ eid: true, email: true });
+// 🔴 **ONE FIELD as of 2026-08-25, where it used to be two.** The email was
+// dropped on the officer's instruction. It was not cosmetic: /attend resolves
+// EID *or* email, and /lookup used to require both to name the same member,
+// which is what §6 pointed at when it allowed this route to show dues status.
+// That justification is gone and the page still shows it — the officer was told
+// and chose it. The reversal is written up at findMemberByEid in lib/lookup.ts
+// and in docs/invariants.md; do not re-derive it as though it were an accident.
+export const lookupSchema = checkinSchema.pick({ eid: true });
 
 export type LookupFields = z.infer<typeof lookupSchema>;
 

@@ -467,7 +467,6 @@ export type Database = {
       }
       members: {
         Row: {
-          active: boolean
           custom_fields: Json
           eid: string
           email: string
@@ -480,7 +479,6 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          active?: boolean
           custom_fields?: Json
           eid: string
           email: string
@@ -493,7 +491,6 @@ export type Database = {
           updated_at?: string
         }
         Update: {
-          active?: boolean
           custom_fields?: Json
           eid?: string
           email?: string
@@ -642,12 +639,11 @@ export type Database = {
       }
       member_directory: {
         Row: {
-          active: boolean | null
           attendance_points: number | null
           attendance_rate: number | null
           bonus_points: number | null
           custom_fields: Json | null
-          dues_paid_current_term: boolean | null
+          dues_paid_term: boolean | null
           eid: string | null
           email: string | null
           events_attended: number | null
@@ -659,6 +655,7 @@ export type Database = {
           notes: string | null
           pending_count: number | null
           source: string | null
+          term: string | null
           total_points: number | null
           updated_at: string | null
         }
@@ -667,6 +664,12 @@ export type Database = {
     }
     Functions: {
       current_term: { Args: never; Returns: string }
+      member_terms: {
+        Args: never
+        Returns: {
+          term: string
+        }[]
+      }
       nearby_events: {
         Args: { ts?: string; window_hours?: number }
         Returns: {

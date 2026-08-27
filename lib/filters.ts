@@ -32,19 +32,23 @@
 // reads by key and is total, so an old bookmark carrying `minRate=50` is simply
 // ignored, and memberFilterToParams does not put it back in the URL.
 //
-// The Central-anchored half-open date-range translation went with them. Phase 6
-// needs it back for "not seen since"; the pattern to copy is the awarded-date
-// range in app/admin/(shell)/points/page.tsx.
+// ⚠️ 2026-08-25 removed two more the same way, and for the same reason. `state`
+// (active / inactive) went because `members.active` went — migration 29 replaced
+// a hand-ticked flag with a derivation, so there is no column left to filter on.
+// `notSeenSince` went with it: judging membership by how recently somebody was
+// marked present was the other half of the same idea, and the term scope now
+// answers that question from evidence instead. The Central-anchored half-open
+// date-range translation left with `notSeenSince`; if a date range is ever
+// needed here again, the pattern to copy is the awarded-date range in
+// app/admin/(shell)/points/page.tsx.
+//
+// 📌 What arrived in their place is `term`, and it is a SCOPE rather than a
+// narrowing filter — see the field's own note in MemberFilter for why null,
+// not a term string, is what "the current term" is spelled as.
 
 // The only import here, and deliberately a pure one: lib/members.ts owns the
 // key format and the `cf:` namespace, so both modules cannot drift on what a
 // custom sort key looks like. Still no next/* and no supabase-js.
-// lib/events.ts is pure too — no next/* and no supabase-js — so importing the
-// Central wall-clock conversion here keeps this module's contract intact. It is
-// the same function every other date range in the app anchors on, which is the
-// point: a second implementation is how two screens start disagreeing about
-// where a day begins.
-import { centralWallTimeToInstant } from "@/lib/events";
 import {
   customFieldColumn,
   customFieldKey,
@@ -63,7 +67,7 @@ import {
  *
  * `dues` (Stage 6.5 phase 4) is the fifth, and it obeys the same rule from the
  * other side: it is sortable *because* it is displayed. It maps to
- * `dues_paid_current_term`, a boolean the view calculates — nothing about this
+ * `dues_paid_term`, a boolean the view calculates — nothing about this
  * key is officer-defined, so it belongs here rather than behind the `cf:`
  * namespace.
  */
@@ -111,7 +115,7 @@ const SORT_COLUMNS: Record<MemberBuiltinSort, string> = {
   email: "email",
   eid: "eid",
   total_points: "total_points",
-  dues: "dues_paid_current_term",
+  dues: "dues_paid_term",
 };
 
 /**
@@ -150,11 +154,27 @@ export function sortColumn(
   return customFieldColumn(custom);
 }
 
-export const MEMBER_STATES = ["active", "inactive", "all"] as const;
-export type MemberState = (typeof MEMBER_STATES)[number];
+/**
+ * The sentinel that widens the roster to every term.
+ *
+ * In-band with the term strings themselves, and safe only because a real term
+ * is `Spring|Fall YYYY` and can never be the literal `all` — the same trick the
+ * events screen's term control already uses. TERM_SHAPE is what guarantees it.
+ */
+export const MEMBER_TERM_ALL = "all";
 
 /**
- * Dues status, as a three-way selector shaped like MEMBER_STATES.
+ * A term's SHAPE, which is the only thing worth validating about one.
+ *
+ * 🪤 `term_index()` is not a validator — `term_index('Autumn 2026')` equals
+ * `term_index('Spring 2026')` — so a term arriving from a URL is checked
+ * against this and dropped if it does not match. Nothing here builds a term
+ * string; §4.7's rule is that they are derived, and this only recognises one.
+ */
+export const TERM_SHAPE = /^(Spring|Fall) [0-9]{4}$/;
+
+/**
+ * Dues status, as a three-way selector.
  *
  * ⚠️ `all` is FIRST because it is the default, and that is the difference from
  * `state`, which defaults to the narrowing `active`. Dues status must not narrow
@@ -205,7 +225,6 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** A `YYYY-MM-DD` civil date, which is what the date inputs emit. */
-const CIVIL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * The most characters a custom-field filter value may carry.
@@ -223,15 +242,26 @@ export const MAX_SEARCH_LENGTH = 64;
 
 export type MemberFilter = {
   /**
-   * Active / inactive / all.
+   * Which term's roster to show, and the ONE scope selector on this screen
+   * since `state` (active / inactive) was dropped on 2026-08-25.
    *
-   * Not a displayed column, and kept anyway — deliberately framed as a *scope
-   * selector* rather than a column filter. Dropping it with the rest of phase
-   * 1's filters would strand inactive members with no route to them at all;
-   * `leaderboard` excludes them too, so this screen is the only way to reach
-   * one.
+   * 📌 THREE VALUES, and the null is the interesting one:
+   *   * `null`  — the current term. The DEFAULT, and what an absent parameter
+   *     means. Deliberately not the term string itself: §4.7 forbids typing one
+   *     into application code, and a filter object that carried `"Fall 2026"`
+   *     would be a *snapshot* of the clock rather than a reference to it — a
+   *     saved preset would then pin the term it was created in, which is the
+   *     opposite of what "this term's unpaid members" should mean.
+   *   * `MEMBER_TERM_ALL` — every term, one row per member per term they belong
+   *     to. An explicit choice; never a default.
+   *   * a term string — that term, shape-checked by TERM_SHAPE on the way in.
+   *
+   * 🪤 Only `applyMemberFilter` resolves the null, and it takes the real term as
+   * a required argument for exactly that. Keeping the resolution at query time
+   * is what lets this module stay pure and lets the serializer omit the default
+   * without knowing what today's date is.
    */
-  state: MemberState;
+  term: string | null;
   /**
    * Free text across name / email / EID — the displayed identity columns, which
    * is what keeps it inside "filtering narrows to what is displayed".
@@ -244,7 +274,7 @@ export type MemberFilter = {
   minPoints: number | null;
   maxPoints: number | null;
   /**
-   * Paid / not paid / any, against `member_directory.dues_paid_current_term`
+   * Paid / not paid / any, against `member_directory.dues_paid_term`
    * (Stage 6.5 phase 4).
    *
    * Dues status is CALCULATED — a live `dues_payments` row whose `covered_terms`
@@ -309,17 +339,6 @@ export type MemberFilter = {
    * not mean "this term".
    */
   pending: MemberPending;
-  /**
-   * A civil date; matches members last seen strictly before it, **including
-   * those never seen at all**.
-   *
-   * ⚠️ The null half is the whole point and is easy to lose. `last_seen_at` is
-   * null for a member who has never been marked present, and a bare `.lt()`
-   * drops nulls silently — so the officer asking "who has gone quiet?" would
-   * get an answer with the quietest members missing from it. Same shape as the
-   * `attendance_rate` null-vs-zero rule.
-   */
-  notSeenSince: string | null;
   /**
    * Bounds on `events_attended`, current-term.
    *
@@ -454,12 +473,20 @@ export function parseMemberFilter(
    */
   fields: readonly SortableField[] = NO_CUSTOM_FIELDS
 ): MemberFilter {
-  const rawState = one(params, "state");
-  const state: MemberState = (MEMBER_STATES as readonly string[]).includes(
-    rawState
-  )
-    ? (rawState as MemberState)
-    : "active";
+  // The term scope. `all` widens; a well-shaped term narrows to it; anything
+  // else — absent, typed nonsense, a term from a bookmark that never existed —
+  // falls back to null, which applyMemberFilter reads as the current term.
+  //
+  // 🪤 An unrecognised term must NOT become `all`. Widening on a value nobody
+  // chose is how a screen quietly starts showing every member who has ever been
+  // in the club under a heading that says this semester.
+  const rawTerm = one(params, "term").trim();
+  const term: string | null =
+    rawTerm === MEMBER_TERM_ALL
+      ? MEMBER_TERM_ALL
+      : TERM_SHAPE.test(rawTerm)
+        ? rawTerm
+        : null;
 
   const rawDues = one(params, "dues");
   const dues: MemberDues = (MEMBER_DUES as readonly string[]).includes(rawDues)
@@ -491,11 +518,6 @@ export function parseMemberFilter(
   )
     ? (rawPending as MemberPending)
     : "all";
-
-  const rawNotSeen = one(params, "notSeenSince").trim();
-  const notSeenSince: string | null = CIVIL_DATE_RE.test(rawNotSeen)
-    ? rawNotSeen
-    : null;
 
   // Officer-defined field filters, read by walking the definitions rather than
   // the params — so an unknown `cf:` param is ignored by construction and never
@@ -534,7 +556,7 @@ export function parseMemberFilter(
   // ignored by construction: this reads the keys it knows and never enumerates
   // the input.
   return {
-    state,
+    term,
     q: searchTerm(one(params, "q")),
     minPoints: intOrNull(one(params, "minPoints"), 1_000_000),
     maxPoints: intOrNull(one(params, "maxPoints"), 1_000_000),
@@ -544,7 +566,6 @@ export function parseMemberFilter(
     event,
     eventMode,
     pending,
-    notSeenSince,
     minEvents: intOrNull(one(params, "minEvents"), 10_000),
     maxEvents: intOrNull(one(params, "maxEvents"), 10_000),
     sort,
@@ -576,12 +597,13 @@ export function memberFilterToParams(
   }
   const params = new URLSearchParams();
 
-  if (merged.state !== "active") params.set("state", merged.state);
+  // Null is the default and emits nothing, which is what keeps a saved preset
+  // pointing at "the current term" rather than at the term it was saved in.
+  if (merged.term !== null) params.set("term", merged.term);
   if (merged.dues !== "all") params.set("dues", merged.dues);
   if (merged.source !== "all") params.set("source", merged.source);
   if (merged.pending !== "all") params.set("pending", merged.pending);
   if (merged.q) params.set("q", merged.q);
-  if (merged.notSeenSince) params.set("notSeenSince", merged.notSeenSince);
 
   // ⚠️ The mode rides on the event, never alone. A URL carrying
   // `eventMode=missed` with no event describes a filter that reads as active in
@@ -639,7 +661,6 @@ export type MemberFilterFields = {
   maxPoints: string;
   minEvents: string;
   maxEvents: string;
-  notSeenSince: string;
 };
 
 /**
@@ -667,8 +688,6 @@ export function memberFilterFields(filter: MemberFilter): MemberFilterFields {
     maxPoints: show(filter.maxPoints),
     minEvents: show(filter.minEvents),
     maxEvents: show(filter.maxEvents),
-    // A date input reads "" for unset, exactly as the number boxes do.
-    notSeenSince: filter.notSeenSince ?? "",
   };
 }
 
@@ -685,7 +704,6 @@ export function hasRelationalFilter(filter: MemberFilter): boolean {
   return (
     filter.event !== null ||
     filter.pending !== "all" ||
-    filter.notSeenSince !== null ||
     filter.minEvents !== null ||
     filter.maxEvents !== null
   );
@@ -696,7 +714,6 @@ export function relationalFilterCount(filter: MemberFilter): number {
   return [
     filter.event !== null,
     filter.pending !== "all",
-    filter.notSeenSince !== null,
     filter.minEvents !== null,
     filter.maxEvents !== null,
   ].filter(Boolean).length;
@@ -830,12 +847,30 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
   query: Q,
   filter: MemberFilter,
   /** Required, unlike parseMemberFilter's — see the note there. */
-  fields: readonly SortableField[]
+  fields: readonly SortableField[],
+  /**
+   * The term a null `filter.term` means, from `current_term()`.
+   *
+   * 🪤 Required, and required for the same reason `fields` is: a caller that
+   * forgets it is a compile error rather than a directory that quietly widens.
+   * There is no honest default — this module cannot know what term it is, and
+   * §4.7 forbids it from guessing. The events screen throws when the rpc fails
+   * rather than falling back to "" for exactly this failure, which presented as
+   * a screen and a filter agreeing with each other about the wrong thing.
+   */
+  currentTerm: string
 ): Q {
   let q = query;
 
-  if (filter.state === "active") q = q.eq("active", true);
-  else if (filter.state === "inactive") q = q.eq("active", false);
+  // The term scope, and the only clause that can widen rather than narrow.
+  //
+  // ⚠️ member_directory is ONE ROW PER (MEMBER, TERM) since migration 29, so
+  // omitting this does not return "the whole roster" — it returns every member
+  // once per term they belong to, and the count above the table would then be
+  // rows rather than people. `all` is a deliberate choice an officer makes; it
+  // is never what an absent or unreadable parameter falls back to.
+  const term = filter.term ?? currentTerm;
+  if (term !== MEMBER_TERM_ALL) q = q.eq("term", term);
 
   // Free text over the three identity columns the table displays. One `or`
   // group, so it composes with the other clauses as a conjunction — three
@@ -866,8 +901,8 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
   // provably the same query as the count rendered beside the button. A dues
   // predicate hand-written into the page or the export route is exactly how that
   // pair starts disagreeing.
-  if (filter.dues === "paid") q = q.eq("dues_paid_current_term", true);
-  else if (filter.dues === "unpaid") q = q.eq("dues_paid_current_term", false);
+  if (filter.dues === "paid") q = q.eq("dues_paid_term", true);
+  else if (filter.dues === "unpaid") q = q.eq("dues_paid_term", false);
 
   // §4.2's roster-cleanup query, back as a filter after phase 3 removed it as a
   // column.
@@ -908,30 +943,6 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
 
   if (filter.minEvents !== null) q = q.gte("events_attended", filter.minEvents);
   if (filter.maxEvents !== null) q = q.lte("events_attended", filter.maxEvents);
-
-  // "Not seen since <date>", and the null branch is the whole filter rather than
-  // a nicety.
-  //
-  // ⚠️ A member who has never been marked present has `last_seen_at` null, and a
-  // bare `.lt()` drops nulls silently — so the officer asking "who has gone
-  // quiet?" would get an answer with the quietest members missing. Same shape as
-  // the attendance_rate null-vs-zero rule, and decided the same way.
-  //
-  // ⚠️ Central-anchored. A bare `.lt("last_seen_at", "2026-09-01")` is read as
-  // UTC midnight and silently drops five hours of a Central day — the
-  // `new Date("2026-09-01T18:00")` class of bug, and it fails plausibly.
-  //
-  // 📌 This is the SECOND `or` group on the query when a search is also active.
-  // Separate `or=` params AND together, which is what two independent concerns
-  // want; the failure the search comment warns about is splitting ONE concern
-  // across several calls.
-  if (filter.notSeenSince !== null) {
-    const cutoff = centralWallTimeToInstant(
-      filter.notSeenSince,
-      "00:00"
-    ).toISOString();
-    q = q.or(`last_seen_at.is.null,last_seen_at.lt.${cutoff}`);
-  }
 
   // Attended or missed one specific event — the only filter here that is not a
   // column on the view.

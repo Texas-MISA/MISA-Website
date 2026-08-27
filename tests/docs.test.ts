@@ -27,6 +27,18 @@ import { describe, expect, it } from "vitest";
 
 const DOC = "docs/student-org-website-architecture.md";
 const CLAUDE = "CLAUDE.md";
+/**
+ * The annotated layout tree.
+ *
+ * 🪤 It lived in CLAUDE.md's `## Layout` section until 2026-08-25, when that
+ * file was compressed under 40k and the tree was extracted here. This test kept
+ * pointing at the section that had become a one-line pointer, so all 49
+ * module assertions failed at once — the map had not lost anything, the test
+ * had lost the map. Scope the check to wherever the tree actually lives; a
+ * whole-file grep would pass on a changelog mention, which is the failure the
+ * header describes.
+ */
+const LAYOUT = "docs/layout.md";
 
 function read(path: string): string {
   return readFileSync(path, "utf8");
@@ -137,13 +149,22 @@ describe("the route table documents every route", () => {
 describe("the layout maps every module", () => {
   const doc = read(DOC);
   const claude = read(CLAUDE);
+  const layout = read(LAYOUT);
 
-  // §10 and CLAUDE.md's Layout are the two maps. They serve different readers —
-  // §10 explains the shape to someone learning the project, Layout is what an
-  // agent reads cold — so a module has to be in both or one of them lies.
-  // §10 is the last numbered section, so it runs to the end of the file.
+  // §10 and docs/layout.md are the two maps. They serve different readers —
+  // §10 explains the shape to someone learning the project, the layout tree is
+  // what an agent reads cold — so a module has to be in both or one of them
+  // lies. §10 is the last numbered section, so it runs to the end of the file.
   const layoutDoc = section(doc, "## 10. Repository Layout", null);
-  const layoutClaude = section(claude, "## Layout", "## Working agreements");
+  const layoutTree = layout;
+
+  // CLAUDE.md no longer carries the tree, but it must still POINT at it, or the
+  // agent that reads CLAUDE.md cold never learns the map exists.
+  it("CLAUDE.md points at the layout tree", () => {
+    expect(section(claude, "## Layout", "## Working agreements")).toContain(
+      LAYOUT
+    );
+  });
 
   const libModules = modulesIn("lib");
   const actionModules = modulesIn("app/actions");
@@ -152,16 +173,16 @@ describe("the layout maps every module", () => {
     expect(names(layoutDoc, file)).toBe(true);
   });
 
-  it.each(libModules)("CLAUDE.md maps lib/%s", (file) => {
-    expect(names(layoutClaude, file)).toBe(true);
+  it.each(libModules)("docs/layout.md maps lib/%s", (file) => {
+    expect(names(layoutTree, file)).toBe(true);
   });
 
   it.each(actionModules)("§10 maps app/actions/%s", (file) => {
     expect(names(layoutDoc, file)).toBe(true);
   });
 
-  it.each(actionModules)("CLAUDE.md maps app/actions/%s", (file) => {
-    expect(names(layoutClaude, file)).toBe(true);
+  it.each(actionModules)("docs/layout.md maps app/actions/%s", (file) => {
+    expect(names(layoutTree, file)).toBe(true);
   });
 
   it("does not accept a prefixed filename as the plain one", () => {
@@ -180,7 +201,18 @@ describe("the layout maps every module", () => {
     // months when §10 was missing six modules. Proven by construction: the
     // section is a strict slice of the file.
     expect(layoutDoc.length).toBeLessThan(doc.length);
-    expect(layoutClaude.length).toBeLessThan(claude.length);
+
+    // 📌 docs/layout.md IS the map, so its scoping is the file boundary rather
+    // than a slice — which holds only while the file stays a map and does not
+    // absorb the brief around it.
+    expect(layoutTree).not.toContain("## Invariants");
+
+    // And CLAUDE.md's Layout section stays a POINTER. If the tree is ever
+    // pasted back in, the two copies drift and the pointer stops being the
+    // thing a reader follows.
+    expect(
+      section(claude, "## Layout", "## Working agreements").length
+    ).toBeLessThan(600);
   });
 });
 

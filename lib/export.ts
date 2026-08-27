@@ -67,7 +67,7 @@ export type ExportSourceRow = {
   full_name: string | null;
   email: string | null;
   eid: string | null;
-  active: boolean | null;
+  term: string | null;
   source: string | null;
   joined_at: string | null;
   notes: string | null;
@@ -79,7 +79,7 @@ export type ExportSourceRow = {
   attendance_rate: number | null;
   pending_count: number | null;
   last_seen_at: string | null;
-  dues_paid_current_term: boolean | null;
+  dues_paid_term: boolean | null;
   custom_fields: unknown;
 };
 
@@ -130,7 +130,12 @@ const BUILTIN_FIELDS: readonly ExportField[] = [
   { key: "pending_count", label: "Pending submissions", kind: "number", source: "builtin" },
   { key: "last_seen_at", label: "Last seen", kind: "date", source: "builtin" },
   { key: "joined_at", label: "Joined", kind: "date", source: "builtin" },
-  { key: "active", label: "Active", kind: "text", source: "builtin" },
+  // ⚠️ Replaced "Active" on 2026-08-25, when members.active was dropped. It is
+  // not a like-for-like swap: this names the SEMESTER the row's points,
+  // attendance, rate and dues belong to, so a saved file can still be read a
+  // year later. Every export carries it whether or not the officer ticked it —
+  // see exportedFields, which records what actually left.
+  { key: "term", label: "Term", kind: "text", source: "builtin" },
   { key: "source", label: "Source", kind: "text", source: "builtin" },
   // Stage 6.5 phase 4 — ONE catalogue entry, not a new mechanism. `dues` is
   // already reserved (RESERVED_FIELD_KEYS, and migration 19's
@@ -301,10 +306,8 @@ function builtinCell(row: ExportSourceRow, key: string): ExportCell {
       return dateCell(row.last_seen_at);
     case "joined_at":
       return dateCell(row.joined_at);
-    case "active":
-      return row.active === null
-        ? { kind: "empty" }
-        : { kind: "text", value: row.active ? "Yes" : "No" };
+    case "term":
+      return textCell(row.term);
     case "source":
       return textCell(row.source);
     case "dues":
@@ -312,11 +315,11 @@ function builtinCell(row: ExportSourceRow, key: string): ExportCell {
       // and the screen cannot be read as saying different things. Not a number
       // and not a bare boolean: the CSV formula guard fires on text and must
       // never fire on numbers, and "Paid" / "Not Paid" trip none of `= + - @`.
-      return row.dues_paid_current_term === null
+      return row.dues_paid_term === null
         ? { kind: "empty" }
         : {
             kind: "text",
-            value: row.dues_paid_current_term ? "Paid" : "Not Paid",
+            value: row.dues_paid_term ? "Paid" : "Not Paid",
           };
     case "notes":
       return textCell(row.notes);

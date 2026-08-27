@@ -30,7 +30,7 @@ type Adjustment = {
   voided_at: string | null;
   voided_by: string | null;
   void_reason: string | null;
-  members: { id: string; full_name: string; active: boolean } | null;
+  members: { id: string; full_name: string } | null;
   events: { id: string; title: string } | null;
 };
 
@@ -41,7 +41,7 @@ async function fetchAdjustment(id: string): Promise<Adjustment | null> {
     .select(
       "id, member_id, points, reason, category, term, event_id, " +
         "awarded_by, awarded_at, voided_at, voided_by, void_reason, " +
-        "members(id, full_name, active), events(id, title)"
+        "members(id, full_name), events(id, title)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -117,9 +117,6 @@ export default async function AdjustmentDetailPage({
               </Link>
             ) : (
               <span className="text-misa-muted">unknown member</span>
-            )}
-            {adjustment.members?.active === false && (
-              <span className="ml-2 text-xs text-misa-muted">inactive</span>
             )}
           </Row>
           <Row label="Points">

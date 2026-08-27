@@ -57,7 +57,6 @@ export type MergeMember = {
   email: string;
   eid: string;
   normalizedEid: string;
-  active: boolean;
   /** ISO, as PostgREST returns it. Compared as strings: ISO-8601 with the same
    * offset sorts lexicographically, and both come from the same column. */
   joinedAt: string;
@@ -342,8 +341,7 @@ export const MIN_DUPLICATE_AXES = 2;
  * form's five: this is a destructive action and a long list invites picking. */
 export const MAX_DUPLICATE_SUGGESTIONS = 4;
 
-/** Which identity a match reason speaks to. `inactive` is a penalty rather than
- * a signal and belongs to none of them. */
+/** Which identity a match reason speaks to. */
 function matchAxis(reason: MatchReason): "name" | "email" | "eid" | null {
   switch (reason.kind) {
     case "email_exact":
@@ -356,8 +354,6 @@ function matchAxis(reason: MatchReason): "name" | "email" | "eid" | null {
     case "name_tokens":
     case "name_near":
       return "name";
-    case "inactive":
-      return null;
   }
 }
 

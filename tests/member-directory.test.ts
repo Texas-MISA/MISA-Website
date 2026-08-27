@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   applyMemberFilter,
+  MEMBER_TERM_ALL,
   parseMemberFilter,
   type SortableField,
 } from "@/lib/filters";
@@ -47,6 +48,38 @@ import {
 // ledger's awarded-date range.
 
 const db = testClient();
+
+/**
+ * The term `applyMemberFilter` resolves a null scope to, read from the database
+ * once and reused.
+ *
+ * 🪤 Asked for rather than written down. §4.7's rule is that a term string is
+ * derived, never typed, and a test that hardcoded "Fall 2026" would pass today
+ * and start failing on 1 January with nothing to say why.
+ */
+let cachedTerm: string | null = null;
+async function currentTerm(): Promise<string> {
+  if (cachedTerm === null) {
+    const { data, error } = await db.rpc("current_term");
+    if (error) throw new Error(`current_term failed: ${error.message}`);
+    cachedTerm = data as string;
+  }
+  return cachedTerm;
+}
+
+/**
+ * An instant far enough back to land in an earlier term whatever today is.
+ *
+ * Terms are half-open six-month blocks (Fall = Aug–Dec, Spring = Jan–Jul), so
+ * eight months is always at least one term ago and never two boundaries away in
+ * a way that matters here — the fixtures only need to be OFF the current term's
+ * roster.
+ */
+function priorTermInstant(): Date {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() - 8);
+  return d;
+}
 const track: Tracker = newTracker();
 
 /** The marker every testIdentity() EID carries. No seed EID contains it, and no
@@ -57,10 +90,10 @@ const FIXTURE_MARKER = "t3q";
  * narrow from here; the default `state: "active"` would silently exclude the
  * deactivated fixtures and make every count assertion off by three. */
 const isolated = () =>
-  parseMemberFilter({ q: FIXTURE_MARKER, state: "all" });
+  parseMemberFilter({ q: FIXTURE_MARKER, term: MEMBER_TERM_ALL });
 
 const ROW_COLUMNS =
-  "id, full_name, email, eid, active, source, events_attended, events_possible, attendance_rate, total_points, notes, custom_fields" as const;
+  "id, full_name, email, eid, term, source, events_attended, events_possible, attendance_rate, total_points, notes, custom_fields" as const;
 
 /**
  * A deliberately tiny chunk, so a fixture set of thirty-odd rows spans several
@@ -85,7 +118,8 @@ async function chunk(
   const { data, error, count } = await applyMemberFilter(
     db.from("member_directory").select(ROW_COLUMNS, { count: "exact" }),
     filter,
-    fields
+    fields,
+    await currentTerm()
   ).range(from, from + CHUNK - 1);
   if (error) throw new Error(`directory query failed: ${error.message}`);
   return { rows: data, count: count ?? 0 };
@@ -115,7 +149,11 @@ async function readAll(
 // swallows the whole fixture set hides every bug this screen is prone to, which
 // is exactly why these rows exist.
 const FIXTURE_COUNT = CHUNK * 4 + 3;
-const INACTIVE_EVERY = 13;
+/** Every Nth fixture joins in an EARLIER term, so it is on that term's roster
+ * and off the current one. This replaced an `active: false` flag when migration
+ * 29 dropped the column — the partition it creates is the same shape and now
+ * tests something real. */
+const PRIOR_TERM_EVERY = 13;
 const SELF_CHECKIN_EVERY = 11;
 
 const createdIds: string[] = [];
@@ -127,7 +165,7 @@ beforeAll(async () => {
     const id = await createTestMember(db, track, identity, {
       // Every fixture sits at zero points, so the sort column is tied across the
       // whole set — which is what makes the page-stability test meaningful.
-      active: i % INACTIVE_EVERY !== 0,
+      joinedAt: i % PRIOR_TERM_EVERY === 0 ? priorTermInstant() : undefined,
       source: i % SELF_CHECKIN_EVERY === 0 ? "self_checkin" : "admin",
     });
     createdIds.push(id);
@@ -179,15 +217,20 @@ describe("the directory query on live data", () => {
     expect(again.rows.map((r) => r.id)).toEqual(first.rows.map((r) => r.id));
   });
 
-  it("splits the roster on state, with the two halves accounting for everyone", async () => {
-    const all = await readAll(isolated());
-    const active = await readAll({ ...isolated(), state: "active" });
-    const inactive = await readAll({ ...isolated(), state: "inactive" });
+  it("scopes the roster to one term, leaving earlier joiners out of it", async () => {
+    const term = await currentTerm();
+    const everyTerm = await readAll({ ...isolated(), term: MEMBER_TERM_ALL });
+    const thisTerm = await readAll({ ...isolated(), term: null });
 
-    expect(inactive.count).toBe(Math.ceil(FIXTURE_COUNT / INACTIVE_EVERY));
-    expect(inactive.rows.every((r) => r.active === false)).toBe(true);
-    expect(active.rows.every((r) => r.active === true)).toBe(true);
-    expect(active.count + inactive.count).toBe(all.count);
+    // The prior-term fixtures are on SOME roster — nobody falls out entirely,
+    // because every member appears in the term they joined.
+    const priorCount = Math.ceil(FIXTURE_COUNT / PRIOR_TERM_EVERY);
+    expect(thisTerm.count).toBe(FIXTURE_COUNT - priorCount);
+    expect(everyTerm.count).toBe(FIXTURE_COUNT);
+
+    // ⚠️ Every row of a scoped read carries the term it was scoped to, which is
+    // what makes the numbers beside it that term's numbers.
+    expect(thisTerm.rows.every((r) => r.term === term)).toBe(true);
   });
 
 });
@@ -240,20 +283,27 @@ describe("free-text search against real PostgREST", () => {
     // that case makes no difference, and that is what this asserts.
     const lower = await readAll(isolated());
     const upper = await readAll(
-      parseMemberFilter({ q: FIXTURE_MARKER.toUpperCase(), state: "all" })
+      parseMemberFilter({ q: FIXTURE_MARKER.toUpperCase(), term: MEMBER_TERM_ALL })
     );
     expect(upper.count).toBe(lower.count);
     expect(upper.count).toBeGreaterThanOrEqual(FIXTURE_COUNT);
   });
 
   it("composes with the roster scope rather than replacing it", async () => {
-    // An `or` group and an `eq` are ANDed. If the search ever escaped its group,
-    // "inactive only" plus a search would return active members too.
-    const inactive = await readAll(
-      parseMemberFilter({ q: FIXTURE_MARKER, state: "inactive" })
-    );
-    expect(inactive.count).toBe(Math.ceil(FIXTURE_COUNT / INACTIVE_EVERY));
-    expect(inactive.rows.every((r) => r.active === false)).toBe(true);
+    // An `or` group and an `eq` are ANDed. If the search ever escaped its
+    // group, a term scope plus a search would return other terms' rows too.
+    //
+    // 📌 Asserted relatively, not against FIXTURE_COUNT: earlier tests in this
+    // file add members carrying the same marker, so the absolute number is not
+    // stable across the file — the same reason the case-insensitivity test
+    // above compares two runs rather than a constant.
+    const term = await currentTerm();
+    const everyTerm = await readAll({ ...isolated(), term: MEMBER_TERM_ALL });
+    const scoped = await readAll(parseMemberFilter({ q: FIXTURE_MARKER }));
+
+    expect(scoped.count).toBeGreaterThan(0);
+    expect(scoped.count).toBeLessThan(everyTerm.count);
+    expect(scoped.rows.every((r) => r.term === term)).toBe(true);
   });
 });
 
@@ -547,7 +597,7 @@ describe("custom-field sorting through the view", () => {
 // ranges — which is now how the directory reads too.
 const EX_MARKER = "t3qex";
 const EX_COUNT = CHUNK * 4 + 3;
-const EX_INACTIVE_EVERY = 5;
+const EX_PRIOR_TERM_EVERY = 5;
 
 describe("the export query returns every matching member", () => {
   // Deliberately far below EX_COUNT, so the loop genuinely goes round four
@@ -563,13 +613,17 @@ describe("the export query returns every matching member", () => {
         db,
         track,
         { ...base, eid: base.eid.replace("t3q", EX_MARKER) },
-        { active: i % EX_INACTIVE_EVERY !== 0 }
+        {
+          joinedAt:
+            i % EX_PRIOR_TERM_EVERY === 0 ? priorTermInstant() : undefined,
+        }
       );
       exIds.push(id);
     }
   }, 60_000);
 
-  const everyone = () => parseMemberFilter({ q: EX_MARKER, state: "all" });
+  const everyone = () =>
+    parseMemberFilter({ q: EX_MARKER, term: MEMBER_TERM_ALL });
 
   async function exportAll(
     filter: ReturnType<typeof parseMemberFilter>,
@@ -578,7 +632,8 @@ describe("the export query returns every matching member", () => {
     const base = applyMemberFilter(
       db.from("member_directory").select(ROW_COLUMNS, { count: "exact" }),
       filter,
-      []
+      [],
+      await currentTerm()
     );
     const query = ids.length > 0 ? base.in("id", ids) : base;
 
@@ -663,7 +718,7 @@ describe("the export query returns every matching member", () => {
 // Stage 6.5 phase 4 — the dues filter against the real view.
 //
 // The pure translation is pinned in filters.test.ts; what only real PostgREST
-// can answer is whether `dues_paid_current_term` actually flips when a payment
+// can answer is whether `dues_paid_term` actually flips when a payment
 // is recorded, voided, or left undecided — because that column is an
 // `exists (…)` over a generated array, scoped to current_term(), and every one
 // of those three parts is somewhere the filter could silently agree with itself
@@ -734,13 +789,26 @@ describe("the dues filter against real payments", () => {
   });
 
   const mine = (dues: string) =>
-    parseMemberFilter({ q: DUES_MARKER, state: "all", dues });
+    parseMemberFilter({ q: DUES_MARKER, term: MEMBER_TERM_ALL, dues });
+
+  /** The same question, asked of ONE term rather than of every term. */
+  async function scopedIdsFor(dues: string, scopeTerm: string) {
+    const { data, error } = await applyMemberFilter(
+      db.from("member_directory").select("id"),
+      parseMemberFilter({ q: DUES_MARKER, term: scopeTerm, dues }),
+      [],
+      await currentTerm()
+    );
+    if (error) throw new Error(`dues query failed: ${error.message}`);
+    return (data ?? []).map((row) => row.id ?? "");
+  }
 
   async function idsFor(dues: string) {
     const { data, error, count } = await applyMemberFilter(
       db.from("member_directory").select("id", { count: "exact" }),
       mine(dues),
-      []
+      [],
+      await currentTerm()
     );
     if (error) throw new Error(`dues query failed: ${error.message}`);
     return { ids: (data ?? []).map((row) => row.id ?? ""), count: count ?? 0 };
@@ -797,17 +865,28 @@ describe("the dues filter against real payments", () => {
     expect((await idsFor("unpaid")).ids).toContain(member);
   });
 
-  it("🪤 ignores a payment covering only a term that is not the current one", async () => {
-    // member_directory is scoped to current_term() like every other aggregate
-    // here, so a live payment for a past term counts for nothing. Stepped off
-    // the index rather than typed, because 'Fall 2026' < 'Spring 2026' is true
-    // as a string and false as a calendar fact.
+  it("🪤 a payment for another term marks THAT term paid and this one unpaid", async () => {
+    // Stepped off the index rather than typed, because 'Fall 2026' <
+    // 'Spring 2026' is true as a string and false as a calendar fact.
+    //
+    // ⚠️ Rewritten for migration 29, and the difference is the point. Dues used
+    // to be a single current-term boolean per member, so a payment for a past
+    // term "counted for nothing". The view is per-term now: the same payment
+    // marks its OWN term paid and leaves the current one unpaid. Scoping the
+    // question is what makes the answer meaningful — asked across all terms,
+    // this member is legitimately both.
     const [member] = unpaidIds;
     const previous = termAtIndex(termIndex(term)! - 1);
     const txn = await pay(member, { start_term: previous, terms_covered: 1 });
 
-    expect((await idsFor("paid")).ids).not.toContain(member);
-    expect((await idsFor("unpaid")).ids).toContain(member);
+    // Scoped to the current term, which is the question the directory asks.
+    const paidNow = await scopedIdsFor("paid", term);
+    const unpaidNow = await scopedIdsFor("unpaid", term);
+    expect(paidNow).not.toContain(member);
+    expect(unpaidNow).toContain(member);
+
+    // And the term they actually paid for says so.
+    expect(await scopedIdsFor("paid", previous)).toContain(member);
 
     await db.from("dues_payments").delete().eq("venmo_txn_id", txn);
   });
@@ -980,7 +1059,8 @@ describe("categorical filters against the view", () => {
     const query = applyMemberFilter(
       db.from("member_directory").select(ROW_COLUMNS, { count: "exact" }),
       filter,
-      fields
+      fields,
+      await currentTerm()
     );
 
     const exported: { id: string | null }[] = [];
@@ -1081,13 +1161,14 @@ describe("relational filters against the view", () => {
   }, 60_000);
 
   const mine = (params: Record<string, string>) =>
-    parseMemberFilter({ q: REL_MARKER, state: "all", ...params });
+    parseMemberFilter({ q: REL_MARKER, term: MEMBER_TERM_ALL, ...params });
 
   async function run(params: Record<string, string>) {
     const { data, error, count } = await applyMemberFilter(
       db.from("member_directory").select(REL_COLUMNS, { count: "exact" }),
       mine(params),
-      []
+      [],
+      await currentTerm()
     );
     if (error) throw new Error(`relational query failed: ${error.message}`);
     return { ids: (data ?? []).map((r) => r.id ?? ""), count: count ?? 0 };
@@ -1148,17 +1229,6 @@ describe("relational filters against the view", () => {
     expect(ids.length).toBe((await run({})).count);
   });
 
-  it("excludes members seen after the cutoff", async () => {
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-    const { ids } = await run({ notSeenSince: yesterday });
-
-    // The attenders were seen just now, so they fall out; the never-seen member
-    // stays, because null is not "after the cutoff".
-    for (const id of attended) expect(ids).not.toContain(id);
-    expect(ids).toContain(neverSeenId);
-  });
 
   it("finds members with a check-in still waiting", async () => {
     const { ids } = await run({ pending: "has" });
@@ -1196,7 +1266,8 @@ describe("relational filters against the view", () => {
     const query = applyMemberFilter(
       db.from("member_directory").select(REL_COLUMNS, { count: "exact" }),
       filter,
-      []
+      [],
+      await currentTerm()
     );
 
     const rows: { id: string | null }[] = [];

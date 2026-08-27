@@ -89,7 +89,7 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     eid: "abc1234",
     full_name: "Rowan Pike",
     email: "rowan@example.edu",
-    active: true,
+    term: "Fall 2026",
     source: "admin",
     joined_at: "2026-01-15T18:00:00.000Z",
     notes: null,
@@ -101,7 +101,7 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     attendance_rate: 0.75,
     pending_count: 0,
     last_seen_at: "2026-03-01T02:00:00.000Z",
-    dues_paid_current_term: true,
+    dues_paid_term: true,
     custom_fields: {},
     ...over,
   };

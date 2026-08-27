@@ -48,7 +48,6 @@ export type PreviewRow = {
   eid: string;
   fullName: string;
   email: string;
-  active: boolean;
   /** Already rendered — describeOutcome lives in the pure core so the preview
    * and any future caller cannot describe the same outcome differently. */
   outcome: string;
@@ -191,7 +190,6 @@ function toPreviewRow(row: PlannedMember): PreviewRow {
     eid: row.eid,
     fullName: row.fullName,
     email: row.email,
-    active: row.active,
     outcome: describeOutcome(row.outcome),
     willImport: row.outcome.kind === "new",
   };
@@ -270,8 +268,7 @@ export async function commitRosterImport(
           eid: row.eid,
           full_name: row.fullName,
           email: row.email,
-          active: row.active,
-          custom_fields: row.customFields,
+                custom_fields: row.customFields,
           // Not a new `source` value. Widening the CHECK would touch the
           // filter, the SELF badge, the export catalogue and the seed, and the
           // audit row below already answers "how did this row arrive" — which

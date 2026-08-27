@@ -625,7 +625,6 @@ describe("rankPaymentSuggestions", () => {
       email: "rowan.pike@example.edu",
       eid: "rp8571",
       normalizedEid: "rp8571",
-      active: true,
     },
     {
       id: "m-amara",
@@ -633,7 +632,6 @@ describe("rankPaymentSuggestions", () => {
       email: "amara.osei@example.edu",
       eid: "ao4471",
       normalizedEid: "ao4471",
-      active: true,
     },
     {
       id: "m-mika",
@@ -641,7 +639,6 @@ describe("rankPaymentSuggestions", () => {
       email: "mika.petrov@example.edu",
       eid: "mp8570",
       normalizedEid: "mp8570",
-      active: true,
     },
   ];
 

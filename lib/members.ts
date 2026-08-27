@@ -152,7 +152,7 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   // Stage 6.5 (migration 19). ⚠️ These three are reserved for a different
   // reason from the rest: they name no column an officer could shadow, they
   // forbid a *duplicate answer*. Dues status is calculated from `dues_payments`
-  // and surfaced as `member_directory.dues_paid_current_term`, so a hand-ticked
+  // and surfaced as `member_directory.dues_paid_term`, so a hand-ticked
   // "Paid Dues" dropdown beside it would leave the roster carrying two answers
   // to one question with nothing to say which is right.
   //
@@ -162,6 +162,13 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   "dues",
   "dues_paid",
   "dues_paid_current_term",
+  // Its replacement since migration 29. BOTH stay reserved: freeing the old key
+  // would let a definition claim a name that older exports and saved presets
+  // still refer to.
+  "dues_paid_term",
+  // A directory column since migration 29, and a sortable/filterable one, so a
+  // custom field keyed `term` would shadow it.
+  "term",
 ]);
 
 /** Bounds on an option list, mirroring `valid_field_options()` in migration 18. */
@@ -365,7 +372,7 @@ export function isAllowedFieldValue(
  * column no other mutation touches never appears in their diffs.
  */
 export const AUDITED_MEMBER_COLUMNS =
-  "id, full_name, email, eid, active, joined_at, notes, custom_fields, updated_at" as const;
+  "id, full_name, email, eid, joined_at, notes, custom_fields, updated_at" as const;
 
 /** The same contract for a field definition. Kept separate from
  * `FIELD_COLUMNS` in lib/member-fields.ts, which is the narrower read the UI

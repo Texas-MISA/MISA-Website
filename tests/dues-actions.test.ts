@@ -449,11 +449,11 @@ async function voidIt(id: string, reason: string) {
 async function duesPaid(memberId: string): Promise<boolean | null> {
   const { data, error } = await db
     .from("member_directory")
-    .select("dues_paid_current_term")
+    .select("dues_paid_term")
     .eq("id", memberId)
     .maybeSingle();
   if (error) throw new Error(error.message);
-  return data?.dues_paid_current_term ?? null;
+  return data?.dues_paid_term ?? null;
 }
 
 async function currentTerm(): Promise<string> {
@@ -463,7 +463,7 @@ async function currentTerm(): Promise<string> {
 }
 
 describe("assigning and voiding a payment", () => {
-  it("âš ï¸ flips dues_paid_current_term on, and back off when voided", async () => {
+  it("âš ï¸ flips dues_paid_term on, and back off when voided", async () => {
     // The stage's exit criterion, end to end. Nothing application-side
     // maintains this boolean — member_directory derives it from covered_terms —
     // so it is the one assertion that proves the whole chain agrees.

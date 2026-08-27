@@ -141,7 +141,7 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - **`present_requires_resolution` is load-bearing.** `status = 'present'` guarantees both `event_id` and `member_id` are non-null. Never work around it.
 - **Match and dedupe on the normalized generated column, never the raw value.** `members.normalized_eid` / `attendance.normalized_eid`, folded to `lower`.
 - **A near-miss EID needs corroboration at edit distance 2; distance 1 stands alone.** Don't auto-resolve.
-- 🔓 **`/lookup`'s gate is a CONJUNCTION in one query,** never `lib/checkin.ts`'s ordered fallback; two lookups or an `.or()` silently reduce it to EID-alone. **One `unmatched` outcome and one message for every miss.** **`/lookup` throttles in its own bucket** (`hashClientIp("lookup")`).
+- 🔴 **`/lookup`'s gate is the EID ALONE as of 2026-08-25 (officer), and dues status was KEPT.** It was EID **and** matching email, and §6 named that conjunction as the reason this page may show dues status — an EID-alone gate is explicitly *not* sufficient for that. The officer was told and chose it, so this is a recorded reversal, not drift: see `findMemberByEid` in `lib/lookup.ts`. A UT EID is derived from initials, so guessing one is cheap, and `LOOKUP_RATE_LIMIT_MAX` is now the only cost to a script. **Still binding:** ONE query, never `lib/checkin.ts`'s ordered fallback (an `.or()` would widen the match to another column); **one `unmatched` outcome and one message for every miss**; and its own throttle bucket (`hashClientIp("lookup")`).
 
 ### Check-in location verification (migration 28)
 
@@ -192,21 +192,23 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 
 ### Dues and terms
 
-- **Dues status is calculated, never ticked.** "Official member" means a non-voided `dues_payments` row whose `covered_terms` includes `current_term()`. It gates nothing. `dues`, `dues_paid` and `dues_paid_current_term` are **reserved custom-field keys**.
+- **Dues status is calculated, never ticked.** "Official member" means a non-voided `dues_payments` row whose `covered_terms` includes **the row's term** — `member_directory.dues_paid_term`, renamed from `dues_paid_current_term` by migration 29 because the old name lies on any row not scoped to now. It gates nothing. `dues`, `dues_paid`, `dues_paid_current_term`, `dues_paid_term` and `term` are all **reserved custom-field keys**; the two retired names stay reserved because older exports and saved presets still refer to them.
 - 🔓 **The dedupe key is Venmo's transaction ID; a content fingerprint is not acceptable.** The unique index **spans voided rows**.
 - 🪤 **Terms do not sort lexicographically.** Every "which term is later" question goes through `term_index()` / `termIndex` / `isLaterTerm`, never `max(term)` or `order by term`.
 - **The import is a Server Action, re-parses server-side, and never persists the uploaded file.** `MAX_IMPORT_BYTES` (512 KB) and `MAX_IMPORT_ROWS` (2000) **refuse; neither truncates**.
 
 ### Views, events and the schema
 
-- **Both views are scoped to `current_term()`,** denominators included.
+- 🔓 **`member_directory` is ONE ROW PER (MEMBER, TERM)** (migration 29). Every aggregate belongs to **that row's term**, denominators included; `pending_count` and `last_seen_at` stay all-time and must be labelled as such. **Membership is derived** — present at one of the term's events, points in it, dues covering it, or joined during it — and `joined_at` is NOT NULL, so **every member always has at least one row**. 🪤 A `.eq("id", …).maybeSingle()` on this view is now a PGRST116 waiting to happen; read the rows and pick the term. `applyMemberFilter` takes the current term as a **required** argument, like `fields`, so a caller that forgets it is a compile error rather than a roster that silently shows every member once per term.
+- ⚠️ **`leaderboard` is defined OVER `member_directory`** scoped to `current_term()`, having lost `where m.active` with the column. One definition of "who is in the club". 🪤 **The board can now be EMPTY**, which the old LEFT join made impossible — and an empty board has no `term` for the heading. **Never add an `rpc("current_term")` fallback for that case**; it is the two-sources-for-one-fact defect migration 21 closed.
+- ⚠️ **`members.active` IS GONE** (migration 29, irreversible). Nothing is "switched off" any more — term membership answers the same question from evidence. It reached far past the directory: the candidate scans (which now read the **whole** roster, so `MEMBER_SCAN_LIMIT` bites sooner), the `member_inactive` resolution warning, `fetchMemberOptions`' filter and its `includeId`, the roster import's column, and the export's **Active** field (now **Term**).
 - **The board's term label comes from the same row as its numbers** (`leaderboard.term`). **`/leaderboard` is `force-dynamic`** — there is no `revalidatePath("/leaderboard")` anywhere on purpose.
 - **Change a view with `create or replace`, which can only *append* columns.** Dropping a view drops its grants. The one exception (renaming an output column) requires a drop — permitted only if the same migration re-issues the grants.
 - **The database must stay disposable.** Every schema change is a file in `supabase/migrations/`, never applied only through the dashboard.
 - **`seed.sql` must not use trailing inline comments** — `scripts/seed-remote.sh` flattens each chunk onto one line.
 - 🔴 **Emptying production is `scripts/wipe-remote.sh`, NOT `seed-remote.sh --force`** — `--force` wipes *and re-inserts the 32 fabricated members*.
 - **Never type a term string.** `events.term` is generated via `term_of()`; a literal `'Fall 2026'` in application code is a bug.
-- **`wipe-remote.sh` accounts for ALL TWELVE tables in `public`.** A migration that adds a table has to place it.
+- **`wipe-remote.sh` accounts for ALL THIRTEEN tables in `public`.** A migration that adds a table has to place it.
 
 ### Rendering, errors and framework behaviour
 

@@ -42,105 +42,69 @@ async function counts() {
   };
 }
 
-describe("the EID + email gate", () => {
-  // 🔓 These four are the reason this file exists. /attend's findMember is an
-  // ordered FALLBACK — normalized_eid, then lower(email) — because a check-in
-  // must recognise someone who fat-fingers one field. Reproducing that shape
-  // here would mean an EID alone opens the page, and the EID-alone gate is
-  // exactly the one §6 says is NOT sufficient to reveal dues status. Without
-  // the two mismatch cases below, a refactor to the fallback shape would pass
-  // every other test in this file.
+describe("the EID gate", () => {
+  // 🔴 This block used to pin an EID **and** matching email conjunction, and
+  // four of its cases existed solely to stop a refactor turning the gate into
+  // /attend's ordered fallback. The officer removed the email half on
+  // 2026-08-25 knowing what it gave up, so those cases are gone rather than
+  // inverted — there is nothing left for them to describe.
+  //
+  // What is still worth pinning, and is: the gate matches on the normalized
+  // EID and on nothing else, every miss is the SAME `unmatched` outcome, and
+  // the path still writes nothing.
 
-  it("refuses a real EID with the wrong email", async () => {
+
+  it("refuses an EID that is on no roster", async () => {
     const identity = testIdentity();
     await createTestMember(db, track, identity);
 
-    const result = await lookupMemberHistory(
-      db,
-      { eid: identity.eid, email: "someone.else@example.edu" },
-      now
-    );
+    const result = await lookupMemberHistory(db, { eid: "t3qnobody999" }, now);
     expect(result.status).toBe("unmatched");
   });
 
-  it("refuses a real email with the wrong EID", async () => {
+
+  it("matches on the EID alone", async () => {
     const identity = testIdentity();
     await createTestMember(db, track, identity);
 
-    const result = await lookupMemberHistory(
-      db,
-      { eid: "t3qnobody999", email: identity.email },
-      now
-    );
-    expect(result.status).toBe("unmatched");
-  });
-
-  it("refuses two halves belonging to two different members", async () => {
-    // The sharpest version: both values are real and on the roster, and they
-    // are not the same person. An `.or()` would let this through.
-    const a = testIdentity();
-    const b = testIdentity();
-    await createTestMember(db, track, a);
-    await createTestMember(db, track, b);
-
-    const result = await lookupMemberHistory(
-      db,
-      { eid: a.eid, email: b.email },
-      now
-    );
-    expect(result.status).toBe("unmatched");
-  });
-
-  it("matches when both halves name the same member", async () => {
-    const identity = testIdentity();
-    await createTestMember(db, track, identity);
-
-    const result = await lookupMemberHistory(db, identity, now);
+    const result = await lookupMemberHistory(db, { eid: identity.eid }, now);
     expect(result.status).toBe("found");
     if (result.status !== "found") return;
     expect(result.profile.fullName).toBe(identity.fullName);
   });
 
-  it("folds case and stray whitespace on both halves", async () => {
-    // normalizeEid strips spaces and hyphens and lowercases; the email compare
-    // is a case-insensitive equality via ilike. People paste from badges.
+  it("folds case and stray whitespace", async () => {
+    // normalizeEid strips spaces and hyphens and lowercases. People paste from
+    // badges.
     const identity = testIdentity();
     await createTestMember(db, track, identity);
 
     const result = await lookupMemberHistory(
       db,
-      {
-        eid: ` ${identity.eid.toUpperCase()} `,
-        email: identity.email.toUpperCase(),
-      },
+      { eid: ` ${identity.eid.toUpperCase()} ` },
       now
     );
     expect(result.status).toBe("found");
   });
 
-  it("treats an email wildcard as a literal, not a pattern", async () => {
-    // escapeIlike is what keeps `.ilike()` an equality test. Without it a
-    // single `%` would match half the roster — a wildcard past half the gate.
+
+  it("lets somebody off THIS term's roster look themselves up", async () => {
+    // 🔓 The case migration 29 created, and the one most likely to regress into
+    // an affirmative absence. This member joined an earlier term and has done
+    // nothing since, so they have no row for the current term at all — and they
+    // are exactly who needs to see their own record. Reporting "we can't match
+    // that" would be false, and reporting an error would be worse.
     const identity = testIdentity();
-    await createTestMember(db, track, identity);
+    const priorTerm = new Date();
+    priorTerm.setUTCMonth(priorTerm.getUTCMonth() - 8);
+    await createTestMember(db, track, identity, { joinedAt: priorTerm });
 
-    const result = await lookupMemberHistory(
-      db,
-      { eid: identity.eid, email: "%@example.edu" },
-      now
-    );
-    expect(result.status).toBe("unmatched");
-  });
-
-  it("lets a DEACTIVATED member look themselves up", async () => {
-    // member_directory has no `active` filter, unlike leaderboard. Somebody
-    // switched off the roster is exactly who needs to see their own record —
-    // and telling them "we can't match that" would be false.
-    const identity = testIdentity();
-    await createTestMember(db, track, identity, { active: false });
-
-    const result = await lookupMemberHistory(db, identity, now);
+    const result = await lookupMemberHistory(db, { eid: identity.eid }, now);
     expect(result.status).toBe("found");
+    if (result.status !== "found") return;
+    // Their own page reads zero for a term they were not part of, which is
+    // true — never "—" and never a crash.
+    expect(result.profile.totalPoints).toBe(0);
 
     const { data: board } = await db
       .from("leaderboard")
@@ -159,12 +123,8 @@ describe("the EID + email gate", () => {
     await createTestMember(db, track, identity);
 
     const before = await counts();
-    await lookupMemberHistory(db, identity, now);
-    await lookupMemberHistory(
-      db,
-      { eid: "t3qghost404", email: "nobody@example.edu" },
-      now
-    );
+    await lookupMemberHistory(db, { eid: identity.eid }, now);
+    await lookupMemberHistory(db, { eid: "t3qghost404" }, now);
     expect(await counts()).toEqual(before);
   });
 });
@@ -460,20 +420,22 @@ describe("source assertions", () => {
   // Behavioural tests cannot reach these: vitest runs `environment: "node"`,
   // so there is no DOM, and the properties are about the SHAPE of the code.
 
-  it("resolves the member in one query carrying both predicates", () => {
+  it("resolves the member in one query on the EID and nothing else", () => {
     const source = readFileSync(
       new URL("../lib/lookup.ts", import.meta.url),
       "utf8"
     );
-    const fn = source.slice(source.indexOf("async function findMemberByBoth"));
+    const fn = source.slice(source.indexOf("async function findMemberByEid"));
     const body = fn.slice(0, fn.indexOf("\n}"));
 
-    // One .from("members"), both predicates on it, and no .or() — which is the
-    // shape a well-meaning "make it more forgiving, like /attend" edit takes.
+    // ⚠️ The email predicate left on 2026-08-25 with that half of the gate.
+    // What this still pins is the shape a well-meaning "make it more forgiving,
+    // like /attend" edit would take: ONE .from("members"), the EID predicate on
+    // it, and no .or() widening the match to some other column.
     expect(body.match(/\.from\("members"\)/g)).toHaveLength(1);
     expect(body).toContain('.eq("normalized_eid"');
-    expect(body).toContain('.ilike("email"');
     expect(body).not.toContain(".or(");
+    expect(body).not.toContain('.ilike("email"');
   });
 
   it("keeps app/actions/lookup.ts to a single export", () => {
@@ -500,7 +462,6 @@ describe("source assertions", () => {
     );
     expect(source).toContain("state.submitted ?? EMPTY");
     expect(source).toContain("defaultValue={submitted.eid}");
-    expect(source).toContain("defaultValue={submitted.email}");
     // The reset button carries name/value directly. The JSX attribute
     // `formAction=` would make React drop the submitter's name from the
     // FormData pre-hydration, so `step` would arrive on a slow phone and

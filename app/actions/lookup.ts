@@ -23,20 +23,20 @@ import { lookupSchema } from "@/lib/validation";
 // It writes exactly one row anywhere: the throttle record, inside
 // checkRateLimit. Nothing else on this path touches the database.
 //
-// No role check, because there is no role. The gate is EID **and** matching
-// email, enforced as a single query in lib/lookup.ts — see the header on
-// findMemberByBoth for why it must never become an ordered fallback.
+// No role check, because there is no role. The gate is the EID alone as of
+// 2026-08-25 — see the header on findMemberByEid in lib/lookup.ts, which
+// records what that gave up. It must still never become an ordered fallback
+// over some other identifier.
 
 /**
  * The values the member typed, echoed back so the form can repopulate.
  *
  * React 19 resets an uncontrolled `<form action>` once the action resolves, so
- * without this a failed lookup would clear the two fields the member is trying
- * to correct. Every `defaultValue` on the form is driven from here.
+ * without this a failed lookup would clear the field the member is trying to
+ * correct. Every `defaultValue` on the form is driven from here.
  */
 export type SubmittedValues = {
   eid: string;
-  email: string;
 };
 
 export type LookupState = (
@@ -45,7 +45,7 @@ export type LookupState = (
   | { status: "rate_limited" }
   | {
       status: "invalid";
-      fieldErrors: Partial<Record<"eid" | "email", string[]>>;
+      fieldErrors: Partial<Record<"eid", string[]>>;
     }
 ) & { submitted?: SubmittedValues };
 
@@ -55,7 +55,7 @@ export type LookupState = (
  * could otherwise have the server reflect a megabyte back into its own
  * response.
  */
-const ECHO_LIMITS = { eid: 32, email: 254 } as const;
+const ECHO_LIMITS = { eid: 32 } as const;
 
 function echoField(value: FormDataEntryValue | null, max: number): string {
   // FormData.get can return a File; anything not a string echoes as empty.
@@ -76,7 +76,6 @@ export async function lookupMember(
 
   const raw: SubmittedValues = {
     eid: echoField(formData.get("eid"), ECHO_LIMITS.eid),
-    email: echoField(formData.get("email"), ECHO_LIMITS.email),
   };
 
   // "Look someone else up" from the result screen. Returns before touching the
@@ -89,7 +88,6 @@ export async function lookupMember(
 
   const parsed = lookupSchema.safeParse({
     eid: formData.get("eid"),
-    email: formData.get("email"),
   });
   if (!parsed.success) {
     const fieldErrors: Record<string, string[]> = {};

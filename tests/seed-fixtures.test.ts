@@ -47,7 +47,7 @@ beforeAll(async () => {
   const db = testClient();
   const { data, error } = await db
     .from("members")
-    .select("id, full_name, email, eid, normalized_eid, active");
+    .select("id, full_name, email, eid, normalized_eid");
   if (error) throw new Error(error.message);
   roster = (data ?? []).map((m) => ({
     id: m.id,
@@ -55,7 +55,6 @@ beforeAll(async () => {
     email: m.email,
     eid: m.eid,
     normalizedEid: m.normalized_eid ?? "",
-    active: m.active,
   }));
 });
 

@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyMemberFilter,
+  MEMBER_TERM_ALL,
   chunkRange,
   defaultDirection,
   hasRelationalFilter,
@@ -86,18 +87,26 @@ function recorder(): Recorder {
  * "no custom fields" means one thing in the tests and the source alike. */
 const NO_FIELDS = NO_CUSTOM_FIELDS;
 
+/** The term a null scope resolves to in these tests. A fixed, obviously-fake
+ * string: applyMemberFilter never parses or compares terms, it only passes one
+ * through, so the value matters solely as something to assert against. */
+const TEST_TERM = "Fall 2099";
+
 function callsFor(
   filter: Partial<MemberFilter>,
   fields: readonly SortableField[] = NO_FIELDS
 ): Call[] {
   const full = parseMemberFilter({});
-  return applyMemberFilter(recorder(), { ...full, ...filter }, fields).calls;
+  return applyMemberFilter(recorder(), { ...full, ...filter }, fields, TEST_TERM)
+    .calls;
 }
 
 describe("parseMemberFilter", () => {
-  it("defaults to the active roster sorted by name", () => {
+  it("defaults to the current term's roster sorted by name", () => {
     const filter = parseMemberFilter({});
-    expect(filter.state).toBe("active");
+    // Null, not a term string: the default follows the clock rather than
+    // pinning the term the filter happened to be built in.
+    expect(filter.term).toBeNull();
     expect(filter.sort).toBe("name");
     expect(filter.dir).toBe("asc");
     expect(filter.minPoints).toBeNull();
@@ -181,11 +190,13 @@ describe("parseMemberFilter", () => {
 
   it("falls back rather than throwing on values a human edited into the URL", () => {
     const filter = parseMemberFilter({
-      state: "banana",
+      term: "banana",
       sort: "'; drop table members; --",
       dir: "sideways",
     });
-    expect(filter.state).toBe("active");
+    // ⚠️ Null (the current term), NEVER `all`. Widening on a value nobody chose
+    // would show every member once per term under a heading saying otherwise.
+    expect(filter.term).toBeNull();
     expect(filter.sort).toBe("name");
     expect(filter.dir).toBe("asc");
   });
@@ -213,7 +224,8 @@ describe("parseMemberFilter", () => {
     // And it does not survive back into the URL.
     expect(memberFilterToParams(filter).toString()).toBe("");
     // Nor does it reach the query.
-    const calls = applyMemberFilter(recorder(), filter, NO_FIELDS).calls;
+    const calls = applyMemberFilter(recorder(), filter, NO_FIELDS, TEST_TERM)
+      .calls;
     expect(
       calls.filter(
         ([, column]) =>
@@ -236,8 +248,8 @@ describe("parseMemberFilter", () => {
   });
 
   it("takes the first value when a key is repeated", () => {
-    expect(parseMemberFilter({ state: ["inactive", "all"] }).state).toBe(
-      "inactive"
+    expect(parseMemberFilter({ term: ["Spring 2026", "all"] }).term).toBe(
+      "Spring 2026"
     );
   });
 });
@@ -366,15 +378,22 @@ describe("sortColumn", () => {
 });
 
 describe("applyMemberFilter", () => {
-  it("scopes to active members by default and drops the clause for 'all'", () => {
-    expect(callsFor({ state: "active" })).toContainEqual(["eq", "active", true]);
-    expect(callsFor({ state: "inactive" })).toContainEqual([
+  it("scopes to the current term by default and drops the clause for 'all'", () => {
+    // Null resolves to whatever term the caller passed — the ONE place that
+    // resolution happens, which is why applyMemberFilter requires it.
+    expect(callsFor({ term: null })).toContainEqual(["eq", "term", TEST_TERM]);
+    expect(callsFor({ term: "Spring 2026" })).toContainEqual([
       "eq",
-      "active",
-      false,
+      "term",
+      "Spring 2026",
     ]);
+    // ⚠️ `all` is the only value that removes the clause, and removing it does
+    // NOT mean "the whole roster" — the view is one row per member per term, so
+    // an unscoped query returns a member once per term they belong to.
     expect(
-      callsFor({ state: "all" }).filter(([m, c]) => m === "eq" && c === "active")
+      callsFor({ term: MEMBER_TERM_ALL }).filter(
+        ([m, c]) => m === "eq" && c === "term"
+      )
     ).toHaveLength(0);
   });
 
@@ -522,7 +541,7 @@ describe("dues status (Stage 6.5 phase 4)", () => {
     expect(filter.dues).toBe("all");
     expect(isDefaultFilter(filter)).toBe(true);
     expect(callsFor({ dues: "all" }).some(([, column]) =>
-      column === "dues_paid_current_term"
+      column === "dues_paid_term"
     )).toBe(false);
   });
 
@@ -537,23 +556,23 @@ describe("dues status (Stage 6.5 phase 4)", () => {
   it("translates to one equality on the view's calculated boolean", () => {
     expect(callsFor({ dues: "paid" })).toContainEqual([
       "eq",
-      "dues_paid_current_term",
+      "dues_paid_term",
       true,
     ]);
     // Not `.not("eq", true)` and not a null branch: the view computes this as an
     // `exists (…)`, so it is a real boolean in every row.
     expect(callsFor({ dues: "unpaid" })).toContainEqual([
       "eq",
-      "dues_paid_current_term",
+      "dues_paid_term",
       false,
     ]);
   });
 
   it("composes with the other clauses rather than replacing them", () => {
-    // The exit-criterion query: every unpaid active member matching a search.
-    const calls = callsFor({ dues: "unpaid", state: "active", q: "sharma" });
-    expect(calls).toContainEqual(["eq", "active", true]);
-    expect(calls).toContainEqual(["eq", "dues_paid_current_term", false]);
+    // The exit-criterion query: every unpaid member this term matching a search.
+    const calls = callsFor({ dues: "unpaid", term: null, q: "sharma" });
+    expect(calls).toContainEqual(["eq", "term", TEST_TERM]);
+    expect(calls).toContainEqual(["eq", "dues_paid_term", false]);
     expect(calls.some(([method]) => method === "or")).toBe(true);
     expect(calls.some(([method]) => method === "range")).toBe(false);
   });
@@ -564,7 +583,7 @@ describe("dues status (Stage 6.5 phase 4)", () => {
     // looking at dues; who has paid is the answer it should open on.
     expect(parseMemberFilter({ sort: "dues" }).dir).toBe("desc");
     expect(defaultDirection("dues")).toBe("desc");
-    expect(sortColumn("dues", NO_FIELDS)).toBe("dues_paid_current_term");
+    expect(sortColumn("dues", NO_FIELDS)).toBe("dues_paid_term");
   });
 
   it("is a built-in sort key, not a custom one", () => {
@@ -801,11 +820,10 @@ describe("categorical filters (phase 5c)", () => {
 describe("relational filters (phase 6)", () => {
   const EVENT = "11111111-2222-4333-8444-555555555555";
 
-  it("all five default to narrowing nothing", () => {
+  it("all four default to narrowing nothing", () => {
     const filter = parseMemberFilter({});
     expect(filter.event).toBeNull();
     expect(filter.pending).toBe("all");
-    expect(filter.notSeenSince).toBeNull();
     expect(filter.minEvents).toBeNull();
     expect(filter.maxEvents).toBeNull();
     expect(isDefaultFilter(filter)).toBe(true);
@@ -848,47 +866,6 @@ describe("relational filters (phase 6)", () => {
     });
   });
 
-  describe("not seen since", () => {
-    it("⚠️ includes members never seen at all", () => {
-      // The null branch IS the filter. A bare .lt() drops nulls silently, so
-      // the officer asking "who has gone quiet?" would get an answer with the
-      // quietest members missing from it.
-      const or = callsFor({ notSeenSince: "2026-09-01" }).find(
-        ([method]) => method === "or"
-      );
-      expect(or?.[1]).toContain("last_seen_at.is.null");
-      expect(or?.[1]).toContain("last_seen_at.lt.");
-    });
-
-    it("🪤 anchors the cutoff in Central, not UTC", () => {
-      // A bare "2026-09-01" is read as UTC midnight and silently drops the last
-      // five hours of the Central day before it. September is CDT (UTC-5), so
-      // Central midnight is 05:00Z.
-      const or = callsFor({ notSeenSince: "2026-09-01" }).find(
-        ([method]) => method === "or"
-      );
-      expect(or?.[1]).toContain("2026-09-01T05:00:00.000Z");
-    });
-
-    it("rejects anything that is not a civil date", () => {
-      for (const bad of ["yesterday", "2026-9-1", "09/01/2026", ""]) {
-        expect(parseMemberFilter({ notSeenSince: bad }).notSeenSince, bad).toBeNull();
-      }
-    });
-
-    it("📌 coexists with the search as a SECOND or-group", () => {
-      // Separate `or=` params AND together, which is what two independent
-      // concerns want. The failure the search's own comment warns about is
-      // different — splitting ONE concern's alternatives across several calls
-      // ANDs them and matches nothing.
-      const groups = callsFor({ q: "dara", notSeenSince: "2026-09-01" }).filter(
-        ([method]) => method === "or"
-      );
-      expect(groups).toHaveLength(2);
-      expect(groups.some(([, body]) => String(body).includes("full_name.ilike"))).toBe(true);
-      expect(groups.some(([, body]) => String(body).includes("last_seen_at"))).toBe(true);
-    });
-  });
 
   describe("attended / missed one event", () => {
     it("scopes the embed to present rows and asks for a match", () => {
@@ -959,11 +936,10 @@ describe("relational filters (phase 6)", () => {
     const filter = parseMemberFilter({
       event: EVENT,
       pending: "has",
-      notSeenSince: "2026-09-01",
       minEvents: "2",
     });
     expect(hasRelationalFilter(filter)).toBe(true);
-    expect(relationalFilterCount(filter)).toBe(4);
+    expect(relationalFilterCount(filter)).toBe(3);
   });
 
   it("round-trips every field through the URL", () => {
@@ -983,7 +959,7 @@ describe("relational filters (phase 6)", () => {
 
   it("survives a change to any other control", () => {
     const filter = parseMemberFilter(
-      { event: EVENT, eventMode: "missed", pending: "has", notSeenSince: "2026-09-01" },
+      { event: EVENT, eventMode: "missed", pending: "has", term: "Spring 2026" },
       NO_FIELDS
     );
     const next = new URLSearchParams(
@@ -992,7 +968,7 @@ describe("relational filters (phase 6)", () => {
     expect(next.get("event")).toBe(EVENT);
     expect(next.get("eventMode")).toBe("missed");
     expect(next.get("pending")).toBe("has");
-    expect(next.get("notSeenSince")).toBe("2026-09-01");
+    expect(next.get("term")).toBe("Spring 2026");
   });
 
   it("never windows the result, however many predicates are applied", () => {
@@ -1000,7 +976,7 @@ describe("relational filters (phase 6)", () => {
       event: EVENT,
       eventMode: "missed",
       pending: "has",
-      notSeenSince: "2026-09-01",
+      term: "Spring 2026",
       minEvents: 1,
       maxEvents: 9,
       q: "a",
@@ -1054,7 +1030,6 @@ describe("filter control state", () => {
       maxPoints: "",
       minEvents: "",
       maxEvents: "",
-      notSeenSince: "",
     });
   });
 
@@ -1074,7 +1049,6 @@ describe("filter control state", () => {
         maxPoints: 40,
         minEvents: 2,
         maxEvents: 9,
-        notSeenSince: "2026-09-01",
       })
     ).toEqual({
       q: "dara",
@@ -1082,9 +1056,6 @@ describe("filter control state", () => {
       maxPoints: "40",
       minEvents: "2",
       maxEvents: "9",
-      // A date passes through as its civil string — no Date round trip, which
-      // is what would shift it a day for anyone east or west of the server.
-      notSeenSince: "2026-09-01",
     });
   });
 
@@ -1122,11 +1093,11 @@ describe("filter control state", () => {
   it("preserves sort and direction across a filter change", () => {
     const sorted: MemberFilter = { ...base, sort: "total_points", dir: "asc" };
     // total_points defaults to desc, so an explicit asc has to survive.
-    const url = memberFilterUrl(sorted, { state: "all" }, NO_CUSTOM_FIELDS);
+    const url = memberFilterUrl(sorted, { term: "all" }, NO_CUSTOM_FIELDS);
     const params = new URLSearchParams(url);
     expect(params.get("sort")).toBe("total_points");
     expect(params.get("dir")).toBe("asc");
-    expect(params.get("state")).toBe("all");
+    expect(params.get("term")).toBe("all");
   });
 
   it("sanitizes a typed value immediately rather than displaying an unapplied one", () => {

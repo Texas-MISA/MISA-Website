@@ -3,6 +3,7 @@ import { writeAudit } from "@/app/actions/audit";
 import {
   applyMemberFilter,
   isDefaultFilter,
+  MEMBER_TERM_ALL,
   memberFilterToParams,
   needsAttendanceEmbed,
   parseMemberFilter,
@@ -64,7 +65,7 @@ export const dynamic = "force-dynamic";
 // catalogue can reach, so the picker is limited by the catalogue rather than by
 // what happened to be selected here.
 const EXPORT_COLUMNS =
-  "id, eid, full_name, email, active, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_current_term, custom_fields" as const;
+  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, custom_fields" as const;
 
 // The same list plus phase 6's attendance embed, spelled out in full rather than
 // concatenated for the reason above: PostgREST types the row off the literal.
@@ -74,7 +75,7 @@ const EXPORT_COLUMNS =
 // shows up as a missing field in the file rather than as a type error. Change
 // them together.
 const EXPORT_COLUMNS_WITH_ATTENDANCE =
-  "id, eid, full_name, email, active, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_current_term, custom_fields, attendance!left(event_id)" as const;
+  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, custom_fields, attendance!left(event_id)" as const;
 
 /**
  * Rows per PostgREST request while paging through the result.
@@ -130,6 +131,14 @@ export async function GET(request: Request): Promise<Response> {
       fields
     );
 
+    // 🪤 The term the filter's null scope resolves to, and it has to be asked
+    // for HERE rather than defaulted: applyMemberFilter requires it, and this
+    // route must reach the same query the screen did. THROWS on failure for the
+    // same reason the directory page does — a widened export is the "select all
+    // N matching" failure with a file attached, and it would leave the building
+    // before anybody noticed.
+    const currentTerm = await fetchCurrentTerm(db);
+
     const catalogue = exportCatalogue(fields);
     const chosen = parseFieldSelection(params.getAll("fields"), catalogue);
 
@@ -158,12 +167,14 @@ export async function GET(request: Request): Promise<Response> {
             .from("member_directory")
             .select(EXPORT_COLUMNS_WITH_ATTENDANCE, { count: "exact" }),
           filter,
-          fields
+          fields,
+          currentTerm
         )
       : applyMemberFilter(
           db.from("member_directory").select(EXPORT_COLUMNS, { count: "exact" }),
           filter,
-          fields
+          fields,
+          currentTerm
         );
 
     // ⚠️ applyMemberFilter applies no window at all, and that is the whole
@@ -237,6 +248,12 @@ export async function GET(request: Request): Promise<Response> {
         rowCount: rows.length,
         scope: scoped ? "selected" : "filter",
         filter: memberFilterToParams(filter).toString(),
+        // ⚠️ RESOLVED, not the raw filter value. The default scope serializes to
+        // nothing, so `filter` above says nothing about which semester's figures
+        // left the building — and a receipt that cannot answer that is not a
+        // receipt. Recorded beside the filter rather than instead of it: one is
+        // what the officer chose, this is what it meant on the day.
+        term: filter.term === MEMBER_TERM_ALL ? "all" : filter.term ?? currentTerm,
         wholeRoster: !scoped && isDefaultFilter(filter),
       },
       note: `${format} export of ${rows.length} member${
@@ -244,7 +261,7 @@ export async function GET(request: Request): Promise<Response> {
       } (${exported.length} field${exported.length === 1 ? "" : "s"})`,
     });
 
-    return respond(format, chosen, rows, today, sheetLabelOf(filter));
+    return respond(format, chosen, rows, today, sheetLabelOf(filter, currentTerm));
   } catch (e) {
     console.error(
       "roster export failed:",
@@ -259,9 +276,37 @@ export async function GET(request: Request): Promise<Response> {
  * `sheetName()` in lib/xlsx.ts does the sanitizing — Excel forbids several
  * characters and caps the name at 31 — so this only has to be descriptive.
  */
-function sheetLabelOf(filter: ReturnType<typeof parseMemberFilter>): string {
+/**
+ * The term a null scope resolves to.
+ *
+ * 🔓 Throws, like the directory page's copy. A Route Handler answering a `fetch`
+ * cannot redirect and must not guess: without the term this route cannot know
+ * which semester it is being asked to export, and the one dishonest option —
+ * applying no term predicate — writes a file containing every member once per
+ * term they have ever belonged to, under a filename that claims otherwise. The
+ * house catch below turns this into a 500 the toolbar surfaces.
+ */
+async function fetchCurrentTerm(
+  db: ReturnType<typeof createAdminClient>
+): Promise<string> {
+  const { data, error } = await db.rpc("current_term");
+  if (error) {
+    console.error("current_term rpc failed:", error.message);
+    throw new Error("Could not determine the current term.");
+  }
+  return data;
+}
+
+function sheetLabelOf(
+  filter: ReturnType<typeof parseMemberFilter>,
+  currentTerm: string
+): string {
+  // 📌 The term is ALWAYS named, including when it is the default. A workbook
+  // outlives the URL it came from, and "Members" on a file whose numbers are
+  // one semester's is the same class of mistake as an all-time denominator
+  // under a current-term numerator — it looks right and quietly is not.
   const parts = ["Members"];
-  if (filter.state !== "active") parts.push(filter.state);
+  parts.push(filter.term === MEMBER_TERM_ALL ? "all terms" : filter.term ?? currentTerm);
   if (filter.q) parts.push(filter.q);
   return parts.join(" - ");
 }

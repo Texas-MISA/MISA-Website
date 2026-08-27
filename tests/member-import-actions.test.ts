@@ -56,7 +56,6 @@ describe("roster import", () => {
           eid: row.eid,
           full_name: row.fullName,
           email: row.email,
-          active: row.active,
           custom_fields: row.customFields,
           source: "admin" as const,
         }))
@@ -119,10 +118,6 @@ describe("roster import", () => {
     const { data, error } = await commit(plan.rows, "roster.csv");
     expect(error).toBeNull();
     expect(data).toHaveLength(2);
-
-    // source is 'admin', not a third value — the audit row is what records how
-    // the member arrived.
-    expect(data!.every((row) => row.active)).toBe(true);
 
     const { data: audit } = await db
       .from("admin_audit")

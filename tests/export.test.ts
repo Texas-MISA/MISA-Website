@@ -46,7 +46,7 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     eid: "abc1234",
     full_name: "Rowan Pike",
     email: "rowan@example.edu",
-    active: true,
+    term: "Fall 2026",
     source: "admin",
     joined_at: "2026-01-15T18:00:00.000Z",
     notes: null,
@@ -58,7 +58,7 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     attendance_rate: 0.75,
     pending_count: 0,
     last_seen_at: "2026-03-01T02:00:00.000Z",
-    dues_paid_current_term: false,
+    dues_paid_term: false,
     custom_fields: {},
     ...over,
   };
@@ -216,16 +216,12 @@ describe("projectRow", () => {
     expect(blank[0]).toEqual({ kind: "empty" });
   });
 
-  it("renders active as Yes/No and nulls as empty", () => {
-    expect(projectRow(row({ active: true }), pick("active"))[0]).toEqual({
+  it("renders the term the row's figures belong to", () => {
+    expect(projectRow(row({ term: "Spring 2026" }), pick("term"))[0]).toEqual({
       kind: "text",
-      value: "Yes",
+      value: "Spring 2026",
     });
-    expect(projectRow(row({ active: false }), pick("active"))[0]).toEqual({
-      kind: "text",
-      value: "No",
-    });
-    expect(projectRow(row({ active: null }), pick("active"))[0]).toEqual({
+    expect(projectRow(row({ term: null }), pick("term"))[0]).toEqual({
       kind: "empty",
     });
   });
@@ -238,13 +234,13 @@ describe("projectRow", () => {
   // Stage 6.5 phase 4 — ONE catalogue entry, not a new mechanism.
   it("renders dues as the same two words the directory prints", () => {
     expect(
-      projectRow(row({ dues_paid_current_term: true }), pick("dues"))[0]
+      projectRow(row({ dues_paid_term: true }), pick("dues"))[0]
     ).toEqual({ kind: "text", value: "Paid" });
     expect(
-      projectRow(row({ dues_paid_current_term: false }), pick("dues"))[0]
+      projectRow(row({ dues_paid_term: false }), pick("dues"))[0]
     ).toEqual({ kind: "text", value: "Not Paid" });
     expect(
-      projectRow(row({ dues_paid_current_term: null }), pick("dues"))[0]
+      projectRow(row({ dues_paid_term: null }), pick("dues"))[0]
     ).toEqual({ kind: "empty" });
   });
 

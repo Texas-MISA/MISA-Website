@@ -46,7 +46,7 @@ export const metadata: Metadata = { title: "Member" };
 // lib/points.ts. Every column of the view, because this page is where the ones
 // the directory no longer shows have to land.
 const DIRECTORY_COLUMNS =
-  "id, eid, full_name, email, active, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate, notes, custom_fields, dues_paid_current_term, updated_at" as const;
+  "id, eid, full_name, email, term, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate, notes, custom_fields, dues_paid_term, updated_at" as const;
 
 const ATTENDANCE_COLUMNS =
   "id, event_id, status, submitted_at, submitted_name, submitted_eid, source" as const;
@@ -77,11 +77,12 @@ export default async function MemberDetailPage({
   // is exactly what that read's own comment anticipated.
   const [directory, definitions, currentTerm, attendance, adjustments, payments] =
     await Promise.all([
-      db
-        .from("member_directory")
-        .select(DIRECTORY_COLUMNS)
-        .eq("id", id)
-        .maybeSingle(),
+      // 🪤 EVERY term row for this member, not `.maybeSingle()`. The view is
+      // one row per (member, term) since migration 29, so maybeSingle() would
+      // answer PGRST116 for anyone who has been here more than one semester —
+      // a working record rendering as a broken page. The rows are picked apart
+      // below: identity is the same on all of them, the aggregates are not.
+      db.from("member_directory").select(DIRECTORY_COLUMNS).eq("id", id),
       // Archived definitions included: a member may still hold an answer given
       // under one, and a value nobody can see is a value nobody can audit.
       fetchFieldDefinitions(db, { includeArchived: true }),
@@ -118,22 +119,59 @@ export default async function MemberDetailPage({
     console.error("member detail query failed:", directory.error.message);
     throw new Error("Could not read this member.");
   }
-  const member = directory.data;
-  // Genuinely absent: deleted, or merged into another member.
-  if (!member) notFound();
+  // 🔓 Throws rather than degrading, and this is stricter than it used to be.
+  // The term used to affect only the events grid, so a failed rpc left the rest
+  // of the page correct. It now decides WHICH ROW of the directory is the one to
+  // show — without it this page cannot tell a member's Fall 2026 figures from
+  // their Spring 2026 ones, and picking either would be a guess rendered as a
+  // fact.
+  if (currentTerm.error) {
+    console.error("current_term rpc failed:", currentTerm.error.message);
+    throw new Error("Could not determine the current term.");
+  }
+  const term: string = currentTerm.data;
 
-  const term = currentTerm.error ? null : currentTerm.data;
+  const rows = directory.data;
+  // Genuinely absent: deleted, or merged into another member. Every member has
+  // at least one row — the roster CTE includes the term they joined in, and
+  // joined_at is NOT NULL — so an empty result means no such member rather than
+  // "not on any roster".
+  if (rows.length === 0) notFound();
+
+  // Identity, notes, custom fields, pending_count and last_seen_at are the same
+  // on every row; only the term aggregates differ. Taking them off the first row
+  // is safe for exactly that reason.
+  const identity = rows[0];
+  const scoped = rows.find((row) => row.term === term) ?? null;
+
+  // ⚠️ A member with no row this term is NOT missing — they are simply not on
+  // this term's roster (no attendance, no points, no dues covering it, and they
+  // joined earlier). Zeroes are the honest reading of "this term", and the
+  // notice below says so rather than letting the officer read a real zero as a
+  // lapsed record.
+  const member = scoped ?? {
+    ...identity,
+    term,
+    events_attended: 0,
+    attendance_points: 0,
+    bonus_points: 0,
+    total_points: 0,
+    // Null, never zero: this member has no row for the term, so nothing here
+    // knows how many events it held. formatAttendanceRate renders null as "—",
+    // which is the same call migration 14 made for a term with no events.
+    events_possible: null,
+    attendance_rate: null,
+    dues_paid_term: false,
+  };
 
   // The term's published events. Cancelled events credit nobody, and drafts are
   // not something a member could have been asked to attend.
-  const termEvents = term
-    ? await db
-        .from("events")
-        .select(TERM_EVENT_COLUMNS)
-        .eq("term", term)
-        .eq("status", "published")
-        .order("starts_at", { ascending: true })
-    : null;
+  const termEvents = await db
+    .from("events")
+    .select(TERM_EVENT_COLUMNS)
+    .eq("term", term)
+    .eq("status", "published")
+    .order("starts_at", { ascending: true });
 
   // 🔓 Per-section failure flags, not `x.error ? []`. Each of these used to
   // render a read failure as an affirmative claim: "No adjustments have been
@@ -217,8 +255,7 @@ export default async function MemberDetailPage({
   const memberOptions = mergeCandidates
     .map((candidate) => ({
       id: candidate.id,
-      label: `${candidate.fullName} (${candidate.eid})${candidate.active ? "" : " — inactive"}`,
-      active: candidate.active,
+      label: `${candidate.fullName} (${candidate.eid})`,
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 
@@ -229,7 +266,6 @@ export default async function MemberDetailPage({
       email: member.email ?? "",
       eid: member.eid ?? "",
       normalizedEid: normalizeEid(member.eid ?? ""),
-      active: member.active ?? true,
       joinedAt: member.joined_at ?? "",
       notes: member.notes,
       customFields: member.custom_fields,
@@ -253,11 +289,6 @@ export default async function MemberDetailPage({
           {member.full_name}
         </h1>
         <div className="flex items-center gap-2">
-          {member.active === false && (
-            <span className="border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-              inactive
-            </span>
-          )}
           {member.source === "self_checkin" && (
             <span
               title="Created by the check-in form rather than an officer"
@@ -295,8 +326,11 @@ export default async function MemberDetailPage({
               ? "The check-in form"
               : "An officer"}
           </Row>
+          {/* Derived, not ticked. This replaced an Active / Inactive row on
+              2026-08-25 when members.active was dropped — the flag answered the
+              same question from a checkbox nobody kept up to date. */}
           <Row label="Roster">
-            {member.active === false ? "Inactive" : "Active"}
+            {scoped ? `On the ${term} roster` : `Not on the ${term} roster`}
           </Row>
         </dl>
       </section>
@@ -404,22 +438,21 @@ export default async function MemberDetailPage({
         </p>
         {/* ⚠️ These counts and the "events attended" figure above can legitimately
             differ. member_directory counts present rows against any non-cancelled
-            current-term event, drafts included; this grid is published-only. The
+            event in this term, drafts included; this grid is published-only. The
             view is the authority on the numbers; the grid is the breakdown, and
             neither is derived from the other. */}
 
-        {/* 🪤 `termEvents` is null when the current_term rpc failed, so this
-            section used to render its heading, "0 attended, 0 missed", and then
-            NOTHING — no table, no empty state, no error. All three branches
-            below were false at once. */}
-        {(termEvents?.error || termEvents === null) && (
-          <ReadError
-            what={termEvents === null ? "the current term" : "this term's events"}
-            className="mt-4"
-          />
+        {/* 🪤 `termEvents` used to be nullable, because a failed current_term
+            rpc left the term unknown and this section rendered its heading,
+            "0 attended, 0 missed", and then NOTHING — no table, no empty state,
+            no error, all three branches false at once. The rpc now throws
+            upstream, so the null case is unreachable and only the read error
+            remains. */}
+        {termEvents.error && (
+          <ReadError what="this term's events" className="mt-4" />
         )}
 
-        {termEvents && !termEvents.error && termEvents.data.length === 0 && (
+        {!termEvents.error && termEvents.data.length === 0 && (
           <p className="mt-4 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
             No published events in this term yet.
           </p>
@@ -549,7 +582,7 @@ export default async function MemberDetailPage({
             carry — see paidThroughTerm. */}
         <p className="mt-3 max-w-3xl text-sm text-misa-secondary">
           Calculated from payments, never ticked by hand.{" "}
-          {member.dues_paid_current_term ? (
+          {member.dues_paid_term ? (
             <span className="font-medium">
               Official for {term ?? "the current term"}.
             </span>

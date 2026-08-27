@@ -16,7 +16,6 @@ export type DuesLedgerRow = {
   note: string | null;
   memberId: string | null;
   memberName: string | null;
-  memberActive: boolean;
   /** The terms this payment actually covers, or null while undecided. */
   coveredTerms: string[] | null;
   startTerm: string;
@@ -90,11 +89,6 @@ export function DuesTable({
                   </Link>
                 ) : (
                   <span className="text-misa-muted">nobody yet</span>
-                )}
-                {row.memberId && !row.memberActive && (
-                  <span className="ml-2 text-xs text-misa-muted">
-                    inactive
-                  </span>
                 )}
               </td>
               <td className="py-2 pr-4 font-mono whitespace-nowrap">

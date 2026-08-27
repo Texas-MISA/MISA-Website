@@ -100,8 +100,12 @@ lib/
                         helpers, expandSeries, previewEventEdit — no next/* imports
   checkin.ts            check-in resolution core + ORPHAN_WINDOW_HOURS + rate limit.
                         Lookup and creation are separate on purpose
-  lookup.ts             the member self-service core — the gate is a CONJUNCTION in
-                        ONE query, never checkin.ts's ordered fallback
+  lookup.ts             the member self-service core. 🔴 The gate is the EID
+                        ALONE since 2026-08-25 (officer) — it was EID AND
+                        matching email, which is what §6 rested the dues-status
+                        exposure on. Still ONE query, still never checkin.ts's
+                        ordered fallback, still one `unmatched` for every miss.
+                        See findMemberByEid's header for what the change cost
   attendance.ts         resolution core: interval parsing, member-candidate scoring,
                         previewResolution, canApprove, planBulkAssign. Anything with
                         a decision in it belongs here, not in the action
@@ -111,7 +115,15 @@ lib/
                         setFieldValue, AUDITED_MEMBER_COLUMNS
   filters.ts            directory filter core: parse → MemberFilter → query. The
                         query builder is typed structurally so tests drive a fake.
-                        READ_CHUNK + chunkRange(); the window stays the CALLER's
+                        READ_CHUNK + chunkRange(); the window stays the CALLER's.
+                        🔓 `term` is the roster SCOPE (2026-08-25), replacing
+                        `state` (active/inactive) and `notSeenSince`, both of
+                        which were DELETED rather than hidden. null = the
+                        current term and is the default — never a term string,
+                        so a saved preset follows the clock instead of pinning
+                        the semester it was created in. 🪤 applyMemberFilter
+                        takes the real term as a REQUIRED argument, like
+                        `fields`: it is the one place null is resolved
   ledger-filters.ts     the points-ledger and attendance-queue filter cores. ONE
                         module for two screens: each had its own copy of the
                         Central half-open date bound and the exports were a third
@@ -120,7 +132,12 @@ lib/
   member-presets.ts     the preset read
   member-fields.ts      fetchFieldDefinitions — live custom-field definitions,
                         deliberately uncapped
-  member-options.ts     fetchMemberOptions — bounded roster scan (MEMBER_SCAN_LIMIT)
+  member-options.ts     fetchMemberOptions — bounded roster scan (MEMBER_SCAN_LIMIT).
+                        ⚠️ Scans the WHOLE roster since 2026-08-25: the
+                        active-only predicate went with members.active, and
+                        `includeId` went with it (its only job was keeping a
+                        DEACTIVATED member in the picker), so the cap bites
+                        sooner than it did
   event-options.ts      fetchEventOptions — labels formatted server-side
   gallery-photos.ts     galleryPhotos() (paths, for the home marquee) and
                         galleryPhotoEntries() (paths PLUS each file's real

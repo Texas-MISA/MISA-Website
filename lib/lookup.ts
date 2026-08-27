@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { escapeIlike, normalizeEid } from "@/lib/checkin";
+import { normalizeEid } from "@/lib/checkin";
 import { paidThroughTerm } from "@/lib/dues";
 import { formatCategory, formatDay, formatInstant } from "@/lib/events";
 import {
@@ -38,14 +38,20 @@ type Client = SupabaseClient<Database>;
  *
  * ⚠️ It is still a room number, not a security tuning knob. A venue's NAT puts
  * everyone on one address, so size it against the largest room the org books —
- * do not talk it down on abuse grounds. The gate itself (EID **and** matching
- * email) is what makes guessing expensive; this only stops scripted floods.
+ * do not talk it down on abuse grounds.
+ *
+ * 🔴 **This throttle now carries more weight than it was sized for.** It used to
+ * be backed by a gate that was expensive to guess — EID *and* matching email.
+ * The email half was removed on 2026-08-25 (officer's decision), so an EID
+ * alone opens this page, and a UT EID is derived from a person's initials
+ * rather than issued at random. The throttle is what is left between a script
+ * and the roster. It is still a room number and still must not be talked down;
+ * it is simply no longer a second line of defence behind a strong first one.
  */
 export const LOOKUP_RATE_LIMIT_MAX = 30;
 
 export type LookupInput = {
   eid: string;
-  email: string;
 };
 
 /**
@@ -136,7 +142,7 @@ export type LookupResult =
   | { status: "error" };
 
 const DIRECTORY_COLUMNS =
-  "id, full_name, events_attended, attendance_points, bonus_points, total_points, pending_count, events_possible, attendance_rate, dues_paid_current_term" as const;
+  "id, full_name, term, events_attended, attendance_points, bonus_points, total_points, pending_count, events_possible, attendance_rate, dues_paid_term" as const;
 
 const TERM_EVENT_COLUMNS = "id, title, starts_at, ends_at, points, category" as const;
 
@@ -148,25 +154,36 @@ const ADJUSTMENT_COLUMNS =
 const DUES_COLUMNS = "covered_terms, voided_at" as const;
 
 /**
- * Resolve the EID + email pair to exactly one member.
+ * Resolve the EID to exactly one member.
  *
- * 🔓 **ONE query carrying BOTH predicates, and that is the security control.**
+ * 🔴 **THIS GATE WAS DELIBERATELY WEAKENED ON 2026-08-25, and the reversal is
+ * recorded here rather than quietly applied.**
  *
- * `findMember` in lib/checkin.ts is an ordered *fallback* — normalized_eid,
- * then lower(email) — because a check-in must recognise someone who fat-fingers
- * one of the two. That is right there and catastrophic here: reproducing the
- * shape would mean an EID alone opens the page, and the EID-alone gate is
- * exactly the one §6 says is **not** sufficient to reveal dues status. The
- * double gate is the entire reason this route is allowed to show it.
+ * It used to be one query carrying BOTH `normalized_eid` and `lower(email)`,
+ * and that conjunction was described in §6 as the security control — the entire
+ * reason this route was allowed to show dues status, since §6 holds that an EID
+ * alone is *not* a sufficient gate for that. The officer asked for a one-field
+ * lookup on 2026-08-25 and, told what it meant, chose to keep the page
+ * unchanged. So:
  *
- * So: never two lookups, never an `.or()`. Both predicates, one row, or nothing.
+ *   * A UT EID is derived from a person's initials, not issued at random, which
+ *     is the same property `lib/attendance.ts` relies on when it refuses to
+ *     corroborate a near-miss at edit distance 2. Guessing one is cheap.
+ *   * Anyone holding a guessed EID now sees that member's name, point total,
+ *     attendance history and whether they have paid dues.
+ *   * `LOOKUP_RATE_LIMIT_MAX` is the only remaining cost, and it is a room
+ *     number rather than a security parameter.
  *
- * The email comparison is `.ilike(escapeIlike(...))`, which is a
- * case-insensitive *equality* test matching the `lower(email)` unique index's
- * semantics — the escape is what stops a `%` in the input turning it into a
- * pattern match, which would be a wildcard past half the gate.
+ * What did NOT change, and must not: still ONE query, still one `unmatched`
+ * outcome for every miss. Splitting the failures would hand back an oracle on
+ * top of an already-cheap gate.
+ *
+ * 📌 Still not `findMember` from lib/checkin.ts. That one is an ordered
+ * *fallback* — EID, then email — so it can recognise somebody who fat-fingers
+ * one of the two. Here there is one identifier and one predicate; borrowing the
+ * fallback would silently let an email address open somebody else's page.
  */
-async function findMemberByBoth(
+async function findMemberByEid(
   db: Client,
   input: LookupInput
 ): Promise<MemberMatch> {
@@ -174,7 +191,6 @@ async function findMemberByBoth(
     .from("members")
     .select("id")
     .eq("normalized_eid", normalizeEid(input.eid))
-    .ilike("email", escapeIlike(input.email))
     .maybeSingle();
 
   if (error) {
@@ -199,11 +215,11 @@ async function buildProfile(
 ): Promise<LookupProfile | null> {
   const [directory, currentTerm, attendance, adjustments, payments] =
     await Promise.all([
-      db
-        .from("member_directory")
-        .select(DIRECTORY_COLUMNS)
-        .eq("id", memberId)
-        .maybeSingle(),
+      // 🪤 Every term row, not `.maybeSingle()`: the view is one row per
+      // (member, term) since migration 29, so a member in their second semester
+      // would answer PGRST116 and the whole lookup would report an error to
+      // somebody whose record is fine. The current term's row is picked below.
+      db.from("member_directory").select(DIRECTORY_COLUMNS).eq("id", memberId),
       // Never type a term string (§4.7). Since migration 21 this honours an
       // officer's pin for every role, not only the service one.
       db.rpc("current_term"),
@@ -227,12 +243,11 @@ async function buildProfile(
     console.error("lookup directory query failed:", directory.error.message);
     return null;
   }
-  const member = directory.data;
-  // The member row exists (we just matched it) but the view does not have it.
-  // member_directory has no `active` filter, so this is a genuine fault rather
-  // than a deactivated member, and reporting it as "not found" would tell
-  // someone on the roster that they are not on it.
-  if (!member) return null;
+  // The member row exists — we just matched it — so an EMPTY result is a
+  // genuine fault rather than an absence, and reporting it as "not found" would
+  // tell somebody on the roster that they are not on it. Every member has at
+  // least one row (the term they joined in).
+  if (directory.data.length === 0) return null;
 
   // ⚠️ A failed term read is NOT "no term". It skips the events query below
   // entirely, so the grid empties and the page claims the org has held no
@@ -243,16 +258,35 @@ async function buildProfile(
   }
   const term = currentTerm.data;
 
+  // The current term's row, or zeros. ⚠️ A member with no row this term is a
+  // NORMAL state, not an error: they joined an earlier semester and have not
+  // attended, been granted points, or paid dues covering this one. Their own
+  // page should say zero for this term, which is true — the alternative,
+  // treating it as "not found", would tell somebody on the roster that they are
+  // not on it, and that is the failure this whole module is shaped around.
+  const scoped = directory.data.find((row) => row.term === term) ?? null;
+  const member = scoped ?? {
+    ...directory.data[0],
+    term,
+    events_attended: 0,
+    attendance_points: 0,
+    bonus_points: 0,
+    total_points: 0,
+    // Null, never 0: with no row for the term nothing here knows how many
+    // events it held, and formatAttendanceRate renders null as "—".
+    events_possible: null,
+    attendance_rate: null,
+    dues_paid_term: false,
+  };
+
   // Published only: a cancelled event credits nobody, and a draft is not
   // something a member could have been asked to attend.
-  const termEvents = term
-    ? await db
-        .from("events")
-        .select(TERM_EVENT_COLUMNS)
-        .eq("term", term)
-        .eq("status", "published")
-        .order("starts_at", { ascending: true })
-    : null;
+  const termEvents = await db
+    .from("events")
+    .select(TERM_EVENT_COLUMNS)
+    .eq("term", term)
+    .eq("status", "published")
+    .order("starts_at", { ascending: true });
 
   // 🔓 Every one of these used to be `x.error ? [] : x.data`, and each turned a
   // read failure into an affirmative lie on a MEMBER'S OWN page (Stage 7 phase
@@ -360,7 +394,7 @@ async function buildProfile(
         category: formatPointCategory(row.category),
         reason: row.reason,
       })),
-    duesPaidCurrentTerm: member.dues_paid_current_term ?? false,
+    duesPaidCurrentTerm: member.dues_paid_term ?? false,
     // 🪤 Through the term index, never max(term) or order by term.
     paidThrough: paidThroughTerm(
       paymentRows.map((row) => ({
@@ -382,7 +416,7 @@ export async function lookupMemberHistory(
   input: LookupInput,
   now: Date
 ): Promise<LookupResult> {
-  const match = await findMemberByBoth(db, input);
+  const match = await findMemberByEid(db, input);
   // A transient fault is reported as an error, never as `unmatched` — the
   // discriminated tri-state exists precisely so this branch cannot collapse
   // into the miss.

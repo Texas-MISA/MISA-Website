@@ -41,7 +41,7 @@ const DIRECTORY = "/admin/members";
 /** One unbroken literal with `as const` — PostgREST types the returned row off
  * the string literal, and a concatenation widens it to plain `string`. */
 const MERGE_MEMBER_COLUMNS =
-  "id, full_name, email, eid, normalized_eid, active, joined_at, notes, custom_fields, updated_at" as const;
+  "id, full_name, email, eid, normalized_eid, joined_at, notes, custom_fields, updated_at" as const;
 
 /** The attendance columns the plan needs, plus what the reject write audits. */
 const MERGE_ATTENDANCE_COLUMNS =
@@ -110,7 +110,6 @@ async function loadMember(
       email: data.email,
       eid: data.eid,
       normalizedEid: data.normalized_eid ?? "",
-      active: data.active,
       joinedAt: data.joined_at,
       notes: data.notes,
       customFields: data.custom_fields,

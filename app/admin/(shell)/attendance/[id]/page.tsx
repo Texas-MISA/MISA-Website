@@ -64,7 +64,6 @@ type SubmissionDetail = {
     full_name: string;
     email: string;
     eid: string;
-    active: boolean;
   } | null;
 };
 
@@ -156,14 +155,19 @@ async function fetchMemberSuggestions(
   // candidate set structurally excludes the row we are looking for.
   //
   // ⚠️ Unordered on purpose today (the ranker sorts anyway) — which means that
-  // once the active roster passes MEMBER_SCAN_LIMIT this scores an *arbitrary*
-  // subset and the right member can be absent with nothing on screen to say so.
+  // once the roster passes MEMBER_SCAN_LIMIT this scores an *arbitrary* subset
+  // and the right member can be absent with nothing on screen to say so.
+  //
+  // ⚠️ It scans the WHOLE roster since 2026-08-25. It used to be `.eq("active",
+  // true)`, which both narrowed the scan and kept it under the limit; with
+  // `members.active` gone there is nothing to narrow on, so the cap bites
+  // sooner than it did. Nothing was substituted — scoping this to a term would
+  // hide exactly the returning member whose check-in nobody could resolve.
   // Fix the limit (pg_trgm) rather than adding an order here; an order would
   // only make the truncation deterministic, not correct. See §2.2.
   const { data, error } = await db
     .from("members")
-    .select("id, full_name, email, eid, normalized_eid, active")
-    .eq("active", true)
+    .select("id, full_name, email, eid, normalized_eid")
     .limit(MEMBER_SCAN_LIMIT);
 
   // Same shape as the event suggestions above: an unread roster must not read
@@ -179,7 +183,6 @@ async function fetchMemberSuggestions(
     email: row.email,
     eid: row.eid,
     normalizedEid: row.normalized_eid ?? "",
-    active: row.active,
   }));
 
   return {
@@ -226,9 +229,7 @@ export default async function SubmissionDetailPage({
       fetchEventSuggestions(submission.submitted_at),
       fetchMemberSuggestions(submission),
       fetchEventOptions(createAdminClient()),
-      fetchMemberOptions(createAdminClient(), {
-        includeId: submission.member_id,
-      }),
+      fetchMemberOptions(createAdminClient()),
     ]);
 
   // 🔓 These two pickers ARE the manual escape hatch this screen exists for —
@@ -244,7 +245,6 @@ export default async function SubmissionDetailPage({
 
   const warnings = previewResolution({
     event: submission.events,
-    memberActive: submission.members?.active ?? null,
     submittedAt: submission.submitted_at,
   });
 
@@ -456,8 +456,6 @@ function describeWarning(warning: ResolutionWarning): string {
       return "This event is cancelled, so approving here credits nobody — cancelled events contribute no points.";
     case "event_draft":
       return "This event is still a draft. Its attendance counts on the public leaderboard anyway, so approving will move public standings before the event is published.";
-    case "member_inactive":
-      return "This member is inactive. They appear in the officer directory but not on the public leaderboard, so approving will change nothing publicly.";
     case "outside_window":
       return warning.side === "after"
         ? `The submission arrived ${formatDuration(warning.secondsOutside)} after check-in closed. That is normal for this queue — approving it is a judgement that they were there.`

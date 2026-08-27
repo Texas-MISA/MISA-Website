@@ -299,11 +299,6 @@ function RowTable({ rows }: { rows: PreviewRow[] }) {
               <td className="px-3 py-2 tabular-nums">{row.line}</td>
               <td className="px-3 py-2">
                 {row.fullName || "—"}
-                {!row.active && (
-                  <span className="ml-2 border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
-                    inactive
-                  </span>
-                )}
               </td>
               <td className="px-3 py-2">{row.email || "—"}</td>
               <td className="px-3 py-2">{row.eid || "—"}</td>

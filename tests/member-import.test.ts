@@ -6,7 +6,6 @@ import {
   importColumns,
   matchHeaders,
   MAX_ROSTER_IMPORT_ROWS,
-  parseActive,
   planRosterImport,
   type ExistingMember,
   type PlannedMember,
@@ -53,9 +52,11 @@ function rowsOf(result: ReturnType<typeof plan>): PlannedMember[] {
 const HEADER = "Name,Email,EID";
 
 describe("importColumns", () => {
-  it("offers the three required identity columns plus active", () => {
+  it("offers the three required identity columns", () => {
+    // ✂️ `active` was the fourth until migration 29 dropped the column. Every
+    // remaining builtin is required, which is the whole importable set now.
     const keys = importColumns(NO_FIELDS).map((c) => c.key);
-    expect(keys).toEqual(["name", "email", "eid", "active"]);
+    expect(keys).toEqual(["name", "email", "eid"]);
     expect(
       importColumns(NO_FIELDS)
         .filter((c) => c.required)
@@ -83,7 +84,7 @@ describe("importColumns", () => {
 
   it("uses the export's own labels, so a downloaded file imports back", () => {
     const labels = importColumns([SHIRT]).map((c) => c.label);
-    expect(labels).toEqual(["Name", "Email", "EID", "Active", "Shirt Size"]);
+    expect(labels).toEqual(["Name", "Email", "EID", "Shirt Size"]);
   });
 });
 
@@ -137,28 +138,6 @@ describe("matchHeaders", () => {
   });
 });
 
-describe("parseActive", () => {
-  it("defaults an empty cell to active", () => {
-    expect(parseActive("")).toBe(true);
-    expect(parseActive("   ")).toBe(true);
-  });
-
-  it("accepts the spellings officers actually type", () => {
-    for (const yes of ["yes", "Y", "TRUE", "t", "1", "Active"]) {
-      expect(parseActive(yes)).toBe(true);
-    }
-    for (const no of ["no", "N", "FALSE", "f", "0", "Inactive"]) {
-      expect(parseActive(no)).toBe(false);
-    }
-  });
-
-  it("refuses to guess at anything else", () => {
-    // Guessing would silently reinstate somebody the officer meant to archive,
-    // and a wrongly-active member shows up on the roster and in every count.
-    expect(parseActive("maybe")).toBeNull();
-    expect(parseActive("2")).toBeNull();
-  });
-});
 
 describe("planRosterImport", () => {
   it("refuses a file with no rows under the header", () => {
@@ -194,7 +173,6 @@ describe("planRosterImport", () => {
       fullName: "Ada Lovelace",
       email: "ada@example.edu",
       eid: "al1234",
-      active: true,
       customFields: {},
     });
     // 1-based and counting the header, so it matches Excel's row gutter.
@@ -322,23 +300,7 @@ describe("planRosterImport", () => {
       });
     });
 
-    it("refuses an unrecognisable active cell", () => {
-      const rows = rowsOf(
-        plan(`Name,Email,EID,Active\nAda,a@example.edu,ab1234,perhaps`)
-      );
-      expect(rows[0].outcome).toEqual({
-        kind: "invalid",
-        reason: { kind: "bad_active", value: "perhaps" },
-      });
-    });
 
-    it("reads a no in the active column", () => {
-      const rows = rowsOf(
-        plan(`Name,Email,EID,Active\nAda,a@example.edu,ab1234,no`)
-      );
-      expect(rows[0].outcome.kind).toBe("new");
-      expect(rows[0].active).toBe(false);
-    });
   });
 
   describe("custom fields", () => {

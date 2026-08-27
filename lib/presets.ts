@@ -21,6 +21,7 @@
 
 import {
   MEMBER_SORT_LABELS,
+  MEMBER_TERM_ALL,
   defaultDirection,
   memberFilterToParams,
   parseMemberFilter,
@@ -141,9 +142,13 @@ export function presetSummary(
 ): string[] {
   const parts: string[] = [];
 
-  // `active` is the default scope and says nothing; the other two do.
-  if (filter.state === "inactive") parts.push("Inactive only");
-  else if (filter.state === "all") parts.push("Active and inactive");
+  // 📌 A null term is the default scope — "whatever term it is when you open
+  // this" — and says nothing, which is why it is omitted rather than described
+  // as the current term. Describing it would make every saved view read as
+  // though it had pinned the semester it was created in, which is exactly the
+  // thing null exists to avoid.
+  if (filter.term === MEMBER_TERM_ALL) parts.push("All terms");
+  else if (filter.term !== null) parts.push(filter.term);
 
   if (filter.q) parts.push(`“${filter.q}”`);
 
@@ -170,14 +175,6 @@ export function presetSummary(
   }
 
   if (filter.pending === "has") parts.push("Has pending check-ins");
-
-  // Labelled all-time, matching the control and the member detail page —
-  // `last_seen_at` is one of the two columns on the view that is not
-  // term-scoped, and a summary that dropped the qualifier would read as
-  // "this term".
-  if (filter.notSeenSince !== null) {
-    parts.push(`Not seen since ${filter.notSeenSince} (all-time)`);
-  }
 
   const events = rangeLabel("Events", filter.minEvents, filter.maxEvents);
   if (events) parts.push(events);

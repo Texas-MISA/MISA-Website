@@ -57,11 +57,7 @@ export function DirectoryRow({
   const adoptToken = useCallback((next: string) => setToken(next), []);
 
   return (
-    <tr
-      className={`border-b border-misa-hairline transition-colors duration-150 last:border-b-0 hover:bg-misa-panel/70 ${
-        row.active ? "" : "bg-misa-panel text-misa-muted"
-      }`}
-    >
+    <tr className="border-b border-misa-hairline transition-colors duration-150 last:border-b-0 hover:bg-misa-panel/70">
       {/* Outside the per-cell <form> elements below, deliberately: those each
           carry exactly one field name, and a checkbox inside one would ride
           along on a custom-field save. */}
@@ -73,11 +69,6 @@ export function DirectoryRow({
         >
           {row.fullName}
         </Link>
-        {!row.active && (
-          <span className="ml-2 border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
-            inactive
-          </span>
-        )}
         {row.source === "self_checkin" && (
           <span
             title="Created by the check-in form rather than an officer"

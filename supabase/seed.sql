@@ -159,7 +159,15 @@ update app_settings set current_term = null;
 -- rp8571, which is Rowan Pike, who is on no roster. That cluster is the
 -- regression fixture for the suggestion score floor — see the note on the
 -- unmatched submissions below.
-with raw(first_name, last_name, eid, active, source) as (values
+--
+-- 📌 `attends` is a SEED-LOCAL flag and not a column. It marks the three
+-- members who draw no bulk attendance (ab8049, bc2714, cm6580), and it replaced
+-- `active` when migration 29 dropped that column. The fixture it produces is
+-- more useful than the flag was: everybody joins in Spring 2026, so these three
+-- have evidence in that term and none in Fall 2026 — which makes them the
+-- regression case for the term-scoped roster. They are on Spring 2026's roster
+-- and absent from the current one, and nothing about them is "switched off".
+with raw(first_name, last_name, eid, attends, source) as (values
   ('Amara','Osei','AO4471',true,'admin'),        ('Bela','Kovacs','bk2856',true,'admin'),
   ('Chen','Wu','Cw9134',true,'admin'),           ('Dara','Nolan','dn5027',true,'admin'),
   ('Esi','Boateng','eb7318',true,'admin'),       ('Farid','Haddad','fh6402',true,'admin'),
@@ -177,12 +185,11 @@ with raw(first_name, last_name, eid, active, source) as (values
   ('Cleo','Marchand','cm6580',false,'admin'),    ('Devi','Sharma','ds4392',true,'self_checkin'),
   ('Eli','Rosenberg','er9067',true,'self_checkin'), ('Fern','Whitlock','fw1725',true,'self_checkin')
 )
-insert into members (eid, full_name, email, active, source, joined_at)
+insert into members (eid, full_name, email, source, joined_at)
 select
   eid,
   first_name || ' ' || last_name,
   lower(first_name || '.' || last_name || '@example.edu'),
-  active,
   source,
   -- Self-registered members joined mid-semester, at their first check-in.
   --
@@ -316,7 +323,10 @@ from events e
 cross join members m
 where e.status = 'published'
   and e.starts_at < now()
-  and m.active
+  -- The three `attends = false` members from the roster CTE above, named
+  -- explicitly because that flag is not stored. Excluding them is what keeps
+  -- somebody off the CURRENT term's roster while still on an earlier one.
+  and m.eid not in ('ab8049', 'bc2714', 'cm6580')
   -- Self-registered members only start attending from when they joined.
   and e.starts_at >= m.joined_at
   -- 🔓 Two slots are RESERVED for the explicit fixtures below, and this
@@ -348,7 +358,7 @@ where e.status = 'published'
 insert into attendance (event_id, member_id, submitted_name, submitted_eid, submitted_email, submitted_at, status, source)
 select e.id, m.id, m.full_name, m.eid, m.email, e.starts_at + interval '5 minutes', 'present', 'self_checkin'
 from events e
-cross join lateral (select * from members where active order by full_name limit 3) m
+cross join lateral (select * from members where eid not in ('ab8049', 'bc2714', 'cm6580') order by full_name limit 3) m
 where e.title = 'Rained Out Tabling';
 
 -- @chunk attendance-edge-cases

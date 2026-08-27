@@ -16,7 +16,7 @@ import type { Database } from "@/lib/types/database";
 // list.
 //
 // ⚠️ The limit truncates silently — no error, no marker in the list. Past
-// MEMBER_SCAN_LIMIT active members, names sorting after the cut simply are not
+// MEMBER_SCAN_LIMIT members, names sorting after the cut simply are not
 // offered by any picker, which reads to an officer as "that member doesn't
 // exist". pg_trgm is the growth path and it is due before the roster gets
 // there; §2.2's capacity check has the numbers.
@@ -34,32 +34,27 @@ export type MergeCandidatesResult =
 export type MemberOption = {
   id: string;
   label: string;
-  active: boolean;
 };
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
+// ✂️ `includeId` left with `members.active` on 2026-08-25, and so did the whole
+// `.or()` this function used to build. Its only job was keeping a member who
+// had been DEACTIVATED since being linked in the list, so that reopening the
+// payment editor did not silently unlink them on the next save. With no flag
+// there is nobody to exclude and nothing to make an exception for.
+//
+// ⚠️ It never protected against the OTHER way a linked member can be missing —
+// `limit` applies after filtering, so somebody sorting past MEMBER_SCAN_LIMIT
+// dropped out then and drops out now. That is the cap's problem, tracked with
+// the cap.
 export async function fetchMemberOptions(
   db: Client,
-  opts: { includeId?: string | null; limit?: number } = {}
+  opts: { limit?: number } = {}
 ): Promise<MemberOptionsResult> {
-  const { includeId = null, limit = MEMBER_SCAN_LIMIT } = opts;
-
-  // `id.eq.${…}` splices a string into a PostgREST filter expression, so this
-  // has to be a uuid before it goes anywhere near the query. Today every caller
-  // passes a value read back out of the database, but the guard is what keeps
-  // that true once one of them starts passing a searchParam.
-  const linkedId = includeId && UUID_RE.test(includeId) ? includeId : null;
+  const { limit = MEMBER_SCAN_LIMIT } = opts;
 
   const { data, error } = await db
     .from("members")
-    .select("id, full_name, eid, active")
-    // With no linked id this collapses to `active.eq.true`, which is exactly
-    // what a picker with nothing preselected wants. With one, it keeps whoever
-    // is currently linked even if they have been deactivated since — dropping
-    // them from the list would silently unlink them on the next save.
-    .or(linkedId ? `active.eq.true,id.eq.${linkedId}` : "active.eq.true")
+    .select("id, full_name, eid")
     .order("full_name")
     .limit(limit);
 
@@ -80,22 +75,19 @@ export async function fetchMemberOptions(
     kind: "ok",
     options: data.map((member) => ({
       id: member.id,
-      label: `${member.full_name} (${member.eid})${member.active ? "" : " — inactive"}`,
-      active: member.active,
+      label: `${member.full_name} (${member.eid})`,
     })),
   };
 }
 
 /**
- * The merge screen's candidates (§7 Stage 6 phase 8) — **including inactive
- * members**, and in the ranker's own shape.
+ * The merge screen's candidates (§7 Stage 6 phase 8), in the ranker's own shape.
  *
- * ⚠️ Deliberately not `fetchMemberOptions`, and the difference is the whole
- * point: that one is active-only, which is exactly wrong here. A duplicate is
- * very often the deactivated half of a pair — an officer who noticed a ghost
- * and switched it off rather than merging it, which is the only thing they
- * could do before this phase existed. Filtering to active would hide precisely
- * the rows the merge tool was built to clean up.
+ * ⚠️ Deliberately not `fetchMemberOptions`. The difference used to be that one
+ * was active-only — exactly wrong here, since a duplicate is very often the
+ * deactivated half of a pair. `members.active` is gone as of 2026-08-25, so the
+ * two now differ only in SHAPE: this returns MemberCandidate for the ranker,
+ * with the normalized EID it scores on.
  *
  * `includeId` cannot cover that case either: it keeps the *currently linked*
  * member, and a merge has no linked member — it is looking for one.
@@ -119,7 +111,7 @@ export async function fetchMergeCandidates(
 
   const { data, error } = await db
     .from("members")
-    .select("id, full_name, email, eid, normalized_eid, active")
+    .select("id, full_name, email, eid, normalized_eid")
     .limit(limit);
 
   // A failed read here left the merge picker empty AND the duplicate
@@ -140,7 +132,6 @@ export async function fetchMergeCandidates(
       email: row.email,
       eid: row.eid,
       normalizedEid: row.normalized_eid ?? "",
-      active: row.active,
     })),
   };
 }

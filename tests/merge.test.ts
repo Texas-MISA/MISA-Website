@@ -50,7 +50,6 @@ function member(over: Partial<MergeMember> = {}): MergeMember {
     email: "ada@example.edu",
     eid: "al1815",
     normalizedEid: "al1815",
-    active: true,
     joinedAt: "2026-08-01T12:00:00.000Z",
     notes: null,
     customFields: {},
@@ -264,8 +263,7 @@ describe("mergeNotes", () => {
 function candidate(
   fullName: string,
   email: string,
-  eid: string,
-  active = true
+  eid: string
 ): MemberCandidate {
   return {
     id: eid,
@@ -273,7 +271,6 @@ function candidate(
     email,
     eid,
     normalizedEid: eid.toLowerCase().replace(/[\s-]/g, ""),
-    active,
   };
 }
 
@@ -320,13 +317,6 @@ describe("rankDuplicateCandidates", () => {
     expect(rank(other)).toEqual([]);
   });
 
-  it("offers an inactive duplicate, which is the common case", () => {
-    // A ghost is usually the half somebody switched off, because that was the
-    // only thing they could do before this phase existed. The `inactive` penalty
-    // is -20, so a real duplicate still clears the floor.
-    const ghost = candidate("Ada Lovelace", "ada.l@example.edu", "al1816", false);
-    expect(rank(ghost)).toEqual([ghost.id]);
-  });
 
   it("ranks the strongest first", () => {
     const weaker = candidate("Ada Lovelace", "other@example.edu", "al1837");
@@ -375,7 +365,4 @@ describe("matchAxisCount", () => {
     ).toBe(2);
   });
 
-  it("does not count the inactive penalty as agreement", () => {
-    expect(matchAxisCount([{ kind: "name_exact" }, { kind: "inactive" }])).toBe(1);
-  });
 });

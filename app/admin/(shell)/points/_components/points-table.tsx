@@ -19,7 +19,7 @@ export type LedgerRow = {
   voided: boolean;
   officerLabel: string;
   member_id: string;
-  members: { id: string; full_name: string; active: boolean } | null;
+  members: { id: string; full_name: string } | null;
   events: { id: string; title: string } | null;
 };
 
@@ -88,11 +88,6 @@ export function PointsTable({
                   </Link>
                 ) : (
                   <span className="text-misa-muted">unknown member</span>
-                )}
-                {row.members?.active === false && (
-                  <span className="ml-2 text-xs text-misa-muted">
-                    inactive
-                  </span>
                 )}
               </td>
               <td className="py-2 pr-4 font-mono whitespace-nowrap">

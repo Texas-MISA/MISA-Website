@@ -37,7 +37,6 @@ export type MemberRow = {
   /** Not a column. Drives the INACTIVE badge, which is an annotation on the
    * name rather than a field of its own — and the only on-screen signal that
    * the roster scope is showing someone deactivated. */
-  active: boolean;
   /** Likewise: the SELF badge marks a row the check-in form created, which is
    * §4.2's roster-cleanup signal. */
   source: string;
@@ -45,7 +44,7 @@ export type MemberRow = {
   /**
    * Calculated dues status for the current term (Stage 6.5 phase 4).
    *
-   * A column, not a badge like `active` and `source`: officers filter and sort
+   * A column, not a badge like `source`: officers filter and sort
    * on it, which is the line between the two. Read-only everywhere — it is
    * derived from `dues_payments` and the only way to change it is to record,
    * correct or void a payment.

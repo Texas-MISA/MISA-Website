@@ -54,7 +54,7 @@ export function formatAttendanceSource(source: string): string {
 }
 
 /**
- * How many active members the roster scan will pull.
+ * How many members the roster scan will pull.
  *
  * Scanning rather than probing is deliberate: the canonical near-miss is `Jon`
  * vs `John`, and `ilike '%jon%'` cannot match `John` — a probe-based candidate
@@ -64,8 +64,8 @@ export function formatAttendanceSource(source: string): string {
  *
  * ⚠️ There is NO fallback above this limit. An earlier version of this comment
  * promised one ("falls back to bounded ILIKE probes") and none was ever built;
- * every caller is a bare `.limit(MEMBER_SCAN_LIMIT)`. Past 400 active members
- * the pickers and the near-miss ranker silently see a subset — and the
+ * every caller is a bare `.limit(MEMBER_SCAN_LIMIT)`. Past 400 members the
+ * pickers and the near-miss ranker silently see a subset — and the
  * candidate query in attendance/[id] does not order, so it is an arbitrary
  * subset. pg_trgm is the growth path and it has to be built before the roster
  * reaches this number, not after. See §2.2's capacity check.
@@ -227,7 +227,6 @@ export type MemberCandidate = {
   email: string;
   eid: string;
   normalizedEid: string;
-  active: boolean;
 };
 
 export type SubmissionIdentity = {
@@ -244,8 +243,7 @@ export type MatchReason =
   | { kind: "id_near_miss"; distance: number }
   | { kind: "name_exact" }
   | { kind: "name_tokens"; shared: string[] }
-  | { kind: "name_near"; distance: number }
-  | { kind: "inactive" };
+  | { kind: "name_near"; distance: number };
 
 export type MemberSuggestion = {
   member: MemberCandidate;
@@ -395,11 +393,12 @@ export function scoreMemberMatch(
     }
   }
 
-  if (score > 0 && !candidate.active) {
-    score -= 20;
-    reasons.push({ kind: "inactive" });
-  }
-
+  // ✂️ A -20 penalty for an inactive candidate stood here until 2026-08-25.
+  // `members.active` was dropped with migration 29, so there is no flag to
+  // penalise — and nothing replaced it: term membership is a fact about a
+  // semester, not about whether this is the person who just checked in, and
+  // scoring a name match lower because somebody was quiet last term would push
+  // a returning member below a stranger.
   return { score, reasons };
 }
 
@@ -431,9 +430,7 @@ export function rankMemberSuggestions(
  *
  * Lives here rather than beside one screen because two now render suggestions —
  * the attendance resolution form and the dues payment editor — and the same
- * reason must read the same way in both. `inactive` returns "" on purpose: it
- * is a score penalty, and the roster row is already labelled inactive where it
- * is shown, so naming it again would read as a reason to pick the member.
+ * reason must read the same way in both.
  */
 export function describeMatchReason(reason: MatchReason): string {
   switch (reason.kind) {
@@ -451,8 +448,6 @@ export function describeMatchReason(reason: MatchReason): string {
       return `shares ${reason.shared.join(", ")}`;
     case "name_near":
       return "near-identical name";
-    case "inactive":
-      return "";
   }
 }
 
@@ -517,8 +512,7 @@ function rawIndexOf(raw: string, normalizedIndex: number): number | null {
 export type ResolutionWarning =
   | { kind: "event_cancelled" }
   | { kind: "event_draft" }
-  | { kind: "outside_window"; secondsOutside: number; side: "before" | "after" }
-  | { kind: "member_inactive" };
+  | { kind: "outside_window"; secondsOutside: number; side: "before" | "after" };
 
 /**
  * What an officer should know before approving — the §4.6 edit-impact idea
@@ -526,13 +520,16 @@ export type ResolutionWarning =
  * outside the window is the normal case for the whole queue, and the officer
  * is the one deciding it happened.
  *
- * Two of these are surprising enough that leaving them silent would be a bug:
+ * One of these is surprising enough that leaving it silent would be a bug:
  *
  *   - `event_draft`: the leaderboard view excludes only `cancelled`, so
  *     attendance on an unpublished event still moves public standings.
- *   - `member_inactive`: the leaderboard filters on `members.active`, so
- *     approving for an inactive member changes the officer directory and
- *     produces no public change at all.
+ *
+ * ✂️ `member_inactive` was the second until 2026-08-25. Its whole justification
+ * was that the leaderboard filtered on `members.active` — approving for an
+ * inactive member moved the officer directory and produced no public change.
+ * Migration 29 dropped the column and rebuilt the board over the term roster,
+ * so the warning would now be describing a mechanism that no longer exists.
  *
  * There is deliberately no term warning. Attendance points come from
  * events.term, so the submission's own date is irrelevant — and deriving a
@@ -540,7 +537,6 @@ export type ResolutionWarning =
  */
 export function previewResolution(input: {
   event: (EventWindowRow & { status: string }) | null;
-  memberActive: boolean | null;
   submittedAt: string;
 }): ResolutionWarning[] {
   const warnings: ResolutionWarning[] = [];
@@ -568,8 +564,6 @@ export function previewResolution(input: {
       });
     }
   }
-
-  if (input.memberActive === false) warnings.push({ kind: "member_inactive" });
 
   return warnings;
 }

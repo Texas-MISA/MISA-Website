@@ -517,13 +517,12 @@ describe("first-time confirmation (§4.2, docs/attend-confirmation-flow.md)", ()
     const normalized = normalizeEid(identity.eid);
     const { data: member } = await db
       .from("members")
-      .select("id, source, active, full_name, eid, email")
+      .select("id, source, full_name, eid, email")
       .eq("normalized_eid", normalized)
       .single();
     await adoptMemberByNormalizedId(db, track, normalized);
 
     expect(member?.source).toBe("self_checkin");
-    expect(member?.active).toBe(true);
     expect(member?.full_name).toBe(identity.fullName);
     expect(member?.eid).toBe(identity.eid);
     expect(member?.email).toBe(identity.email);

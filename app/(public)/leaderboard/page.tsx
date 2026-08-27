@@ -132,9 +132,22 @@ function rankRows(rows: readonly LeaderboardRow[]): RankedRow[] {
 export default async function LeaderboardPage() {
   const result = await fetchLeaderboard();
   const rows = result.kind === "ok" ? rankRows(result.rows) : [];
-  // A term with no points yet is a real, expected state, not an empty one: the
-  // view LEFT JOINs every active member, so early in a term — or the moment an
-  // officer pins the board on a term that has not started — it renders the whole
+  // ⚠️ REWRITTEN for migration 29, because the old reasoning is now false in a
+  // way that matters. The view used to LEFT JOIN every active member, so the
+  // board could not be empty and always carried a term. It is now the term's
+  // ROSTER — attendance, points, dues covering it, or having joined during it —
+  // so it CAN be empty, and an empty board carries no term to name. The page
+  // already handled a null term and still does; what changed is that the null
+  // case is now reachable in normal use (a brand-new term, or a pin on a term
+  // nobody was part of) rather than only on a failed read.
+  //
+  // 🔓 The rule it must not break: the term still comes off the SAME ROW as the
+  // numbers. When there are no rows there is no term to disagree with, so the
+  // heading says "Current-term standings" rather than reaching for a second
+  // source. Do not add an rpc("current_term") fallback here — that is the exact
+  // two-sources-for-one-fact defect migration 21 closed.
+  //
+  // The original note, still true of a non-empty board: the
   // roster tied at zero and tied at rank 1. That is accurate and reads as
   // broken, so say what it means (§4.4 calls out the early-August case).
   const allZero = rows.length > 0 && rows.every((row) => row.totalPoints === 0);

@@ -148,7 +148,7 @@ describe("covered_terms", () => {
   });
 });
 
-describe("member_directory.dues_paid_current_term", () => {
+describe("member_directory.dues_paid_term", () => {
   // ⚠️ Its own member, not the file's shared one. An earlier block in this file
   // gives that member a payment covering the current term, so a `before` of
   // false would already be false only by luck of execution order — and the
@@ -162,10 +162,10 @@ describe("member_directory.dues_paid_current_term", () => {
       (
         await db
           .from("member_directory")
-          .select("dues_paid_current_term")
+          .select("dues_paid_term")
           .eq("id", subject)
           .single()
-      ).data?.dues_paid_current_term;
+      ).data?.dues_paid_term;
 
     expect(await read()).toBe(false);
 
@@ -242,7 +242,7 @@ describe("the reserved dues keys", () => {
   it("⚠️ are refused by the DATABASE, not merely by the zod schema", async () => {
     // Without this an officer recreates the hand-ticked dropdown beside the
     // calculated column and the roster carries two answers to one question.
-    for (const key of ["dues", "dues_paid", "dues_paid_current_term"]) {
+    for (const key of ["dues", "dues_paid", "dues_paid_term"]) {
       const { error } = await db.from("member_field_definitions").insert({
         key,
         label: "Paid dues",

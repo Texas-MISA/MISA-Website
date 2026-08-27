@@ -13,7 +13,7 @@ import {
   MEMBER_DUES,
   MEMBER_PENDING,
   MEMBER_SOURCES,
-  MEMBER_STATES,
+  MEMBER_TERM_ALL,
   memberFilterFields,
   memberFilterUrl,
   relationalFilterCount,
@@ -37,6 +37,10 @@ import {
 // bookmark carrying them narrows nothing and the count always accounts for what
 // is on screen.
 //
+// 📌 The roster scope is a TERM as of 2026-08-25, where it used to be active /
+// inactive. It is the one control that changes what the other numbers mean
+// rather than merely which rows survive — see the page's own header.
+//
 // Stage 6.5 phase 4 added Dues; phase 5c adds the categorical rest — "Added by"
 // and one dropdown per directory custom field. 📌 `source` is a deliberate
 // return rather than a reversal of the phase-3 trim: it came out as a *column*
@@ -45,12 +49,13 @@ import {
 //
 // Every control in the top row is a selector over a categorical value, and every
 // one of them defaults to the option that narrows NOTHING. Only the roster scope
-// defaults to narrowing, and it is the exception on purpose (see MemberFilter).
+// defaults to narrowing — to the current term — and it is the exception on
+// purpose (see MemberFilter).
 //
 // ⚠️ **Phase 6's relational filters sit in their own panel below, and the split
 // is the point rather than a layout preference.** They narrow on data the
 // directory does not display — attendance against one event, pending
-// submissions, when someone was last seen — which cuts against the phase-3 trim
+// submissions — which cuts against the phase-3 trim
 // that cut the table to what it shows. The trim's actual argument was that a
 // filter the officer cannot see leaves a count they cannot account for, so the
 // answer is a panel that says plainly what it is, not a filter smuggled into the
@@ -66,6 +71,8 @@ export function MemberFilters({
   filter,
   definitions,
   events,
+  terms,
+  currentTerm,
 }: {
   filter: MemberFilter;
   /**
@@ -98,6 +105,26 @@ export function MemberFilters({
    * on the Capacity-ceilings list in tasks.md rather than raised blind here.
    */
   events: readonly EventOption[];
+  /**
+   * Every term with somebody on its roster, newest first, from `member_terms()`.
+   *
+   * 📌 May legitimately be EMPTY — a failed read arrives that way too, and the
+   * page says so above the table rather than here. Either way the control still
+   * offers `currentTerm`, because the scope it is showing is always a real one.
+   *
+   * 🪤 Never sorted here. Terms do not sort lexicographically — 'Fall 2026' <
+   * 'Spring 2026' is true as a string and false as a calendar fact — so the
+   * order comes from the database's term_index() and is passed straight through.
+   */
+  terms: readonly string[];
+  /**
+   * What a null `filter.term` resolves to, from `current_term()`.
+   *
+   * Passed in rather than derived: §4.7 forbids typing a term string, and the
+   * page has already asked the database once. Two sources for one fact is the
+   * failure the leaderboard's `term` column exists to prevent.
+   */
+  currentTerm: string;
 }) {
   const router = useRouter();
 
@@ -149,8 +176,14 @@ export function MemberFilters({
 
   const relationalCount = relationalFilterCount(filter);
 
+  // The current term is always offerable even when the list is empty or failed,
+  // so the control can never show a scope it cannot also name.
+  const termOptions = terms.includes(currentTerm)
+    ? terms
+    : [currentTerm, ...terms];
+
   const anyNarrowing =
-    filter.state !== "active" ||
+    filter.term !== null ||
     filter.q !== "" ||
     filter.minPoints !== null ||
     filter.maxPoints !== null ||
@@ -186,21 +219,32 @@ export function MemberFilters({
         />
       </Labelled>
 
+      {/* The scope selector. It replaced Active only / Inactive only on
+          2026-08-25, when `members.active` was dropped — the question both
+          answer is "who is in the club", and this one answers it from evidence
+          rather than from a flag somebody remembered to tick.
+
+          🪤 Picking the CURRENT term emits no parameter at all rather than
+          `term=Fall 2026`. The two look identical today and are not the same
+          thing: a saved view carrying the term string would pin the semester it
+          was created in, so "this term's unpaid members" would quietly become
+          "Fall 2026's unpaid members" forever. Null means *follow the clock*. */}
       <Labelled label="Roster">
         <select
           className={control}
-          value={filter.state}
-          onChange={(e) => update({ state: e.target.value })}
+          value={filter.term ?? currentTerm}
+          onChange={(e) =>
+            update({
+              term: e.target.value === currentTerm ? "" : e.target.value,
+            })
+          }
         >
-          {MEMBER_STATES.map((state) => (
-            <option key={state} value={state}>
-              {state === "all"
-                ? "Active and inactive"
-                : state === "active"
-                  ? "Active only"
-                  : "Inactive only"}
+          {termOptions.map((term) => (
+            <option key={term} value={term}>
+              {term === currentTerm ? `${term} (current)` : term}
             </option>
           ))}
+          <option value={MEMBER_TERM_ALL}>All terms</option>
         </select>
       </Labelled>
 
@@ -419,18 +463,12 @@ function RelationalPanel({
             </select>
           </Labelled>
 
-          {/* ⚠️ Labelled all-time on purpose. Every other number on this screen
-              is current-term scoped, and "when did we last see this person" is
-              not a term question — the member detail page says the same. */}
-          <Labelled label="Not seen since (all-time)">
-            <input
-              type="date"
-              className={control}
-              value={fields.notSeenSince}
-              onChange={(e) => set("notSeenSince", e.target.value)}
-              onBlur={(e) => update({ notSeenSince: e.target.value })}
-            />
-          </Labelled>
+          {/* ✂️ "Not seen since" stood here until 2026-08-25. It was removed
+              with `members.active` rather than kept alongside the term scope:
+              both dated a member's membership by inference, and the roster
+              control now answers the same question from evidence. Its field is
+              gone from MemberFilter too, so an old bookmark carrying
+              `notSeenSince=` narrows nothing rather than narrowing invisibly. */}
 
           <Labelled label="Events attended this term">
             <div className="flex items-center gap-1">

@@ -193,7 +193,6 @@ describe("member suggestions", () => {
     email: "hana.sato@example.edu",
     eid: "hs8260",
     normalizedEid: "hs8260",
-    active: true,
     ...over,
   });
 
@@ -283,16 +282,6 @@ describe("member suggestions", () => {
     expect(reasons).toContainEqual({ kind: "id_exact" });
   });
 
-  it("demotes an inactive member without hiding them", () => {
-    const inactive = candidate({ active: false });
-    const ranked = rankMemberSuggestions(submission({}), [inactive]);
-
-    expect(ranked).toHaveLength(1);
-    expect(ranked[0].reasons).toContainEqual({ kind: "inactive" });
-    expect(ranked[0].score).toBeLessThan(
-      scoreMemberMatch(submission({}), candidate({})).score
-    );
-  });
 
   it("returns nothing rather than a weak guess", () => {
     // The auto-resolve invariant as a unit test: below the threshold the
@@ -472,7 +461,6 @@ describe("previewResolution", () => {
     expect(
       previewResolution({
         event,
-        memberActive: true,
         submittedAt: "2030-03-05T18:30:00Z",
       })
     ).toEqual([]);
@@ -484,7 +472,6 @@ describe("previewResolution", () => {
     expect(
       previewResolution({
         event: { ...event, status: "draft" },
-        memberActive: true,
         submittedAt: "2030-03-05T18:30:00Z",
       })
     ).toContainEqual({ kind: "event_draft" });
@@ -494,27 +481,16 @@ describe("previewResolution", () => {
     expect(
       previewResolution({
         event: { ...event, status: "cancelled" },
-        memberActive: true,
         submittedAt: "2030-03-05T18:30:00Z",
       })
     ).toContainEqual({ kind: "event_cancelled" });
   });
 
-  it("warns that an inactive member produces no public change", () => {
-    expect(
-      previewResolution({
-        event,
-        memberActive: false,
-        submittedAt: "2030-03-05T18:30:00Z",
-      })
-    ).toContainEqual({ kind: "member_inactive" });
-  });
 
   it("reports how far outside the window the submission fell", () => {
     expect(
       previewResolution({
         event,
-        memberActive: true,
         submittedAt: "2030-03-05T19:40:00Z",
       })
     ).toContainEqual({
@@ -526,7 +502,6 @@ describe("previewResolution", () => {
     expect(
       previewResolution({
         event,
-        memberActive: true,
         submittedAt: "2030-03-05T17:00:00Z",
       })
     ).toContainEqual({
@@ -539,7 +514,6 @@ describe("previewResolution", () => {
   it("treats the closing instant as outside, matching the half-open window", () => {
     const warnings = previewResolution({
       event,
-      memberActive: true,
       submittedAt: "2030-03-05T19:00:00Z",
     });
     expect(warnings).toContainEqual({
@@ -553,7 +527,6 @@ describe("previewResolution", () => {
     expect(
       previewResolution({
         event: null,
-        memberActive: true,
         submittedAt: "2030-03-05T19:40:00Z",
       })
     ).toEqual([]);

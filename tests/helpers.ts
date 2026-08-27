@@ -459,7 +459,7 @@ export async function createTestMember(
   // The directory tests need members that seed rows cannot be confused with,
   // and `joined_at` is the only column phase 1 can filter on that the seed does
   // not already populate across a wide range. Everything else defaults.
-  opts: { joinedAt?: Date; active?: boolean; source?: string } = {}
+  opts: { joinedAt?: Date; source?: string } = {}
 ): Promise<string> {
   const { data, error } = await db
     .from("members")
@@ -468,7 +468,6 @@ export async function createTestMember(
       eid: identity.eid,
       email: identity.email,
       joined_at: opts.joinedAt?.toISOString(),
-      active: opts.active,
       source: opts.source,
     })
     .select("id")

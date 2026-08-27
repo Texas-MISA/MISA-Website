@@ -186,12 +186,12 @@ describe("isValidFieldKey", () => {
     // The built-in keys above are reserved so two columns cannot compete for one
     // name in the export catalogue. These three forbid a duplicate ANSWER: dues
     // status is calculated from dues_payments and surfaced as
-    // member_directory.dues_paid_current_term, so a hand-ticked dropdown beside
+    // member_directory.dues_paid_term, so a hand-ticked dropdown beside
     // it would leave the roster saying two different things at once.
     //
     // Well-formed keys, every one of them — which is the point. Only the
     // reservation stops them, here and in migration 19's CHECK.
-    for (const key of ["dues", "dues_paid", "dues_paid_current_term"]) {
+    for (const key of ["dues", "dues_paid", "dues_paid_term"]) {
       expect(FIELD_KEY_PATTERN.test(key), `${key} is well-formed`).toBe(true);
       expect(isValidFieldKey(key), key).toBe(false);
     }

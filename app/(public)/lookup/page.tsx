@@ -11,11 +11,17 @@ import { LookupForm } from "./_components/lookup-form";
 // and their dues status. The page itself is a static shell; all the work
 // happens in the lookupMember Server Action.
 //
-// 🔓 This is the only surface in the system that shows dues status to an
-// unauthenticated caller, and it is allowed to because the gate is EID **and**
-// matching email — strictly narrower than the EID-alone oracle §6 accepts for
-// check-in. Do not relax the gate, and do not carry dues status anywhere
-// reachable with less (§9 #1, #12).
+// 🔴 This is the only surface in the system that shows dues status to an
+// unauthenticated caller. It used to be allowed to because the gate was EID
+// **and** matching email — strictly narrower than the EID-alone oracle §6
+// accepts for check-in. **That gate was reduced to the EID alone on 2026-08-25
+// at the officer's instruction, and dues status was kept**, so this page no
+// longer rests on the argument that justified it. The reversal is recorded at
+// findMemberByEid in lib/lookup.ts and in docs/invariants.md.
+//
+// ⚠️ What still holds: one message for every miss, and dues status must not be
+// carried anywhere reachable with LESS than this (§9 #1, #12) — /leaderboard
+// most of all.
 
 export const metadata: Metadata = {
   title: "My Attendance",
@@ -32,7 +38,7 @@ export default function LookupPage() {
     <>
       <PageHero
         title="My Attendance"
-        subhead="Enter your UT EID and the email we have on file, and you'll see where you stand this term."
+        subhead="Enter your UT EID and you'll see where you stand this term."
       />
       {/* 🪤 White for the same reason /attend is: the lookup form's controls
           fill with `bg-misa-panel`, which is now the page ground's own colour. */}

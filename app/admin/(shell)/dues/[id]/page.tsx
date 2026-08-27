@@ -61,7 +61,7 @@ type Payment = {
   voided_by: string | null;
   void_reason: string | null;
   updated_at: string;
-  members: { id: string; full_name: string; eid: string; active: boolean } | null;
+  members: { id: string; full_name: string; eid: string } | null;
 };
 
 async function fetchPayment(id: string): Promise<Payment | null> {
@@ -97,8 +97,7 @@ async function fetchSuggestions(payment: Payment) {
   const db = createAdminClient();
   const { data, error } = await db
     .from("members")
-    .select("id, full_name, email, eid, normalized_eid, active")
-    .eq("active", true)
+    .select("id, full_name, email, eid, normalized_eid")
     .limit(MEMBER_SCAN_LIMIT);
 
   if (error) {
@@ -115,7 +114,6 @@ async function fetchSuggestions(payment: Payment) {
     email: row.email,
     eid: row.eid,
     normalizedEid: row.normalized_eid ?? "",
-    active: row.active,
   }));
 
   return rankPaymentSuggestions(
@@ -159,11 +157,9 @@ export default async function PaymentDetailPage({
         (v): v is string => v !== null
       )
     ),
-    // includeId keeps a deactivated but currently-credited member in the list;
-    // dropping them would silently unlink them on the next save.
     voided
       ? Promise.resolve({ kind: "ok" as const, options: [] })
-      : fetchMemberOptions(db, { includeId: payment.member_id }),
+      : fetchMemberOptions(db),
     review.noMember && !voided ? fetchSuggestions(payment) : Promise.resolve([]),
   ]);
 

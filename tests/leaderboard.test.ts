@@ -87,6 +87,11 @@ describe("current_term() visibility (migration 21)", () => {
     expect(pinned).not.toBe(derived);
 
     const anon = anonClient();
+
+    // Non-empty before the pin, or "it emptied" proves nothing.
+    const { data: seeded } = await anon.from("leaderboard").select("id");
+    expect((seeded ?? []).length).toBeGreaterThan(0);
+
     try {
       await pinTerm(pinned);
 
@@ -95,12 +100,18 @@ describe("current_term() visibility (migration 21)", () => {
       expect(anonTerm).toBe(pinned);
 
       // And the view agrees, through the same role.
+      //
+      // 🔓 Asserted as the board EMPTYING rather than as a term string on a
+      // row, and the change is migration 29's. The board is now the pinned
+      // term's ROSTER, and nobody is on the roster of a term that has not
+      // happened — so if current_term() were still evaluating as the derived
+      // term for anon, these rows would still be here. An empty board under a
+      // future pin is the assertion.
       const { data: rows, error: viewError } = await anon
         .from("leaderboard")
-        .select("term")
-        .limit(1);
+        .select("id, term");
       expect(viewError).toBeNull();
-      expect(rows?.[0]?.term).toBe(pinned);
+      expect(rows ?? []).toEqual([]);
     } finally {
       await unpinTerm();
     }
@@ -149,11 +160,11 @@ describe("current_term() visibility (migration 21)", () => {
     const { data: other } = await db.rpc("next_term", { t: event.term });
     try {
       await pinTerm(other!);
-      const during = await leaderboardRow(memberId);
-      // Still on the board (the member is active and the join is a LEFT join),
-      // but nothing they did counts toward a term they did nothing in.
-      expect(during?.term).toBe(other);
-      expect(during?.total_points).toBe(0);
+      // ⚠️ OFF the board entirely, where before migration 29 they stayed on it
+      // at zero. The board is the term's roster now, and doing nothing in a
+      // term is precisely what keeps somebody off that term's roster — so the
+      // rows leaving scope is visible as an absence rather than as a zero.
+      expect(await leaderboardRow(memberId)).toBeNull();
     } finally {
       await unpinTerm();
     }
@@ -190,34 +201,32 @@ describe("leaderboard contents", () => {
     expect(row?.total_points).toBe(3);
   });
 
-  it("omits an inactive member entirely, while member_directory keeps them", async () => {
-    // §4.4's second surprise, now load-bearing: `where m.active` has no
-    // counterpart in member_directory, so approving attendance for an inactive
-    // member changes the officer directory and produces NO public change. An
-    // officer who does not know that reads it as a bug in the approval.
+  it("omits somebody off this term's roster, while member_directory keeps them", async () => {
+    // §4.4's second surprise, rebuilt on migration 29. `where m.active` used to
+    // be the board's only trim and had no counterpart in member_directory; the
+    // trim is now the term roster, and it DOES have a counterpart — the same
+    // rule, one term over. A member who joined an earlier term and has done
+    // nothing since is off the public board and still fully present in the
+    // officer directory under the term they joined.
     const identity = testIdentity();
+    const priorTerm = new Date();
+    priorTerm.setUTCMonth(priorTerm.getUTCMonth() - 8);
     const memberId = await createTestMember(db, track, identity, {
-      active: false,
-    });
-    const event = await createCurrentTermEvent(db, track, { points: 2 });
-    await createTestAttendance(db, track, {
-      eventId: event.id,
-      memberId,
-      submittedName: identity.fullName,
-      submittedEid: identity.eid,
-      submittedEmail: identity.email,
-      submittedAt: new Date(),
-      status: "present",
+      joinedAt: priorTerm,
     });
 
     expect(await leaderboardRow(memberId)).toBeNull();
 
+    // 🔓 Not `.maybeSingle()`: the view is one row per (member, term), and the
+    // point of this member is that their row is under a term that is not the
+    // current one.
     const { data: directory } = await db
       .from("member_directory")
-      .select("id, total_points")
-      .eq("id", memberId)
-      .maybeSingle();
-    expect(directory?.total_points).toBe(2);
+      .select("id, term, total_points")
+      .eq("id", memberId);
+    expect(directory).toHaveLength(1);
+    expect(directory?.[0].total_points).toBe(0);
+    expect(directory?.[0].term).not.toBe(await currentTerm());
   });
 
   it("excludes a cancelled event's points but counts a DRAFT event's", async () => {

@@ -7,6 +7,7 @@ import {
   applyMemberFilter,
   chunkRange,
   isDefaultFilter,
+  MEMBER_TERM_ALL,
   memberFilterToParams,
   needsAttendanceEmbed,
   parseMemberFilter,
@@ -26,9 +27,18 @@ import { MemberTable, type MemberRow } from "./_components/member-table";
 import { PresetBar, type PresetChip } from "./_components/preset-bar";
 import { SelectionProvider } from "./_components/selection";
 
-// The member directory (§5, §7 Stage 6). Reads member_directory, which is
-// current-term scoped and keeps the attendance/bonus split the public
-// leaderboard deliberately drops (§4.4, §4.5).
+// The member directory (§5, §7 Stage 6). Reads member_directory, which since
+// migration 29 is ONE ROW PER (MEMBER, TERM), and keeps the attendance/bonus
+// split the public leaderboard deliberately drops (§4.4, §4.5).
+//
+// ⚠️ The term scope is not an ordinary filter, and treating it as one is how
+// this screen would start lying. Every number on a row — points, events
+// attended, the rate, dues — belongs to that row's term, so the scope decides
+// what the figures MEAN and not merely which rows survive. It is also the one
+// clause that can widen: without it the table would show each member once per
+// term they belong to, and the count above it would be rows rather than people.
+// applyMemberFilter therefore always applies a term unless the officer picked
+// `all` explicitly.
 //
 // Service-role read behind requireOfficer(), like every other admin screen.
 // member_directory carries eid and email, so it is granted to
@@ -36,11 +46,12 @@ import { SelectionProvider } from "./_components/selection";
 // anon key (§6).
 //
 // Four columns as of phase 3 — Name, Email, EID, Total Points — with everything
-// else on /admin/members/[id]. Still read-only: inline editing arrives with the
-// custom fields in phase 4, and selection and export in phase 5. The relational
-// filters (attended or missed a specific event, has pending submissions, not
-// seen since) need an attendance subquery rather than a column comparison and
-// land in phase 6, in their own labelled panel.
+// else on /admin/members/[id]. The relational filters (attended or missed a
+// specific event, has pending submissions) need an attendance subquery rather
+// than a column comparison and live in their own labelled panel. "Not seen
+// since" was the third of them until 2026-08-25 and went with `members.active`:
+// both answered "is this person still around" by inference, and the term scope
+// now answers it from evidence.
 
 export const metadata: Metadata = { title: "Members" };
 
@@ -50,11 +61,12 @@ export const metadata: Metadata = { title: "Members" };
 // collapses the result into an untyped error shape. The wrapped-and-concatenated
 // version of this line cost a build here too.
 //
-// `active` and `source` are not displayed columns — they drive the INACTIVE and
-// SELF badges beside the name. The view keeps every other column for the detail
-// page; nothing was dropped from the schema by this trim.
+// `source` is not a displayed column — it drives the SELF badge beside the
+// name. `active` used to sit beside it driving an INACTIVE badge; migration 29
+// dropped the column, and the badge went with it. The view keeps every other
+// column for the detail page.
 const COLUMNS =
-  "id, eid, full_name, email, active, source, total_points, dues_paid_current_term, custom_fields, updated_at" as const;
+  "id, eid, full_name, email, source, total_points, dues_paid_term, custom_fields, updated_at" as const;
 
 // The same list plus the attendance embed phase 6's event filter needs.
 //
@@ -70,11 +82,59 @@ const COLUMNS =
 // is set — unfiltered it still returns the right rows and the right count, but
 // it nests every member's whole attendance history into the payload for nothing.
 const COLUMNS_WITH_ATTENDANCE =
-  "id, eid, full_name, email, active, source, total_points, dues_paid_current_term, custom_fields, updated_at, attendance!left(event_id)" as const;
+  "id, eid, full_name, email, source, total_points, dues_paid_term, custom_fields, updated_at, attendance!left(event_id)" as const;
 
 type DirectoryQueryResult =
   | { kind: "ok"; rows: MemberRow[]; total: number }
   | { kind: "error" };
+
+/**
+ * The term a null `filter.term` means.
+ *
+ * 🔓 THROWS rather than returning null, copying the events screen deliberately.
+ * The caller would otherwise need a fallback, and every honest fallback is
+ * wrong here: `""` applies no predicate, which turns the roster into one row per
+ * member per term with a count that reads as a member total; and this module may
+ * not invent a term string (§4.7). Worse, either failure would leave the term
+ * control and the query agreeing with each other about the wrong thing, which is
+ * exactly the shape the events page recorded — nothing on screen looks out of
+ * place. The error boundary can say the term could not be determined; a silently
+ * widened roster cannot.
+ */
+async function fetchCurrentTerm(
+  db: ReturnType<typeof createAdminClient>
+): Promise<string> {
+  const { data, error } = await db.rpc("current_term");
+  if (error) {
+    console.error("current_term rpc failed:", error.message);
+    throw new Error("Could not determine the current term.");
+  }
+  return data;
+}
+
+/**
+ * Every term the roster control can offer, newest first.
+ *
+ * 🪤 Through the `member_terms()` rpc rather than `select term from
+ * member_directory` deduped here. The view is one row per member per term, so
+ * that read is members × terms and the hosted project's PostgREST `max_rows`
+ * would return a short list with no error — and a truncated term list does not
+ * look broken, it looks like the club never had a Spring 2026.
+ *
+ * 📌 An empty list is a real answer and renders as a control offering only the
+ * current term. A FAILED one is not: it returns null so the caller can say the
+ * list is missing rather than implying this is the club's only term.
+ */
+async function fetchTerms(
+  db: ReturnType<typeof createAdminClient>
+): Promise<string[] | null> {
+  const { data, error } = await db.rpc("member_terms");
+  if (error) {
+    console.error("member_terms rpc failed:", error.message);
+    return null;
+  }
+  return data.map((row) => row.term);
+}
 
 /**
  * The un-embedded directory select — used for real in the common branch, and
@@ -95,7 +155,8 @@ type DirectoryRow = NonNullable<
 async function fetchDirectory(
   db: ReturnType<typeof createAdminClient>,
   filter: ReturnType<typeof parseMemberFilter>,
-  fields: readonly FieldDefinition[]
+  fields: readonly FieldDefinition[],
+  currentTerm: string
 ): Promise<DirectoryQueryResult> {
   // applyMemberFilter is the only thing that translates a filter into a query.
   // The export calls it on the same filter and reads the same way — that
@@ -117,9 +178,10 @@ async function fetchDirectory(
           .from("member_directory")
           .select(COLUMNS_WITH_ATTENDANCE, { count: "exact" }),
         filter,
-        fields
+        fields,
+        currentTerm
       )
-    : applyMemberFilter(narrowSelect(db), filter, fields);
+    : applyMemberFilter(narrowSelect(db), filter, fields, currentTerm);
 
   // ⚠️ Read in chunks rather than asking for the whole result at once. The
   // directory stopped paginating on 2026-08-07 and shows every matching member,
@@ -168,14 +230,13 @@ async function fetchDirectory(
     eid: row.eid ?? "",
     fullName: row.full_name ?? "",
     email: row.email ?? "",
-    active: row.active ?? true,
     source: row.source ?? "admin",
     totalPoints: row.total_points ?? 0,
     // The view computes this as an `exists (…)`, so it is never really null —
     // but every column of a view is nullable in the generated types, and false
     // is the honest default: "we have no record of a payment covering this
     // term" is exactly what Not Paid means.
-    duesPaid: row.dues_paid_current_term ?? false,
+    duesPaid: row.dues_paid_term ?? false,
     customFields: row.custom_fields ?? {},
     // The compare-and-set anchor every inline cell posts back. Carried as the
     // raw PostgREST string all the way to the hidden input — a Date round trip
@@ -200,18 +261,29 @@ export default async function AdminMembersPage({
   // key from one naming a field that has since been archived. One client for
   // both reads.
   const db = createAdminClient();
-  const fields = await fetchFieldDefinitions(db);
+  // 🪤 Both before the filter is used, and for different reasons. The
+  // definitions tell a live `cf:` sort key from an archived one; the current
+  // term is what a null `filter.term` resolves to, and applyMemberFilter takes
+  // it as a required argument so this cannot be forgotten.
+  const [fields, currentTerm] = await Promise.all([
+    fetchFieldDefinitions(db),
+    fetchCurrentTerm(db),
+  ]);
 
   const filter = parseMemberFilter(params, fields);
+  // What the scope actually resolved to, for the control and the copy below.
+  // Never re-derived from the clock a second time — one fact, one source.
+  const scopeTerm = filter.term ?? currentTerm;
 
   // The directory read and the event picker are independent, so they go
   // together. fetchEventOptions is the same all-status list the attendance queue
   // and manual entry offer — an officer asking who missed a cancelled event is
   // asking a real question, and a published-only picker could not answer it.
-  const [result, eventsResult, presetsResult] = await Promise.all([
-    fetchDirectory(db, filter, fields),
+  const [result, eventsResult, presetsResult, terms] = await Promise.all([
+    fetchDirectory(db, filter, fields, currentTerm),
     fetchEventOptions(db),
     fetchPresets(db),
+    fetchTerms(db),
   ]);
 
   // The filter, serving two jobs at once: it is the export's query string, and
@@ -264,6 +336,15 @@ export default async function AdminMembersPage({
           className="mb-6"
         />
       )}
+      {/* A failed term list is not "this is the only term". The roster below is
+          still correct — it is scoped to a term that came from current_term(),
+          not from this list — but the officer cannot move off it, so say so. */}
+      {terms === null && (
+        <ReadError
+          what="the list of terms, so the term control offers only this one"
+          className="mb-6"
+        />
+      )}
       <div className="flex flex-wrap items-baseline justify-between gap-4">
         <h1 className="font-display text-[30px] leading-[1.02] font-semibold tracking-[-0.015em] sm:text-[34px]">
           Members
@@ -288,14 +369,29 @@ export default async function AdminMembersPage({
         </div>
       </div>
 
+      {/* The scope stated in words, because the control alone does not say what
+          it does to the NUMBERS. Every figure in the table is that term's. */}
       <p className="mt-3 max-w-2xl text-sm text-misa-secondary">
-        The roster. <span className="font-medium">Total points are scoped to
-        the current term.</span> Open a member for their attendance, rate,
-        points breakdown, pending submissions, and history.
+        The roster for{" "}
+        <span className="font-medium">
+          {filter.term === MEMBER_TERM_ALL ? "every term" : scopeTerm}
+        </span>
+        .{" "}
+        {filter.term === MEMBER_TERM_ALL
+          ? "Each member appears once per term they were part of, and their points are that term's."
+          : "Points, attendance and dues are all scoped to it."}{" "}
+        Open a member for their attendance, rate, points breakdown, pending
+        submissions, and history.
       </p>
 
       <div className="mt-6">
-        <MemberFilters filter={filter} definitions={fields} events={events} />
+        <MemberFilters
+          filter={filter}
+          definitions={fields}
+          events={events}
+          terms={terms ?? []}
+          currentTerm={currentTerm}
+        />
         <PresetBar
           presets={chips}
           filterKey={filterKey}
@@ -315,10 +411,16 @@ export default async function AdminMembersPage({
             {/* Every matching member is on screen, so this is a count rather
                 than a window — and it is the SAME number the export carries,
                 which is the property the whole screen is built around. */}
+            {/* ⚠️ The empty state names the membership rule rather than saying
+                "no members", because an empty CURRENT term is the expected
+                state in week one — before any event has happened, the roster is
+                whoever joined this term or has already paid. Without this the
+                officer reads a working screen as a broken one, or worse, as a
+                lost roster. */}
             <p className="mb-3 text-xs text-misa-muted">
               {result.total === 0
                 ? isDefaultFilter(filter)
-                  ? "No active members yet."
+                  ? `Nobody is on the ${scopeTerm} roster yet — members appear here once they attend an event, are granted points, pay dues covering the term, or join.`
                   : "No members match these filters."
                 : isDefaultFilter(filter)
                   ? `${result.total} member${result.total === 1 ? "" : "s"}.`

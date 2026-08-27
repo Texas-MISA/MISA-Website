@@ -11,9 +11,8 @@
 //     shown, and never written. A stale spreadsheet must not be able to
 //     overwrite a name or an email an officer has corrected, and create-only is
 //     what makes re-importing the same file a no-op.
-//   * It never guesses. An `active` cell that is not recognisably yes or no
-//     makes the row invalid rather than defaulting; a custom-field value that is
-//     not one of the definition's options does the same.
+//   * It never guesses. A custom-field value that is not one of the
+//     definition's options makes the row invalid rather than defaulting.
 //   * It never drops anything silently. Every row of the file comes back with an
 //     outcome, and every column the importer ignored is named — so the numbers
 //     on the preview add up to the file the officer uploaded.
@@ -90,7 +89,11 @@ const MIN_EID_LENGTH = 3;
  * with no validation, and bulk-overwriting officer notes from a spreadsheet is
  * the create-only rule's spirit broken through a side door.
  */
-const IMPORTABLE_BUILTINS = ["name", "email", "eid", "active"] as const;
+// ✂️ `active` left on 2026-08-25 with the column itself (migration 29). The
+// header set is still exportCatalogue's importable subset, so a downloaded CSV
+// round-trips — a file carrying an "Active" column now simply has an unknown
+// header, which matchHeaders already ignores by name.
+const IMPORTABLE_BUILTINS = ["name", "email", "eid"] as const;
 
 export type ImportColumn = ExportField & {
   /** A row missing this cannot be imported at all. */
@@ -108,8 +111,8 @@ export function importColumns(
     )
     .map((field) => ({
       ...field,
-      // The three NOT NULL columns on `members`. `active` has a default and
-      // every custom field is optional by nature.
+      // The three NOT NULL columns on `members`. Every custom field is
+      // optional by nature.
       required: field.key === "name" || field.key === "email" || field.key === "eid",
     }));
 }
@@ -197,7 +200,6 @@ export type InvalidReason =
   | { kind: "missing"; column: string }
   | { kind: "eid_too_short" }
   | { kind: "too_long"; column: string }
-  | { kind: "bad_active"; value: string }
   | { kind: "not_an_option"; column: string; value: string };
 
 export type RowOutcome =
@@ -220,7 +222,6 @@ export type PlannedMember = {
   eid: string;
   fullName: string;
   email: string;
-  active: boolean;
   /** Keyed by definition key. A key is ABSENT when the cell was empty — never
    * `""`, so "cleared" and "never answered" stay one state (the setFieldValue
    * rule, and §4.5's null-is-not-zero in a new place). */
@@ -321,7 +322,6 @@ export function planRosterImport({
       eid,
       fullName,
       email,
-      active: true,
       customFields: {} as Record<string, string>,
     };
 
@@ -348,12 +348,6 @@ export function planRosterImport({
       return invalid({ kind: "eid_too_short" });
     }
 
-    const rawActive = cell("active");
-    const active = parseActive(rawActive);
-    if (active === null) {
-      return invalid({ kind: "bad_active", value: rawActive });
-    }
-    planned.active = active;
 
     for (const column of customColumns) {
       const value = cell(column.key);
@@ -437,25 +431,6 @@ export function countOutcomes(rows: readonly PlannedMember[]): ImportCounts {
   return counts;
 }
 
-/**
- * An `active` cell as a boolean, or null for "not recognisable".
- *
- * Lenient about spelling because officers type what they like into a
- * spreadsheet, and strict about everything else: an unrecognised value returns
- * null and invalidates the row rather than defaulting to active. Guessing here
- * would silently reinstate somebody the officer meant to archive, and a wrongly
- * active member shows up on the roster and in every count.
- *
- * Empty means "not stated", which is the column default.
- */
-export function parseActive(raw: string): boolean | null {
-  const value = raw.trim().toLowerCase();
-  if (value === "") return true;
-  if (["yes", "y", "true", "t", "1", "active"].includes(value)) return true;
-  if (["no", "n", "false", "f", "0", "inactive"].includes(value)) return false;
-  return null;
-}
-
 /** A one-line explanation of an outcome, for the preview table. Here rather
  * than in the component so it is testable and so the two never disagree. */
 export function describeOutcome(outcome: RowOutcome): string {
@@ -483,8 +458,6 @@ function describeInvalid(reason: InvalidReason): string {
       return "That EID is too short to be real";
     case "too_long":
       return `${reason.column} is too long`;
-    case "bad_active":
-      return `“${reason.value}” is not yes or no`;
     case "not_an_option":
       return `“${reason.value}” is not an option for ${reason.column}`;
   }

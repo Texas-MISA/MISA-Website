@@ -1,9 +1,17 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.75
+**Version:** 1.76
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0 and 1 complete, phase 2 next.**
 **Last updated:** August 2026
 
+> **v1.76: the roster is TERM-SCOPED, `members.active` is GONE, and `/lookup`'s gate is the EID alone.**
+>
+> Three officer instructions, 2026-08-25, on the `roster-terms-and-lookup` branch. Migration 29.
+>
+> - 🔓 **`member_directory` is now ONE ROW PER (MEMBER, TERM)** and `/admin/members` has a term control defaulting to the current term. Every aggregate on a row belongs to that row's term, so choosing a semester changes what the numbers MEAN rather than only which rows survive. `dues_paid_current_term` is renamed **`dues_paid_term`**. Membership is derived — attendance, points, dues covering the term, or having joined during it — see §4.5.
+> - 🔴 **`members.active` is DROPPED.** A hand-ticked boolean was the only answer to "is this person still in the club" and nothing kept it current. Term membership answers the same question from evidence. This reached much further than the directory: the candidate scans, the `member_inactive` resolution warning, `fetchMemberOptions`' filter, the roster import's column, the export's **Active** field (now **Term**) and four inactive badges all went with it. §4.4's second surprise is rewritten below because the mechanism it described no longer exists.
+> - 🔴 **`/lookup` now resolves on the EID ALONE.** The email half of the gate was removed at the officer's instruction, and dues status was KEPT. §6's argument for showing dues status there rested on that conjunction; it no longer holds and the row in §6 says so rather than being quietly deleted.
+>
 > **v1.75: the officer roster is replaced, the real logo landed, the page heroes are centred, and check-in location verification shipped.**
 >
 > 📌 1.74 and 1.73 were developed in parallel on two branches and both came off 1.72; this is the merge of the two, not a third round of changes. §9 gains entries 14 and 15 from the 1.73 side, §6's *Check-in on behalf of someone else* row is rewritten there, and §11 loses the rotating venue code.
@@ -590,8 +598,19 @@
 > **v1.51: Stage 7 phase 2 — `/lookup`, and the gate that had to be one query.**
 > **No migration.** `lib/lookup.ts`, `lib/request-ip.ts`, `app/actions/lookup.ts`.
 >
-> - 🔓 **The EID + email gate is a CONJUNCTION expressed in a single query, and
->   the obvious reuse would have broken it silently.** `findMember` in
+> - 🔴 **SUPERSEDED IN v1.76 — the email half was removed on 2026-08-25 at the
+>   officer's instruction, and dues status was kept.** The original entry is
+>   below, unedited, because it is the argument that was overruled and deleting
+>   it would hide what the change cost. What is true now: `/lookup` resolves on
+>   `normalized_eid` alone, in one query; a UT EID is derived from a person's
+>   initials rather than issued at random, so guessing one is cheap; and
+>   `LOOKUP_RATE_LIMIT_MAX` — a *room number*, not a security parameter — is the
+>   only remaining cost to a script. The parts that still hold and are still
+>   tested: ONE query, ONE `unmatched` outcome for every miss, and no borrowing
+>   of `findMember`'s ordered fallback.
+>
+> - 🔓 ~~**The EID + email gate is a CONJUNCTION expressed in a single query, and
+>   the obvious reuse would have broken it silently.**~~ `findMember` in
 >   `lib/checkin.ts` is an ordered *fallback* — EID, then email — because a
 >   check-in must recognise someone who mistypes one field. Copying that shape
 >   into `/lookup` resolves on either half alone, which reduces the page that
@@ -2814,9 +2833,9 @@ The one rough edge is early August, when the new term is live but has no events 
 **Two filters here surprise people, and both matter when an officer approves a submission** (found and documented in v1.20):
 
 - **The attendance leg excludes only `cancelled`, not unpublished** — so **a draft event's attendance counts publicly.** That is defensible on purpose: an officer can build a schedule, backfill attendance, and publish afterwards without the numbers vanishing in between. But it means approving a submission against a draft event moves the public board immediately, which is not what "draft" suggests. The review screen warns rather than blocks.
-- **`where m.active` has no counterpart in `member_directory`.** Approving attendance for an inactive member therefore changes the officer directory and produces *no public change at all*. Without a warning that reads as a bug in the approval.
+- ~~**`where m.active` has no counterpart in `member_directory`.**~~ ✂️ **GONE in v1.76 (migration 29), and the surprise went with it.** The column was dropped, so there is nothing to be inactive; the board's trim is now the term roster, which `member_directory` *does* have a counterpart for — the same rule, one term over. The `member_inactive` resolution warning was removed rather than reworded, because it described a mechanism that no longer exists. ⚠️ What replaced the surprise is a different one, recorded in §4.5: **the board can now be EMPTY**, where the old LEFT JOIN over every active member made that impossible.
 
-Neither is worth changing — the behaviours are individually right — but both need saying out loud, because the failure mode is an officer who does not believe the screen.
+The first is not worth changing — the behaviours are individually right — but both need saying out loud, because the failure mode is an officer who does not believe the screen.
 
 ### 4.5 Member directory view
 
@@ -2906,13 +2925,36 @@ left join bonus_agg      ba on ba.member_id = m.id;
 
 `source` is exposed so officers can filter to self-registered members and review what the check-in form has added (§4.2).
 
-**One dues column, and it is a boolean** (migration 19, v1.34). `dues_paid_current_term` is the entire answer to "official or unofficial", scoped to `current_term()` like everything else here, and derived from `dues_payments` and nothing else. The directory renders it **Paid / Not Paid** — one word, no coverage detail — for the same reason the phase-3 trim exists: the table answers the question officers filter on, and the member detail page answers everything else.
+**One dues column, and it is a boolean** (migration 19, v1.34; **renamed `dues_paid_term` in v1.76**). It is the entire answer to "official or unofficial", scoped to **the row's term** — which was `current_term()` until migration 29 made the view per-term — and derived from `dues_payments` and nothing else. 🪤 The rename was not cosmetic: on a row scoped to Spring 2025 a column called `dues_paid_current_term` is an outright lie, and migration 29 was already dropping the view (see below), which is the only circumstance in which a rename is permitted. The directory renders it **Paid / Not Paid** — one word, no coverage detail — for the same reason the phase-3 trim exists: the table answers the question officers filter on, and the member detail page answers everything else.
 
 **There is deliberately no "paid through" column, and the reason is that terms do not sort.** `'Fall 2026'` precedes `'Spring 2026'` alphabetically and follows it chronologically, so `max(term)` over a member's covered terms is wrong in a way that reads as right — it returns "Spring" for someone paid through Fall. A latest-covered-term column would therefore need a sortable key that nothing else in the schema wants. The member detail page reads that member's `dues_payments` rows directly instead, exactly as it already does for point adjustments, and orders them with `terms_from` semantics rather than a string compare (§4.7).
 
 **A voided payment can make a member unofficial retroactively**, and that is correct rather than a bug: the boolean is a live derivation, not a stored flag, so correcting a mis-parsed payment corrects the status in the same instant. Officers should expect it, which is why the void flow requires a reason and writes an audit row.
 
-⚠️ **This column appends, and that is load-bearing.** `create or replace view` can only add columns at the end (see the rule below), so `dues_paid_current_term` sits last and migration 19 needs no `drop`. That matters more here than the tidiness suggests: a `drop` + `create` silently re-opens the anon read that migration 15 closed, because `alter default privileges` grants new tables *and views* to `anon`. Any future change to this view that cannot be expressed as an append must re-issue both the `revoke` and the `grant` in the same migration.
+⚠️ **This column appends, and that is load-bearing.** `create or replace view` can only add columns at the end (see the rule below), so the dues boolean sits last and migration 19 needs no `drop`. That matters more here than the tidiness suggests: a `drop` + `create` silently re-opens the anon read that migration 15 closed, because `alter default privileges` grants new tables *and views* to `anon`. Any future change to this view that cannot be expressed as an append must re-issue both the `revoke` and the `grant` in the same migration.
+
+🔓 **v1.76 (migration 29) is the change that could not be an append, and it did exactly that.** It removed `active`, renamed the dues boolean and changed the view's grain, so it is a `drop view` + `create view` — and it **re-issues `revoke all … from anon` and `… from authenticated`** in the same file. Read that migration's section 2 before touching this view again; it is the rule above being paid rather than an exception to it.
+
+---
+
+#### The view is per-term (migration 29, v1.76)
+
+**`member_directory` is ONE ROW PER (MEMBER, TERM).** The officer picks the term on `/admin/members`; the default is the current one. Every aggregate on a row — `events_attended`, `attendance_points`, `bonus_points`, `total_points`, `events_possible`, `attendance_rate`, `dues_paid_term` — is computed **for that row's term**. `pending_count` and `last_seen_at` remain all-time and are now the only columns that are not term-scoped, which is why both must stay labelled wherever they are rendered.
+
+**Membership is derived, and this is the part to read before trusting the screen.** A member is on a term's roster when there is *evidence* they were part of the club in it:
+
+- they were marked `present` at one of its events, or
+- they were granted or docked points in it, or
+- a live `dues_payments` row covers it, or
+- they joined during it (`term_of(joined_at)`).
+
+`members.joined_at` is `not null`, so **every member always has at least one row** and nobody can fall off the roster entirely — which is what lets `/lookup` and the member detail page treat an empty result as "no such member" rather than as an absence.
+
+⚠️ **The consequence to expect in week one:** before a term's first event, that term's roster is only the members who joined during it or have already paid dues covering it. That is the rule working, not failing, and the directory's empty state names the four ways onto the roster rather than saying "no members".
+
+⚠️ **`leaderboard` is now defined OVER this view**, scoped to `current_term()`, having lost `where m.active` along with the column. One definition of "who is in the club", so the public board and the officer directory cannot disagree. 🪤 **The board can therefore be EMPTY**, which the old LEFT-JOIN-every-active-member shape made impossible — and an empty board carries no `term` to put in the heading. `/leaderboard` already handled a null term and still does. **Do not add an `rpc("current_term")` fallback for that case**: that is precisely the two-sources-for-one-fact defect migration 21 closed.
+
+📌 **`member_terms()`** (migration 29) is the term list the roster control offers, newest first by `term_index()`. It is an rpc rather than `select term from member_directory` deduped in JavaScript because the view is members × terms — §2.2's worst case is 4,000 rows — and the hosted project's PostgREST `max_rows` would return a short list with no error. A truncated term list does not look broken; it looks like the club never had a Spring 2026.
 
 ### 4.6 Event edit semantics
 

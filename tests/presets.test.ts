@@ -47,10 +47,10 @@ describe("canonicalPresetQuery", () => {
     // preset by STRING EQUALITY against the current filter's query string, so
     // two officers who picked the same filters in a different order must store
     // the same bytes or neither of their chips ever lights up.
-    const a = canonicalPresetQuery("dues=unpaid&state=all&minPoints=5", FIELDS);
-    const b = canonicalPresetQuery("minPoints=5&dues=unpaid&state=all", FIELDS);
+    const a = canonicalPresetQuery("dues=unpaid&term=all&minPoints=5", FIELDS);
+    const b = canonicalPresetQuery("minPoints=5&dues=unpaid&term=all", FIELDS);
     expect(a).toBe(b);
-    expect(a).toBe("state=all&dues=unpaid&minPoints=5");
+    expect(a).toBe("term=all&dues=unpaid&minPoints=5");
   });
 
   it("is idempotent", () => {
@@ -219,14 +219,15 @@ describe("presetSummary", () => {
     expect(presetSummary(filterOf(""), FIELDS)).toEqual([]);
   });
 
-  it("omits the default roster scope and names the other two", () => {
-    expect(presetSummary(filterOf(""), FIELDS)).not.toContain("Active only");
-    expect(presetSummary(filterOf("state=inactive"), FIELDS)).toContain(
-      "Inactive only"
+  it("omits the default term scope and names an explicit one", () => {
+    // 📌 The default is null — "whatever term it is when you open this" — and
+    // describing it would make every saved view read as though it had pinned
+    // the semester it was created in. That is precisely what null avoids.
+    expect(presetSummary(filterOf(""), FIELDS)).toEqual([]);
+    expect(presetSummary(filterOf("term=Spring 2026"), FIELDS)).toContain(
+      "Spring 2026"
     );
-    expect(presetSummary(filterOf("state=all"), FIELDS)).toContain(
-      "Active and inactive"
-    );
+    expect(presetSummary(filterOf("term=all"), FIELDS)).toContain("All terms");
   });
 
   it("describes dues, source and search", () => {
@@ -289,11 +290,6 @@ describe("presetSummary", () => {
     );
   });
 
-  it("labels not-seen-since all-time, matching the control", () => {
-    expect(presetSummary(filterOf("notSeenSince=2026-09-01"), FIELDS)).toContain(
-      "Not seen since 2026-09-01 (all-time)"
-    );
-  });
 
   it("discloses a non-default sort and stays quiet about the default", () => {
     // A preset restores the sort too, and an officer who clicks a chip and
