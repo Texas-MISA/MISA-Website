@@ -1,7 +1,8 @@
 "use client";
 
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
-import { controlClass } from "@/components/ui/field";
+import { CHECKBOX, controlClass } from "@/components/ui/field";
 
 import { useActionState, useState } from "react";
 
@@ -91,7 +92,7 @@ export function ReviewQueue({
         </label>
 
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" name="approve" value="yes" className="size-4 shrink-0 accent-misa-blue" />
+          <input type="checkbox" name="approve" value="yes" className={CHECKBOX} />
           {/* Opt-in, never the default: approving is a judgement that these
               people were there, and a checkbox that starts ticked makes it an
               accident. Rows with no member stay pending regardless. */}
@@ -126,21 +127,37 @@ export function ReviewQueue({
 function BulkResult({ state }: { state: BulkAssignState }) {
   if (state.status === "idle") return null;
 
+  // 🐛 All three of these were one local `Banner` hardcoded to the CAUTION
+  // wash. An expired session and a failed assign are not cautions — they are an
+  // action that did not happen, which is what `error` is for. `invalid` stays a
+  // caution: the officer's input was refused and is theirs to correct.
   if (state.status === "unauthorized") {
-    return <Banner>Your session has expired — sign in again.</Banner>;
+    return (
+      <Notice tone="error" role="alert" className="mb-4">
+        Your session has expired — sign in again.
+      </Notice>
+    );
   }
   if (state.status === "error") {
-    return <Banner>Couldn&apos;t assign those submissions.</Banner>;
+    return (
+      <Notice tone="error" role="alert" className="mb-4">
+        Couldn&apos;t assign those submissions.
+      </Notice>
+    );
   }
   if (state.status === "invalid") {
-    return <Banner>{state.message}</Banner>;
+    return (
+      <Notice tone="warning" role="alert" className="mb-4">
+        {state.message}
+      </Notice>
+    );
   }
 
+  // 🪤 `as="div"`: this report carries paragraphs and a list, and a <p> cannot
+  // contain either — the parser would close the banner at the first child and
+  // the rest would render outside its frame.
   return (
-    <div
-      role="status"
-      className="mb-4 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-    >
+    <Notice tone="success" as="div" role="status" className="mb-4">
       <p>
         Assigned {state.assigned} submission{state.assigned === 1 ? "" : "s"}
         {state.approved > 0 && `, ${state.approved} approved`}.
@@ -164,7 +181,7 @@ function BulkResult({ state }: { state: BulkAssignState }) {
           </ul>
         </>
       )}
-    </div>
+    </Notice>
   );
 }
 
@@ -181,13 +198,3 @@ function describeSkip(reason: string): string {
   }
 }
 
-function Banner({ children }: { children: React.ReactNode }) {
-  return (
-    <p
-      role="status"
-      className="mb-4 border border-misa-caution/45 bg-misa-caution-wash px-4 py-3 text-sm"
-    >
-      {children}
-    </p>
-  );
-}

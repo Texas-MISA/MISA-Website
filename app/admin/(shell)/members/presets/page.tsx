@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-import { ReadError } from "@/app/admin/(shell)/_components/notice";
+import { Notice, ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import { fetchEventOptions } from "@/lib/event-options";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
@@ -97,11 +97,11 @@ export default async function MemberPresetsPage() {
         {presetsFailed ? (
           <ReadError what="the saved views" />
         ) : rows.length === 0 ? (
-          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice>
             No saved views yet. Filter the directory, then use{" "}
             <span className="font-medium">Save this view…</span> under the
             filters.
-          </p>
+          </Notice>
         ) : (
           <ul className="flex flex-col gap-4">
             {rows.map(({ preset, parts }) => (

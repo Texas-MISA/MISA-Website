@@ -6,7 +6,9 @@ import { requireOfficer } from "@/lib/auth";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { FieldDefinition } from "@/lib/members";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { PageHeader, SectionHeading } from "@/components/ui/page-header";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 
 // Officer-defined custom fields (§7 Stage 6 phase 4).
 //
@@ -51,10 +53,10 @@ export default async function MemberFieldsPage() {
         <SectionHeading>Live</SectionHeading>
         <div className="mt-4">
           {live.length === 0 ? (
-            <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+            <Notice>
               No custom fields yet. The directory shows its four built-in
               columns until you add one.
-            </p>
+            </Notice>
           ) : (
             <FieldTable rows={live} />
           )}
@@ -84,45 +86,45 @@ export default async function MemberFieldsPage() {
 
 function FieldTable({ rows }: { rows: FieldDefinition[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[48rem] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-misa-border text-left">
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Label</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Key</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Options</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Where</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Order</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70">
-              <td className="py-2 pr-4">
-                <Link
-                  href={`/admin/members/fields/${row.id}`}
-                  className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
-                >
-                  {row.label}
-                </Link>
-              </td>
-              <td className="py-2 pr-4 font-mono text-xs">{row.key}</td>
-              <td className="py-2 pr-4">{row.options.join(", ")}</td>
-              <td className="py-2 pr-4">
-                {row.showInDirectory ? (
-                  <>
-                    Directory column
-                    {row.editableInline ? ", editable inline" : ", read-only"}
-                  </>
-                ) : (
-                  "Member page only"
-                )}
-              </td>
-              <td className="py-2 pr-4 tabular-nums">{row.sortOrder}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table minWidth="min-w-[48rem]">
+      <THead>
+        <Tr hover={false}>
+          <Th>Label</Th>
+          <Th>Key</Th>
+          <Th>Options</Th>
+          <Th>Where</Th>
+          <Th numeric>Order</Th>
+        </Tr>
+      </THead>
+      <tbody>
+        {rows.map((row) => (
+          <Tr key={row.id} className="align-top">
+            <Td>
+              <Link
+                href={`/admin/members/fields/${row.id}`}
+                className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+              >
+                {row.label}
+              </Link>
+            </Td>
+            {/* A field key is an identifier — it is typed into a preset query
+                and read back out of an export header. */}
+            <Td className="font-mono text-xs">{row.key}</Td>
+            <Td>{row.options.join(", ")}</Td>
+            <Td>
+              {row.showInDirectory ? (
+                <>
+                  Directory column
+                  {row.editableInline ? ", editable inline" : ", read-only"}
+                </>
+              ) : (
+                "Member page only"
+              )}
+            </Td>
+            <Td numeric>{row.sortOrder}</Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }

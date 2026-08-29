@@ -1,4 +1,4 @@
-import { ReadError } from "@/app/admin/(shell)/_components/notice";
+import { Notice, ReadError } from "@/app/admin/(shell)/_components/notice";
 import { describeMatchReason, type MemberSuggestion } from "@/lib/attendance";
 
 // Ranked suggestions for a payment nobody is credited with (§7 Stage 6.5 phase
@@ -26,12 +26,12 @@ export function PaymentSuggestions({
   }
   if (suggestions.length === 0) {
     return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+      <Notice>
         Nothing on the roster looks like a close enough match to suggest. Read
         the note and the payer&apos;s name above and pick by hand below, or leave
         it queued — a weak guess here credits the wrong person&apos;s dues, and
         neither they nor the real payer has any reason to notice.
-      </p>
+      </Notice>
     );
   }
 

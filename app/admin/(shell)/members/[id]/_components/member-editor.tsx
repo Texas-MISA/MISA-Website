@@ -12,6 +12,7 @@ import {
 import { fieldValue, type FieldDefinition } from "@/lib/members";
 
 import { SectionHeading } from "@/components/ui/page-header";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { MemberFieldCell } from "../../_components/member-field-cell";
 
 // The member detail page's editable half (§7 Stage 6 phase 4).
@@ -69,9 +70,9 @@ export function MemberEditor({
         <SectionHeading>Custom fields</SectionHeading>
 
         {live.length === 0 && archivedHeld.length === 0 ? (
-          <p className="mt-4 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice className="mt-4">
             No custom fields are defined.
-          </p>
+          </Notice>
         ) : (
           <dl className="mt-4 grid gap-3 sm:grid-cols-[14rem_1fr]">
             {live.map((definition) => (

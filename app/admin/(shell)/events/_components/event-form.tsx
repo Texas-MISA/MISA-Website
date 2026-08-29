@@ -15,6 +15,7 @@ import {
   type EventWarning,
 } from "@/lib/events";
 import { SectionHeading } from "@/components/ui/page-header";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // Create and edit share one form: the fields are identical, and the only
 // difference is whether an `id` is posted. Client Component for
@@ -435,12 +436,9 @@ function describeWarning(warning: EventWarning): React.ReactNode {
 
 function Alert({ children }: { children: React.ReactNode }) {
   return (
-    <p
-      role="alert"
-      className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-    >
+    <Notice tone="error" role="alert">
       {children}
-    </p>
+    </Notice>
   );
 }
 

@@ -3,6 +3,8 @@
 import { useCallback, useState } from "react";
 import Link from "next/link";
 
+import { Pill } from "@/components/ui/pill";
+import { Tr } from "@/components/ui/table";
 import { fieldValue, type FieldDefinition } from "@/lib/members";
 
 import { MemberFieldCell } from "./member-field-cell";
@@ -57,7 +59,7 @@ export function DirectoryRow({
   const adoptToken = useCallback((next: string) => setToken(next), []);
 
   return (
-    <tr className="border-b border-misa-hairline transition-colors duration-150 last:border-b-0 hover:bg-misa-panel/70">
+    <Tr>
       {/* Outside the per-cell <form> elements below, deliberately: those each
           carry exactly one field name, and a checkbox inside one would ride
           along on a custom-field save. */}
@@ -70,16 +72,20 @@ export function DirectoryRow({
           {row.fullName}
         </Link>
         {row.source === "self_checkin" && (
-          <span
+          <Pill
+            tone="neutral"
             title="Created by the check-in form rather than an officer"
-            className="ml-2 border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]"
+            className="ml-2"
           >
             self
-          </span>
+          </Pill>
         )}
       </td>
       <td className={text}>{row.email}</td>
-      <td className={text}>{row.eid}</td>
+      {/* Monospace: an EID is transcribed by hand off a phone screen, and this
+          column is where `l` has to stay distinguishable from `1`. It is the one
+          identifier column in the app that was still set in the body face. */}
+      <td className={`${text} font-mono text-xs`}>{row.eid}</td>
       <td className={`${numeric} font-medium`}>{row.totalPoints}</td>
 
       {/* ⚠️ Text, never a <select>. Dues status is calculated from
@@ -91,15 +97,15 @@ export function DirectoryRow({
           One word each, and no coverage detail: what a payment bought and what
           the member is paid through belong on /admin/members/[id], which has
           room to show the payments themselves. */}
+      {/* 🐛 These two badges were `text-[11px] tracking-[0.12em]` and
+          `text-[0.7rem] tracking-wider` — 11px and 11.2px, two sizes reading as
+          one, in the SAME column one row apart. Exactly the drift pill.tsx was
+          written to end. */}
       <td className={text}>
         {row.duesPaid ? (
-          <span className="border border-misa-border bg-misa-panel px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-            paid
-          </span>
+          <Pill tone="affirm">paid</Pill>
         ) : (
-          <span className="border border-misa-border px-2 py-0.5 text-[0.7rem] tracking-wider text-misa-muted uppercase">
-            not paid
-          </span>
+          <Pill tone="neutral">not paid</Pill>
         )}
       </td>
 
@@ -125,6 +131,6 @@ export function DirectoryRow({
           )}
         </td>
       ))}
-    </tr>
+    </Tr>
   );
 }

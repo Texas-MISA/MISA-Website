@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AuditTrail } from "@/app/admin/(shell)/_components/audit-trail";
-import { ReadError } from "@/app/admin/(shell)/_components/notice";
+import { Notice, ReadError } from "@/app/admin/(shell)/_components/notice";
 import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
 import { describeMatchReason } from "@/lib/attendance";
 import { normalizeEid } from "@/lib/checkin";
@@ -22,6 +22,7 @@ import { formatPointCategory, signedPoints } from "@/lib/points";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { PageHeader, SectionHeading } from "@/components/ui/page-header";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 import { Pill } from "@/components/ui/pill";
 import { MemberEditor } from "./_components/member-editor";
 import { MergePanel, type DuplicateHint } from "./_components/merge-panel";
@@ -449,50 +450,48 @@ export default async function MemberDetailPage({
         )}
 
         {!termEvents.error && termEvents.data.length === 0 && (
-          <p className="mt-4 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice className="mt-4">
             No published events in this term yet.
-          </p>
+          </Notice>
         )}
 
         {termEvents && !termEvents.error && termEvents.data.length > 0 && (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[40rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-misa-border text-left">
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">When</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Category</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Points</th>
-                  <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">This member</th>
-                </tr>
-              </thead>
+          <div className="mt-4">
+            <Table minWidth="min-w-[40rem]">
+              <THead>
+                <Tr hover={false}>
+                  <Th>Event</Th>
+                  <Th>When</Th>
+                  <Th>Category</Th>
+                  <Th numeric>Points</Th>
+                  <Th wrap>This member</Th>
+                </Tr>
+              </THead>
               <tbody>
                 {termEvents.data.map((event) => (
-                  <tr key={event.id} className="border-b border-misa-hairline transition-colors duration-150 hover:bg-misa-panel/70">
-                    <td className="py-2 pr-4">
+                  <Tr key={event.id}>
+                    <Td>
                       <Link
                         href={`/admin/events/${event.id}`}
                         className="underline underline-offset-2"
                       >
                         {event.title}
                       </Link>
-                    </td>
-                    <td className="py-2 pr-4 whitespace-nowrap">
+                    </Td>
+                    <Td className="whitespace-nowrap">
                       {formatDay(event.starts_at)}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {formatCategory(event.category)}
-                    </td>
-                    <td className="py-2 pr-4 tabular-nums">{event.points}</td>
-                    <td className="py-2">
+                    </Td>
+                    <Td>{formatCategory(event.category)}</Td>
+                    <Td numeric>{event.points}</Td>
+                    <Td>
                       <AttendanceMark
                         state={gridState.get(event.id) ?? "upcoming"}
                       />
-                    </td>
-                  </tr>
+                    </Td>
+                  </Tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
       </section>
@@ -502,41 +501,36 @@ export default async function MemberDetailPage({
         {adjustmentsFailed ? (
           <ReadError what="this member's point adjustments" className="mt-4 max-w-3xl" />
         ) : adjustmentRows.length === 0 ? (
-          <p className="mt-4 max-w-3xl border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice className="mt-4 max-w-3xl">
             No adjustments have been granted to this member.
-          </p>
+          </Notice>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[48rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-misa-border text-left">
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Awarded</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Points</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Category</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Reason</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Term</th>
-                  <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Officer</th>
-                </tr>
-              </thead>
+          <div className="mt-4">
+            <Table minWidth="min-w-[48rem]">
+              <THead>
+                <Tr hover={false}>
+                  <Th>Awarded</Th>
+                  <Th>Points</Th>
+                  <Th>Category</Th>
+                  <Th>Reason</Th>
+                  <Th>Term</Th>
+                  <Th>Officer</Th>
+                </Tr>
+              </THead>
               <tbody>
                 {adjustmentRows.map((row) => {
                   const voided = row.voided_at !== null;
                   return (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-misa-hairline align-top ${
-                        voided ? "text-misa-muted" : ""
-                      }`}
-                    >
-                      <td className="py-2 pr-4 whitespace-nowrap">
+                    <Tr key={row.id} muted={voided} className="align-top">
+                      <Td className="whitespace-nowrap">
                         <Link
                           href={`/admin/points/${row.id}`}
                           className="underline underline-offset-2"
                         >
                           {formatInstant(row.awarded_at)} CT
                         </Link>
-                      </td>
-                      <td className="py-2 pr-4 font-mono whitespace-nowrap">
+                      </Td>
+                      <Td className="font-mono whitespace-nowrap">
                         {/* A voided adjustment stays visible and contributes
                             nothing — voiding is a recorded action, not a
                             deletion (§4.2). */}
@@ -544,26 +538,20 @@ export default async function MemberDetailPage({
                           {signedPoints(row.points)}
                         </span>
                         {voided && (
-                          <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
+                          <Pill tone="critical" className="ml-2">
                             voided
-                          </span>
+                          </Pill>
                         )}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {formatPointCategory(row.category)}
-                      </td>
-                      <td className="py-2 pr-4">{row.reason}</td>
-                      <td className="py-2 pr-4 whitespace-nowrap">
-                        {row.term}
-                      </td>
-                      <td className="py-2">
-                        {describeOfficer(officerNames, row.awarded_by)}
-                      </td>
-                    </tr>
+                      </Td>
+                      <Td>{formatPointCategory(row.category)}</Td>
+                      <Td>{row.reason}</Td>
+                      <Td className="whitespace-nowrap">{row.term}</Td>
+                      <Td>{describeOfficer(officerNames, row.awarded_by)}</Td>
+                    </Tr>
                   );
                 })}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
       </section>
@@ -605,54 +593,49 @@ export default async function MemberDetailPage({
         {paymentsFailed ? (
           <ReadError what="this member's payments" className="mt-4 max-w-3xl" />
         ) : paymentRows.length === 0 ? (
-          <p className="mt-4 max-w-3xl border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice className="mt-4 max-w-3xl">
             No payments have been credited to this member.
-          </p>
+          </Notice>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[48rem] border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-misa-border text-left">
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Paid</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Amount</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Covers</th>
-                  <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Payer</th>
-                  <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Note</th>
-                </tr>
-              </thead>
+          <div className="mt-4">
+            <Table minWidth="min-w-[48rem]">
+              <THead>
+                <Tr hover={false}>
+                  <Th>Paid</Th>
+                  <Th>Amount</Th>
+                  <Th>Covers</Th>
+                  <Th>Payer</Th>
+                  <Th>Note</Th>
+                </Tr>
+              </THead>
               <tbody>
                 {paymentRows.map((row) => {
                   const voided = row.voided_at !== null;
                   return (
-                    <tr
-                      key={row.id}
-                      className={`border-b border-misa-hairline align-top ${
-                        voided ? "text-misa-muted" : ""
-                      }`}
-                    >
-                      <td className="py-2 pr-4 whitespace-nowrap">
+                    <Tr key={row.id} muted={voided} className="align-top">
+                      <Td className="whitespace-nowrap">
                         <Link
                           href={`/admin/dues/${row.id}`}
                           className="underline underline-offset-2"
                         >
                           {formatInstant(row.paid_at)} CT
                         </Link>
-                      </td>
-                      <td className="py-2 pr-4 font-mono whitespace-nowrap">
+                      </Td>
+                      <Td className="font-mono whitespace-nowrap">
                         <span className={voided ? "line-through" : ""}>
                           {formatCents(row.amount_cents)}
                         </span>
                         {voided && (
-                          <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
+                          <Pill tone="critical" className="ml-2">
                             voided
-                          </span>
+                          </Pill>
                         )}
-                      </td>
+                      </Td>
                       {/* Same wording as the ledger's Covers column, on purpose:
                           an undecided amount covers NOTHING until an officer
                           says what it bought, and a row that reads blank here
                           would look like a bug rather than a job. */}
-                      <td className="py-2 pr-4 whitespace-nowrap">
+                      <Td className="whitespace-nowrap">
                         {row.covered_terms && row.covered_terms.length > 0 ? (
                           row.covered_terms.join(", ")
                         ) : (
@@ -660,22 +643,20 @@ export default async function MemberDetailPage({
                             nothing yet — from {row.start_term}
                           </span>
                         )}
-                      </td>
-                      <td className="py-2 pr-4">
+                      </Td>
+                      <Td>
                         {row.payer_name ?? (
                           <span className="text-misa-muted">—</span>
                         )}
-                      </td>
-                      <td className="py-2 max-w-[18rem] break-words">
-                        {row.note ?? (
-                          <span className="text-misa-muted">—</span>
-                        )}
-                      </td>
-                    </tr>
+                      </Td>
+                      <Td className="max-w-[18rem] break-words">
+                        {row.note ?? <span className="text-misa-muted">—</span>}
+                      </Td>
+                    </Tr>
                   );
                 })}
               </tbody>
-            </table>
+            </Table>
           </div>
         )}
       </section>

@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { Pill } from "@/components/ui/pill";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 import { formatCategory, formatEventRange } from "@/lib/events";
 
 // Presentational only — the page owns the query. Server Component: nothing
@@ -25,9 +28,7 @@ export type EventListRow = {
 export function EventTable({ rows }: { rows: EventListRow[] }) {
   if (rows.length === 0) {
     return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
-        No events match these filters.
-      </p>
+      <Notice>No events match these filters.</Notice>
     );
   }
 
@@ -37,74 +38,64 @@ export function EventTable({ rows }: { rows: EventListRow[] }) {
   const seriesPosition = numberSeriesMembers(rows);
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[52rem] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-misa-border text-left">
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">When (CT)</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Category</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Points</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Check-ins</th>
-            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const position = seriesPosition.get(row.id);
-            return (
-              <tr key={row.id} className="border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70">
-                <td className="py-2 pr-4">
-                  <Link
-                    href={`/admin/events/${row.id}`}
-                    className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
-                  >
-                    {row.title}
-                  </Link>
-                  {position && (
-                    <span className="ml-2 text-xs text-misa-muted">
-                      {position}
-                    </span>
-                  )}
-                  {row.location && (
-                    <div className="text-xs text-misa-muted">
-                      {row.location}
-                    </div>
-                  )}
-                </td>
-                <td className="py-2 pr-4 whitespace-nowrap">
-                  {formatEventRange(row.starts_at, row.ends_at)}
-                </td>
-                <td className="py-2 pr-4">{formatCategory(row.category)}</td>
-                <td className="py-2 pr-4">{row.points}</td>
-                <td className="py-2 pr-4">{row.attendance?.[0]?.count ?? 0}</td>
-                <td className="py-2">
-                  <EventStatusPill status={row.status} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <Table minWidth="min-w-[52rem]">
+      <THead>
+        <Tr hover={false}>
+          <Th>Event</Th>
+          <Th>When (CT)</Th>
+          <Th>Category</Th>
+          <Th numeric>Points</Th>
+          <Th numeric>Check-ins</Th>
+          <Th>Status</Th>
+        </Tr>
+      </THead>
+      <tbody>
+        {rows.map((row) => {
+          const position = seriesPosition.get(row.id);
+          return (
+            <Tr key={row.id} className="align-top">
+              <Td>
+                <Link
+                  href={`/admin/events/${row.id}`}
+                  className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+                >
+                  {row.title}
+                </Link>
+                {position && (
+                  <span className="ml-2 text-xs text-misa-muted">
+                    {position}
+                  </span>
+                )}
+                {row.location && (
+                  <div className="text-xs text-misa-muted">{row.location}</div>
+                )}
+              </Td>
+              <Td className="whitespace-nowrap">
+                {formatEventRange(row.starts_at, row.ends_at)}
+              </Td>
+              <Td>{formatCategory(row.category)}</Td>
+              <Td numeric>{row.points}</Td>
+              <Td numeric>{row.attendance?.[0]?.count ?? 0}</Td>
+              <Td>
+                <EventStatusPill status={row.status} />
+              </Td>
+            </Tr>
+          );
+        })}
+      </tbody>
+    </Table>
   );
 }
 
+// 🪤 The status→tone mapping stays HERE rather than inside `Pill`, and defaults
+// to neutral: `events.status` is text with a CHECK constraint, so a value this
+// component has not heard of must render as itself rather than vanish into an
+// "unknown" branch.
 export function EventStatusPill({ status }: { status: string }) {
   const tone =
-    status === "published"
-      ? "border-misa-affirm/45 text-misa-affirm"
-      : status === "draft"
-        ? "border-misa-border text-misa-secondary"
-        : "border-misa-critical/40 text-misa-critical";
+    status === "published" ? "affirm" : status === "draft" ? "neutral" : "critical";
 
-  return (
-    <span
-      className={`border px-2 py-0.5 text-[11px] uppercase tracking-[0.12em] ${tone}`}
-    >
-      {status}
-    </span>
-  );
+  return <Pill tone={tone}>{status}</Pill>;
 }
 
 /** "week 6 of 12" for every event that belongs to a series. */

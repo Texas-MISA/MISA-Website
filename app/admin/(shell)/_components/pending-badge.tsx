@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // The pending-review count (§7 Stage 4). Surfacing it on the dashboard is the
 // mitigation for a rotting queue — §9 #8 chose no enforced resolution
@@ -28,21 +29,21 @@ export async function PendingBadge() {
 
   if (count === null) {
     return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+      <Notice>
         Couldn&apos;t load the pending count.
-      </p>
+      </Notice>
     );
   }
 
   if (count === 0) {
     return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+      <Notice>
         Nothing waiting for review.{" "}
         <Link href="/admin/attendance?status=all" className="underline">
           Browse all submissions
         </Link>
         .
-      </p>
+      </Notice>
     );
   }
 

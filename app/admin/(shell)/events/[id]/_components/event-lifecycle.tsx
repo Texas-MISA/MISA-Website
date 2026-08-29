@@ -9,6 +9,7 @@ import {
   setEventStatus,
   type EventActionState,
 } from "@/app/actions/events";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // Lifecycle controls: publish, cancel, reopen, delete (§4.1, §4.6).
 //
@@ -45,22 +46,16 @@ export function EventLifecycle({
   return (
     <div className="flex flex-col gap-4">
       {statusState.status === "overlap" && (
-        <p
-          role="alert"
-          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Notice tone="error" role="alert">
           Can&apos;t publish: another published event&apos;s check-in window
           overlaps this one. Only one event can be open for check-in at a time.
           Adjust either event&apos;s times or its check-in window first.
-        </p>
+        </Notice>
       )}
       {(statusState.status === "error" || deleteState.status === "error") && (
-        <p
-          role="alert"
-          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Notice tone="error" role="alert">
           That didn&apos;t work — please try again.
-        </p>
+        </Notice>
       )}
       {deleteState.status === "blocked" && (
         <p

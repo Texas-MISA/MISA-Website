@@ -12,6 +12,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { PageHeader, SectionHeading } from "@/components/ui/page-header";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 import { EventForm } from "../_components/event-form";
 import { EventStatusPill } from "../_components/event-table";
 import {
@@ -253,37 +254,33 @@ export default async function EventDetailPage({
           ) : rows.length === 0 ? (
             <Notice>Nobody has checked in to this event.</Notice>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[36rem] border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-misa-border text-left">
-                    <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Name</th>
-                    <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">EID</th>
-                    <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Submitted (CT)</th>
-                    <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id} className="border-b border-misa-hairline transition-colors duration-150 hover:bg-misa-panel/70">
-                      <td className="py-2 pr-4">
-                        <span className="flex flex-wrap items-center gap-2">
-                          {row.submitted_name}
-                          <OriginPill flag={originFlag(row)} />
-                        </span>
-                      </td>
-                      <td className="py-2 pr-4 font-mono text-xs">
-                        {row.submitted_eid}
-                      </td>
-                      <td className="py-2 pr-4 whitespace-nowrap">
-                        {formatInstant(row.submitted_at)}
-                      </td>
-                      <td className="py-2">{row.status}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <Table minWidth="min-w-[36rem]">
+              <THead>
+                <Tr hover={false}>
+                  <Th>Name</Th>
+                  <Th>EID</Th>
+                  <Th>Submitted (CT)</Th>
+                  <Th>Status</Th>
+                </Tr>
+              </THead>
+              <tbody>
+                {rows.map((row) => (
+                  <Tr key={row.id}>
+                    <Td>
+                      <span className="flex flex-wrap items-center gap-2">
+                        {row.submitted_name}
+                        <OriginPill flag={originFlag(row)} />
+                      </span>
+                    </Td>
+                    <Td className="font-mono text-xs">{row.submitted_eid}</Td>
+                    <Td className="whitespace-nowrap">
+                      {formatInstant(row.submitted_at)}
+                    </Td>
+                    <Td>{row.status}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
           )}
         </div>
       </section>

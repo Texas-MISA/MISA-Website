@@ -19,6 +19,7 @@ import {
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { PointFilters, type OfficerOption } from "./_components/point-filters";
 import { PointsTable, type LedgerRow } from "./_components/points-table";
 
@@ -256,9 +257,9 @@ export default async function AdminPointsPage({
 
       <div className="mt-8">
         {result.kind === "error" ? (
-          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice>
             Couldn&apos;t load the points ledger.
-          </p>
+          </Notice>
         ) : (
           <>
             <p className="mb-3 text-xs text-misa-muted">

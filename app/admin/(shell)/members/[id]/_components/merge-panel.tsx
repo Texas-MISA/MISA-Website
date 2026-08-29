@@ -12,6 +12,7 @@ import {
   type PreviewState,
 } from "@/app/actions/member-merge";
 import type { MemberOption } from "@/lib/member-options";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // Merging a duplicate into this member (§7 Stage 6 phase 8).
 //
@@ -380,11 +381,8 @@ function Problem({ state }: { state: PreviewState | CommitState }) {
 
   if (message === null) return null;
   return (
-    <p
-      role="alert"
-      className="mt-3 border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-    >
+    <Notice tone="error" role="alert" className="mt-3">
       {message}
-    </p>
+    </Notice>
   );
 }

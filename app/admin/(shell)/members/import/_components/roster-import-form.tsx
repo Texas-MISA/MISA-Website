@@ -13,6 +13,7 @@ import {
 } from "@/app/actions/member-import";
 import type { ImportCounts } from "@/lib/member-import";
 import { SectionHeading } from "@/components/ui/page-header";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // The two-step roster import (§7 Stage 6 phase 7b), modelled directly on
 // /admin/dues/import's form. Three things are copied deliberately rather than
@@ -200,12 +201,9 @@ function Problem({ state }: { state: PreviewState | CommitState }) {
           : state.message;
 
   return (
-    <p
-      role="alert"
-      className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-    >
+    <Notice tone="error" role="alert">
       {message}
-    </p>
+    </Notice>
   );
 }
 

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { LedgerExport } from "@/app/admin/(shell)/_components/ledger-export";
-import { ReadError } from "@/app/admin/(shell)/_components/notice";
+import { Notice, ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import { fetchEventOptions } from "@/lib/event-options";
 import { formatInstant } from "@/lib/events";
@@ -154,9 +154,9 @@ export default async function AdminAttendancePage({
 
       <div className="mt-8">
         {result.kind === "error" ? (
-          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice>
             Couldn&apos;t load the review queue.
-          </p>
+          </Notice>
         ) : (
           <>
             <p className="mb-3 text-xs text-misa-muted">

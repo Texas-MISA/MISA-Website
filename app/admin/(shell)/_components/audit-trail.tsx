@@ -6,6 +6,7 @@ import {
 import { formatInstant } from "@/lib/events";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/types/database";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // Per-entity activity log (§4.2, §6). Shared by the submission detail page and
 // the points ledger; the global /admin/audit route in §5 is a later stage.
@@ -136,18 +137,18 @@ export async function AuditTrail({
 
   if (result.kind === "error") {
     return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+      <Notice>
         Couldn&apos;t load the history for this record.
-      </p>
+      </Notice>
     );
   }
 
   if (result.rows.length === 0) {
     return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+      <Notice>
         No officer has changed this record yet. Check-ins submitted through the
         public form write no audit row — there is no acting officer to record.
-      </p>
+      </Notice>
     );
   }
 

@@ -1,5 +1,7 @@
+import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 
+import { Table, THead, Th, Tr } from "@/components/ui/table";
 import {
   defaultDirection,
   memberFilterToParams,
@@ -83,67 +85,64 @@ export function MemberTable({
     `${DIRECTORY}/${id}${context ? `?${context}` : ""}`;
 
   return (
-    /* 🪤 The bounded height is what makes the sticky header work, and it is not
-       a styling preference. `overflow-x-auto` alone computes `overflow-y` to
-       `auto` as well, so this div is already a scroll container — but with no
-       height limit its content never overflows, the PAGE scrolls instead, and a
-       `sticky` header inside has no scrollport to stick within. Giving it a real
-       max height makes it scroll in both axes, which is what the header sticks
-       to. Since the directory stopped paginating this list runs to the whole
-       roster, and losing the column headers (and the sort controls with them)
-       partway down is exactly what showing everything at once would otherwise
-       cost. */
-    <div className="max-h-[70vh] overflow-auto border border-misa-border">
-      <table className="w-full min-w-[40rem] border-collapse text-sm">
-        <thead className="bg-misa-panel">
-          {/* The border sits on the cells rather than the row: a sticky element
-              carries its own borders, and a border on the <tr> scrolls away
-              from the cells that stuck. */}
-          <tr>
-            {/* One Client Component cell in an otherwise server-rendered head —
-                the other headers are navigation links, this is a control. */}
-            <SelectAllHeader />
-            <SortHeader filter={filter} column="name" align="left">
-              Member
+    /* 🪤 `maxHeight` is what makes the sticky header work, and it is not a
+       styling preference. A plain `overflow-x-auto` wrapper computes
+       `overflow-y` to `auto` as well, so it is already a scroll container — but
+       with no height limit its content never overflows, the PAGE scrolls
+       instead, and a `sticky` head has no scrollport to stick within. A real max
+       height makes it scroll in both axes, which is what the head sticks to.
+       Since the directory stopped paginating this list runs to the whole roster,
+       and losing the column headers (and the sort controls with them) partway
+       down is exactly what showing everything at once would otherwise cost. */
+    <Table minWidth="min-w-[40rem]" maxHeight="max-h-[70vh]">
+      {/* 🪤 `sticky` puts the position and the opaque ground on the <thead> and
+          the border on each <th> — a border on the <tr> would scroll away from
+          the cells that stuck. */}
+      <THead sticky>
+        <Tr hover={false}>
+          {/* One Client Component cell in an otherwise server-rendered head —
+              the other headers are navigation links, this is a control. */}
+          <SelectAllHeader />
+          <SortHeader filter={filter} column="name" align="left">
+            Member
+          </SortHeader>
+          <SortHeader filter={filter} column="email" align="left">
+            Email
+          </SortHeader>
+          <SortHeader filter={filter} column="eid" align="left">
+            EID
+          </SortHeader>
+          <SortHeader filter={filter} column="total_points">
+            Total points
+          </SortHeader>
+          {/* Last of the built-ins, so the officer-defined columns stay a
+              contiguous block after them. */}
+          <SortHeader filter={filter} column="dues" align="left">
+            Dues
+          </SortHeader>
+          {columns.map((field) => (
+            <SortHeader
+              key={field.key}
+              filter={filter}
+              column={customFieldKey(field.key)}
+              align="left"
+            >
+              {field.label}
             </SortHeader>
-            <SortHeader filter={filter} column="email" align="left">
-              Email
-            </SortHeader>
-            <SortHeader filter={filter} column="eid" align="left">
-              EID
-            </SortHeader>
-            <SortHeader filter={filter} column="total_points">
-              Total points
-            </SortHeader>
-            {/* Last of the built-ins, so the officer-defined columns stay a
-                contiguous block after them. */}
-            <SortHeader filter={filter} column="dues" align="left">
-              Dues
-            </SortHeader>
-            {columns.map((field) => (
-              <SortHeader
-                key={field.key}
-                filter={filter}
-                column={customFieldKey(field.key)}
-                align="left"
-              >
-                {field.label}
-              </SortHeader>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <DirectoryRow
-              key={row.id}
-              row={row}
-              fields={columns}
-              detailHref={detailHref(row.id)}
-            />
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Tr>
+      </THead>
+      <tbody>
+        {rows.map((row) => (
+          <DirectoryRow
+            key={row.id}
+            row={row}
+            fields={columns}
+            detailHref={detailHref(row.id)}
+          />
+        ))}
+      </tbody>
+    </Table>
   );
 }
 
@@ -177,27 +176,41 @@ function SortHeader({
   });
   const query = params.toString();
 
+  // 🪤 Drawn glyphs, not "▲"/"▼". A text triangle is a CHARACTER — it inherits
+  // the label's 12px uppercase type, renders in whatever the fallback font has,
+  // and had been shrunk to `text-[0.6rem]` (9.6px) to stop it out-weighing the
+  // header it annotates. Lucide is the family the rest of the app draws from.
+  //
+  // 📌 An INACTIVE column now shows a faint two-way chevron rather than an empty
+  // span, which is the one behavioural gain here: with nothing rendered until a
+  // column was clicked, the only way to discover the directory sorts at all was
+  // to click a header and see what happened.
+  const Icon = isActive
+    ? filter.dir === "asc"
+      ? ChevronUp
+      : ChevronDown
+    : ChevronsUpDown;
+
   return (
-    <th
-      scope="col"
+    <Th
       aria-sort={
         isActive ? (filter.dir === "asc" ? "ascending" : "descending") : "none"
       }
-      // sticky + a solid background, and the bottom border on the cell rather
-      // than the row — see the note on the wrapper.
-      className={`sticky top-0 z-10 border-b border-misa-border bg-misa-panel px-3 py-2 text-xs font-semibold uppercase tracking-wider ${
-        align === "right" ? "text-right" : "text-left"
-      }`}
+      numeric={align === "right"}
+      className="px-3"
     >
       <Link
         href={`/admin/members${query ? `?${query}` : ""}`}
-        className="inline-flex items-center gap-1 hover:underline"
+        className={`inline-flex items-center gap-1 transition-colors duration-150 hover:text-misa-blue ${
+          isActive ? "text-foreground" : ""
+        }`}
       >
         {children}
-        <span aria-hidden className="text-[0.6rem]">
-          {isActive ? (filter.dir === "asc" ? "▲" : "▼") : ""}
-        </span>
+        <Icon
+          aria-hidden
+          className={`size-3.5 shrink-0 ${isActive ? "" : "opacity-40"}`}
+        />
       </Link>
-    </th>
+    </Th>
   );
 }

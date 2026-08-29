@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { ReadError } from "@/app/admin/(shell)/_components/notice";
+import { Notice, ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import {
   applyMemberFilter,
@@ -404,9 +404,9 @@ export default async function AdminMembersPage({
 
       <div className="mt-8">
         {result.kind === "error" ? (
-          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice>
             Couldn&apos;t load the directory.
-          </p>
+          </Notice>
         ) : (
           <>
             {/* Every matching member is on screen, so this is a count rather

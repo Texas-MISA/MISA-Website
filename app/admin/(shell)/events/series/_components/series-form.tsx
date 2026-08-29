@@ -12,6 +12,7 @@ import {
   MAX_SERIES_EVENTS,
 } from "@/lib/events";
 import { SectionHeading } from "@/components/ui/page-header";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // Client Component for useActionState. Weekdays are checkboxes sharing one
 // name, so they arrive as a repeated form field and the action reads them with
@@ -64,14 +65,11 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
   return (
     <form action={formAction} className="flex flex-col gap-6" noValidate>
       {(state.status === "error" || state.status === "unauthorized") && (
-        <p
-          role="alert"
-          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Notice tone="error" role="alert">
           {state.status === "unauthorized"
             ? "Your session expired — sign in again and resubmit."
             : "Something went wrong creating the series. Nothing was saved."}
-        </p>
+        </Notice>
       )}
 
       <Field label="Title" error={fieldErrors?.title}>

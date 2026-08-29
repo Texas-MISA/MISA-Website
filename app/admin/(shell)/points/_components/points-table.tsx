@@ -1,5 +1,8 @@
 import Link from "next/link";
 
+import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { Pill } from "@/components/ui/pill";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 import { formatPointCategory, signedPoints } from "@/lib/points";
 
 // Presentational only — the page owns the query, matching attendance-table.tsx.
@@ -36,94 +39,90 @@ export function PointsTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
-        No adjustments match these filters.
-      </p>
+      <Notice>No adjustments match these filters.</Notice>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[64rem] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-misa-border text-left">
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Awarded</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Member</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Points</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Category</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Reason</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Event</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Term</th>
-            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Officer</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.id}
-              className={`border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70 ${
-                row.voided ? "text-misa-muted" : ""
-              }`}
-            >
-              <td className="py-2 pr-4 whitespace-nowrap">
+    <Table minWidth="min-w-[64rem]">
+      <THead>
+        <Tr hover={false}>
+          <Th>Awarded</Th>
+          <Th>Member</Th>
+          <Th>Points</Th>
+          <Th>Category</Th>
+          <Th>Reason</Th>
+          <Th>Event</Th>
+          <Th>Term</Th>
+          <Th>Officer</Th>
+        </Tr>
+      </THead>
+      <tbody>
+        {rows.map((row) => (
+          // `muted` is the vocabulary's word for voided/archived/superseded —
+          // still true, just not current.
+          <Tr key={row.id} muted={row.voided} className="align-top">
+            <Td className="whitespace-nowrap">
+              <Link
+                href={`/admin/points/${row.id}${hrefSuffix}`}
+                className="underline underline-offset-2"
+              >
+                {row.awardedLabel} CT
+              </Link>
+            </Td>
+            <Td>
+              {row.members ? (
+                // Filters the ledger rather than opening the member page,
+                // deliberately: from here the useful next question is "what
+                // else was awarded to this person", not "who are they". The
+                // member page carries its own adjustment list for the other
+                // direction.
                 <Link
-                  href={`/admin/points/${row.id}${hrefSuffix}`}
+                  href={memberHref(row.member_id)}
                   className="underline underline-offset-2"
                 >
-                  {row.awardedLabel} CT
+                  {row.members.full_name}
                 </Link>
-              </td>
-              <td className="py-2 pr-4">
-                {row.members ? (
-                  // Filters the ledger rather than opening the member page,
-                  // deliberately: from here the useful next question is "what
-                  // else was awarded to this person", not "who are they". The
-                  // member page carries its own adjustment list for the other
-                  // direction.
-                  <Link
-                    href={memberHref(row.member_id)}
-                    className="underline underline-offset-2"
-                  >
-                    {row.members.full_name}
-                  </Link>
-                ) : (
-                  <span className="text-misa-muted">unknown member</span>
-                )}
-              </td>
-              <td className="py-2 pr-4 font-mono whitespace-nowrap">
-                <span className={row.voided ? "line-through" : ""}>
-                  {signedPoints(row.points)}
-                </span>
-                {row.voided && (
-                  <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-                    voided
-                  </span>
-                )}
-              </td>
-              <td className="py-2 pr-4">{formatPointCategory(row.category)}</td>
-              <td className="py-2 pr-4">{row.reason}</td>
-              <td className="py-2 pr-4">
-                {row.events ? (
-                  <Link
-                    href={`/admin/events/${row.events.id}`}
-                    className="underline underline-offset-2"
-                  >
-                    {row.events.title}
-                  </Link>
-                ) : (
-                  <span className="text-misa-muted">—</span>
-                )}
-              </td>
-              {/* Not decoration: both views are scoped to current_term(), so a
-                  live grant in a past term counts for nothing. Without this
-                  column the ledger and the directory appear to disagree with
-                  no visible reason. */}
-              <td className="py-2 pr-4 whitespace-nowrap">{row.term}</td>
-              <td className="py-2">{row.officerLabel}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+              ) : (
+                <span className="text-misa-muted">unknown member</span>
+              )}
+            </Td>
+            {/* Mono rather than `numeric`: a signed figure sharing its cell
+                with a badge cannot be right-aligned without pushing the badge
+                to the column edge, and mono numerals already align. */}
+            <Td className="font-mono whitespace-nowrap">
+              <span className={row.voided ? "line-through" : ""}>
+                {signedPoints(row.points)}
+              </span>
+              {row.voided && (
+                <Pill tone="critical" className="ml-2">
+                  voided
+                </Pill>
+              )}
+            </Td>
+            <Td>{formatPointCategory(row.category)}</Td>
+            <Td>{row.reason}</Td>
+            <Td>
+              {row.events ? (
+                <Link
+                  href={`/admin/events/${row.events.id}`}
+                  className="underline underline-offset-2"
+                >
+                  {row.events.title}
+                </Link>
+              ) : (
+                <span className="text-misa-muted">—</span>
+              )}
+            </Td>
+            {/* Not decoration: both views are scoped to current_term(), so a
+                live grant in a past term counts for nothing. Without this
+                column the ledger and the directory appear to disagree with
+                no visible reason. */}
+            <Td className="whitespace-nowrap">{row.term}</Td>
+            <Td>{row.officerLabel}</Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }

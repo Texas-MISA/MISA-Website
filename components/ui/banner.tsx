@@ -50,6 +50,17 @@ export type BannerProps = {
    * message is the result of something the person just did.
    */
   role?: "alert" | "status";
+  /**
+   * `div` where the banner carries block content — a list, or more than one
+   * paragraph.
+   *
+   * 🪤 A `<p>` cannot contain a `<p>` or a `<ul>`: the parser closes the outer
+   * one at the child's start tag, so the wrapper's ground and frame end early
+   * and the rest of the message renders bare on the page. Not a styling
+   * preference — the browser rewrites the DOM. The attendance bulk-result
+   * report is the case that found it.
+   */
+  as?: "p" | "div";
   children: ReactNode;
 };
 
@@ -57,15 +68,16 @@ export function Banner({
   tone = "info",
   className = "",
   role,
+  as: Tag = "p",
   children,
 }: BannerProps) {
   return (
-    <p
+    <Tag
       role={role}
       className={`border px-4 py-3 text-sm ${TONES[tone]} ${className}`.trim()}
     >
       {children}
-    </p>
+    </Tag>
   );
 }
 

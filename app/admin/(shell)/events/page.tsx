@@ -6,6 +6,7 @@ import { requireOfficer } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { EventFilters } from "./_components/event-filters";
 import { EventTable, type EventListRow } from "./_components/event-table";
 import { SeriesActions } from "./_components/series-actions";
@@ -168,9 +169,9 @@ export default async function AdminEventsPage({
 
       <div className="mt-8">
         {result.kind === "error" ? (
-          <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
+          <Notice>
             Couldn&apos;t load the schedule.
-          </p>
+          </Notice>
         ) : (
           <EventTable rows={result.rows} />
         )}

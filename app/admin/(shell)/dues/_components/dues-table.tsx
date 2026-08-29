@@ -1,5 +1,9 @@
 import Link from "next/link";
 
+import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { Pill } from "@/components/ui/pill";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
+
 // Presentational only — the page owns the query, matching points-table.tsx.
 //
 // A Server Component: the ledger holds no selection, and every amount, date and
@@ -37,95 +41,88 @@ export function DuesTable({
 }) {
   if (rows.length === 0) {
     return (
-      <p className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm">
-        No payments match these filters.
-      </p>
+      <Notice>No payments match these filters.</Notice>
     );
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[64rem] border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-misa-border text-left">
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Paid</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Payer</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Member</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Amount</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Covers</th>
-            <th className="py-2 pr-4 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Note</th>
-            <th className="py-2 align-bottom text-[12px] font-medium tracking-[0.14em] text-misa-muted uppercase">Needs review</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.id}
-              className={`border-b border-misa-hairline align-top transition-colors duration-150 hover:bg-misa-panel/70 ${
-                row.voided ? "text-misa-muted" : ""
-              }`}
-            >
-              <td className="py-2 pr-4 whitespace-nowrap">
+    <Table minWidth="min-w-[64rem]">
+      <THead>
+        <Tr hover={false}>
+          <Th>Paid</Th>
+          <Th>Payer</Th>
+          <Th>Member</Th>
+          <Th>Amount</Th>
+          <Th>Covers</Th>
+          <Th>Note</Th>
+          <Th wrap>Needs review</Th>
+        </Tr>
+      </THead>
+      <tbody>
+        {rows.map((row) => (
+          <Tr key={row.id} muted={row.voided} className="align-top">
+            <Td className="whitespace-nowrap">
+              <Link
+                href={`/admin/dues/${row.id}${hrefSuffix}`}
+                className="underline underline-offset-2"
+              >
+                {row.paidLabel} CT
+              </Link>
+            </Td>
+            <Td>
+              {row.payerName ?? <span className="text-misa-muted">—</span>}
+            </Td>
+            <Td>
+              {row.memberId && row.memberName ? (
+                // Filters the ledger rather than opening the member page, for
+                // the same reason the points ledger does: from here the useful
+                // next question is "what else has this person paid".
                 <Link
-                  href={`/admin/dues/${row.id}${hrefSuffix}`}
+                  href={memberHref(row.memberId)}
                   className="underline underline-offset-2"
                 >
-                  {row.paidLabel} CT
+                  {row.memberName}
                 </Link>
-              </td>
-              <td className="py-2 pr-4">
-                {row.payerName ?? <span className="text-misa-muted">—</span>}
-              </td>
-              <td className="py-2 pr-4">
-                {row.memberId && row.memberName ? (
-                  // Filters the ledger rather than opening the member page, for
-                  // the same reason the points ledger does: from here the useful
-                  // next question is "what else has this person paid".
-                  <Link
-                    href={memberHref(row.memberId)}
-                    className="underline underline-offset-2"
-                  >
-                    {row.memberName}
-                  </Link>
-                ) : (
-                  <span className="text-misa-muted">nobody yet</span>
-                )}
-              </td>
-              <td className="py-2 pr-4 font-mono whitespace-nowrap">
-                <span className={row.voided ? "line-through" : ""}>
-                  {row.amountLabel}
+              ) : (
+                <span className="text-misa-muted">nobody yet</span>
+              )}
+            </Td>
+            {/* Mono rather than `numeric`, as in the points ledger: the badge
+                shares the cell, and mono numerals already align. */}
+            <Td className="font-mono whitespace-nowrap">
+              <span className={row.voided ? "line-through" : ""}>
+                {row.amountLabel}
+              </span>
+              {row.voided && (
+                <Pill tone="critical" className="ml-2">
+                  voided
+                </Pill>
+              )}
+            </Td>
+            {/* Not decoration. member_directory is scoped to current_term(),
+                so a live payment covering only past terms counts for nothing
+                — without this column the ledger and the directory appear to
+                disagree with no visible reason. Same argument as the points
+                ledger's Term column. */}
+            <Td className="whitespace-nowrap">
+              {row.coveredTerms && row.coveredTerms.length > 0 ? (
+                row.coveredTerms.join(", ")
+              ) : (
+                <span className="text-misa-muted">
+                  nothing yet — from {row.startTerm}
                 </span>
-                {row.voided && (
-                  <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-                    voided
-                  </span>
-                )}
-              </td>
-              {/* Not decoration. member_directory is scoped to current_term(),
-                  so a live payment covering only past terms counts for nothing
-                  — without this column the ledger and the directory appear to
-                  disagree with no visible reason. Same argument as the points
-                  ledger's Term column. */}
-              <td className="py-2 pr-4 whitespace-nowrap">
-                {row.coveredTerms && row.coveredTerms.length > 0 ? (
-                  row.coveredTerms.join(", ")
-                ) : (
-                  <span className="text-misa-muted">
-                    nothing yet — from {row.startTerm}
-                  </span>
-                )}
-              </td>
-              <td className="py-2 pr-4 max-w-[18rem] break-words">
-                {row.note ?? <span className="text-misa-muted">—</span>}
-              </td>
-              <td className="py-2 whitespace-nowrap">
-                <ReviewFlags row={row} />
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+              )}
+            </Td>
+            <Td className="max-w-[18rem] break-words">
+              {row.note ?? <span className="text-misa-muted">—</span>}
+            </Td>
+            <Td className="whitespace-nowrap">
+              <ReviewFlags row={row} />
+            </Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
 
@@ -145,17 +142,9 @@ function ReviewFlags({ row }: { row: DuesLedgerRow }) {
   }
 
   return (
-    <span className="flex flex-col gap-1">
-      {row.noMember && (
-        <span className="border border-misa-caution px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-          no member
-        </span>
-      )}
-      {row.undecidedAmount && (
-        <span className="border border-misa-caution px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-          amount undecided
-        </span>
-      )}
+    <span className="flex flex-col items-start gap-1">
+      {row.noMember && <Pill tone="caution">no member</Pill>}
+      {row.undecidedAmount && <Pill tone="caution">amount undecided</Pill>}
     </span>
   );
 }

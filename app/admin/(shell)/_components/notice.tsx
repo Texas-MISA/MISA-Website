@@ -31,6 +31,7 @@ export function Notice({
   tone = "info",
   className = "",
   role,
+  as,
   children,
 }: {
   tone?: NoticeTone;
@@ -41,10 +42,12 @@ export function Notice({
    * message is the result of something the officer just did.
    */
   role?: "alert" | "status";
+  /** `div` where the notice carries a list or more than one paragraph. */
+  as?: "p" | "div";
   children: React.ReactNode;
 }) {
   return (
-    <Banner tone={TONE_MAP[tone]} className={className} role={role}>
+    <Banner tone={TONE_MAP[tone]} className={className} role={role} as={as}>
       {children}
     </Banner>
   );

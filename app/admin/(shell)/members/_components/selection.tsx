@@ -9,6 +9,8 @@ import {
   type ReactNode,
 } from "react";
 
+import { CHECKBOX } from "@/components/ui/field";
+
 // Row selection for the directory (§7 Stage 6 phase 5).
 //
 // ⚠️ The two modes are the whole point of this file. A hand-picked set of rows
@@ -203,13 +205,13 @@ export function SelectAllHeader() {
   const some = mode === "filter" || visibleIds.some((id) => ids.has(id));
 
   return (
-    <th
-      scope="col"
-      className="sticky top-0 z-10 w-10 border-b border-misa-border bg-misa-panel px-3 py-2"
-    >
+    // 🪤 No `sticky` of its own any more: `<THead sticky>` carries the position,
+    // the opaque ground and the cell border for every head cell, so a second
+    // sticky context here would be a duplicate that can only drift.
+    <th scope="col" className="w-10 px-3 py-2">
       <input
         type="checkbox"
-        className="size-4 shrink-0 accent-misa-blue"
+        className={CHECKBOX}
         checked={all}
         // Indeterminate is a property, not an attribute, so React cannot set it
         // declaratively — a ref callback is the only way to reach it.
@@ -238,7 +240,7 @@ export function SelectRowCell({
     <td className="w-10 px-3 py-2">
       <input
         type="checkbox"
-        className="size-4 shrink-0 accent-misa-blue"
+        className={CHECKBOX}
         checked={isSelected(id)}
         onChange={() => toggle(id)}
         aria-label={`Select ${label}`}

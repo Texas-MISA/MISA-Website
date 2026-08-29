@@ -12,6 +12,7 @@ import {
   type PreviewState,
 } from "@/app/actions/dues";
 import { SectionHeading } from "@/components/ui/page-header";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // The two-step import (§7 Stage 6.5 phase 2).
 //
@@ -202,12 +203,9 @@ function Problem({ state }: { state: PreviewState | CommitState }) {
         : state.message;
 
   return (
-    <p
-      role="alert"
-      className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-    >
+    <Notice tone="error" role="alert">
       {message}
-    </p>
+    </Notice>
   );
 }
 

@@ -5,6 +5,7 @@ import { useActionState } from "react";
 import { signIn, type SignInState } from "@/app/actions/auth";
 import { BUTTON_PRIMARY } from "@/components/ui/button";
 import { controlClass } from "@/components/ui/field";
+import { Notice } from "@/app/admin/(shell)/_components/notice";
 
 // Client Component for useActionState only — the form posts to the Server
 // Action via <form action>, so it works before hydration too.
@@ -22,21 +23,15 @@ export function LoginForm({ next }: { next?: string }) {
   return (
     <form action={formAction} className="flex flex-col gap-5" noValidate>
       {state.status === "failed" && (
-        <p
-          role="alert"
-          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Notice tone="error" role="alert">
           That email and password don&apos;t match an officer account. Check
           both, or ask another officer to reset your access.
-        </p>
+        </Notice>
       )}
       {state.status === "error" && (
-        <p
-          role="alert"
-          className="border border-misa-blue/35 bg-misa-panel px-4 py-3 text-sm"
-        >
+        <Notice tone="error" role="alert">
           Something went wrong signing you in — please try again.
-        </p>
+        </Notice>
       )}
 
       {next && <input type="hidden" name="next" value={next} />}
