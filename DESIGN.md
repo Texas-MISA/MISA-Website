@@ -753,9 +753,12 @@ elevation (none → four steps), radius (0 everywhere → 0 plus a 4px plate), d
 (flat → stacked planes), photography (banned → live locally), and the home page's
 entire composition.
 
-⚠️ **`docs/invariants.md` has not yet been reconciled with this file.** That is
-scheduled for phase 5, and until then it describes v1 for the surfaces v2 has not
-reached — which is most of them.
+⚠️ **`docs/invariants.md` has not yet been fully reconciled with this file.**
+That is scheduled for phase 5. Its *Design, rendering and the public UI* section
+still describes v1 aesthetics for the surfaces v2 has not reached — now just the
+three phase-3 pages. 📌 **Phase 4 added its own section there rather than waiting**
+(*The officer UI, and moving a page ground*), because the three rules it carries
+are engineering rather than taste and bind immediately.
 
 ---
 

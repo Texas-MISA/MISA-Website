@@ -322,3 +322,117 @@ SELECT — anon *holds* `select` on this table via migration 22's narrowed defau
 privileges, so **RLS is the only thing hiding the rows**. Same family as the
 empty-payload trap: assert the refusal you mean, and give the assertion
 something real to be non-vacuous about.
+
+## The officer UI, and moving a page ground (added 2026-08-29, v2 phase 4)
+
+The short form is in `CLAUDE.md`. What follows is the counting and the
+measurement behind each rule, because all three came out of numbers rather than
+taste.
+
+### A primitive with no call sites has not ended the drift it was written to end
+
+**Counted at the start of the phase, before anything was designed:**
+
+| Primitive | Written for | Call sites when phase 4 opened |
+|---|---|---|
+| `PageHeader` | `/admin` | **0, anywhere in the repository** |
+| `SectionHeading` | `/admin` | **0, anywhere in the repository** |
+| `Table` | eight admin tables | **0 in `/admin`** (2 public) |
+| `Panel` | admin filter panels and spec cards | **1**, on `/attend` |
+
+Each was authored *against* duplication its own doc comment names —
+*"thirteen admin pages open with the same three elements … written out longhand
+every time"*, *"the `font-display text-xl font-bold` that appears 38 times"*,
+*"eight admin tables … were written out longhand, and the head-cell string `py-2
+pr-4 font-medium` alone appears 47 times"*. **All of that duplication was still
+there, verbatim**: 25 pages repeating one h1 class string, 45 h2s in three
+shapes, 11 raw tables, 47 head cells.
+
+📌 **The generalisable rule: extracting the component is half the job, and only
+the second half changes anything.** A `components/ui/` file is evidence that
+somebody noticed the drift, not evidence that it was fixed. The cheap check is a
+grep for call sites at the moment of extraction — a primitive that ships with
+zero is a note-to-self wearing a component's clothes.
+
+🐛 **It also hid a second-order defect.** `Table`'s own comment calls row hover
+*"the point of the exercise"* because the directory runs to several hundred
+rows — and not one admin table had it, because not one used the component. The
+same for `Pill`: five badges were still hand-rolled, including two in the *same
+column one row apart* at `text-[11px]` and `text-[0.7rem]` — 11px and 11.2px,
+two sizes reading as one, which is precisely the drift `pill.tsx` was written to
+end and which its own comment describes.
+
+### Moving a page ground is a contrast change, not a paint change
+
+🔴 **Five shared primitives fill with `bg-misa-panel`** — `controlClass` (every
+input), `table.tsx`'s sticky `<THead>`, `chip.tsx`'s resting `FilterChip`,
+`banner.tsx`'s neutral variant, and `Tr`'s `hover:bg-misa-panel/70`. Making a
+page ground that same grey puts each of them at **the colour of what is behind
+it**.
+
+**Measured on `/admin/members` immediately after the flip, by looping every
+control and comparing its computed fill against its composited ground: 36
+controls collided.** The whole filter row, plus every inline custom-field select
+in the table. Zero of them are visible as a defect in a screenshot — the border
+still draws, so the control looks like a control.
+
+Two more failures the same move produced, neither of them a colour anyone chose:
+
+- 🐛 **The loading skeleton went invisible.** Its lighter bars were
+  `bg-misa-panel`; the screen degraded to two lonely dark bars on an empty page.
+  Both weights are alpha over the ground now (`bg-misa-hairline` and
+  `/50`), so no future ground change can erase them.
+- 🐛 **`--misa-muted` measures 4.33:1 on Vellum and fails AA**, in four places
+  that had been correct on white: the member editor's field labels, the
+  custom-field form's hints, and both admin error boundaries' digest line.
+
+📌 **That last one is the rule worth stating, because phase 2 already "fixed"
+it.** Phase 2 found the same pairing on three public pages and fixed those three
+pages. It recurred the moment a different ground moved. **The defect is a ground
+moving under ink, not a list of pages** — so any commit that changes a ground
+re-measures every grey sitting on it, and `DESIGN.md` carries the narrow form:
+*muted may sit on Paper, never on Vellum.*
+
+🔴 **The ordering constraint that follows from all of this: wrap the screens in
+white surfaces FIRST, flip the ground LAST.** A white surface on a still-white
+page is invisible and harmless, so every intermediate commit stays shippable and
+the flip is one line. The reverse order gives a branch that looks finished and is
+measurably broken. Phase 4 moved `/admin` this way; `Table` now carries its own
+`bg-white` so the surface belongs to the component rather than to each caller's
+memory.
+
+**At the gate: 20 screens, 166 contrast pairings, 0 failures, smallest 4.84:1**,
+each composited on the ground its text actually sits on; 0 control/ground
+collisions, down from 36.
+
+⚠️ **One pairing was fixed that WCAG arguably exempts.** The disabled "Audit"
+nav item measured **3.39:1** at `white/40`. An inactive control is exempt — but
+that item's own comment says it is in the nav *"precisely so the shape of the
+section is visible, which only works if everyone can perceive it"*, and 3.39:1
+undercuts its own stated reason. `white/55` is the first ramp step that passes,
+at **5.05:1**, solved against the composited navy rather than picked.
+
+🐛 **And the contrast fix was still spent on something unreachable.** The
+element carried the `disabled` attribute, which takes it out of the tab order —
+so it remained keyboard-invisible, which is the exact defect the comment above it
+claims to have fixed by making it a `<button>` rather than a `<span>`.
+`aria-disabled` announces the state and keeps focus; a click handler makes it
+inert. 📌 **Three things had to be true and only the first was: it has to exist,
+it has to be REACHABLE, and it has to be LEGIBLE.**
+
+### A dropped column is a grep of every quoted select, not a compile error
+
+🔴 **Migration 29 dropped `members.active`, and three PostgREST `.select()`
+strings still named it** — the submission detail, the dues detail and the points
+ledger. Each answered `column members_1.active does not exist` and rendered the
+error boundary: **three officer screens broken outright.**
+
+📌 **The whole suite was green with that live — 1094 tests across 37 files.**
+Nothing type-checks the inside of a quoted select string, and no test covers a
+column list. `npx tsc --noEmit` is clean on `"members(id, full_name, active)"`
+for exactly the same reason it is clean on any other string literal.
+
+**It was found by loading the pages.** That is the argument for the browser
+walkthrough surviving as a gate step even when the suite is green, and it is the
+same shape as the marquee wrap defect above: the failure is real, reproducible,
+and invisible to every automated check the project owns.

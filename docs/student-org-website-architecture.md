@@ -1,9 +1,18 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.76
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0 and 1 complete, phase 2 next.**
+**Version:** 1.77
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0, 1, 2 and 4 complete; phase 3 deferred; phase 5 outstanding.**
 **Last updated:** August 2026
 
+> **v1.77: `/admin` is on the v2 system, and three officer screens were found broken by migration 29.**
+>
+> v2 phase 4, 2026-08-29, on the `v2-phase-4-admin` branch. **Presentational only — no route, Server Action, `lib/`, view or schema change**, so nothing in §2–§6 moves. Recorded here for the three decisions and the one defect.
+>
+> - 🔴 **Migration 29 broke three officer screens and no test caught it.** `members.active` was dropped, and three PostgREST `.select()` strings still named it — the submission detail, the dues detail and the points ledger — so each answered `column members_1.active does not exist` and rendered its error boundary. **The suite was green with the bug live**, because nothing type-checks the inside of a quoted select string. 📌 The rule this adds: **a dropped column is a grep of every quoted select, not a compile error**, and the browser walkthrough is what found it.
+> - 🔓 **The officer UI is governed by `impeccable`'s Operate mode, not by `design-taste-frontend`.** That skill is primary for the *public* visual UI (§10); the layout-family budget, the eyebrow cap and the image-slot strategy are public-page instruments that do not reach a filter bar. `/admin`'s bar is scanability — wide tables, dense filter rows, consistent vocabulary — per §2.2's operating context, which puts officers at a desk on a laptop all semester.
+> - 📌 **`<Section>` stays public-only and keeps its zero admin call sites.** It owns the public gutter and vertical rhythm, which `/admin` does not share; `Panel` is the officer surface and the shell layout owns the ground. The admin page ground is `bg-misa-panel` on `app/admin/(shell)/layout.tsx`'s `<main>` — never on `body`, which keeps `--background: #ffffff` for the surfaces lifted off it.
+> - ⚠️ **Five accessibility findings were deliberately LEFT STANDING** rather than folded into a presentational phase, because each is behaviour or user-visible copy: no unsaved-changes guard on two forms; "cancel whole series" with no confirm step; four `title`-only explanations; missing `aria-live` on two async paths; and ALL-CAPS button labels in the DOM at ~25 sites. They are itemised in `tasks.md` and want an officer's answer.
+>
 > **v1.76: the roster is TERM-SCOPED, `members.active` is GONE, and `/lookup`'s gate is the EID alone.**
 >
 > Three officer instructions, 2026-08-25, on the `roster-terms-and-lookup` branch. Migration 29.

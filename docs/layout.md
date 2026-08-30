@@ -65,6 +65,16 @@ app/admin/(shell)/      authed chrome + dashboard, events/, attendance/, points/
                         later audit/. Route groups don't appear in URLs, so §5's
                         route table is unchanged. _components/ holds shell-wide
                         pieces (status-pill.tsx, audit-trail.tsx, notice.tsx)
+                        🔓 **ON THE v2 GROUND since phase 4 (2026-08-29)**:
+                        layout.tsx's <main> is bg-misa-panel and content regions
+                        are white surfaces lifted off it. 🪤 On <main>, NEVER on
+                        body — body keeps --background: #ffffff, which is what
+                        those surfaces are lifted off. 🔴 That one line landed
+                        LAST, after every screen was wrapped: five shared
+                        primitives fill with bg-misa-panel, so on a Vellum page
+                        each is the colour of what is behind it. Wrap first,
+                        flip last — the reverse order looks finished and is
+                        measurably broken.
 app/actions/
   attendance.ts         submitCheckin ONLY — the one unauthenticated WRITE path,
                         kept single-export so the §6 attack surface is one file
@@ -270,7 +280,31 @@ components/             site-header.tsx (4-item nav incl. Admin — was 5 until
                                     is now a REAL bg-white with one caller, the
                                     marquee band; `paper` was RETIRED with the
                                     gray-to-white radial behind it.
-                                    panel.tsx, page-header.tsx
+                                    🪤 section.tsx is PUBLIC-ONLY and has ZERO
+                                    admin call sites by design — it owns the
+                                    public gutter and rhythm, which /admin does
+                                    not share. On the officer side panel.tsx is
+                                    the surface and the shell owns the ground.
+                                    panel.tsx (🪤 does NOT forward `action`, so
+                                    a <form> needing one stays a <form> with a
+                                    bg-white frame), page-header.tsx
+                                    (PageHeader + SectionHeading. 🔓 v2 phase 4
+                                    finally ADOPTED both: they had ZERO call
+                                    sites in the repo while 25 admin pages
+                                    repeated one h1 class string verbatim and 45
+                                    h2s repeated another. PageHeader carries
+                                    title / `badge` (a status pill BESIDE the
+                                    title, never pushed right with `action`) /
+                                    `back` (🪤 ABOVE the title — it is an
+                                    ancestor pointer, and all eleven screens had
+                                    it below, arriving after the line that
+                                    assumed you knew) / description / children.
+                                    SectionHeading takes `id` (five landmarks
+                                    point aria-labelledby at it) and
+                                    `level="sub"` — 🪤 which renders an <h3>,
+                                    not a smaller <h2>: three visual levels have
+                                    to be three semantic ones or the outline
+                                    lies)
                           type      heading.tsx (Headline/Title/Eyebrow/Lead —
                                     ground-aware via an .on-navy variant, not a
                                     prop), chevron-section.tsx (PageHero — navy
@@ -280,9 +314,27 @@ components/             site-header.tsx (4-item nav incl. Admin — was 5 until
                                     call site is already an <a>, a <Link> or a
                                     <button>), field.tsx (Field/Input/Select/
                                     Textarea/controlClass/CHECKBOX — deliberately
-                                    thin; see the invariant), chip.tsx
+                                    thin; see the invariant. 🐛 v2 phase 4 moved
+                                    the hint and the error OUT of the <label>:
+                                    everything inside one becomes part of the
+                                    control's ACCESSIBLE NAME, so a field with a
+                                    hint was announced as its label followed by
+                                    two sentences of guidance. The label is
+                                    explicit now and the component threads the
+                                    id itself, so no call site gained plumbing.
+                                    🪤 It clones the FIRST ELEMENT child, not
+                                    `children` — two call sites pass a <select>
+                                    plus an explanatory <p>, and treating that
+                                    array as one element leaves the label
+                                    pointing at nothing), chip.tsx
                           feedback  banner.tsx (Banner + ReadError — ONE status
-                                    language for the whole app), pill.tsx,
+                                    language for the whole app. 🪤 `as="div"`
+                                    where it carries a list or more than one
+                                    paragraph: a <p> cannot contain either, and
+                                    the parser closes it at the child's start
+                                    tag, so the frame ends early and the rest
+                                    renders bare — a DOM rewrite, not a styling
+                                    preference), pill.tsx,
                                     empty-state.tsx (never a <Hatch>),
                                     recovery-nav.tsx (the row of ways out on
                                     BOTH 404s — it was written out verbatim in
@@ -290,7 +342,21 @@ components/             site-header.tsx (4-item nav incl. Admin — was 5 until
                                     working the day the page ground became the
                                     colour it filled with)
                           data      table.tsx (Table/THead/Tr/Th/Td, with the row
-                                    hover none of the eight admin tables had)
+                                    hover none of the eight admin tables had —
+                                    🔓 and v2 phase 4 is where they finally got
+                                    it: the component had ZERO admin call sites
+                                    against 11 raw tables and 47 copies of one
+                                    head-cell string. 🐛 It carries its OWN
+                                    bg-white now rather than each caller
+                                    remembering: three things in the file fill
+                                    with bg-misa-panel — the sticky <THead>,
+                                    Tr's hover, and every controlClass input in
+                                    a cell — and both page grounds are that same
+                                    grey. 🪤 The scrollport is a focusable,
+                                    labelled region: several of these tables
+                                    contain no focusable cell at all, so below
+                                    their min-width a keyboard-only officer
+                                    could not scroll to the right-hand columns)
                           content   partners.tsx, kpi-plate.tsx, activities.tsx,
                                     officer-card.tsx, hatch.tsx (the labelled
                                     placeholder box — every image slot is one),
