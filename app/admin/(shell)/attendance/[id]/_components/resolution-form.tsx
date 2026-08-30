@@ -3,7 +3,7 @@
 import { Banner } from "@/components/ui/banner";
 
 import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
-import { controlClass } from "@/components/ui/field";
+import { controlClass, Field as SharedField } from "@/components/ui/field";
 
 import { useActionState, useState } from "react";
 
@@ -137,17 +137,32 @@ function Fields({
         <Notice state={state} />
 
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          {/* 🪤 `aria-invalid` on every field that can carry an error, not just
+              the first: `controlClass`'s `aria-invalid:border-misa-critical`
+              only fires where the attribute is actually set, so a field with a
+              message under it and no attribute showed the message in a
+              normal-looking box. */}
           <Field label="Name" error={errors.submittedName}>
             <input
               name="submittedName"
               defaultValue={values.submittedName}
+              aria-invalid={errors.submittedName ? true : undefined}
+              autoComplete="off"
+              spellCheck={false}
               className={fieldClass}
             />
           </Field>
           <Field label="EID" error={errors.submittedEid}>
+            {/* An identifier: autocorrect and autocapitalize will mangle it,
+                and a spell-checker underlines every one of them. */}
             <input
               name="submittedEid"
               defaultValue={values.submittedEid}
+              aria-invalid={errors.submittedEid ? true : undefined}
+              autoComplete="off"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               className={`${fieldClass} font-mono`}
             />
           </Field>
@@ -156,7 +171,14 @@ function Fields({
         <Field label="Email" error={errors.submittedEmail}>
           <input
             name="submittedEmail"
+            type="email"
+            inputMode="email"
             defaultValue={values.submittedEmail}
+            aria-invalid={errors.submittedEmail ? true : undefined}
+            autoComplete="off"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             className={fieldClass}
           />
         </Field>
@@ -402,6 +424,17 @@ function Notice({ state }: { state: ResolutionState }) {
   );
 }
 
+/**
+ * 🐛 A thin adapter over the SHARED `Field`, not a tenth local copy of it.
+ *
+ * This one had drifted in three ways that all mattered: its error had no
+ * `role="alert"`, so a validation message appeared silently; the error was
+ * `--misa-caution`, which says "look at this later" about a field that just
+ * refused a save (`--misa-critical` is the one that means refused); and its
+ * label was `--misa-muted` where every other form on the site uses foreground
+ * ink. The only real difference from the shared component is the shape of
+ * `error`, and that is what this adapts.
+ */
 function Field({
   label,
   error,
@@ -412,12 +445,8 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-misa-muted">{label}</span>
+    <SharedField label={label} error={error?.[0] ?? null}>
       {children}
-      {error && error.length > 0 && (
-        <span className="text-xs text-misa-caution">{error[0]}</span>
-      )}
-    </label>
+    </SharedField>
   );
 }

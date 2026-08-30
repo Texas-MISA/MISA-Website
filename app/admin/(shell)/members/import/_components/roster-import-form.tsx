@@ -15,6 +15,7 @@ import type { ImportCounts } from "@/lib/member-import";
 import { SectionHeading } from "@/components/ui/page-header";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { Panel } from "@/components/ui/panel";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 
 // The two-step roster import (§7 Stage 6 phase 7b), modelled directly on
 // /admin/dues/import's form. Three things are copied deliberately rather than
@@ -101,7 +102,7 @@ export function RosterImportForm() {
             ref={fileInput}
             type="file"
             accept=".csv,text/csv"
-            className="mt-2 block w-full text-sm file:mr-3 file:border-2 file:border-black file:bg-white file:px-3 file:py-1 file:text-xs file:font-semibold file:uppercase file:tracking-wider"
+            className="mt-2 block w-full text-sm file:mr-3 file:border file:border-misa-border file:bg-white file:px-3 file:py-1 file:text-xs file:font-semibold file:uppercase file:tracking-wider"
             onChange={(event) => onFile(event.currentTarget.files?.[0])}
           />
           {fileName && (
@@ -273,41 +274,35 @@ function RowTable({ rows }: { rows: PreviewRow[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <div className="max-h-[60vh] overflow-auto border border-misa-border">
-      <table className="w-full min-w-[48rem] border-collapse text-sm">
-        <thead className="bg-misa-panel">
-          <tr>
-            {["Line", "Name", "Email", "EID", "Outcome"].map((head) => (
-              <th
-                key={head}
-                scope="col"
-                className="sticky top-0 z-10 border-b border-misa-border bg-misa-panel px-3 py-2 text-left"
-              >
-                {head}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.line}
-              className={`border-b border-misa-border last:border-b-0 ${
-                row.willImport ? "" : "bg-misa-panel text-misa-muted"
-              }`}
-            >
-              <td className="px-3 py-2 tabular-nums">{row.line}</td>
-              <td className="px-3 py-2">
-                {row.fullName || "—"}
-              </td>
-              <td className="px-3 py-2">{row.email || "—"}</td>
-              <td className="px-3 py-2">{row.eid || "—"}</td>
-              <td className="px-3 py-2">{row.outcome}</td>
-            </tr>
+    <Table minWidth="min-w-[48rem]" maxHeight="max-h-[60vh]">
+      <THead sticky>
+        <Tr hover={false}>
+          {["Line", "Name", "Email", "EID", "Outcome"].map((head) => (
+            <Th key={head} className="px-3">
+              {head}
+            </Th>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </Tr>
+      </THead>
+      <tbody>
+        {rows.map((row) => (
+          // A row that will not be imported is `muted` — still true, just not
+          // going to happen. It keeps its grey fill, which reads as recessive
+          // against the table's own white rather than against the page.
+          <Tr
+            key={row.line}
+            muted={!row.willImport}
+            className={row.willImport ? "" : "bg-misa-panel"}
+          >
+            <Td className="px-3 tabular-nums">{row.line}</Td>
+            <Td className="px-3">{row.fullName || "—"}</Td>
+            <Td className="px-3">{row.email || "—"}</Td>
+            <Td className="px-3 font-mono text-xs">{row.eid || "—"}</Td>
+            <Td className="px-3">{row.outcome}</Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
 

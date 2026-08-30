@@ -30,12 +30,25 @@ export type TableProps = {
   className?: string;
   /** Caps the height and makes the head sticky — for the long directory reads. */
   maxHeight?: string;
+  /**
+   * What this table lists, for the scroll region's accessible name.
+   *
+   * 🪤 **The scrollport is focusable, and that is WCAG 2.1.1 rather than
+   * polish.** Several of these tables contain no focusable cell at all — the
+   * dashboard's recent check-ins is five columns of plain text at a 36rem
+   * minimum — so below that width a keyboard-only officer had no way to scroll
+   * the region and simply could not read the right-hand columns. A focusable
+   * region scrolls with the arrow keys. It needs a name to be announced as
+   * anything useful, so pass one.
+   */
+  label?: string;
 };
 
 export function Table({
   children,
   minWidth,
   maxHeight,
+  label,
   className = "",
 }: TableProps) {
   // 🐛 **The white ground is a correctness control, not a taste one**, and it
@@ -51,7 +64,15 @@ export function Table({
     : "overflow-x-auto bg-white";
 
   return (
-    <div className={scroller}>
+    <div
+      className={scroller}
+      // 🪤 `tabIndex` and `role` go together or neither helps: a focusable div
+      // with no role is announced as nothing, and a labelled region that cannot
+      // be focused still cannot be scrolled from the keyboard.
+      tabIndex={0}
+      role="region"
+      aria-label={label ?? "Table"}
+    >
       <table
         className={`w-full border-collapse text-left text-sm ${minWidth ?? ""} ${className}`.trim()}
       >

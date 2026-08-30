@@ -3,7 +3,11 @@
 import { Banner } from "@/components/ui/banner";
 
 import { BUTTON_PRIMARY } from "@/components/ui/button";
-import { controlClass } from "@/components/ui/field";
+import {
+  CHECKBOX,
+  controlClass,
+  Field as SharedField,
+} from "@/components/ui/field";
 
 import { useActionState } from "react";
 
@@ -26,8 +30,7 @@ import {
 
 const INITIAL: FieldFormState = { status: "idle" };
 
-const inputClass =
-  controlClass("md", "w-full");
+const inputClass = controlClass("md", "w-full");
 
 const EMPTY: SubmittedFieldValues = {
   key: "",
@@ -41,7 +44,7 @@ const EMPTY: SubmittedFieldValues = {
 export function FieldForm({ definition }: { definition?: FieldDefinition }) {
   const [state, formAction, pending] = useActionState(
     saveFieldDefinition,
-    INITIAL
+    INITIAL,
   );
 
   const isCreate = !definition;
@@ -75,7 +78,16 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
       {definition && <input type="hidden" name="id" value={definition.id} />}
 
       <div className="flex flex-col gap-6">
-        <Field label="Label" error={errors.label}>
+        <Field
+          label="Label"
+          error={errors.label}
+          hint={
+            <>
+              What officers see — the column header and the field name. Safe to
+              change at any time.
+            </>
+          }
+        >
           <input
             type="text"
             name="label"
@@ -83,14 +95,24 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             placeholder="Dues paid"
             className={inputClass}
           />
-          <span className="text-xs text-misa-muted">
-            What officers see — the column header and the field name. Safe to
-            change at any time.
-          </span>
         </Field>
 
         {isCreate ? (
-          <Field label="Key" error={errors.key}>
+          <Field
+            label="Key"
+            error={errors.key}
+            hint={
+              <>
+                Lowercase letters, numbers and underscores, starting with a
+                letter.{" "}
+                <span className="font-medium">
+                  This cannot be changed later
+                </span>{" "}
+                — every answer is stored under it, and renaming would orphan
+                them all.
+              </>
+            }
+          >
             <input
               type="text"
               name="key"
@@ -98,12 +120,6 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
               placeholder="dues_paid"
               className={inputClass}
             />
-            <span className="text-xs text-misa-muted">
-              Lowercase letters, numbers and underscores, starting with a
-              letter. <span className="font-medium">This cannot be changed
-              later</span> — every answer is stored under it, and renaming would
-              orphan them all.
-            </span>
           </Field>
         ) : (
           <div className="flex flex-col gap-1 text-sm">
@@ -118,7 +134,21 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
           </div>
         )}
 
-        <Field label="Options, one per line" error={errors.options}>
+        <Field
+          label="Options, one per line"
+          error={errors.options}
+          hint={
+            <>
+              Up to {MAX_FIELD_OPTIONS}, at most {MAX_OPTION_LENGTH} characters
+              each, no two the same. Blank lines are ignored.{" "}
+              <span className="font-medium">
+                Removing an option does not change anyone&apos;s stored answer
+              </span>{" "}
+              — members keep it, and it shows as &ldquo;no longer an
+              option&rdquo; until someone clears it.
+            </>
+          }
+        >
           <textarea
             name="options"
             defaultValue={values.options}
@@ -126,18 +156,18 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             placeholder={"Paid\nUnpaid\nWaived"}
             className={inputClass}
           />
-          <span className="text-xs text-misa-muted">
-            Up to {MAX_FIELD_OPTIONS}, at most {MAX_OPTION_LENGTH} characters
-            each, no two the same. Blank lines are ignored.{" "}
-            <span className="font-medium">
-              Removing an option does not change anyone&apos;s stored answer
-            </span>{" "}
-            — members keep it, and it shows as &ldquo;no longer an
-            option&rdquo; until someone clears it.
-          </span>
         </Field>
 
-        <Field label="Order" error={errors.sortOrder}>
+        <Field
+          label="Order"
+          error={errors.sortOrder}
+          hint={
+            <>
+              Lower numbers come first. Ties fall back to the key, so the order
+              is always stable.
+            </>
+          }
+        >
           <input
             type="number"
             name="sortOrder"
@@ -146,10 +176,6 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             step={1}
             className={`${inputClass} max-w-[8rem]`}
           />
-          <span className="text-xs text-misa-muted">
-            Lower numbers come first. Ties fall back to the key, so the order is
-            always stable.
-          </span>
         </Field>
 
         <label className="flex items-start gap-3 text-sm">
@@ -157,7 +183,7 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             type="checkbox"
             name="showInDirectory"
             defaultChecked={values.showInDirectory}
-            className="mt-1 size-4 shrink-0 accent-misa-blue"
+            className={`mt-1 ${CHECKBOX}`}
           />
           <span>
             Show as a column in the directory
@@ -174,7 +200,7 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             type="checkbox"
             name="editableInline"
             defaultChecked={values.editableInline}
-            className="mt-1 size-4 shrink-0 accent-misa-blue"
+            className={`mt-1 ${CHECKBOX}`}
           />
           <span>
             Editable straight from the directory table
@@ -188,16 +214,8 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
         <StatusBanner state={state} />
 
         <div>
-          <button
-            type="submit"
-            disabled={pending}
-            className={BUTTON_PRIMARY}
-          >
-            {pending
-              ? "SAVING…"
-              : isCreate
-                ? "CREATE FIELD"
-                : "SAVE CHANGES"}
+          <button type="submit" disabled={pending} className={BUTTON_PRIMARY}>
+            {pending ? "SAVING…" : isCreate ? "CREATE FIELD" : "SAVE CHANGES"}
           </button>
         </div>
       </div>
@@ -220,30 +238,39 @@ function StatusBanner({ state }: { state: FieldFormState }) {
           : "Something went wrong. Nothing was saved.";
 
   return (
-    <Banner tone={state.status === "saved" ? "affirm" : "caution"} role="status">
+    <Banner
+      tone={state.status === "saved" ? "affirm" : "caution"}
+      role="status"
+    >
       {message}
     </Banner>
   );
 }
 
+/**
+ * 🐛 A thin adapter over the SHARED `Field`, not a local copy.
+ *
+ * The local one wrapped everything in a `<label>` and the call sites passed
+ * the guidance text as a second child — so every hint became part of its
+ * control ACCESSIBLE NAME. "Label" was announced as *"Label What officers see
+ * — the column header and the field name. Safe to change at any time."* The
+ * shared component puts the hint in `aria-describedby`, where guidance about a
+ * control belongs, and the only thing this adapter does is reshape `error`.
+ */
 function Field({
   label,
   error,
+  hint,
   children,
 }: {
   label: string;
   error?: string[];
+  hint?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      {label}
+    <SharedField label={label} error={error?.[0] ?? null} hint={hint}>
       {children}
-      {error && (
-        <span role="alert" className="text-xs text-misa-critical">
-          {error[0]}
-        </span>
-      )}
-    </label>
+    </SharedField>
   );
 }

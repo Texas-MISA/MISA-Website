@@ -124,17 +124,24 @@ export function SectionHeading({
   level?: "section" | "sub";
   className?: string;
 }) {
+  // 🪤 **`sub` is an `<h3>`, not a smaller `<h2>`.** Three visual levels have to
+  // be three semantic ones or the outline lies: a heading inside a panel is a
+  // CHILD of the section heading above it, and rendering both as `<h2>` announces
+  // them as siblings. `merge-panel.tsx` had already hand-rolled an `<h3>` with
+  // this exact class string, which is the tree disagreeing with itself about
+  // what the style means.
+  const Tag = level === "sub" ? "h3" : "h2";
   const size =
     level === "sub"
       ? "text-[18px] leading-[1.1]"
       : "text-[22px] leading-[1.05]";
 
   return (
-    <h2
+    <Tag
       id={id}
       className={`font-display ${size} font-semibold text-foreground ${className}`.trim()}
     >
       {children}
-    </h2>
+    </Tag>
   );
 }

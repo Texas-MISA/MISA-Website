@@ -13,6 +13,7 @@ import {
 } from "@/app/actions/member-merge";
 import type { MemberOption } from "@/lib/member-options";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { SectionHeading } from "@/components/ui/page-header";
 
 // Merging a duplicate into this member (§7 Stage 6 phase 8).
 //
@@ -119,12 +120,18 @@ export function MergePanel({
                   <ul className="mt-2 flex flex-col gap-1">
                     {suggestions.map((hint) => (
                       <li key={hint.id}>
+                        {/* 🪤 `aria-pressed`, because colour was carrying the
+                            selected state alone — and what is selected here is
+                            the member a confirmed merge DELETES. A toggle whose
+                            only "on" signal is a fill is unreadable to anyone
+                            not seeing the fill. */}
                         <button
                           type="button"
+                          aria-pressed={loserId === hint.id}
                           onClick={() => setLoserId(hint.id)}
-                          className={`w-full border px-3 py-2 text-left text-sm transition ${
+                          className={`w-full border px-3 py-2 text-left text-sm transition-colors duration-150 ${
                             loserId === hint.id
-                              ? "border-black bg-misa-blue text-white"
+                              ? "border-misa-blue-dark bg-misa-blue text-white"
                               : "border-misa-border hover:bg-misa-panel"
                           }`}
                         >
@@ -250,9 +257,9 @@ function Preview({
         readOnly
       />
 
-      <h3 className="font-display text-[18px] leading-[1.1] font-semibold">
+      <SectionHeading level="sub">
         Merge {preview.loser.label} into {survivorLabel}
-      </h3>
+      </SectionHeading>
 
       <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <Stat label="Check-ins moved" value={counts.attendanceMoved} />

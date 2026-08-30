@@ -60,30 +60,42 @@ export function AdminNav({
               if (!item.ready) {
                 return (
                   <li key={item.href}>
-                    {/* 🪤 A disabled BUTTON, not a `<span>`. As a span this was
-                        invisible to the keyboard and to assistive technology:
-                        an officer tabbing the nav skipped it entirely, and
-                        nothing announced that the item exists but is not built
-                        — the `title` tooltip is mouse-only. It is in the nav
-                        precisely so the shape of the section is visible, which
-                        only works if everyone can perceive it. */}
-                    {/* 🐛 `white/40` measured **3.39:1** on the navy bar and
-                        failed AA. WCAG exempts an inactive control, but the
-                        exemption is beside the point here: the paragraph above
-                        says this item is in the nav so the shape of the section
-                        is visible to everyone, and 3.39:1 undercuts its own
-                        stated reason. `white/55` is the first step on the ramp
-                        that passes — **5.05:1**, solved against the composited
-                        navy rather than picked. It still reads as clearly
-                        quieter than the live items at `white/85`. */}
+                    {/* 🪤 A BUTTON, not a `<span>`: as a span an officer
+                        tabbing the nav skipped it entirely, and nothing
+                        announced that the item exists but is not built. It is
+                        here precisely so the shape of the section is visible,
+                        which only works if everyone can perceive it.
+
+                        🐛 Three things had to be true for that to actually
+                        hold, and only the first was:
+
+                        1. It is a real element in the DOM. ✅
+                        2. 🐛 It has to be REACHABLE. The `disabled` attribute
+                           takes an element out of the tab order, so this was
+                           still keyboard-invisible — the defect the paragraph
+                           above claims to have fixed, surviving the fix.
+                           `aria-disabled` announces the state and keeps focus;
+                           the click handler is what makes it inert.
+                        3. 🐛 It has to be LEGIBLE. `white/40` measured
+                           **3.39:1** on the navy bar. WCAG exempts an inactive
+                           control, but the exemption is beside the point when
+                           the item's whole purpose is to be perceived.
+                           `white/55` is the first ramp step that passes —
+                           **5.05:1**, solved against the composited navy —
+                           and still reads clearly quieter than the live items
+                           at `white/85`.
+
+                        🪤 The state is a real `<span>`, not `title`. A `title`
+                        tooltip is mouse-only, which is the same failure in a
+                        third costume. */}
                     <button
                       type="button"
-                      disabled
                       aria-disabled="true"
-                      title="Not built yet"
+                      onClick={(event) => event.preventDefault()}
                       className="cursor-not-allowed text-sm text-white/55"
                     >
                       {item.label}
+                      <span className="sr-only"> — not built yet</span>
                     </button>
                   </li>
                 );
@@ -117,8 +129,8 @@ export function AdminNav({
               </Pill>
             )}
           </span>
-          {/* A form POST, so signing out can't be triggered by a prefetch or
-              an <img> the way a GET link could. */}
+          {/* A form POST, so signing out can't be triggered by a prefetch or by
+              an image tag pointed at the URL, the way a GET link could. */}
           <form action={signOut}>
             <button type="submit" className={BUTTON_ON_NAVY_SM}>
               Sign out

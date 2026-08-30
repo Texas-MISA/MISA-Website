@@ -15,6 +15,7 @@ import { SectionHeading } from "@/components/ui/page-header";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { Pill } from "@/components/ui/pill";
 import { Panel } from "@/components/ui/panel";
+import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 
 // The two-step import (§7 Stage 6.5 phase 2).
 //
@@ -107,7 +108,7 @@ export function ImportForm({ maxRows }: { maxRows: number }) {
             ref={fileInput}
             type="file"
             accept=".csv,text/csv"
-            className="mt-2 block w-full text-sm file:mr-3 file:border-2 file:border-black file:bg-white file:px-3 file:py-1 file:text-xs file:font-semibold file:uppercase file:tracking-wider"
+            className="mt-2 block w-full text-sm file:mr-3 file:border file:border-misa-border file:bg-white file:px-3 file:py-1 file:text-xs file:font-semibold file:uppercase file:tracking-wider"
             onChange={(event) => onFile(event.currentTarget.files?.[0])}
           />
           {fileName && (
@@ -278,57 +279,58 @@ function RowTable({ rows }: { rows: PreviewRow[] }) {
   if (rows.length === 0) return null;
 
   return (
-    <div className="overflow-x-auto border border-misa-border">
-      <table className="w-full min-w-[44rem] border-collapse text-sm">
-        <thead className="bg-misa-panel">
-          <tr className="border-b border-misa-border">
-            <th className="px-3 py-2 text-left">Paid</th>
-            <th className="px-3 py-2 text-left">From</th>
-            <th className="px-3 py-2 text-left">Note</th>
-            <th className="px-3 py-2 text-right">Amount</th>
-            <th className="px-3 py-2 text-left">Outcome</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr
-              key={row.venmoTxnId}
-              className={`border-b border-misa-border last:border-b-0 ${
-                row.duplicate ? "bg-misa-panel text-misa-muted" : ""
-              }`}
-            >
-              <td className="px-3 py-2">{row.paidAtLabel}</td>
-              <td className="px-3 py-2">{row.payerName ?? "—"}</td>
-              <td className="px-3 py-2">{row.note ?? "—"}</td>
-              <td className="px-3 py-2 text-right tabular-nums">
-                ${(row.amountCents / 100).toFixed(2)}
-              </td>
-              <td className="px-3 py-2">
-                {row.duplicate ? (
-                  <span className="text-xs uppercase tracking-wider">
-                    already recorded
-                  </span>
-                ) : row.review ? (
-                  <Pill tone="caution">
-                    {REVIEW_LABEL[row.review] ?? row.review}
-                  </Pill>
-                ) : (
-                  <span>
-                    Matched · {row.termsCovered} term
-                    {row.termsCovered === 1 ? "" : "s"}
-                  </span>
-                )}
-                {row.summer && !row.duplicate && (
-                  <span className="ml-2 text-xs text-misa-muted">
-                    (Spring)
-                  </span>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table minWidth="min-w-[44rem]">
+      <THead>
+        <Tr hover={false}>
+          <Th className="px-3">Paid</Th>
+          <Th className="px-3">From</Th>
+          <Th className="px-3">Note</Th>
+          <Th className="px-3" numeric>
+            Amount
+          </Th>
+          <Th className="px-3">Outcome</Th>
+        </Tr>
+      </THead>
+      <tbody>
+        {rows.map((row) => (
+          // A duplicate is `muted` — already recorded, so it is a fact about
+          // this file rather than something the import will do.
+          <Tr
+            key={row.venmoTxnId}
+            muted={row.duplicate}
+            className={row.duplicate ? "bg-misa-panel" : ""}
+          >
+            <Td className="px-3">{row.paidAtLabel}</Td>
+            <Td className="px-3">{row.payerName ?? "—"}</Td>
+            <Td className="px-3">{row.note ?? "—"}</Td>
+            <Td className="px-3" numeric>
+              ${(row.amountCents / 100).toFixed(2)}
+            </Td>
+            <Td className="px-3">
+              {row.duplicate ? (
+                <span className="text-[11px] tracking-[0.12em] uppercase">
+                  already recorded
+                </span>
+              ) : row.review ? (
+                <Pill tone="caution">
+                  {REVIEW_LABEL[row.review] ?? row.review}
+                </Pill>
+              ) : (
+                <span>
+                  Matched · {row.termsCovered} term
+                  {row.termsCovered === 1 ? "" : "s"}
+                </span>
+              )}
+              {row.summer && !row.duplicate && (
+                <span className="ml-2 text-xs text-misa-secondary">
+                  (Spring)
+                </span>
+              )}
+            </Td>
+          </Tr>
+        ))}
+      </tbody>
+    </Table>
   );
 }
 

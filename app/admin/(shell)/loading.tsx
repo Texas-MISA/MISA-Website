@@ -30,26 +30,33 @@
 
 export default function AdminLoading() {
   return (
-    <div className="animate-pulse" aria-hidden="true">
-      {/* 🐛 The lighter bars were `bg-misa-panel`, which is the colour the admin
-          page ground BECAME in phase 4 — they went invisible, and this screen
-          silently degraded to two lonely dark bars on an empty page. Both
-          weights are alpha over the ground now, so neither can be erased by a
-          ground change again: Hairline for structure, half of it for text. */}
-      {/* Sized to the heading every admin page opens with, so the swap does not
-          shift the page under the officer's cursor. */}
-      <div className="h-9 w-64 bg-misa-hairline" />
-      <div className="mt-4 h-4 w-full max-w-2xl bg-misa-hairline/50" />
-      <div className="mt-2 h-4 w-3/4 max-w-xl bg-misa-hairline/50" />
+    <>
+      {/* 🐛 OUTSIDE the aria-hidden wrapper, and it used to be inside it — which
+          made the one accessible announcement of this screen the single thing on
+          it that assistive technology was told to ignore. The bars are decoration
+          and stay hidden; the sentence is the content. */}
+      <span role="status" className="sr-only">
+        Loading…
+      </span>
+      <div className="animate-pulse" aria-hidden="true">
+        {/* 🐛 The lighter bars were `bg-misa-panel`, which is the colour the admin
+            page ground BECAME in phase 4 — they went invisible, and this screen
+            silently degraded to two lonely dark bars on an empty page. Both
+            weights are alpha over the ground now, so neither can be erased by a
+            ground change again: Hairline for structure, half of it for text. */}
+        {/* Sized to the heading every admin page opens with, so the swap does not
+            shift the page under the officer's cursor. */}
+        <div className="h-9 w-64 bg-misa-hairline" />
+        <div className="mt-4 h-4 w-full max-w-2xl bg-misa-hairline/50" />
+        <div className="mt-2 h-4 w-3/4 max-w-xl bg-misa-hairline/50" />
 
-      <div className="mt-10 space-y-2">
-        <div className="h-10 w-full bg-misa-hairline" />
-        {Array.from({ length: 8 }).map((_, i) => (
-          <div key={i} className="h-9 w-full bg-misa-hairline/50" />
-        ))}
+        <div className="mt-10 space-y-2">
+          <div className="h-10 w-full bg-misa-hairline" />
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="h-9 w-full bg-misa-hairline/50" />
+          ))}
+        </div>
       </div>
-
-      <span className="sr-only">Loading…</span>
-    </div>
+    </>
   );
 }

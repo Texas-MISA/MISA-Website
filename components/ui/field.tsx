@@ -27,8 +27,10 @@
 //     on a submit button whose `name`/`value` is read — React drops the
 //     submitter's name from the FormData.
 
+import { Children, cloneElement, isValidElement, useId } from "react";
 import type {
   InputHTMLAttributes,
+  ReactElement,
   ReactNode,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
@@ -92,19 +94,86 @@ export type FieldProps = {
 /**
  * Label, optional hint, control, optional error — wrapped in a `<label>`, so
  * the association needs no id plumbing at the call site.
+ *
+ * 🐛 **The hint and the error sit OUTSIDE the `<label>`, and that is an
+ * accessible-name fix rather than a layout preference.** Everything inside a
+ * `<label>` becomes part of the control's name, so a field with a hint was
+ * announced as *"Label What officers see — the column header and the field
+ * name. Safe to change at any time."* — one run-on string, with the actual
+ * label buried at the front. The hint is guidance ABOUT the control, which is
+ * what `aria-describedby` is for; it is read after the name, separately, and
+ * only when the person wants it.
+ *
+ * 🪤 **The hint keeps its position above the control** — that placement is a
+ * decision ("so it is read before typing"), and only the DOM nesting changed.
+ * The `<label>` is explicit now rather than wrapping, so the component threads
+ * the id itself and the call site still passes none.
  */
-export function Field({ label, children, error, hint, className = "" }: FieldProps) {
+export function Field({
+  label,
+  children,
+  error,
+  hint,
+  className = "",
+}: FieldProps) {
+  // `useId` rather than a counter: two Fields with the same label render on one
+  // screen (the directory's min/max pair), and a colliding id would point both
+  // controls at one description.
+  const id = useId();
+  const controlId = `${id}-control`;
+  const hintId = hint ? `${id}-hint` : undefined;
+  const errorId = error ? `${id}-error` : undefined;
+  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
+
+  // 🪤 **The FIRST element child is the control, not `children` itself.** Two
+  // call sites pass a `<select>` followed by an explanatory `<p>`, which makes
+  // `children` an array — treating it as a single element there would leave the
+  // label pointing at nothing and silently un-name the control. Walking the
+  // array is what keeps the explicit `htmlFor` as reliable as the wrapping
+  // `<label>` it replaced.
+  //
+  // A call site that sets its own `id` wins: the props spread comes last.
+  const list = Children.toArray(children);
+  const controlIndex = list.findIndex((child) => isValidElement(child));
+  const labelled = controlIndex !== -1;
+  const control = labelled
+    ? list.map((child, i) =>
+        i === controlIndex
+          ? cloneElement(
+              child as ReactElement<{
+                id?: string;
+                "aria-describedby"?: string;
+              }>,
+              {
+                id: controlId,
+                "aria-describedby": describedBy,
+                ...((child as ReactElement).props as object),
+              },
+            )
+          : child,
+      )
+    : children;
+
   return (
-    <label className={`flex flex-col gap-1 text-sm ${className}`.trim()}>
-      <span className="font-medium text-foreground">{label}</span>
-      {hint ? <span className="text-xs text-misa-muted">{hint}</span> : null}
-      {children}
+    <div className={`flex flex-col gap-1 text-sm ${className}`.trim()}>
+      <label
+        htmlFor={labelled ? controlId : undefined}
+        className="font-medium text-foreground"
+      >
+        {label}
+      </label>
+      {hint ? (
+        <span id={hintId} className="text-xs text-misa-muted">
+          {hint}
+        </span>
+      ) : null}
+      {control}
       {error ? (
-        <span role="alert" className="text-xs text-misa-critical">
+        <span id={errorId} role="alert" className="text-xs text-misa-critical">
           {error}
         </span>
       ) : null}
-    </label>
+    </div>
   );
 }
 
@@ -129,9 +198,16 @@ export type SelectProps = SelectHTMLAttributes<HTMLSelectElement> & {
   density?: ControlSize;
 };
 
-export function Select({ density = "md", className = "", ...rest }: SelectProps) {
+export function Select({
+  density = "md",
+  className = "",
+  ...rest
+}: SelectProps) {
   return (
-    <select className={controlClass(density, `w-full ${className}`)} {...rest} />
+    <select
+      className={controlClass(density, `w-full ${className}`)}
+      {...rest}
+    />
   );
 }
 
