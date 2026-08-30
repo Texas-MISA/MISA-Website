@@ -189,7 +189,7 @@ components:
 > "fix" new work to match it.
 >
 > **Seven engineering rules survive**, listed in
-> [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md) under
+> [`docs/frontend-redesign-v2-plan.md`](frontend-redesign-v2-plan.md) under
 > *The engineering set*: focus rings visible on every ground; sections owning
 > their own padding; shared-rule plates; contrast measured per pairing on the
 > real ground; monospace for `/admin` identifiers; named feedback colours; no
