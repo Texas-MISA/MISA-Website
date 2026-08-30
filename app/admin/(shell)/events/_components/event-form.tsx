@@ -16,6 +16,7 @@ import {
 } from "@/lib/events";
 import { SectionHeading } from "@/components/ui/page-header";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { Panel } from "@/components/ui/panel";
 
 // Create and edit share one form: the fields are identical, and the only
 // difference is whether an `id` is posted. Client Component for
@@ -75,7 +76,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
         };
 
   return (
-    <form action={formAction} className="flex flex-col gap-6" noValidate>
+    <form action={formAction} className="flex flex-col gap-6 border border-misa-border bg-white px-4 py-4" noValidate>
       {initial.id && <input type="hidden" name="id" value={initial.id} />}
 
       {state.status === "overlap" && (
@@ -174,7 +175,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
         </Field>
       </div>
 
-      <fieldset className="border border-misa-border px-4 py-4">
+      <Panel as="fieldset" ground="none" pad="sm">
         <legend className="px-2 text-sm font-medium">Check-in window</legend>
         <p className="text-sm text-misa-secondary">
           How long before and after the event members can check in. Leave both
@@ -202,7 +203,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
             />
           </Field>
         </div>
-      </fieldset>
+      </Panel>
 
       <div
         className={`grid gap-6 ${isCreate ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}

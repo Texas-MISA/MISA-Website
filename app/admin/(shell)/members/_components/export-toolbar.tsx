@@ -99,7 +99,7 @@ export function ExportToolbar({
   const canPromote = mode === "ids" && count > 0 && count < total;
 
   return (
-    <div className="mb-4 border border-misa-border bg-misa-panel">
+    <div className="mb-4 border border-misa-border bg-white">
       <div className="flex flex-wrap items-center gap-3 px-3 py-2">
         <span className="text-sm font-semibold">
           {mode === "filter"

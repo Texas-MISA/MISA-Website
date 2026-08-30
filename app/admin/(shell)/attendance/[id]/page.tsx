@@ -77,7 +77,11 @@ async function fetchSubmission(id: string): Promise<SubmissionDetail | null> {
         "submitted_email, submitted_at, normalized_eid, status, source, " +
         "resolution_note, resolved_at, updated_at, " +
         "events(id, title, status, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, term), " +
-        "members(id, full_name, email, eid, active)"
+        // 🐛 `active` was still selected here after migration 29 dropped the
+        // column, so PostgREST answered `column members_1.active does not
+        // exist` and EVERY submission detail page rendered the error boundary.
+        // Nothing read the value — it was a leftover, not a feature.
+        "members(id, full_name, email, eid)"
     )
     .eq("id", id)
     .maybeSingle();

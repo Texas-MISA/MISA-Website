@@ -13,6 +13,7 @@ import {
   type PresetSaveState,
 } from "@/app/actions/presets";
 import { MAX_PRESET_NAME } from "@/lib/presets";
+import { Panel } from "@/components/ui/panel";
 
 // One saved view on the manage screen: open it, rename it, delete it.
 //
@@ -73,7 +74,7 @@ export function PresetRow({
   if (deleteState.status === "done") return null;
 
   return (
-    <li className="border border-misa-border px-4 py-3">
+    <Panel as="li" ground="white" pad="sm">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
           {renaming ? (
@@ -171,7 +172,7 @@ export function PresetRow({
       </div>
 
       <Problem save={saveState} remove={deleteState} />
-    </li>
+    </Panel>
   );
 }
 

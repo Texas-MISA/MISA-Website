@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/attendance-review";
 import type { EventOption } from "@/lib/event-options";
 
+import { Panel } from "@/components/ui/panel";
 import { AttendanceTable, type SubmissionRow } from "./attendance-table";
 
 // The queue's selection state plus the bulk-assign form, wrapping the table so
@@ -69,7 +70,7 @@ export function ReviewQueue({
     <form action={formAction}>
       <BulkResult state={state} />
 
-      <div className="mb-4 flex flex-wrap items-end gap-4 border border-misa-border bg-misa-panel px-4 py-3">
+      <Panel ground="white" pad="sm" className="mb-4 flex flex-wrap items-end gap-4">
         <p className="text-sm">
           <strong>{selected.size}</strong> selected
         </p>
@@ -109,7 +110,7 @@ export function ReviewQueue({
         >
           {pending ? "ASSIGNING…" : "ASSIGN"}
         </button>
-      </div>
+      </Panel>
 
       <AttendanceTable
         rows={rows}

@@ -41,7 +41,7 @@ export const metadata: Metadata = { title: "Payment" };
 /** ⚠️ Unbroken `as const` literal — PostgREST types the row off the string
  * literal, and a concatenation widens it to plain `string`. */
 const DETAIL_COLUMNS =
-  "id, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, imported_at, voided_at, voided_by, void_reason, updated_at, members(id, full_name, eid, active)" as const;
+  "id, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, imported_at, voided_at, voided_by, void_reason, updated_at, members(id, full_name, eid)" as const;
 
 type Payment = {
   id: string;

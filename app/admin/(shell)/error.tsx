@@ -67,9 +67,13 @@ export default function AdminError({
           screen. In production a Server Component's error message is replaced
           by a generic one before it reaches the client, deliberately — the
           digest is the hash that matches it to the server log. Without it an
-          officer can only report "it broke". */}
+          officer can only report "it broke".
+
+          🐛 Secondary, not muted. `--misa-muted` measures 4.33:1 on the Vellum
+          page ground and fails AA; `--misa-secondary` is 7.60:1. The rule is
+          DESIGN.md's — muted may sit on Paper, never on Vellum. */}
       {error.digest && (
-        <p className="mt-6 text-xs text-misa-muted">
+        <p className="mt-6 text-xs text-misa-secondary">
           Reference: <code className="font-mono">{error.digest}</code> — quote
           this if you report it.
         </p>

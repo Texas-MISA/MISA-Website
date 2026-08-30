@@ -305,7 +305,7 @@ export default async function MemberDetailPage({
 
       <section className="mt-10 max-w-3xl">
         <SectionHeading>Who this is</SectionHeading>
-        <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
+        <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 border border-misa-border bg-white px-4 py-3 sm:grid-cols-[10rem_1fr]">
           <Row label="EID">{member.eid}</Row>
           <Row label="Email">
             <a
@@ -340,7 +340,7 @@ export default async function MemberDetailPage({
           Every figure below is scoped to the current term, denominators
           included. A grant made in a past term counts for nothing here.
         </p>
-        <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
+        <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 border border-misa-border bg-white px-4 py-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Events attended">
             {member.events_attended ?? 0}
             <span className="text-misa-muted">
@@ -374,7 +374,7 @@ export default async function MemberDetailPage({
           officer, and &ldquo;when did we last see this person&rdquo; is an
           all-time question.
         </p>
-        <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-[10rem_1fr]">
+        <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 border border-misa-border bg-white px-4 py-3 sm:grid-cols-[10rem_1fr]">
           <Row label="Last seen">
             {member.last_seen_at ? (
               `${formatInstant(member.last_seen_at)} CT`
@@ -703,24 +703,17 @@ export default async function MemberDetailPage({
   );
 }
 
-/** The grid's three states, as words rather than colour alone. */
+/** The grid's three states, as words rather than colour alone.
+ *
+ * 🐛 These were 11px, 11.2px and 11.2px-with-no-frame — three sizes for one
+ * three-state control, in one column. `upcoming` keeps its frameless treatment
+ * because it is the only state that is not a fact about the member: the event
+ * has not happened, so there is nothing to report yet. */
 function AttendanceMark({ state }: { state: TermEventState }) {
-  if (state === "attended") {
-    return (
-      <span className="border border-misa-border bg-misa-panel px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
-        attended
-      </span>
-    );
-  }
-  if (state === "missed") {
-    return (
-      <span className="border border-misa-border px-2 py-0.5 text-[0.7rem] tracking-wider text-misa-muted uppercase">
-        missed
-      </span>
-    );
-  }
+  if (state === "attended") return <Pill tone="affirm">attended</Pill>;
+  if (state === "missed") return <Pill tone="neutral">missed</Pill>;
   return (
-    <span className="text-[0.7rem] tracking-wider text-misa-muted uppercase">
+    <span className="text-[11px] tracking-[0.12em] text-misa-muted uppercase">
       upcoming
     </span>
   );

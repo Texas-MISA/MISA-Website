@@ -38,9 +38,17 @@ export function Table({
   maxHeight,
   className = "",
 }: TableProps) {
+  // 🐛 **The white ground is a correctness control, not a taste one**, and it
+  // belongs here rather than at each call site. Three things in this file fill
+  // with `bg-misa-panel` — the sticky `<THead>`, `Tr`'s hover, and every
+  // `controlClass` input a cell contains — and on a page whose ground is that
+  // same grey each of them is the colour of what is behind it: the head stops
+  // separating from the rows scrolling under it and row hover does nothing.
+  // Both admin and public page grounds are that grey, so making the table carry
+  // its own surface is the fix that cannot be forgotten on the next screen.
   const scroller = maxHeight
-    ? `overflow-auto border border-misa-border ${maxHeight}`
-    : "overflow-x-auto";
+    ? `overflow-auto border border-misa-border bg-white ${maxHeight}`
+    : "overflow-x-auto bg-white";
 
   return (
     <div className={scroller}>

@@ -13,6 +13,8 @@ import {
 } from "@/app/actions/dues";
 import { SectionHeading } from "@/components/ui/page-header";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { Pill } from "@/components/ui/pill";
+import { Panel } from "@/components/ui/panel";
 
 // The two-step import (§7 Stage 6.5 phase 2).
 //
@@ -96,7 +98,7 @@ export function ImportForm({ maxRows }: { maxRows: number }) {
   return (
     <div className="flex flex-col gap-6">
       {!done && (
-        <div className="border border-misa-border bg-misa-panel px-4 py-4">
+        <Panel ground="white" pad="sm">
           <label className="block text-sm font-semibold" htmlFor="statement">
             Venmo statement (.csv)
           </label>
@@ -119,7 +121,7 @@ export function ImportForm({ maxRows }: { maxRows: number }) {
             Up to {maxRows.toLocaleString()} payments per import. Only completed
             incoming payments count as dues — transfers to the bank are ignored.
           </p>
-        </div>
+        </Panel>
       )}
 
       {/* Step 1 — preview. Writes nothing. */}
@@ -211,7 +213,7 @@ function Problem({ state }: { state: PreviewState | CommitState }) {
 
 function Summary({ counts }: { counts: ImportCounts }) {
   return (
-    <div className="border border-misa-border px-4 py-4">
+    <Panel ground="white" pad="sm">
       <SectionHeading level="sub">Before you import</SectionHeading>
       <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <Stat label="New payments" value={counts.fresh} />
@@ -251,7 +253,7 @@ function Summary({ counts }: { counts: ImportCounts }) {
           importing.
         </p>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -307,9 +309,9 @@ function RowTable({ rows }: { rows: PreviewRow[] }) {
                     already recorded
                   </span>
                 ) : row.review ? (
-                  <span className="border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
+                  <Pill tone="caution">
                     {REVIEW_LABEL[row.review] ?? row.review}
-                  </span>
+                  </Pill>
                 ) : (
                   <span>
                     Matched · {row.termsCovered} term
@@ -338,7 +340,7 @@ function Done({
   onAnother: () => void;
 }) {
   return (
-    <div className="border border-misa-border px-4 py-4">
+    <Panel ground="white" pad="sm">
       <SectionHeading level="sub">Imported</SectionHeading>
       <p className="mt-2 text-sm">
         {counts.fresh} payment{counts.fresh === 1 ? "" : "s"} recorded
@@ -358,6 +360,6 @@ function Done({
       >
         Import another statement
       </button>
-    </div>
+    </Panel>
   );
 }

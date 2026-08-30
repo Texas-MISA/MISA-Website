@@ -69,8 +69,9 @@ export default function AdminShellError({
           </Link>
         </div>
 
+        {/* Secondary, not muted — 4.33:1 vs 7.60:1 on the Vellum ground. */}
         {error.digest && (
-          <p className="mt-6 text-xs text-misa-muted">
+          <p className="mt-6 text-xs text-misa-secondary">
             Reference: <code className="font-mono">{error.digest}</code>
           </p>
         )}

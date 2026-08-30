@@ -13,6 +13,7 @@ import { fieldValue, type FieldDefinition } from "@/lib/members";
 
 import { SectionHeading } from "@/components/ui/page-header";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { Pill } from "@/components/ui/pill";
 import { MemberFieldCell } from "../../_components/member-field-cell";
 
 // The member detail page's editable half (§7 Stage 6 phase 4).
@@ -74,7 +75,12 @@ export function MemberEditor({
             No custom fields are defined.
           </Notice>
         ) : (
-          <dl className="mt-4 grid gap-3 sm:grid-cols-[14rem_1fr]">
+          // 🐛 A white surface, and it is a CONTRAST fix as much as a
+          // structural one. This block carries editable cells, and its `<dt>`
+          // labels are `--misa-muted`, which measures 4.33:1 on Vellum and fails
+          // AA — the pairing DESIGN.md states as *muted may sit on Paper, never
+          // on Vellum*. On white it is 4.84:1. Measured, not assumed.
+          <dl className="mt-4 grid gap-3 border border-misa-border bg-white px-4 py-3 sm:grid-cols-[14rem_1fr]">
             {live.map((definition) => (
               <FieldRow key={definition.key} label={definition.label}>
                 {/* Every live field is editable here, including ones with
@@ -94,9 +100,9 @@ export function MemberEditor({
               <FieldRow key={definition.key} label={definition.label}>
                 <span className="flex items-center gap-2 text-sm">
                   {fieldValue(customFields, definition.key)}
-                  <span className="border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
+                  <Pill tone="neutral">
                     archived
-                  </span>
+                  </Pill>
                 </span>
               </FieldRow>
             ))}

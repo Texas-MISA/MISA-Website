@@ -67,12 +67,21 @@ export function AdminNav({
                         — the `title` tooltip is mouse-only. It is in the nav
                         precisely so the shape of the section is visible, which
                         only works if everyone can perceive it. */}
+                    {/* 🐛 `white/40` measured **3.39:1** on the navy bar and
+                        failed AA. WCAG exempts an inactive control, but the
+                        exemption is beside the point here: the paragraph above
+                        says this item is in the nav so the shape of the section
+                        is visible to everyone, and 3.39:1 undercuts its own
+                        stated reason. `white/55` is the first step on the ramp
+                        that passes — **5.05:1**, solved against the composited
+                        navy rather than picked. It still reads as clearly
+                        quieter than the live items at `white/85`. */}
                     <button
                       type="button"
                       disabled
                       aria-disabled="true"
                       title="Not built yet"
-                      className="cursor-not-allowed text-sm text-white/40"
+                      className="cursor-not-allowed text-sm text-white/55"
                     >
                       {item.label}
                     </button>

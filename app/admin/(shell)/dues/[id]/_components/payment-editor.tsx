@@ -121,7 +121,7 @@ export function PaymentEditor({
   const fieldErrors = state.status === "invalid" ? state.fieldErrors : undefined;
 
   return (
-    <form action={formAction} className="max-w-xl">
+    <form action={formAction} className="max-w-xl border border-misa-border bg-white px-4 py-3">
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="expectedUpdatedAt" value={token} />
 

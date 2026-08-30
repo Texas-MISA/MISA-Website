@@ -82,7 +82,7 @@ export function MergePanel({
 
   return (
     <section className="mt-12 max-w-3xl">
-      <details className="border border-misa-border bg-misa-panel/40">
+      <details className="border border-misa-border bg-white">
         <summary className="cursor-pointer px-4 py-2 text-sm font-medium">
           Merge a duplicate into this member
         </summary>
@@ -232,7 +232,13 @@ function Preview({
   const { counts, collisions, conflicts } = preview;
 
   return (
-    <form action={action} className="mt-5 border border-misa-border px-4 py-4">
+    // A plain <form>, not a Panel: `Panel` does not forward `action`, and
+    // threading a form's action through a surface component would make the
+    // surface responsible for something it has no business knowing about.
+    <form
+      action={action}
+      className="mt-5 border border-misa-border bg-white px-4 py-3"
+    >
       <input type="hidden" name="survivorId" value={preview.survivor.id} readOnly />
       <input type="hidden" name="loserId" value={preview.loser.id} readOnly />
       {/* The survivor's compare-and-set anchor, as the raw PostgREST string —

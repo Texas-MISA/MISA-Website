@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { ATTENDANCE_STATUSES } from "@/lib/attendance";
 import type { EventOption } from "@/lib/event-options";
+import { Panel } from "@/components/ui/panel";
 
 // Same contract as event-filters.tsx: no submit button, everything in the URL
 // so a filtered queue is shareable and survives a reload.
@@ -44,6 +45,9 @@ export function AttendanceFilters({
   }
 
   return (
+    // 🪤 A white surface, because every control in here fills with
+    // `bg-misa-panel` and the admin page ground is now that same grey.
+    <Panel ground="white" pad="sm">
     <div className="flex flex-wrap items-end gap-4">
       <Labelled label="Status">
         <select
@@ -107,6 +111,7 @@ export function AttendanceFilters({
         </select>
       </Labelled>
     </div>
+    </Panel>
   );
 }
 

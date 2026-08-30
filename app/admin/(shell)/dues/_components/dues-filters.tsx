@@ -3,6 +3,7 @@
 import { controlClass } from "@/components/ui/field";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { Panel } from "@/components/ui/panel";
 
 // Same contract as point-filters.tsx and attendance-filters.tsx: no submit
 // button, everything in the URL, so a filtered ledger is shareable and survives
@@ -47,7 +48,9 @@ export function DuesFilters({
   }
 
   return (
-    <div>
+    // 🪤 A white surface, because every control in here fills with
+    // `bg-misa-panel` and the admin page ground is now that same grey.
+    <Panel ground="white" pad="sm">
       <div className="flex flex-wrap items-end gap-4">
         <Labelled label="Show">
           <select
@@ -112,7 +115,7 @@ export function DuesFilters({
           </button>
         </p>
       )}
-    </div>
+    </Panel>
   );
 }
 

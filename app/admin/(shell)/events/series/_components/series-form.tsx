@@ -13,6 +13,7 @@ import {
 } from "@/lib/events";
 import { SectionHeading } from "@/components/ui/page-header";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { Panel } from "@/components/ui/panel";
 
 // Client Component for useActionState. Weekdays are checkboxes sharing one
 // name, so they arrive as a repeated form field and the action reads them with
@@ -63,7 +64,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
   }
 
   return (
-    <form action={formAction} className="flex flex-col gap-6" noValidate>
+    <form action={formAction} className="flex flex-col gap-6 border border-misa-border bg-white px-4 py-4" noValidate>
       {(state.status === "error" || state.status === "unauthorized") && (
         <Notice tone="error" role="alert">
           {state.status === "unauthorized"
@@ -90,7 +91,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
         <input type="text" name="location" className={inputClass} />
       </Field>
 
-      <fieldset className="border border-misa-border px-4 py-4">
+      <Panel as="fieldset" ground="none" pad="sm">
         <legend className="px-2 text-sm font-medium">Repeats on</legend>
         {fieldErrors?.weekdays && (
           <span role="alert" className="text-xs text-misa-critical">
@@ -111,7 +112,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
             </label>
           ))}
         </div>
-      </fieldset>
+      </Panel>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Field label="First date (Central)" error={fieldErrors?.date}>
@@ -154,7 +155,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
         </Field>
       </div>
 
-      <fieldset className="border border-misa-border px-4 py-4">
+      <Panel as="fieldset" ground="none" pad="sm">
         <legend className="px-2 text-sm font-medium">Check-in window</legend>
         <div className="mt-2 grid gap-6 sm:grid-cols-2">
           <Field label="Opens early (minutes)">
@@ -178,7 +179,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
             />
           </Field>
         </div>
-      </fieldset>
+      </Panel>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <Field label="Points per occurrence" error={fieldErrors?.points}>

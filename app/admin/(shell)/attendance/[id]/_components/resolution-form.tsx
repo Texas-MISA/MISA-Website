@@ -129,7 +129,7 @@ function Fields({
 
   return (
     <>
-      <form action={formAction} className="flex flex-col gap-5">
+      <form action={formAction} className="flex flex-col gap-5 border border-misa-border bg-white px-4 py-3">
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="updatedAt" value={updatedAt} />
         <input type="hidden" name="returnTo" value={returnTo} />

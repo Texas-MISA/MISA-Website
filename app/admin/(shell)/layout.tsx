@@ -34,7 +34,25 @@ export default async function AdminShellLayout({
         displayName={officer.displayName ?? officer.email}
         role={officer.role}
       />
-      <main id="main" className="flex-1 px-6 py-10">
+      {/* 🔓 **The officer side moves onto the v2 ground here** (phase 4). Vellum
+          on `<main>`, exactly as the public layout does it, with content regions
+          as white surfaces lifted off it — `DESIGN.md`'s rule, unchanged: *the
+          grey is the background; cards stay white.*
+
+          🪤 On `<main>`, never on `body`. `body` keeps `--background: #ffffff`
+          and must: `Panel ground="white"`, the sticky `<THead>` and every card
+          on these screens only read as lifted off a ground that is not their own
+          colour.
+
+          🔴 This line lands LAST, and the order is the opposite of the tempting
+          one. Five shared primitives fill with `bg-misa-panel` — `controlClass`,
+          `table.tsx`'s sticky head, `chip.tsx`'s resting `FilterChip`,
+          `banner.tsx`'s neutral variant and `Tr`'s hover — so on a Vellum page
+          each is the same colour as what is behind it: inputs disappear, the
+          sticky head stops separating from the rows scrolling under it, and row
+          hover does nothing. Every screen was wrapped in white surfaces first,
+          which is what makes this one line safe. */}
+      <main id="main" className="flex-1 bg-misa-panel px-6 py-10">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
     </div>

@@ -82,7 +82,7 @@ export function MemberPicker({
       </div>
 
       {picked.length > 0 && (
-        <div className="border border-misa-border bg-misa-panel px-3 py-2">
+        <div className="border border-misa-border bg-white px-3 py-2">
           <ul className="flex flex-col gap-1">
             {picked.map((member) => (
               <li key={member.id} className="flex items-center gap-2">

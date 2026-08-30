@@ -29,7 +29,7 @@ export function VoidPaymentForm({ id }: { id: string }) {
     state.status === "invalid" ? state.fieldErrors.voidReason : undefined;
 
   return (
-    <form action={formAction} className="max-w-xl">
+    <form action={formAction} className="max-w-xl border border-misa-border bg-white px-4 py-3">
       <input type="hidden" name="id" value={id} />
 
       <StatusBanner state={state} />

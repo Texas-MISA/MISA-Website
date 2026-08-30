@@ -65,7 +65,13 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
   const errors = state.status === "invalid" ? state.fieldErrors : {};
 
   return (
-    <form action={formAction} className="max-w-2xl">
+    // A white surface: every control here fills with `bg-misa-panel`, which is
+    // the admin page ground, and the hint text is `--misa-muted` — 4.33:1 on
+    // Vellum and 4.84:1 on Paper.
+    <form
+      action={formAction}
+      className="max-w-2xl border border-misa-border bg-white px-4 py-3"
+    >
       {definition && <input type="hidden" name="id" value={definition.id} />}
 
       <div className="flex flex-col gap-6">

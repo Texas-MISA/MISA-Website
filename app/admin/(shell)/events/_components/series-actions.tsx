@@ -11,6 +11,7 @@ import {
 import { formatEventRange } from "@/lib/events";
 import { BUTTON_QUIET_SM } from "@/components/ui/button";
 import { SectionHeading } from "@/components/ui/page-header";
+import { Panel } from "@/components/ui/panel";
 
 // Publish or cancel a whole series (§7 Stage 4).
 //
@@ -41,7 +42,7 @@ export function SeriesActions({
   );
 
   return (
-    <div className="border border-misa-blue/35 bg-misa-panel px-4 py-4">
+    <Panel ground="white" pad="sm">
       <SectionHeading level="sub">This series</SectionHeading>
 
       {publishState.status === "conflicts" && (
@@ -141,6 +142,6 @@ export function SeriesActions({
           </button>
         </form>
       </div>
-    </div>
+    </Panel>
   );
 }

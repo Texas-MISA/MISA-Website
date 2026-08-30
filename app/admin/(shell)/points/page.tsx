@@ -74,7 +74,7 @@ async function fetchLedger(
       .select(
         "id, member_id, points, reason, category, event_id, term, " +
           "awarded_by, awarded_at, voided_at, " +
-          "members(id, full_name, active), events(id, title)",
+          "members(id, full_name), events(id, title)",
         { count: "exact" }
       ),
     filters

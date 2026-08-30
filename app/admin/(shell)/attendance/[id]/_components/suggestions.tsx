@@ -9,6 +9,8 @@ import {
   type MemberSuggestion,
 } from "@/lib/attendance";
 import { formatEventRange } from "@/lib/events";
+import { Pill } from "@/components/ui/pill";
+import { Panel } from "@/components/ui/panel";
 
 // Ranked suggestions for an unresolved submission (§7 Stage 5).
 //
@@ -93,15 +95,17 @@ export function EventSuggestions({
   return (
     <ol className="flex flex-col gap-3">
       {suggestions.map((suggestion, index) => (
-        <li
+        <Panel
+          as="li"
           key={suggestion.eventId}
-          className="border border-misa-border bg-misa-panel px-4 py-3"
+          ground="white"
+          pad="sm"
         >
           <p className="text-sm">
             {index === 0 && (
-              <span className="mr-2 border border-misa-border px-1.5 py-0.5 text-[11px] uppercase tracking-[0.12em]">
+              <Pill tone="info" className="mr-2">
                 closest
-              </span>
+              </Pill>
             )}
             <strong>{suggestion.title}</strong>
             {suggestion.status !== "published" && (
@@ -119,7 +123,7 @@ export function EventSuggestions({
             </span>
           </p>
           <p className="mt-1 text-xs text-misa-muted">{suggestion.range}</p>
-        </li>
+        </Panel>
       ))}
     </ol>
   );
@@ -157,9 +161,11 @@ export function MemberSuggestions({
           suggestion.member.eid
         );
         return (
-          <li
+          <Panel
+            as="li"
             key={suggestion.member.id}
-            className="border border-misa-border bg-misa-panel px-4 py-3"
+            ground="white"
+            pad="sm"
           >
             <p className="text-sm">
               <strong>{suggestion.member.fullName}</strong>
@@ -183,7 +189,7 @@ export function MemberSuggestions({
                 .filter(Boolean)
                 .join(" · ")}
             </p>
-          </li>
+          </Panel>
         );
       })}
     </ol>

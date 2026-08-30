@@ -14,6 +14,7 @@ import {
 import type { ImportCounts } from "@/lib/member-import";
 import { SectionHeading } from "@/components/ui/page-header";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
+import { Panel } from "@/components/ui/panel";
 
 // The two-step roster import (§7 Stage 6 phase 7b), modelled directly on
 // /admin/dues/import's form. Three things are copied deliberately rather than
@@ -91,7 +92,7 @@ export function RosterImportForm() {
   return (
     <div className="flex flex-col gap-6">
       {!done && (
-        <div className="border border-misa-border bg-misa-panel px-4 py-4">
+        <Panel ground="white" pad="sm">
           <label className="block text-sm font-semibold" htmlFor="roster">
             Roster (.csv)
           </label>
@@ -110,7 +111,7 @@ export function RosterImportForm() {
               saved yet.
             </p>
           )}
-        </div>
+        </Panel>
       )}
 
       {/* Step 1 — preview. Writes nothing. */}
@@ -215,7 +216,7 @@ function Summary({
   ignoredColumns: string[];
 }) {
   return (
-    <div className="border border-misa-border px-4 py-4">
+    <Panel ground="white" pad="sm">
       <SectionHeading level="sub">Before you import</SectionHeading>
       <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-4">
         <Stat label="New members" value={counts.fresh} />
@@ -253,7 +254,7 @@ function Summary({
           {ignoredColumns.join(", ")}. Calculated values are not imported.
         </p>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -318,7 +319,7 @@ function Done({
   onAnother: () => void;
 }) {
   return (
-    <div className="border border-misa-border px-4 py-4">
+    <Panel ground="white" pad="sm">
       <SectionHeading level="sub">Imported</SectionHeading>
       <p className="mt-2 text-sm">
         {counts.fresh} member{counts.fresh === 1 ? "" : "s"} added
@@ -347,6 +348,6 @@ function Done({
           Import another file
         </button>
       </div>
-    </div>
+    </Panel>
   );
 }

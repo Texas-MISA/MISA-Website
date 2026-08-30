@@ -26,6 +26,8 @@ import {
   fieldOptions,
   type FieldDefinition,
 } from "@/lib/members";
+import { Pill } from "@/components/ui/pill";
+import { Panel } from "@/components/ui/panel";
 
 // Same contract as attendance-filters.tsx: no submit button, every choice in
 // the URL, so a filtered view is shareable, survives a reload, and — the part
@@ -193,7 +195,10 @@ export function MemberFilters({
     relationalCount > 0;
 
   return (
-    <div>
+    // 🪤 A white surface, because every control in here fills with
+    // `bg-misa-panel` and the admin page ground is now that same grey. Bare on
+    // the page, this whole bar was a row of invisible boxes.
+    <Panel ground="white" pad="sm">
     <div className="flex flex-wrap items-end gap-4">
       <Labelled label="Search">
         <input
@@ -359,7 +364,7 @@ export function MemberFilters({
       set={set}
       update={update}
     />
-    </div>
+    </Panel>
   );
 }
 
@@ -393,16 +398,19 @@ function RelationalPanel({
   update: (changes: Record<string, string>) => void;
 }) {
   return (
+    // 🪤 No ground of its own — it inherits the white panel it now sits in. It
+    // was `bg-misa-panel/40`, and a recessive grey here would put every control
+    // inside it back on the colour those controls fill with.
     <details
       open={hasRelationalFilter(filter)}
-      className="mt-4 border border-misa-border bg-misa-panel/40"
+      className="mt-4 border border-misa-border"
     >
       <summary className="cursor-pointer px-4 py-2 text-sm font-medium">
         Attendance filters
         {activeCount > 0 && (
-          <span className="ml-2 border border-misa-border px-2 py-0.5 text-[11px] tracking-[0.12em] uppercase">
+          <Pill tone="info" className="ml-2">
             {activeCount} active
-          </span>
+          </Pill>
         )}
       </summary>
 

@@ -7,6 +7,7 @@ import { importColumns, MAX_ROSTER_IMPORT_ROWS } from "@/lib/member-import";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { PageHeader, SectionHeading } from "@/components/ui/page-header";
+import { Panel } from "@/components/ui/panel";
 import { RosterImportForm } from "./_components/roster-import-form";
 
 // Roster CSV import (§7 Stage 6 phase 7b).
@@ -54,7 +55,7 @@ export default async function MemberImportPage() {
         }
       />
 
-      <div className="mt-8 border border-misa-border bg-misa-panel px-4 py-4">
+      <Panel ground="white" pad="sm" className="mt-8">
         <SectionHeading level="sub">Columns</SectionHeading>
         <p className="mt-2 text-sm text-misa-secondary">
           Columns are matched <span className="font-medium">by header name</span>
@@ -90,7 +91,7 @@ export default async function MemberImportPage() {
           Calculated columns — points, attendance, dues — are ignored: they come
           from what members do, not from a spreadsheet.
         </p>
-      </div>
+      </Panel>
 
       <div className="mt-8">
         <RosterImportForm />

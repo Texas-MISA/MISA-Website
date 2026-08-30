@@ -1,5 +1,6 @@
 import { Notice, ReadError } from "@/app/admin/(shell)/_components/notice";
 import { describeMatchReason, type MemberSuggestion } from "@/lib/attendance";
+import { Panel } from "@/components/ui/panel";
 
 // Ranked suggestions for a payment nobody is credited with (§7 Stage 6.5 phase
 // 3), modelled on the attendance resolution screen's MemberSuggestions.
@@ -38,9 +39,11 @@ export function PaymentSuggestions({
   return (
     <ol className="flex flex-col gap-3">
       {suggestions.map((suggestion) => (
-        <li
+        <Panel
+          as="li"
           key={suggestion.member.id}
-          className="border border-misa-border bg-misa-panel px-4 py-3"
+          ground="white"
+          pad="sm"
         >
           <p className="text-sm">
             <strong>{suggestion.member.fullName}</strong>
@@ -55,7 +58,7 @@ export function PaymentSuggestions({
               .filter(Boolean)
               .join(" · ")}
           </p>
-        </li>
+        </Panel>
       ))}
     </ol>
   );

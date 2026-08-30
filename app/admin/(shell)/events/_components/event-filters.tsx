@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import { EVENT_CATEGORIES, EVENT_STATUSES, formatCategory } from "@/lib/events";
 import { controlClass } from "@/components/ui/field";
+import { Panel } from "@/components/ui/panel";
 
 // Client Component so a filter change navigates without a submit button.
 // Filters live in the URL rather than in component state, so a filtered view
@@ -33,6 +34,9 @@ export function EventFilters({
   }
 
   return (
+    // 🪤 A white surface, because every control in here fills with
+    // `bg-misa-panel` and the admin page ground is now that same grey.
+    <Panel ground="white" pad="sm">
     <div className="flex flex-wrap items-end gap-4">
       <Labelled label="Term">
         <select
@@ -80,6 +84,7 @@ export function EventFilters({
         </select>
       </Labelled>
     </div>
+    </Panel>
   );
 }
 
