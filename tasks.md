@@ -8,7 +8,51 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ## 🏗️ IN PROGRESS — v2 visual redesign of the whole site (2026-08-17)
 
-Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 complete. ✅ Phase 1 (home page + header) COMPLETE — gate passed 2026-08-19 after four rounds of officer review. ✅ Phase 2 (the five content pages) BUILT and measured, awaiting officer review. ⬅️ Phase 3 is NEXT.**
+Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). **✅ Phase 0 complete. ✅ Phase 1 (home page + header) COMPLETE — gate passed 2026-08-19 after four rounds of officer review. ✅ Phase 2 (the five content pages) BUILT and measured, awaiting officer review. ✅ Phase 4 (`/admin`) BUILT and measured 2026-08-29, awaiting officer review. ⏸️ Phase 3 is DEFERRED, not skipped — see below.**
+
+🌿 **PHASE 4 LIVES ON THE BRANCH `v2-phase-4-admin`**, cut from the roster-terms
+commit rather than from `main`, so the screens it styles are the term-aware ones
+migration 29 produced. ⚠️ **Do not merge it without the officer.**
+
+### ✅ Phase 4 — `/admin`. BUILT, awaiting review. (2026-08-29)
+
+Taken out of order on the officer's instruction: phase 4 was asked for before
+phase 3. Three commits, presentational only — no route, action, `lib/`, view or
+schema change.
+
+📌 **The phase was ADOPTION, not composition.** `PageHeader` and `SectionHeading`
+had **zero call sites in the whole repository**, `Table` had zero admin ones, and
+`Panel` had one — all four written *for* `/admin` and never wired up, while 25
+pages repeated one h1 class string verbatim and 11 raw tables carried 47 copies
+of one head-cell string.
+
+🔴 **The ordering is the part worth remembering: wrap the screens in white
+surfaces FIRST, flip the ground LAST.** Five shared primitives fill with
+`bg-misa-panel`, which is exactly what the page ground became — so the reverse
+order gives a branch that looks finished and is measurably broken. Done this way
+every intermediate commit stayed shippable and the flip was one line.
+
+**What measuring found that looking did not:** 36 controls the exact colour of
+the page behind them; a loading skeleton that went invisible; `--misa-muted` on
+Vellum failing AA in four new places (📌 **the rule is about a ground moving
+under ink, not a list of pages**); the disabled Audit nav item at 3.39:1; and the
+empty-vs-error conflation still alive in the interactive states Stage 8 phase 3
+never reached.
+
+🔴 **Three screens were throwing outright, and it was NOT the redesign.**
+`members.active` was dropped by migration 29 and three `.select()` strings still
+named it, so the submission detail, dues detail and points ledger all rendered
+the error boundary. **The full suite was green with the bug live** — no test
+covers a PostgREST column list and `tsc` cannot see inside a select string. It
+took loading the pages.
+
+**Gate:** 20 screens, 166 contrast pairings, **0 failures**, smallest 4.84:1;
+0 control/ground collisions; 0 overflow; 0 screens throwing; lint, `tsc`, build
+clean; **1094 tests pass**.
+
+⏸️ **Phase 3 is deferred and its debt is NOT absorbed.** `/attend`,
+`/leaderboard` and `/lookup` still carry the `--misa-muted`-on-Vellum AA failure;
+they were left standing rather than touched from outside their phase.
 
 🌿 **PHASE 2 LIVES ON THE BRANCH `v2-phase-2`, NOT ON `main`** (officer, 2026-08-19). It is ahead of `main` and 0 behind, so it merges as a fast-forward. ⚠️ **Do not merge it without the officer** — a merge to `main` replaces the live club website at https://www.txmisa.org.
 

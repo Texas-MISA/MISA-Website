@@ -455,6 +455,115 @@ Then stop for the officer.
 
 ---
 
+## Phase 4 record (2026-08-29) — `/admin`
+
+**Built and measured; waiting on the officer.** Three commits on
+`v2-phase-4-admin`, cut from the roster-terms commit so the screens are the
+term-aware ones. Presentational only: `app/actions/`, `supabase/`, `proxy.ts` and
+`lib/` are untouched.
+
+### What the phase actually was
+
+📌 **Adoption, not composition.** The audit came back with the answer before
+anything was designed: `PageHeader` and `SectionHeading` had **zero call sites in
+the repository**, `Table` had zero admin ones, and `Panel` had one. All four were
+written *for* `/admin` — their doc comments name the exact duplication they were
+meant to replace — and none was ever wired up. Meanwhile 25 pages repeated one h1
+class string verbatim, 45 h2s repeated another, and 11 raw tables carried 47
+copies of one head-cell string.
+
+So the work was three passes, in an order chosen for safety:
+
+1. **Headers** — every screen onto `PageHeader` / `SectionHeading`.
+2. **Tables and states** — every table onto `Table`, every badge onto `Pill`,
+   every notice onto `Notice`.
+3. **The ground** — Vellum on the shell's `<main>`, one line, landing last.
+
+🔴 **The ordering is the finding worth keeping.** Five shared primitives fill
+with `bg-misa-panel`, and that is exactly the colour the page was about to
+become. Wrapping the screens in white surfaces first meant every intermediate
+commit stayed shippable (a white surface on a still-white page is invisible and
+harmless) and the flip itself was trivial. The reverse order produces a branch
+that looks finished and is measurably broken.
+
+### What measuring found that looking did not
+
+- 🐛 **36 controls on the directory were the exact colour of the page behind
+  them** after the flip — the whole filter row, plus every inline custom-field
+  select. Found by comparing each control's computed fill against its composited
+  ground, which is a loop, not a squint at a screenshot.
+- 🐛 **The loading skeleton went invisible.** Its lighter bars were
+  `bg-misa-panel`; the screen degraded to two lonely dark bars on an empty page.
+  Both weights are alpha over the ground now, so the next ground change cannot
+  erase them.
+- 🐛 **`--misa-muted` on Vellum, again — 4.33:1, failing AA.** Phase 2 found this
+  on three public pages and the fix there was per-page. It recurred in four new
+  places the moment the admin ground moved. 📌 **The rule is about a ground
+  moving under ink, not about a list of pages**, and that is now written into
+  `DESIGN.md`.
+- 🐛 **The disabled "Audit" nav item measured 3.39:1.** WCAG exempts an inactive
+  control — but that item's own comment says it sits in the nav so the shape of
+  the section is visible to everyone, and 3.39:1 undercuts its stated reason.
+  `white/55` is **5.05:1**, solved against the composited navy rather than picked.
+- 🐛 **Three notices were the empty-vs-error conflation, alive and well.**
+  `RecentCheckins` rendered a failed read in the neutral blue `info` panel,
+  identical to "no check-ins yet"; the bulk-assign result's three failure states
+  shared one local `Banner` hardcoded to caution; and several `role="alert"`
+  failures elsewhere ("that didn't work", "can't publish", a failed sign-in) wore
+  the same neutral skin. Stage 8 phase 3 corrected this in the *page* logic;
+  these were the interactive states it did not reach.
+- 🐛 **The same badge drift `pill.tsx` was written to end, in five places** —
+  including two dues badges one row apart at 11px and 11.2px, two sizes reading
+  as one.
+- 🪤 **`Banner` renders a `<p>`, and one report carries paragraphs and a list.**
+  A `<p>` cannot contain either; the parser closes it at the child's start tag,
+  so the frame ends early and the rest renders bare. `as` fixes it.
+
+### 🔴 Three screens were throwing outright, and it was not the redesign
+
+`members.active` was dropped by **migration 29** and three queries still selected
+it, so PostgREST answered `column members_1.active does not exist` and the
+**submission detail, dues detail and points ledger** all rendered the error
+boundary. Nothing read the value — it was a leftover.
+
+📌 **This is the argument for walking the screens.** No test covers a PostgREST
+column list, the suite was green across all 1094 tests with the bug live, and
+`tsc` cannot see inside a `.select()` string. It was found by loading pages.
+
+### Decisions taken in the phase
+
+- **`design-taste-frontend` is not primary here.** It is primary for the *public
+  visual UI*; `/admin` is not that. The layout-family budget, the eyebrow cap and
+  the image-slot strategy are public-page instruments and do not reach a filter
+  bar. `impeccable`'s **Operate** mode and craft-floor governed instead, under
+  `DESIGN.md` and the `CLAUDE.md` Invariants.
+- **`<Section>` keeps its zero admin call sites.** It owns the public gutter and
+  rhythm, which `/admin` does not share. `Panel` is the officer surface.
+- **`Table` carries its own white ground** rather than each caller remembering.
+- **A `<form>` that needs its own `action` stays a `<form>` with a `bg-white`
+  frame** — `Panel` does not forward `action`, and threading a form's action
+  through a surface component would make the surface responsible for something it
+  has no business knowing.
+- **`SectionHeading` gained `level="sub"`** for the 18px step /admin genuinely
+  uses seven times, and `id` because five call sites point an `aria-labelledby`
+  at it. Dropping that would have unlabelled five landmarks.
+- **The back link moved above the title** on all eleven screens that carry one.
+
+### Measured at the gate
+
+**20 screens** — every officer route including all six detail pages — probed in
+same-origin iframes at 1280. **166 contrast pairings, 0 failures**, smallest
+**4.84:1**, each composited on the ground its text actually sits on. **0 controls
+colliding with their ground** (was 36). **0 horizontal overflow.** **0 screens
+throwing.** `npm run lint`, `npx tsc --noEmit` and `npm run build` clean; **1094
+tests pass across 37 files**.
+
+⚠️ **Phase 3's debt is still outstanding and phase 4 did not absorb it.**
+`/attend`, `/leaderboard` and `/lookup` still carry the `--misa-muted`-on-Vellum
+failure, and they were left standing rather than touched from outside their phase.
+
+---
+
 ## Phase 2 brief — the five content pages (BUILT — record follows this section)
 
 **Scope:** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, plus the

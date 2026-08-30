@@ -65,8 +65,8 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/attend`, `/leaderboard`, `/lookup` | ⏳ **NOT YET REBUILT** (phase 3). Never had a design; they wear the shared primitives. |
-| `/admin` | ⏳ **NOT YET REBUILT** (phase 4), and governed by scanability rather than expression. |
+| `/attend`, `/leaderboard`, `/lookup` | ⏳ **NOT YET REBUILT** (phase 3, deferred). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure. |
+| `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
 page sits on the v2 page ground today, so a page can be un-rebuilt and still not
@@ -167,7 +167,14 @@ the fill, the focus-ring answer and the section's own padding together.
 | `navy` | `bg-misa-blue` + `.on-navy` | **white** | Solid brand band |
 | `field` | `.ground-field` + `.on-navy` | **white** | The drawn navy radial — heroes, feature bands |
 
-**The page ground itself is `bg-misa-panel` on the public layout's `<main>`.**
+**The page ground itself is `bg-misa-panel` on the public layout's `<main>`** — and,
+since phase 4, on the **admin shell's `<main>` too.** One ground, two layouts,
+both on `<main>` rather than on `body`.
+
+🪤 **`<Section>` still has ZERO admin call sites and keeps them.** It owns the
+public gutter and vertical rhythm, which `/admin` does not share. On the officer
+side the surface is `Panel` (or a `bg-white` frame where a `<form>` needs its own
+`action`, which `Panel` does not forward), and the shell owns the ground.
 
 🔓 **`PageHero` moved from a flat `bg-misa-blue` to `ground="field"` in phase 2**,
 so the site has ONE navy hero treatment rather than two. ⚠️ **Eight pages render
@@ -192,12 +199,24 @@ and centred text inside an off-centre column reads as a bug rather than a choice
   the partner cells are *lifted white surfaces*, and a surface only reads as
   lifted off a ground that is not its own colour. **The grey is the background;
   cards stay white.**
-- 🐛 **`ground="white"` is a correctness control, not a taste one.** Four shared
-  primitives fill with `bg-misa-panel` — `controlClass` (every input),
-  `table.tsx`'s sticky `<THead>`, `chip.tsx`'s resting `FilterChip`, and
-  `banner.tsx`'s neutral variant. On the page ground each is **the same colour as
-  what is behind it**. The fix is a white section under them, never a recoloured
-  primitive: all four are shared with `/admin`.
+- 🐛 **`ground="white"` is a correctness control, not a taste one.** **Five**
+  shared primitives fill with `bg-misa-panel` — `controlClass` (every input),
+  `table.tsx`'s sticky `<THead>`, `chip.tsx`'s resting `FilterChip`,
+  `banner.tsx`'s neutral variant, and `Tr`'s `hover:bg-misa-panel/70`. On the
+  page ground each is **the same colour as what is behind it**: inputs
+  disappear, the sticky head stops separating from the rows scrolling under it,
+  and row hover does nothing. The fix is a white surface under them, never a
+  recoloured primitive — all five are shared between `/admin` and the public
+  pages.
+  - 📌 **`Table` carries its own `bg-white` since phase 4**, rather than every
+    caller remembering to supply one. Three of the five live inside that
+    component and both page grounds are the same grey, so the surface belongs to
+    the component: it is the fix that cannot be forgotten on the next screen.
+  - 🪤 **The order this lands in is load-bearing.** Wrap the screens in white
+    surfaces FIRST and flip the ground LAST. A white surface on a still-white
+    page is invisible and harmless, so every intermediate commit stays
+    shippable; the reverse order gives a branch that looks finished and is
+    measurably broken. Phase 4 moved `/admin` this way and the flip was one line.
 
 ### `.ground-field` — the drawn navy field
 
@@ -330,6 +349,22 @@ Barlow (`--font-sans`) and Barlow Condensed (`--font-display`). Unchanged.
 | `Lead` | `18` px | `1.65`, max `74ch` |
 | Body | `16` px | `1.6` |
 | `Eyebrow` | `12` px | 500, `0.14em`, uppercase |
+
+### The officer ramp
+
+`/admin` is denser than any public page and has three heading levels rather than
+two. `components/ui/page-header.tsx` owns all of it.
+
+| Role | Size | Where |
+|---|---|---|
+| `PageHeader` title | `30 → 34` px at `sm` | Every admin screen opens with one |
+| `SectionHeading` | `22` px | A region of a screen |
+| `SectionHeading level="sub"` | `18` px | Inside a panel or a form |
+
+📌 **34 → 22 → 18 is a 1.55 then 1.22 ratio, and the tightness is the point.** A
+dense screen carries more type roles than a brand page, and exaggerated contrast
+between them reads as noise rather than hierarchy. **The 18px step is admin-only**
+and is the one step the public ramp above does not contain.
 
 🪤 **The hero ramp DIPS at `lg` (44 → 38) and that is not a typo.** Type size
 there is a function of the **type column**, not the viewport, and the column is
@@ -528,9 +563,19 @@ instead is how the last drift happened**: before the 2026-08-17 rework `/admin`
 imported exactly two things from here and had three button dialects, eleven
 copies of an input class and nine copies of the same local `Field`.
 
+🔴 **A primitive with no call sites has not ended the drift it was written to
+end.** Phase 4 opened by counting, and found `PageHeader` and `SectionHeading` at
+**zero call sites anywhere in the repository** — both authored *for* `/admin`,
+whose doc comments named the exact duplication they were meant to replace, while
+25 pages went on repeating one h1 class string verbatim and 45 h2s repeated
+another. `Table` was the same story against 11 raw tables and 47 copies of one
+head-cell string; `Panel` had one call site, on `/attend`. **Extracting the
+component is half the job; the adoption is the other half, and only the second
+half is worth anything.**
+
 | Group | Modules |
 |---|---|
-| layout | `section.tsx`, `panel.tsx`, `page-header.tsx` |
+| layout | `section.tsx` (public only), `panel.tsx`, `page-header.tsx` |
 | type | `heading.tsx` (Headline/Title/Eyebrow/Lead), `chevron-section.tsx` (PageHero) |
 | controls | `button.tsx` (`buttonClass` + named constants), `field.tsx`, `chip.tsx` |
 | feedback | `banner.tsx` (Banner + ReadError), `pill.tsx`, `empty-state.tsx` |
@@ -540,6 +585,30 @@ copies of an input class and nine copies of the same local `Field`.
 
 - 📌 **Buttons are class strings, not components**, because every call site is
   already an `<a>`, a `<Link>` or a `<button>`.
+- 📌 **`PageHeader` owns the title, the badge, the back link and the
+  description**, in that visual order. 🪤 **The back link renders ABOVE the
+  title**, reversing where all eleven admin screens had it: a back link is an
+  ancestor pointer, and below the h1 it arrived after the line that assumed you
+  already knew where you were. It is a prop rather than a component so the
+  position is enforced once instead of remembered eleven times.
+- 🪤 **A status pill beside a title is `badge`, never `action`.** `action` is
+  pushed to the far right of the column, which on a laptop puts a pill an arm's
+  length from the thing whose status it reports.
+- 📌 **`Pill` is the only badge.** Phase 4 found the same drift `pill.tsx` was
+  written to end, still live in five places: two dues badges one row apart at
+  `text-[11px]` and `text-[0.7rem]` — 11px and 11.2px, two sizes reading as one
+  — and the member page's three-state attendance mark at three different
+  treatments.
+- 🪤 **`Banner` takes `as="div"` when it carries block content.** A `<p>` cannot
+  contain a `<p>` or a `<ul>`: the parser closes the outer one at the child's
+  start tag, so the ground and frame end early and the rest renders bare. That
+  is a DOM rewrite, not a styling preference.
+- 📌 **Icons are drawn, from Lucide.** Phase 4 retired the sort header's `▲`/`▼`
+  characters, which inherited the header's uppercase label type and had been
+  shrunk to 9.6px to stop them out-weighing the header they annotate. An
+  inactive sortable column now shows a faint two-way chevron rather than
+  nothing — with an indicator only on the active column, the only way to
+  discover the directory sorted at all was to click a header and watch.
 - 📌 **`PhotoSlot` is the one image slot**: renders the photograph if the slot has
   a `src`, the labelled `<Hatch>` if not. 🪤 Always `fill`, never an intrinsically
   sized `<img>` — an intrinsic image makes its frame grow to the photo's own
@@ -621,6 +690,19 @@ Real photographs are live on the home page **locally only**.
   grey in places. They are phase 3 and were left standing rather than touched
   from outside their phase; the smallest margin on the five phase-2 pages is now
   **4.84:1**.
+  🔴 **The same pairing bit again in phase 4, and that is the useful part: the
+  rule is about a GROUND MOVING UNDER INK, not about a list of pages.** Making
+  the admin ground Vellum re-created the failure in four new places that had been
+  correct on white — the member editor's field labels, the custom-field form's
+  hints, and both admin error boundaries' digest line. **Any commit that changes
+  a ground re-measures every grey sitting on it.**
+- 📌 **Phase 4 measured `/admin` the same way phase 2 measured the public
+  pages**: 20 screens, 166 pairings, composited per pairing on the ground each
+  text actually sits on. **0 failures, smallest 4.84:1.** It also found the
+  disabled "Audit" nav item at **3.39:1** on the navy bar — WCAG exempts an
+  inactive control, but that item exists so the shape of the section is visible
+  to everyone, so the exemption did not apply to its own purpose. `white/55`
+  (**5.05:1**) is the first ramp step that passes, solved rather than picked.
 - **A gradient is not one ground.** Measure at both ends.
 - **Reduced motion** is honoured: all reveals resolve, marquees stop.
 - **The skip link** is the first focusable thing in the document.
