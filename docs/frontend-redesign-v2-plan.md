@@ -549,6 +549,48 @@ column list, the suite was green across all 1094 tests with the bug live, and
   at it. Dropping that would have unlabelled five landmarks.
 - **The back link moved above the title** on all eleven screens that carry one.
 
+### The accessibility review, and what it left standing
+
+`web-design-guidelines` was run over the branch and returned **28 findings**.
+Everything landing on a component this phase created or changed was fixed (see
+the commit); two of those **undercut earlier work on the same branch**, which is
+the part worth keeping:
+
+- The Audit nav item was still **keyboard-unreachable** — `disabled` takes an
+  element out of the tab order, so raising it to 5.05:1 was contrast work spent
+  on something nobody could focus. It was the exact defect the file's own
+  comment claimed to have fixed, surviving the fix.
+- The loading skeleton's `sr-only` "Loading…" sat **inside** its `aria-hidden`
+  wrapper, so the one accessible announcement on the screen was the single thing
+  assistive technology was told to ignore.
+
+📌 **Also fixed because they were in shared primitives:** `SectionHeading
+level="sub"` rendered a second `<h2>` rather than an `<h3>`; `Field` put the
+hint inside the `<label>`, making it part of the control's accessible name;
+`Table`'s scrollport was not focusable, so tables with no focusable cell could
+not be scrolled from the keyboard at all (WCAG 2.1.1).
+
+⬅️ **Left standing, deliberately, and NOT silently absorbed.** Each is
+pre-existing behaviour rather than presentation, and this phase is
+presentational:
+
+1. **No unsaved-changes guard** on the member notes editor or the event form —
+   `Cancel` is a `<Link>` that discards silently.
+2. **"CANCEL WHOLE SERIES" submits immediately**, with no confirm step and no
+   undo, while every comparable destructive control on the branch uses the
+   documented two-click pattern.
+3. **`title`-only explanations** on `OriginPill`, the self-registered badge, and
+   two disabled submit buttons whose `title` is the one sentence explaining why
+   the control is dead — mouse-only in every case, and fixing them properly
+   means new visible copy, which is an officer decision.
+4. **Missing `aria-live`** on the export toolbar's clipboard feedback and the
+   inline field cell's save states.
+5. **ALL-CAPS button labels in the DOM** at ~25 sites, where `buttonClass`
+   already applies `uppercase` — so the caps are redundant and reach assistive
+   technology, translation and the clipboard as caps. Real, but it is a
+   user-visible copy change across the whole officer side and belongs in its own
+   commit.
+
 ### Measured at the gate
 
 **20 screens** — every officer route including all six detail pages — probed in
@@ -557,6 +599,11 @@ same-origin iframes at 1280. **166 contrast pairings, 0 failures**, smallest
 colliding with their ground** (was 36). **0 horizontal overflow.** **0 screens
 throwing.** `npm run lint`, `npx tsc --noEmit` and `npm run build` clean; **1094
 tests pass across 37 files**.
+
+🪤 **One flake, recorded rather than hidden:** `tests/ratelimit.test.ts`'s
+"a full window later" case failed once, mid-session, on a run that spanned local
+midnight; it passed on both re-runs and on the final gate. It exercises
+`lib/ratelimit` against the local stack and touches nothing this phase changed.
 
 ⚠️ **Phase 3's debt is still outstanding and phase 4 did not absorb it.**
 `/attend`, `/leaderboard` and `/lookup` still carry the `--misa-muted`-on-Vellum

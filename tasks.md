@@ -50,6 +50,25 @@ took loading the pages.
 0 control/ground collisions; 0 overflow; 0 screens throwing; lint, `tsc`, build
 clean; **1094 tests pass**.
 
+**The accessibility review returned 28 findings.** Everything in a component this
+phase created or changed was fixed — including two that **undercut earlier work
+on the same branch**: the Audit nav item was still keyboard-unreachable
+(`disabled` removes an element from the tab order, so the contrast fix was spent
+on something nobody could focus), and the loading skeleton's `sr-only`
+announcement sat inside its own `aria-hidden` wrapper.
+
+⬅️ **Five findings are LEFT STANDING and want the officer**, because each is
+behaviour or user-visible copy rather than presentation:
+
+1. No unsaved-changes guard on the notes editor or the event form.
+2. "CANCEL WHOLE SERIES" has no confirm step, unlike every other destructive
+   control here.
+3. `title`-only explanations in four places, including on two disabled buttons
+   where the `title` is the only sentence saying why the control is dead.
+4. No `aria-live` on the clipboard feedback or the inline field-cell saves.
+5. ALL-CAPS button labels in the DOM at ~25 sites, where the CSS already
+   uppercases them.
+
 ⏸️ **Phase 3 is deferred and its debt is NOT absorbed.** `/attend`,
 `/leaderboard` and `/lookup` still carry the `--misa-muted`-on-Vellum AA failure;
 they were left standing rather than touched from outside their phase.
