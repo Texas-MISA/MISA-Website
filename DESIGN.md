@@ -366,6 +366,16 @@ dense screen carries more type roles than a brand page, and exaggerated contrast
 between them reads as noise rather than hierarchy. **The 18px step is admin-only**
 and is the one step the public ramp above does not contain.
 
+🪤 **`level="sub"` renders an `<h3>`, not a smaller `<h2>`.** Three visual levels
+have to be three semantic ones or the document outline lies: a heading inside a
+panel is a child of the section heading above it, not its sibling.
+
+⚠️ **`/admin/login` is the one screen that does NOT use `PageHeader`, and its h1
+is off this ramp** — `text-3xl` at `-0.02em`, with no `sm:` step. It is a centred
+card outside the shell, so the component's left-aligned title-and-action row is
+the wrong shape for it. Recorded as an exception rather than left as undocumented
+drift; the honest fix is a centred variant, and nothing needs one yet.
+
 🪤 **The hero ramp DIPS at `lg` (44 → 38) and that is not a typo.** Type size
 there is a function of the **type column**, not the viewport, and the column is
 narrowest exactly where the split first engages. Change the split ratio and this
