@@ -163,6 +163,14 @@ export default async function AdminEventsPage({
             draftCount={
               result.rows.filter((row) => row.status === "draft").length
             }
+            // 📌 Exact, not truncated, and that matters because the confirm
+            // states this number as fact: `seriesSchema` caps a series at
+            // MAX_SERIES_EVENTS (60), well under fetchEvents' .limit(200), so
+            // a series view always holds every occurrence. Raising either
+            // bound past the other would turn this into an undercount.
+            cancellableCount={
+              result.rows.filter((row) => row.status !== "cancelled").length
+            }
           />
         </div>
       )}
