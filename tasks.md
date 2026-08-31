@@ -2,7 +2,7 @@
 
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
-**Stages 0–5 are complete. ✅ Stage 6 (member directory) is COMPLETE — all 9 phases, browser-verified, exit criteria met. ✅ Stage 6.5 (dues) is COMPLETE — all 4 phases. Stage 7 (member-facing views) is next.** The stage was re-planned on 2026-08-01 after four design decisions landed on top of phase 1. Carry-over chores from Stage 0 are collected under Loose ends.
+**Stages 0–8 are ALL COMPLETE. ⬅️ Stage 9 (launch) is the next task** — see the state table below, which is authoritative. *(This line said "Stage 7 is next" until 2026-08-29; stages 7 and 8 closed long before that and the header simply never moved.)* The stage was re-planned on 2026-08-01 after four design decisions landed on top of phase 1. Carry-over chores from Stage 0 are collected under Loose ends.
 
 ---
 
@@ -234,7 +234,7 @@ rather than on photography.
 | Open | Type, layout, depth, shape, grounds, motion, components |
 | Scope | **Every surface**, `/admin` included |
 | Foundation | **shadcn/ui** (+ `motion`, Lucide icons) |
-| `DESIGN.md` | ⏳ **Retired**, except seven engineering rules |
+| `DESIGN.md` | ✅ **The design source of truth again** — rewritten 2026-08-19 from what phase 1 shipped. *(This row read "Retired, except seven engineering rules" during the v2 retirement; that ended when the file was rewritten.)* |
 
 📌 **"Colour scheme" is not "flat white ground."** Gradients, tinted fields and drawn backgrounds are in play so long as they are built from the palette. A plain white page behind everything is a large part of why v1 read as bland.
 
@@ -265,7 +265,7 @@ The two paths this entry was weighing, kept because the reasoning still applies 
 
 🐛 **The defect this iteration existed to find: `[data-revealed]` set `clip-path: inset(0 0 0 0)` on every revealed node.** That is not "no clip" — it is *clip to my own axis-aligned border box*, and a clip-path clips descendants, so the reveal wrapper was slicing the corners off the rotated plates. They rendered as polygons, not rectangles, and their frame was cut with them. Now `clip-path: none`, with `wipe` keeping its own `inset()` rule because it actually animates the property. ⚠️ **A first pass misdiagnosed the missing frame as a border-vs-rasterised-layer problem and moved it to an `outline`; that was reverted** — a plain `border` renders perfectly on a rotated plate once nothing is clipping it.
 
-🔓 **The public page ground is a flat grey (`#f2f2f3`) site-wide.** `bg-misa-panel` on the public layout's `<main>` — 🪤 not on `body`, which is what keeps `/admin` on the outgoing white system. `Section`'s `white` ground was renamed `page` and a real `white` took the name; `paper` and `.ground-paper` were retired. 🐛 The audit that made it safe: `controlClass`, the sticky `<THead>`, `FilterChip` and the neutral `Banner` all fill with the *same* `bg-misa-panel`, so `/attend`, `/lookup`, `/leaderboard` and the gallery filter bar took `ground="white"` rather than those four shared primitives being recoloured. **The grey is the background; cards stay white.**
+🔓 **The public page ground is a flat grey (`#f2f2f3`) site-wide.** `bg-misa-panel` on the public layout's `<main>` — 🪤 not on `body` — and that still holds now that `/admin` has the same ground: the admin shell paints its OWN `<main>` (phase 4), and `body` stays `#ffffff` on both sides so white surfaces have something to lift off. `Section`'s `white` ground was renamed `page` and a real `white` took the name; `paper` and `.ground-paper` were retired. 🐛 The audit that made it safe: `controlClass`, the sticky `<THead>`, `FilterChip` and the neutral `Banner` all fill with the *same* `bg-misa-panel`, so `/attend`, `/lookup`, `/leaderboard` and the gallery filter bar took `ground="white"` rather than those four shared primitives being recoloured. **The grey is the background; cards stay white.**
 
 ✂️ **All four seams around the gallery bands are 64px at desktop**, down from 112px. The mission and Activities gave up their `lg` steps. 📌 The bottom band's `padBottom` is one step larger than its `padTop`, because below it the navy Projects field starts immediately and there is no light neighbour to bring the other half.
 
@@ -318,7 +318,7 @@ Requested as "a comprehensive rework of the misa website — core logic remains,
 
 📌 **The drift, measured, which is the case for the whole exercise.** `/admin` imported **two** things from `components/ui/`. It had **37 `rounded-full` pills** across 26 files against a system whose first rule is `rounded: none`, **three** button dialects, a local `Field` **redefined verbatim in nine files**, an input class redeclared in **eleven files with four distinct values**, the status pill reimplemented **four times plus ~15 inline**, and the `notice.tsx` literal written out **26 times across 20 files** while 12 files imported the component that already existed.
 
-📌 **New in the system, not merely tidied:** a spacing scale and easing/duration tokens (`@theme` had none at all); a three-ink **status palette** with washes, replacing ~40 uses of raw Tailwind `red-700`/`amber-700`/`green-800`; **five reveal variants** chosen by what an element is; themed browser surfaces (selection, caret, scrollbar, underline offset); **row hover** on all eight admin tables; one disabled threshold where three were in use; and a keyboard-reachable disabled nav item where a `<span>` had been invisible to assistive tech.
+📌 **New in the system, not merely tidied:** a spacing scale and easing/duration tokens (`@theme` had none at all); a three-ink **status palette** with washes, replacing ~40 uses of raw Tailwind `red-700`/`amber-700`/`green-800`; **five reveal variants** chosen by what an element is; themed browser surfaces (selection, caret, scrollbar, underline offset); **row hover** in the shared `Table` component (⚠️ NOT on the admin tables themselves — none of them used the component until v2 phase 4, so the hover shipped unreachable and this line overstated it for twelve days); one disabled threshold where three were in use; and a keyboard-reachable disabled nav item where a `<span>` had been invisible to assistive tech.
 
 🪤 **Two defects found by measuring rather than looking.**
 - A lateral reveal offset of 24px against the 20px phone gutter gave every phone a horizontal scrollbar until the rows revealed — 390px: `scrollWidth` 379 vs `clientWidth` 375, on `/`, `/about` and `/projects`. The travel is now `md`-and-up, which is also right compositionally since those rows are one column on a phone.
@@ -330,7 +330,7 @@ Requested as "a comprehensive rework of the misa website — core logic remains,
 
 **Verified:** `npm run lint`, `npx tsc --noEmit`, `npm run build` and `tests/docs.test.ts` all clean; `npx supabase start` rebuilt the stack from migrations + seed; browser pass over the nine public routes plus `/admin/login`; nav wordmark clearance re-measured at 1646 (left group ends x=331, wordmark starts x=791 — unchanged).
 
-**Open:** `/admin`'s authed screens were **not** visually confirmed — that needs an officer sign-in, and passwords are not something the agent enters. `.impeccable/design.json`'s `components` array still carries pre-rework demos (hand-synced rather than regenerated, because `/impeccable document` would overwrite DESIGN.md's hand-written reasoning). `web-design-guidelines` review not yet run.
+✅ **CLOSED by v2 phase 4 (2026-08-29).** `/admin`'s authed screens were walked in a browser against local seed data — 20 screens, 166 contrast pairings, 0 failures — behind a **local-only dev officer created for the walkthrough and revoked after**, which is how the sign-in problem was solved without anyone typing a real password. `web-design-guidelines` was run: 28 findings, the ones in phase-4 primitives fixed and five listed above for the officer. ⬅️ **Still open:** `.impeccable/design.json`'s `components` array carries pre-rework demos (hand-synced rather than regenerated, because `/impeccable document` would overwrite DESIGN.md's hand-written reasoning).
 
 ---
 

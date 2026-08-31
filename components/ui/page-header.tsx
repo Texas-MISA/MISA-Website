@@ -1,8 +1,11 @@
 // The page title block.
 //
-// 📌 Thirteen admin pages open with the same three elements — a title, an
+// 📌 Thirteen admin pages opened with the same three elements — a title, an
 // optional primary action baselined against it, and a description capped at
-// `max-w-2xl` — written out longhand every time.
+// `max-w-2xl` — written out longhand every time. ⚠️ Past tense since v2 phase
+// 4, which is when this component got its first call site: it shipped with
+// ZERO and the longhand went on being written for twelve days. By then it was
+// 25 pages, not thirteen.
 //
 // 🪤 **The title weight is a drift fix, not a restyle.** Those pages set
 // `font-display text-3xl font-extrabold`, and DESIGN.md's Two-Width Rule puts
@@ -97,7 +100,8 @@ export function PageHeader({
 
 /**
  * The heading for a section within a page — the `font-display text-xl font-bold`
- * that appears 38 times across /admin, likewise corrected to the 600 step.
+ * that **appeared** 38 times across /admin, likewise corrected to the 600 step.
+ * (Past tense since v2 phase 4; there are no raw `<h2>`s under `app/admin` now.)
  *
  * 📌 **Two levels, because /admin genuinely has three.** Counted at the start of
  * phase 4: 38 section headings at 22px and 7 sub-headings at 18px, each written

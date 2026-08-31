@@ -9,7 +9,9 @@ import type { Database } from "@/lib/types/database";
 // Takes the client as a parameter, matching lib/event-options.ts and
 // lib/admin-profiles.ts, so it stays testable and carries no server-only guard.
 //
-// Active members only, bounded by MEMBER_SCAN_LIMIT: this is a scan rather than
+// ⚠️ The WHOLE roster since migration 29 dropped `members.active` — so
+// MEMBER_SCAN_LIMIT bites sooner than it did when this read active members only.
+// Bounded by MEMBER_SCAN_LIMIT: this is a scan rather than
 // a search, for the reason recorded on that constant — `ilike '%jon%'` cannot
 // match `John`, so a probe-based candidate set structurally excludes the row the
 // officer is looking for. Callers that need to filter do it over the returned

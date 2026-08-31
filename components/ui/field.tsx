@@ -7,6 +7,14 @@
 // only four distinct values between them. Nothing was shared because
 // `components/ui/` had no form vocabulary to share.
 //
+// ⚠️ **Two of those nine outlived the extraction and were only folded in at v2
+// phase 4** — the resolution form's and the custom-field form's, both now thin
+// adapters that reshape `error` and nothing else. Each had drifted while it
+// sat there: one gave its errors no `role="alert"` and coloured them
+// `--misa-caution` on a field that had just refused a save, and the other put
+// its hint inside the `<label>`, which is the accessible-name bug the component
+// doc below describes. **A duplicate left standing does not stay still.**
+//
 // 📌 The skin follows DESIGN.md's Text Field: a Vellum interior, square, at the
 // FRAME border weight (1px `--misa-border`) rather than the heavier
 // `border-black/70` the admin had been shipping.
@@ -92,8 +100,11 @@ export type FieldProps = {
 };
 
 /**
- * Label, optional hint, control, optional error — wrapped in a `<label>`, so
- * the association needs no id plumbing at the call site.
+ * Label, optional hint, control, optional error. **The call site passes no id** —
+ * this component generates one and wires the explicit `<label htmlFor>` itself.
+ *
+ * *(It wrapped everything in a `<label>` for implicit association until v2
+ * phase 4; the paragraph below is why that had to change.)*
  *
  * 🐛 **The hint and the error sit OUTSIDE the `<label>`, and that is an
  * accessible-name fix rather than a layout preference.** Everything inside a

@@ -1,6 +1,9 @@
 # Frontend redesign v2 — plan
 
-**Status: NOT BUILT.** Written 2026-08-17, after v1 was built and scrapped.
+**Status: PART-BUILT.** ✅ Phases 0, 1, 2 and **4** are complete and recorded
+below. ⏸️ **Phase 3 is deferred** (taken out of order at the officer's request);
+phase 5 is outstanding. *Written 2026-08-17 as "NOT BUILT", after v1 was built
+and scrapped — the phase records below are the history since.*
 Supersedes [`frontend-redesign-plan.md`](frontend-redesign-plan.md) wherever the
 two disagree; that document's decision table is partly reversed below.
 
@@ -389,21 +392,32 @@ transcribed by hand off a phone screen, which is data, not flavour.
 
 ### What the audit found before anything was designed
 
-Counted, not guessed:
+⚠️ **Every count below is AS THE PHASE OPENED and is now history** — the phase is
+what changed each one. The "after" column is the point.
 
-- 🐛 **`PageHeader` and `SectionHeading` have ZERO call sites in the entire
-  repository.** Both were written *for* `/admin` — their own doc comments say
-  "thirteen admin pages open with the same three elements … written out longhand
-  every time" and "the `font-display text-xl font-bold` that appears 38 times" —
-  and neither was ever wired up. `Panel` has exactly one call site, on `/attend`.
-  **Three primitives were built to end this drift and the drift was never ended.**
-- **25 admin pages repeat one identical h1 class string, verbatim.**
-  `/admin/login` is the single outlier and is off the ramp (`text-3xl`, different
-  tracking).
-- **42 h2s: 38 identical at `text-[22px]`, plus 3 `text-xl` and 1 `text-lg`.**
-  Those four are drift the swap fixes rather than preserves.
-- 43 of 76 admin `.tsx` files already import from `components/ui/`. **The control
-  vocabulary is adopted; the page-level structure is not.** That is the whole gap.
+📌 Counts are **JSX instances** under `app/`, measured the same way on both
+sides so the columns are comparable.
+
+| Counted when phase 4 opened | After |
+|---|---|
+| 🐛 `PageHeader` — **0 call sites in the entire repository** | 25, all admin |
+| 🐛 `SectionHeading` — **0 call sites in the entire repository** | 46, all admin |
+| 🐛 `Table` — **0 admin call sites** (2 public) | 17 (13 admin) |
+| `Panel` — **1 call site**, on `/attend` | 23 (21 admin) |
+| `Section` — 0 admin call sites | **0 admin, deliberately** (28 public) |
+| 25 admin pages repeating **one identical h1 class string, verbatim** | 1 raw `<h1>` (`/admin/login`, a recorded exception) |
+| 42 h2s: 38 at `text-[22px]`, plus 3 `text-xl` and 1 `text-lg` | 0 raw `<h2>`, 0 `text-[22px]` |
+| 11 raw `<table>`, 47 copies of one head-cell string | 0 of each |
+| 43 of 76 admin `.tsx` files importing from `components/ui/` | 71 of 76 |
+
+`PageHeader` and `SectionHeading` were both written *for* `/admin` — their own
+doc comments say "thirteen admin pages open with the same three elements …
+written out longhand every time" and "the `font-display text-xl font-bold` that
+appears 38 times" — and neither was ever wired up. **Three primitives were built
+to end this drift and the drift was never ended.**
+
+📌 The one h1 that stays raw is `/admin/login`'s: a centred card outside the
+shell, recorded as a ramp exception in `DESIGN.md` rather than left as drift.
 
 ### The ground, and the ordering constraint that governs the phase
 
@@ -942,7 +956,9 @@ JS off**, all four project cells uniform at every width. Lint, `tsc`, build clea
   band under it were both tried and reversed the same day.
 - 🔓 **The light ground is a FLAT GREY, site-wide, and `paper` is retired.**
   `bg-misa-panel` on the public layout's `<main>` — not on `body`, which is what
-  keeps `/admin` white. `Section`'s `white` was renamed `page` (paints nothing,
+  kept `/admin` white *(⚠️ until phase 4, which put the same grey on the admin
+  shell's own `<main>`; `body` still is not the carrier, and that is what keeps
+  white surfaces liftable on both sides)*. `Section`'s `white` was renamed `page` (paints nothing,
   inherits the grey) and a real `white` took the name, used only by the four
   sections that carry controls. Grounds run **field → grey → grey → grey → grey
   → field → grey**, with white reserved for cards and forms.

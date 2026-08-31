@@ -1,17 +1,24 @@
 // The table vocabulary.
 //
-// 📌 Eight admin tables and two on /lookup were written out longhand, and the
-// head-cell string `py-2 pr-4 font-medium` alone appears 47 times. The frames
-// disagreed: most heads were `border-b-2 border-black`, the member directory
-// used `border-2 border-black` with a sticky `bg-misa-panel` head, and
+// 📌 Eight admin tables and two on /lookup HAD been written out longhand, with
+// the head-cell string `py-2 pr-4 font-medium` alone appearing 47 times.
+// ⚠️ Past tense since v2 phase 4, and the gap between the two is the lesson:
+// this component existed for twelve days with ZERO admin call sites while all
+// 47 copies stayed exactly where they were. Extracting a primitive is half the
+// job.
+//
+// The frames disagreed: most heads were `border-b-2 border-black`, the member
+// directory used `border-2 border-black` with a sticky `bg-misa-panel` head, and
 // /leaderboard used a plain `border-b border-misa-border`. Three weights for
 // one rule, and only the last of them was on-system — a drafting set separates
 // with hairlines, not with a 2px black bar.
 //
-// 📌 **Row hover is new and is the point of the exercise.** Not one of the
-// eight admin tables had a hover state, and the member directory routinely runs
-// to several hundred rows — an officer tracking across twelve columns had
-// nothing holding the line together.
+// 📌 **Row hover was the point of the exercise, and it took phase 4 to land.**
+// Not one of the eight admin tables had a hover state, and the member directory
+// routinely runs to several hundred rows — an officer tracking across twelve
+// columns had nothing holding the line together. ⚠️ Shipping the hover here in
+// August fixed none of that, because none of those tables used this component
+// until phase 4 adopted it; `tasks.md` claimed the win for twelve days.
 //
 // 🪤 Head cells are uppercase label type, which makes the head scannable but
 // makes a LONG header wrap badly. Pass `wrap` where a column title is a phrase

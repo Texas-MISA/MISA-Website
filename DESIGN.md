@@ -192,9 +192,11 @@ pages, which now read as one family. 🪤 Centring is `text-center` **plus**
 `mx-auto` on both the headline and the subhead: each carries a `max-w` measure,
 and centred text inside an off-centre column reads as a bug rather than a choice.
 
-- 🪤 **It is on `<main>`, not on `body`.** `body` is shared with `/admin`, which
-  still runs v1 and must stay white until phase 4. `<Section>` has zero admin
-  call sites, which is what makes this containable.
+- 🪤 **It is on `<main>`, not on `body`** — and that stayed true when `/admin`
+  took the same ground in phase 4: the admin shell paints its *own* `<main>`.
+  `body` keeps `--background: #ffffff` on both sides, which is what every white
+  surface is lifted off. `<Section>` still has zero admin call sites, which is
+  what kept the two grounds independent while only one of them had moved.
 - 🪤 **`--background` stays `#ffffff` and must.** `.sheet`, the bento cards and
   the partner cells are *lifted white surfaces*, and a surface only reads as
   lifted off a ground that is not its own colour. **The grey is the background;

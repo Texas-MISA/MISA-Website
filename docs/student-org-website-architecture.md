@@ -205,7 +205,7 @@
 > easing/duration tokens (`@theme` had none); a three-ink **status palette** with
 > washes, replacing the undocumented Tailwind colours; **five reveal variants**
 > chosen by what an element is, replacing one universal entrance; themed browser
-> surfaces (selection, caret, scrollbar, underline offset); **row hover** on all
+> surfaces (selection, caret, scrollbar, underline offset); **row hover** in the shared `Table` component (⚠️ not on the admin tables — they did not adopt it until v2 phase 4) rather than on all
 > eight admin tables; and one disabled threshold where three were in use.
 >
 > 🪤 **Two defects found by measuring rather than looking.** A lateral reveal
@@ -4022,10 +4022,15 @@ Two, and they earn a place here on the bar #12 and #13 set: the first changes wh
   gallery-photos.ts          galleryPhotos() — lists public/photos/gallery at
                              build time for the home page's marquee. Imports
                              node:fs, so it is server-only; returns [] when the
-                             directory is absent, which is the production case
-                             because public/photos/ is gitignored
-  member-options.ts          bounded active-roster scan, shared by the
-                             resolution form, manual entry, grant picker
+                             directory is absent. ⚠️ That is NO LONGER the
+                             production case — public/photos/ has been
+                             COMMITTED since 2026-08-19 (143 tracked files);
+                             only pictures/, the raw library, is gitignored
+  member-options.ts          bounded WHOLE-roster scan, shared by the
+                             resolution form, manual entry, grant picker.
+                             ⚠️ Active-only until migration 29 dropped
+                             members.active — so MEMBER_SCAN_LIMIT (400)
+                             bites sooner than it used to
   admin-profiles.ts          fetchOfficerNames — actor_id FKs auth.users,
                              which has no PostgREST path to admin_profiles
   utils.ts                   `cn()` — clsx + tailwind-merge. Created by
@@ -4222,10 +4227,12 @@ Two, and they earn a place here on the bar #12 and #13 set: the first changes wh
                                        public layout so the animated sections
                                        stay Server Components)
 /public
-  /partners                  four partner logos, and the only images the site
-                             serves. /photos was deleted in v1.59 — see the
-                             entry, and note that unlinking would not have been
-                             the same thing as deleting
+  /partners                  four partner logos. ⚠️ NO LONGER the only images
+                             the site serves — /photos was deleted in v1.59
+                             and came BACK committed on 2026-08-19, 143 files,
+                             officer decision. The v1.59 note still stands on
+                             its own point: unlinking is not deleting, and a
+                             public repo makes a committed face unrecallable
 proxy.ts                     admin route protection (Next 16 rename of middleware.ts)
 ```
 
