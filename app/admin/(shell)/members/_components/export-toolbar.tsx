@@ -186,14 +186,41 @@ export function ExportToolbar({
           Download CSV
         </Download>
 
+        {/* The announcement, separate from the visible text below.
+            "Copied 40 addresses." was visible-only, and the clipboard gives no
+            other feedback — so a screen-reader user had no way to know whether
+            the copy worked.
+
+            🪤 Two things force this shape. A live region must be in the DOM
+            BEFORE its contents change, so it cannot be one of the conditional
+            spans below — those mount already carrying their text, which is
+            frequently missed. And it cannot be a wrapper around them either:
+            the row is `flex … gap-2`, so an always-mounted wrapper is a flex
+            item even when empty and would put 8px of dead air between the
+            download links and the field hint. `sr-only` is absolutely
+            positioned, so it leaves the flow and cannot move anything. */}
+        <span role="status" className="sr-only">
+          {status.kind === "working" ? "Working…" : ""}
+          {status.kind === "done" || status.kind === "failed"
+            ? status.message
+            : ""}
+        </span>
+
         {status.kind === "working" && (
-          <span className="text-sm text-misa-secondary">Working…</span>
+          <span className="text-sm text-misa-secondary" aria-hidden="true">
+            Working…
+          </span>
         )}
         {status.kind === "done" && (
-          <span className="text-sm font-medium">{status.message}</span>
+          <span className="text-sm font-medium" aria-hidden="true">
+            {status.message}
+          </span>
         )}
         {status.kind === "failed" && (
-          <span className="text-sm font-medium text-misa-critical">
+          <span
+            className="text-sm font-medium text-misa-critical"
+            aria-hidden="true"
+          >
             {status.message}
           </span>
         )}

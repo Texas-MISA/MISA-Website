@@ -183,6 +183,16 @@ function InviteLink({ url, email }: { url: string; email: string | null }) {
         >
           {copied ? "Copied" : "Copy"}
         </button>
+
+        {/* 🪤 The panel's own `role="status"` (above) does NOT cover this. It
+            mounts together with the invite, before any copy happens, and a
+            label swapping Copy → Copied inside an already-announced region is
+            not reliably re-announced. This is the one place where silence is
+            expensive: the link is shown exactly once, and an officer who
+            believes they copied it and pasted nothing has burned an invite. */}
+        <span role="status" className="sr-only">
+          {copied ? "Invitation link copied to the clipboard." : ""}
+        </span>
       </div>
       <p className="mt-2 text-xs text-misa-secondary">
         This is the only time it can be shown — only a fingerprint of it is
