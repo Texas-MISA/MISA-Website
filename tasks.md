@@ -81,11 +81,29 @@ no status *and no date* filter, so it cancels past and already-cancelled events
 too, with no series-level undo. Narrowing the action was offered and **not
 chosen** — a deliberate non-change, not an oversight.
 
-⚠️ **VERIFICATION IS INCOMPLETE.** `tsc`, lint and `build` are clean and 1094
-tests pass, but the suite is entirely server/lib/db — **no component or DOM test
-covers any of this**, which is the same blind spot that let the `members.active`
-defect ship green. ⬅️ **The browser walkthrough is still owed** and is the only
-thing that can confirm these five actually work.
+✅ **VERIFIED IN A BROWSER (2026-08-31)**, against the local stack behind a
+local-only officer that was revoked afterwards. All five exercised for real:
+the event-form guard armed on Cancel and **did not** arm on a clean form, and
+`beforeunload` fired (the automation's own navigation was refused); the series
+confirm read **"Cancel all 5 events in this series?"** on a 6-event series
+holding one already-cancelled occurrence — the count the fix exists to get
+right; all four disabled buttons showed their reason on screen with the `title`
+gone; the invite copy announced *"Invitation link copied to the clipboard."* in
+its own region; and the caps strip proved out as sentence-case DOM under
+`text-transform: uppercase`.
+
+🐛 **The walkthrough found one defect, and nothing else could have.** The new
+DELETE explanation rendered **"20 check-insrecorded"** — a space that is present
+in the source did not survive into the server-rendered output. Fixed with an
+explicit `{" "}`. **lint, `tsc`, `build` and 1094 tests were all green with it
+live**, which is the same lesson as the `members.active` defect: a green suite
+is not verification of a UI change.
+
+🪤 **A local trap that cost most of the session and is not a code defect:**
+browsing the dev server on **`127.0.0.1` instead of `localhost`** makes Next 16
+block `/_next/*` as cross-origin, so **no page hydrates** — every control
+renders and nothing responds. It looks exactly like a broken build. Use
+`localhost`, or set `allowedDevOrigins`.
 
 ⏸️ **Phase 3 is deferred and its debt is NOT absorbed.** `/attend`,
 `/leaderboard` and `/lookup` still carry the `--misa-muted`-on-Vellum AA failure;

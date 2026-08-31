@@ -691,7 +691,42 @@ already sentence case.
 there are no component or DOM tests. 1094 pass before and after, which proves
 only that nothing server-side regressed — the same blind spot that let the
 `members.active` defect ship with a green suite. **The browser walkthrough is the
-verification, and it is still OUTSTANDING at the time of writing.**
+verification.**
+
+### ✅ Walked in a browser, and it found a defect (2026-08-31)
+
+Local stack, local-only officer, revoked afterwards. Every one of the five was
+exercised rather than inspected:
+
+- **Guard:** armed on Cancel with the typed title intact, "Keep editing" restored
+  it, "Discard" navigated — and it did **not** arm on a clean form. `beforeunload`
+  proved itself by refusing the automation's own navigation while dirty. The
+  confirm's buttons did not submit the form, so the `type="button"` trap holds.
+- **Series:** a 6-event series with one already-cancelled occurrence read
+  **"Cancel all 5 events in this series? This cannot be undone."** — the
+  discrimination the whole fix exists for — beside "Publish all 3 drafts".
+- **Disabled buttons:** all four disabled, `title` absent, reason on screen, and
+  APPROVE selected the correct branch for the row's state.
+- **Announcements:** the export toolbar's region went `""` → `"Working…"` outside
+  any `aria-hidden` wrapper, with the visible copy `aria-hidden` so it is not
+  read twice; the invite copy announced *"Invitation link copied to the
+  clipboard."* from its own region while the panel's pre-existing one sat
+  separate, exactly as designed.
+- **Caps:** DOM `Sign out` / `Assign` under computed `text-transform: uppercase`.
+
+🐛 **One defect, and only a browser could have found it.** The new DELETE
+explanation rendered **"20 check-insrecorded"**: a space that is present in the
+source at byte level did not survive into the server-rendered output
+(`check-ins<!-- -->recorded`). Fixed with an explicit `{" "}`. 🪤 **A structurally
+identical block in `series-actions.tsx` rendered correctly**, so it does not
+reproduce by reading the source. Rule recorded in `docs/invariants.md`.
+
+🪤 **Most of the session went to a local trap that was not a code defect at
+all:** browsing the dev server on **`127.0.0.1` rather than `localhost`** makes
+Next 16 treat `/_next/*` as cross-origin and block it, so **nothing hydrates** —
+every control renders and none respond, with no console error. It is
+indistinguishable from a broken branch until you read the dev-server log, which
+says so plainly. Use `localhost`, or set `allowedDevOrigins`.
 
 ### Measured at the gate
 

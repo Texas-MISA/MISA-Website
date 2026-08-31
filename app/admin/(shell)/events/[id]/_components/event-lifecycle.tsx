@@ -131,9 +131,13 @@ export function EventLifecycle({
             which the general sentence cannot. */}
         {attendanceCount > 0 && (
           <span className="text-xs text-misa-muted">
+            {/* 🪤 Both spaces are explicit `{" "}`. A plain space between an
+                expression and the text that follows it does NOT survive here —
+                the walkthrough caught this rendering as "20 check-insrecorded".
+                Never rely on source whitespace next to a JSX expression. */}
             This event has {attendanceCount}{" "}
-            {attendanceCount === 1 ? "check-in" : "check-ins"} recorded, so it
-            can&apos;t be deleted — cancel it instead.
+            {attendanceCount === 1 ? "check-in" : "check-ins"}{" "}
+            recorded, so it can&apos;t be deleted — cancel it instead.
           </span>
         )}
       </div>

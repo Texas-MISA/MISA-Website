@@ -565,3 +565,32 @@ alone.
 
 📌 **Narrowing the action itself was offered to the officer and not chosen.**
 Recorded as a deliberate non-change, not an oversight.
+
+### A space next to a JSX expression is not reliable — write `{" "}`
+
+🪤 **Caught by the walkthrough, invisible to every automated check.** This
+rendered as **"20 check-insrecorded"** on the event detail:
+
+```jsx
+This event has {attendanceCount}{" "}
+{attendanceCount === 1 ? "check-in" : "check-ins"} recorded, so it
+can&apos;t be deleted — cancel it instead.
+```
+
+The space before `recorded` **is in the source** — confirmed at byte level — and
+did not survive into the server-rendered output, which came out as
+`check-ins<!-- -->recorded`. The line above it already used `{" "}` for exactly
+this reason, so the file demonstrated both the trap and its fix at once.
+
+**The rule: never rely on source whitespace adjacent to a JSX expression when the
+text also wraps across lines. Write `{" "}` explicitly.**
+
+⚠️ **A structurally identical block a few files away rendered correctly**
+(`series-actions.tsx`'s "Cancel all 5 events in this series?"), so this does not
+reproduce on inspection and cannot be found by pattern-matching the source. The
+difference tracked server-rendered vs client-rendered output. **Read the rendered
+text, not the JSX** — `textContent` in a browser, where `innerHTML` also shows
+React's `<!-- -->` separators and makes the missing child obvious.
+
+📌 `npm run lint`, `npx tsc --noEmit`, `npm run build` and 1094 tests were all
+clean with this live. It is a defect only a human or a browser can see.
