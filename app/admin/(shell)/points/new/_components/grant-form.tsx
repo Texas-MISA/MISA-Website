@@ -167,13 +167,18 @@ export function GrantForm({
           <button
             type="submit"
             disabled={pending || selected.size === 0}
-            title={
-              selected.size === 0 ? "Pick at least one member first" : undefined
-            }
             className={BUTTON_PRIMARY_SM}
           >
             {pending ? "GRANTING…" : "GRANT POINTS"}
           </button>
+          {/* On screen rather than in a `title`: a disabled button is not
+              focusable, so the tooltip this replaces was unreachable by
+              keyboard and invisible on touch. */}
+          {selected.size === 0 && (
+            <span className="text-xs text-misa-muted">
+              Pick at least one member first.
+            </span>
+          )}
           <span className="text-xs text-misa-muted">
             The term is set from the date; it is never typed.
           </span>

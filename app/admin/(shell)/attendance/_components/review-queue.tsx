@@ -104,12 +104,18 @@ export function ReviewQueue({
           type="submit"
           disabled={pending || selected.size === 0}
           className={BUTTON_PRIMARY_SM}
-          title={
-            selected.size === 0 ? "Tick the rows you want to assign" : undefined
-          }
         >
           {pending ? "ASSIGNING…" : "ASSIGN"}
         </button>
+
+        {/* On screen rather than in a `title`: a disabled button is not
+            focusable, so the tooltip this replaces was unreachable by keyboard
+            and invisible on touch. */}
+        {selected.size === 0 && (
+          <span className="text-xs text-misa-muted">
+            Tick the rows you want to assign.
+          </span>
+        )}
       </Panel>
 
       <AttendanceTable

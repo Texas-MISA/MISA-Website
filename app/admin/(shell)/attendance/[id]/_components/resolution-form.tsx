@@ -127,6 +127,28 @@ function Fields({
   });
   const canApproveNow = Boolean(links.eventId && links.memberId);
 
+  /**
+   * Why Approve is unavailable, or null when it is available.
+   *
+   * The JS mirror of `present_requires_resolution`. The constraint is still the
+   * guarantee; this is so the officer gets a sentence instead of a 23514.
+   *
+   * 📌 One expression, rendered in one place. It used to live inline in the
+   * button's `title`, where it reached nobody: a disabled button is not
+   * focusable, so the tooltip was unreachable by keyboard and invisible on
+   * touch.
+   */
+  const approveBlockedReason =
+    status === "present"
+      ? "Already approved."
+      : canApproveNow
+        ? null
+        : !links.eventId && !links.memberId
+          ? "Pick an event and a member first — an approved row must have both."
+          : !links.eventId
+            ? "Pick an event first — an approved row must have one."
+            : "Link a member first — an approved row must have one.";
+
   return (
     <>
       <form action={formAction} className="flex flex-col gap-5 border border-misa-border bg-white px-4 py-3">
@@ -252,24 +274,20 @@ function Fields({
             name="intent"
             value="approve"
             disabled={pending || !canApproveNow || status === "present"}
-            title={
-              status === "present"
-                ? "Already approved"
-                : canApproveNow
-                  ? undefined
-                  : // The JS mirror of present_requires_resolution. The
-                    // constraint is still the guarantee; this is so the officer
-                    // gets a sentence instead of a 23514.
-                    !links.eventId && !links.memberId
-                    ? "Pick an event and a member first — an approved row must have both"
-                    : !links.eventId
-                      ? "Pick an event first — an approved row must have one"
-                      : "Link a member first — an approved row must have one"
-            }
             className={BUTTON_PRIMARY_SM}
           >
             {pending ? "SAVING…" : "APPROVE"}
           </button>
+
+          {/* Why Approve is dead, on screen rather than in a `title`.
+              A disabled button is not focusable, so a tooltip on one is
+              unreachable by keyboard and invisible on touch — and this was the
+              only sentence saying why the officer cannot approve. */}
+          {approveBlockedReason && (
+            <span className="text-xs text-misa-muted">
+              {approveBlockedReason}
+            </span>
+          )}
         </div>
       </form>
     </>

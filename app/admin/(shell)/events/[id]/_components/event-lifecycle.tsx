@@ -115,16 +115,27 @@ export function EventLifecycle({
           <button
             type="submit"
             disabled={deletePending || attendanceCount > 0}
-            title={
-              attendanceCount > 0
-                ? "Events with recorded check-ins can't be deleted — cancel instead"
-                : undefined
-            }
             className={`${buttonClass} border-misa-critical/50 text-misa-critical`}
           >
             DELETE
           </button>
         </form>
+
+        {/* On screen rather than in a `title`: a disabled button is not
+            focusable, so the tooltip this replaces was unreachable by keyboard
+            and invisible on touch.
+
+            📌 The <p> below already states the rule, but generically and in
+            the abstract. This says it about THIS event, at the moment the
+            officer has just found the button dead — and it names the count,
+            which the general sentence cannot. */}
+        {attendanceCount > 0 && (
+          <span className="text-xs text-misa-muted">
+            This event has {attendanceCount}{" "}
+            {attendanceCount === 1 ? "check-in" : "check-ins"} recorded, so it
+            can&apos;t be deleted — cancel it instead.
+          </span>
+        )}
       </div>
 
       <p className="text-xs text-misa-muted">
