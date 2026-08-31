@@ -597,6 +597,14 @@ half is worth anything.**
 
 - 📌 **Buttons are class strings, not components**, because every call site is
   already an `<a>`, a `<Link>` or a `<button>`.
+- 🔓 **Button labels are written in SENTENCE CASE; `button.tsx`'s `BASE` applies
+  `uppercase`.** The caps are a *presentation* decision and live in exactly one
+  place. Writing them in the markup as well is pure duplication — identical on
+  screen, but it reaches assistive technology, translation and the clipboard as
+  caps, and some screen readers spell short all-caps strings out letter by
+  letter. Normalised across `/admin` on 2026-08-31 (55 labels, 22 files).
+  🪤 A caps grep has two false positives here: **`EID` is an acronym**, not a
+  styled label, and **`INITIAL` is a constant identifier**.
 - 📌 **`PageHeader` owns the title, the badge, the back link and the
   description**, in that visual order. 🪤 **The back link renders ABOVE the
   title**, reversing where all eleven admin screens had it: a back link is an

@@ -1,9 +1,21 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.77
+**Version:** 1.78
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0, 1, 2 and 4 complete; phase 3 deferred; phase 5 outstanding.**
 **Last updated:** August 2026
 
+> **v1.78: the five accessibility findings phase 4 held back are all decided and built.**
+>
+> Officer decisions, 2026-08-31, on the `v2-phase-4-admin` branch. Five commits, `b4898f4` → `cf00cfb`. 📌 **This is the first phase-4 work that is NOT presentation-only** — it changes behaviour and user-visible copy by decision, which is precisely why these five were held for an officer instead of being absorbed. Still no route, view or schema change, so §2–§6 do not move.
+>
+> - ✅ **Unsaved-changes guard on the EVENT FORM ONLY** (the notes editor was deliberately left alone). 🔓 **`<Link onNavigate>` is the only navigation blocker this Next version has** — it is per-`<Link>`, and App Router's `useRouter` has no router events and no `beforePopState`. So the guard is **honestly partial: Cancel and browser unload only**, with the admin nav and browser Back/Forward out of reach and the code saying so rather than implying coverage.
+> - ✅ **"Cancel whole series" now confirms, and NAMES THE COUNT.** 🔴 The control was worse than the finding recorded: `setSeriesStatus` filters on `series_id` alone — no status, no date — so it cancels drafts, published occurrences and **past** ones alike, with no series-level undo. 📌 **Narrowing the action was offered to the officer and NOT chosen**; recorded as a deliberate non-change.
+> - ✅ **All four disabled buttons explain themselves in visible text**, and the `title`s are removed so each sentence has one source. A `title` on a disabled button reaches nobody — `disabled` removes it from the tab order.
+> - ✅ **`aria-live` on the invite-link copy and the export toolbar.**
+> - ✅ **Caps stripped from button labels** — 55 labels, 22 files, its own commit; `components/ui/button.tsx` already applies `uppercase`.
+> - ⚠️ **Two of the five findings were WRONG about the code**, and each would have aimed the work at the wrong file: the `aria-live` one named a cell that already announced, and the `title` one said "two" buttons where there are four. **A review is a set of claims, not an inventory** — re-derive against the code, including findings this project wrote down itself.
+> - ⚠️ **`npm test` cannot see any of this.** `tests/` is entirely server/lib/db; 1094 pass before and after. That is the same blind spot as v1.77's defect below, and the **browser walkthrough remains the verification**.
+>
 > **v1.77: `/admin` is on the v2 system, and three officer screens were found broken by migration 29.**
 >
 > v2 phase 4, 2026-08-29, on the `v2-phase-4-admin` branch. **Presentational only — no route, Server Action, `lib/`, view or schema change**, so nothing in §2–§6 moves. Recorded here for the three decisions and the one defect.
@@ -11,7 +23,7 @@
 > - 🔴 **Migration 29 broke three officer screens and no test caught it.** `members.active` was dropped, and three PostgREST `.select()` strings still named it — the submission detail, the dues detail and the points ledger — so each answered `column members_1.active does not exist` and rendered its error boundary. **The suite was green with the bug live**, because nothing type-checks the inside of a quoted select string. 📌 The rule this adds: **a dropped column is a grep of every quoted select, not a compile error**, and the browser walkthrough is what found it.
 > - 🔓 **The officer UI is governed by `impeccable`'s Operate mode, not by `design-taste-frontend`.** That skill is primary for the *public* visual UI (§10); the layout-family budget, the eyebrow cap and the image-slot strategy are public-page instruments that do not reach a filter bar. `/admin`'s bar is scanability — wide tables, dense filter rows, consistent vocabulary — per §2.2's operating context, which puts officers at a desk on a laptop all semester.
 > - 📌 **`<Section>` stays public-only and keeps its zero admin call sites.** It owns the public gutter and vertical rhythm, which `/admin` does not share; `Panel` is the officer surface and the shell layout owns the ground. The admin page ground is `bg-misa-panel` on `app/admin/(shell)/layout.tsx`'s `<main>` — never on `body`, which keeps `--background: #ffffff` for the surfaces lifted off it.
-> - ⚠️ **Five accessibility findings were deliberately LEFT STANDING** rather than folded into a presentational phase, because each is behaviour or user-visible copy: no unsaved-changes guard on two forms; "cancel whole series" with no confirm step; four `title`-only explanations; missing `aria-live` on two async paths; and ALL-CAPS button labels in the DOM at ~25 sites. They are itemised in `tasks.md` and want an officer's answer.
+> - ⚠️ **Five accessibility findings were deliberately LEFT STANDING** rather than folded into a presentational phase, because each is behaviour or user-visible copy: no unsaved-changes guard on two forms; "cancel whole series" with no confirm step; four `title`-only explanations; missing `aria-live` on two async paths; and ALL-CAPS button labels in the DOM at ~25 sites. They are itemised in `tasks.md` and want an officer's answer. ✅ **All five were decided and built on 2026-08-31 — see v1.78 above**, including the two whose descriptions here turned out to be wrong about the code.
 >
 > **v1.76: the roster is TERM-SCOPED, `members.active` is GONE, and `/lookup`'s gate is the EID alone.**
 >

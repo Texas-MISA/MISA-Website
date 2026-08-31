@@ -57,17 +57,35 @@ on the same branch**: the Audit nav item was still keyboard-unreachable
 on something nobody could focus), and the loading skeleton's `sr-only`
 announcement sat inside its own `aria-hidden` wrapper.
 
-⬅️ **Five findings are LEFT STANDING and want the officer**, because each is
-behaviour or user-visible copy rather than presentation:
+✅ **The five findings that wanted the officer are ALL DECIDED AND BUILT
+(2026-08-31)**, five commits `b4898f4` → `cf00cfb`, one per finding:
 
-1. No unsaved-changes guard on the notes editor or the event form.
-2. "CANCEL WHOLE SERIES" has no confirm step, unlike every other destructive
-   control here.
-3. `title`-only explanations in four places, including on two disabled buttons
-   where the `title` is the only sentence saying why the control is dead.
-4. No `aria-live` on the clipboard feedback or the inline field-cell saves.
-5. ALL-CAPS button labels in the DOM at ~25 sites, where the CSS already
-   uppercases them.
+1. ✅ Unsaved-changes guard — **event form only** (officer's call; the notes
+   editor is deliberately left alone). Guards **Cancel and browser unload only**;
+   the admin nav and browser Back/Forward are honestly out of reach.
+2. ✅ "CANCEL WHOLE SERIES" now has the two-click confirm, **naming the count**.
+3. ✅ Visible copy on **all four** disabled buttons; the `title`s are removed so
+   each sentence has one source rather than two that can drift.
+4. ✅ `aria-live` on the invite-link copy **and the export toolbar**.
+5. ✅ Caps stripped — **55 labels, 22 files**, its own commit, 40 insertions /
+   40 deletions and no structural change.
+
+🔴 **Two of the five were wrong about the code, and finding out cost more than
+fixing them.** #4 named the inline field-cell saves, which have had
+`role="status"` all along — the real gap was the export toolbar. #3 said "two"
+disabled buttons; there are **four**. A review is a set of claims, not an
+inventory.
+
+🔴 **The series cancel was worse than recorded:** it updates on `series_id` with
+no status *and no date* filter, so it cancels past and already-cancelled events
+too, with no series-level undo. Narrowing the action was offered and **not
+chosen** — a deliberate non-change, not an oversight.
+
+⚠️ **VERIFICATION IS INCOMPLETE.** `tsc`, lint and `build` are clean and 1094
+tests pass, but the suite is entirely server/lib/db — **no component or DOM test
+covers any of this**, which is the same blind spot that let the `members.active`
+defect ship green. ⬅️ **The browser walkthrough is still owed** and is the only
+thing that can confirm these five actually work.
 
 ⏸️ **Phase 3 is deferred and its debt is NOT absorbed.** `/attend`,
 `/leaderboard` and `/lookup` still carry the `--misa-muted`-on-Vellum AA failure;
@@ -90,12 +108,19 @@ Three officer instructions, same branch, same day as the projects change below.
   `grid-area` rules in a `<style>` tag; document order does not match reading
   order. Every `alt` was empty. It was then checked by eye against a rendered
   contact sheet.
-- 🔴 **Two officers share ONE photograph on the source page** — Daniel Chen and
-  Sanya Pillai, the same asset uuid referenced twice. One is wrong and nothing
-  attributes it, so **both render the labelled `<Hatch>`** rather than putting a
-  real student's face under another student's name. ⬅️ **Needs an officer's
-  answer**; the fix is then two lines (copy the file to
-  `pictures/officers/<slug>.JPG`, rebuild, add one `photo` key).
+- ✅ **RESOLVED the same day — two officers shared ONE photograph on the source
+  page.** Daniel Chen and Sanya Pillai, the same asset uuid referenced twice.
+  One was wrong and nothing attributed it, so both rendered the labelled
+  `<Hatch>` rather than putting a real student's face under another student's
+  name. **The officer settled it out of band**, naming the shared file as
+  Daniel's and supplying a genuinely different photograph for Sanya. Both cards
+  now draw a real, distinct image; all thirteen officers have one. See the two
+  comment blocks in `lib/officers.ts`.
+  📌 **`photo` stays OPTIONAL even so** — the optionality IS the rule, not a
+  leftover of it: the next officer added arrives without a photograph and must
+  render `<Hatch>` rather than borrow somebody else's.
+  *(This bullet claimed both were still placeholders until 2026-08-31. They had
+  not been since 2026-08-23; the line simply never moved.)*
 - ⚠️ **The new page carries NO per-officer LinkedIn links** — only MISA's own
   company page. `linkedin` is optional now: the seven returning officers keep the
   URLs the old roster had (same people), and the six new ones have none. A

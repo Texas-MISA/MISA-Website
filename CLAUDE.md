@@ -228,6 +228,15 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - **`<Section>` owns ground, gutter and vertical rhythm together** — the Two Grounds Rule is structural rather than remembered.
 - 🪤 **Never put `data-reveal` on a node that mounts after first paint.** The observer scans once per pathname; appended tiles sit at `opacity: 0` forever. Gallery grid tiles carry no `data-reveal`.
 
+### Accessible controls (phase 4's five findings, 2026-08-31)
+
+- 🔴 **A `title` on a DISABLED button reaches nobody** — `disabled` removes it from the tab order, so the tooltip is unreachable by keyboard and invisible on touch. The reason a control is dead is **visible text beside it**, and the `title` is removed rather than kept, so the sentence has one source. (A `title` on a *non*-disabled element is a different case; `OriginPill` and the self-registered badge keep theirs.)
+- 🪤 **A live region must be in the DOM BEFORE its contents change.** A node that mounts already carrying its text is missed. So it is a separate always-mounted region, never a role on the message node — and never a *wrapper* around conditional siblings in a `flex … gap-*` row, where an empty wrapper is still a flex item and adds a phantom gap. `sr-only` is absolutely positioned and moves nothing.
+- **Button labels are sentence case in the DOM;** `components/ui/button.tsx` already applies `uppercase`. 🪤 `EID` is an acronym and `INITIAL` a constant — both look like hits to a caps grep.
+- 🔓 **`<Link onNavigate>` is the ONLY navigation blocker here.** It is per-`<Link>`; App Router's `useRouter` has no router events and no `beforePopState`. The event form's guard is therefore **Cancel and browser unload only** — the admin nav and browser Back/Forward are out of reach, and the code says so rather than implying coverage. 🪤 Next's own recipe uses `window.confirm`, which this codebase forbids; `beforeunload` is *not* that dialog and is the only option for a tab close. 🪤 A confirm inside a `<form>` needs `type="button"` on every button, so `preset-row`'s nested-`<form>` shape cannot be copied verbatim. 🪤 Only a **saved** state clears a dirty flag.
+- **A destructive control names its blast radius.** `setSeriesStatus` filters on `series_id` alone — no status, no date — so it cancels past and already-cancelled events too, with no series-level undo. 🪤 A stated count must be **exact**: it holds only because `MAX_SERIES_EVENTS` (60) sits under `fetchEvents`' `.limit(200)`.
+- ⚠️ **A review is a set of claims, not an inventory.** Two of these five findings were wrong about the code — the `aria-live` one named a cell that already announced, the `title` one said "two" buttons where there are four. Re-derive against the code, including findings this project wrote down itself.
+
 ## Design
 
 **[`DESIGN.md`](DESIGN.md) is the design source of truth.** It records all v2 design rules — grounds, surfaces, type ramp, photography pipeline, invariants, skill precedence, and which surfaces are NOT YET REBUILT. Read it before any visual change.

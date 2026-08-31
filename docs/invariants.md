@@ -436,3 +436,132 @@ for exactly the same reason it is clean on any other string literal.
 walkthrough surviving as a gate step even when the suite is green, and it is the
 same shape as the marquee wrap defect above: the failure is real, reproducible,
 and invisible to every automated check the project owns.
+
+## Accessible controls in the officer UI (added 2026-08-31, phase 4's five findings)
+
+### A `title` on a disabled button reaches nobody
+
+`disabled` removes an element from the tab order, so a tooltip on one is
+**unreachable by keyboard, unreliable on hover and invisible on touch**. Four
+buttons carried their only explanation there — `resolution-form`'s APPROVE,
+`review-queue`'s ASSIGN, `event-lifecycle`'s DELETE and `grant-form`'s GRANT
+POINTS — so in every case the one sentence saying *why the control is dead*
+reached nobody who needed it.
+
+📌 **This is the phase-4 Audit nav item defect, in four more places.** That one
+was a contrast fix spent on something nobody could focus; these were sentences
+written for someone who could never read them. The same root cause — treating
+`disabled` as a visual state rather than a removal from the interaction model.
+
+**The rule:** the reason a control is disabled is **visible text beside it**, and
+the `title` is removed rather than kept alongside, so the sentence has one source
+rather than two that can drift.
+
+⚠️ A `title` on a **non**-disabled element is a different case — at least
+reachable by hover — and `OriginPill` and the self-registered badge were
+deliberately scoped out on that basis. Their explanations are also long enough
+that rendering them per row would be noise in a busy table.
+
+### A live region must be in the DOM before its contents change
+
+A node that **mounts already carrying its text** is frequently missed by
+assistive technology. Two consequences, both found by trying the obvious thing
+first:
+
+- 🪤 **The invite panel's own `role="status"` does not cover its Copy button.**
+  That region mounts *with* the invite, before any copy happens, and a label
+  swapping `Copy` → `Copied` inside an already-announced region is not reliably
+  re-announced. The copy confirmation needs its **own** always-mounted region.
+  This is the expensive silence: the link is shown exactly once, and an officer
+  who believes they copied it and pasted nothing has burned an invite.
+- 🪤 **It cannot be a wrapper around conditional siblings either.** The export
+  toolbar's row is `flex … gap-2`, so an always-mounted wrapper is a flex item
+  **even when empty** and puts 8px of dead air between the download links and the
+  field hint. `sr-only` is absolutely positioned, leaves the flow, and moves
+  nothing — with the visible spans marked `aria-hidden` so the message is not
+  announced twice.
+
+📌 **`member-field-cell.tsx` already had this right**, which is why the recorded
+finding naming it was wrong. See below.
+
+### A review is a set of claims, not an inventory
+
+Two of the five findings held for the officer were **wrong about the code**, and
+each would have aimed the work at the wrong file:
+
+- The `aria-live` finding named the **inline field-cell saves**. They have
+  carried `role="status"` all along; the real gap was the **export toolbar**.
+- The `title` finding said **two** disabled buttons. There are **four**.
+
+**Re-derive a finding against the code before acting on it**, including one this
+project recorded itself. Both errors survived being written down twice — in
+`tasks.md` and in the v2 plan — because a written finding reads as an inventory.
+
+### Button labels are sentence case in the DOM
+
+`components/ui/button.tsx` applies `uppercase` in its `BASE` constant, so caps in
+the markup are **pure duplication**: identical on screen, but reaching assistive
+technology, translation and the clipboard as caps, and some screen readers spell
+short all-caps strings out letter by letter.
+
+🪤 **Two traps a naive grep walks into:** `EID` is an **acronym**, not a styled
+label, and `INITIAL` is a **constant identifier**. Both look like hits.
+
+🪤 **A third trap is in the tooling, not the code.** The scan script was written
+through a bash heredoc, which collapsed `\s` to `\s`; a JS template literal then
+read that as a literal `s`, so the JSX-text regex matched `s*` and **silently
+replaced nothing while reporting success**. The quoted-label pass had worked,
+which made the run look complete. **Write the script to a file rather than
+through the shell**, and verify a mechanical edit by re-scanning, never by the
+script's own summary.
+
+### There is no global navigation blocker in this Next version
+
+🔓 **`<Link onNavigate>` is the supported way to cancel a client-side
+navigation** — verified in the installed build
+(`node_modules/next/dist/docs/01-app/03-api-reference/02-components/link.md:451`,
+with a "Blocking navigation" section at l.1092 whose stated use case is verbatim
+*"when a form has unsaved changes"*).
+
+⚠️ **It is per-`<Link>`, and nothing covers the rest.** App Router's `useRouter`
+has no router events and no `beforePopState` — that is a Pages-only API. So the
+event form's guard is **honestly partial: Cancel and browser unload only.** The
+admin nav links would need Next's full Context recipe, which also moves the
+confirm away from the control it belongs to; **browser Back/Forward is not
+achievable at all here.** Say so rather than implying coverage that does not
+exist.
+
+🪤 **Next's own recipe calls `window.confirm`; this codebase forbids it**, so the
+armed state is the two-click control from `preset-row.tsx`. But **`beforeunload`
+is not that forbidden dialog** — the rule is about the app opening a blocking
+native dialog as its *own UI*, where a two-click control is strictly better.
+`beforeunload` opens nothing; it registers intent with the browser during
+teardown, and there is no in-app alternative for a tab close.
+
+🪤 **The two-click confirm cannot be copied verbatim into a form.**
+`preset-row.tsx` nests a `<form>`; a confirm inside the event `<form>` must use
+`type="button"` on every button, or it submits the form it exists to guard.
+
+🪤 **Only a saved state clears a dirty flag.** `needs_confirmation`, `invalid`,
+`overlap`, `conflict` and `error` all keep it: nothing was written, the officer's
+values are echoed back into the fields, and losing them is precisely the harm
+being guarded.
+
+### A destructive control must name its blast radius
+
+`setSeriesStatus` updates `.eq("series_id", …)` with **no status filter and no
+date filter** — so "CANCEL WHOLE SERIES" cancels drafts, published occurrences
+and **past** ones alike, and there is no series-level un-cancel: once
+`draftCount` reaches 0 the publish control stops rendering and recovery is
+per-event. **"Cancel the whole series?" and "Cancel all 14 events in this
+series?" are the same click and very different decisions.**
+
+🪤 **A stated count must be exact, or the sentence is a lie.** It is safe only
+because `seriesSchema` caps a series at `MAX_SERIES_EVENTS` (60), under
+`fetchEvents`' `.limit(200)`, so the series view always holds every occurrence.
+Raising either bound past the other turns the confirm into an undercount
+silently — which is why the reasoning lives at the call site rather than here
+alone.
+
+📌 **Narrowing the action itself was offered to the officer and not chosen.**
+Recorded as a deliberate non-change, not an oversight.

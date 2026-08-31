@@ -605,6 +605,94 @@ presentational:
    user-visible copy change across the whole officer side and belongs in its own
    commit.
 
+### ✅ All five resolved by the officer's decision (2026-08-31)
+
+Five commits, `b4898f4` → `cf00cfb`, one per finding, cheapest and most
+defect-like first with the largest mechanical diff isolated last.
+
+📌 **This is the first phase-4 work that is NOT presentation-only.** It changes
+behaviour and user-visible copy by decision, which is exactly why these five
+were held back for an officer rather than absorbed.
+
+| # | Decision | Commit |
+|---|---|---|
+| 1 | Event form only, guarding in-app nav **and** browser unload. Notes editor deliberately left alone. | `8f7c222` |
+| 2 | Two-click confirm **naming the count**. | `b4898f4` |
+| 3 | All four disabled buttons get visible copy. | `7192dab` |
+| 4 | Invite-link copy **and** the export toolbar. | `d69265d` |
+| 5 | Stripped, in its own commit. | `cf00cfb` |
+
+🔴 **Two of the recorded findings above were WRONG about the code, and both
+errors pointed the work at the wrong file.** Worth keeping, because the review
+was read as an inventory when it was a set of claims:
+
+- **#4 named the inline field cell. It already announced** — `member-field-cell.tsx`
+  has carried `role="status"` all along. The real second gap was the **export
+  toolbar**, whose "Copied 40 addresses." was visible-only.
+- **#3 named `OriginPill` and the self-registered badge plus "two" disabled
+  buttons. There are FOUR disabled buttons** (`resolution-form`, `review-queue`,
+  `event-lifecycle`, `grant-form`), and the two non-disabled badges are a
+  separate case the officer scoped out. A `title` on a *non*-disabled element is
+  at least reachable by hover; on a disabled one it is reachable by nothing,
+  because `disabled` removes the element from the tab order.
+
+🔴 **The cancel was worse than #2 described, and the confirm had to say so.**
+`setSeriesStatus` updates `.eq("series_id", …)` with **no status filter and no
+date filter**, so it cancels drafts, published occurrences and **past** ones
+alike — and there is no series-level un-cancel: once `draftCount` hits 0 the
+publish control stops rendering and recovery is per-event. The confirm therefore
+names the count rather than saying "the whole series". 📌 **Narrowing the action
+itself was offered to the officer and NOT chosen** — recorded here as a
+deliberate non-change, not an oversight.
+
+📌 **The count is exact rather than truncated, and that is load-bearing** because
+the confirm states it as fact: `seriesSchema` caps a series at
+`MAX_SERIES_EVENTS` (60), under `fetchEvents`' `.limit(200)`, so a series view
+always holds every occurrence. Raising either bound past the other silently turns
+the sentence into a lie.
+
+🔓 **`<Link onNavigate>` is how App Router cancels a client-side navigation**
+(verified in the installed build: `node_modules/next/dist/docs/01-app/
+03-api-reference/02-components/link.md:451`, and a **"Blocking navigation"**
+section at l.1092 whose stated use case is verbatim *"when a form has unsaved
+changes"*). ⚠️ **There is no global navigation blocker in this version** —
+`useRouter` has no router events and no `beforePopState`, which is a Pages-only
+API. So the guard is honestly partial and the commit says so: **Cancel and
+browser unload only**. Not covered: the admin nav links (would need Next's
+Context recipe, and would move the confirm away from the control it belongs to)
+and **browser Back/Forward, which is not achievable at all here**.
+
+🪤 **Next's own recipe for `onNavigate` calls `window.confirm`; this codebase
+forbids that**, so the armed state is the two-click control instead. And
+`beforeunload` is *not* that forbidden dialog — the rule is about the app opening
+a blocking native dialog as its own UI, where a two-click control is strictly
+better. `beforeunload` opens nothing, and there is no in-app alternative for a
+tab close.
+
+🪤 **The confirm inside the event form cannot copy `preset-row`'s shape
+verbatim.** That pattern nests a `<form>`; this one sits *inside* the event
+`<form>`, so every button in it must be `type="button"` or it submits the form
+it was meant to guard.
+
+🪤 **Only a `"saved"` state clears the dirty flag.** `needs_confirmation`,
+`invalid`, `overlap`, `conflict` and `error` all stay dirty: nothing was written,
+the officer's values are echoed back into the fields, and losing them is
+precisely the harm being guarded.
+
+🪤 **The caps strip is a grep with two traps in it.** `EID` (×8) is an acronym,
+not a styled label, and `INITIAL` (×4) is a constant identifier — both look like
+hits. Final scope was **55 labels across 22 files**, more than the ~25 sites the
+finding estimated, and the diff is 40 insertions / 40 deletions with no
+structural change. 📌 It **finished a migration that was already half-done**:
+`preset-row`, `merge-panel`, `export-toolbar` and `invite-create-form` were
+already sentence case.
+
+⚠️ **`npm test` cannot see ANY of this.** `tests/` is entirely server/lib/db;
+there are no component or DOM tests. 1094 pass before and after, which proves
+only that nothing server-side regressed — the same blind spot that let the
+`members.active` defect ship with a green suite. **The browser walkthrough is the
+verification, and it is still OUTSTANDING at the time of writing.**
+
 ### Measured at the gate
 
 **20 screens** — every officer route including all six detail pages — probed in
