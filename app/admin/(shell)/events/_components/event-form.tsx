@@ -4,7 +4,7 @@ import { BUTTON_OUTLINE, BUTTON_PRIMARY } from "@/components/ui/button";
 import { CHECKBOX, controlClass } from "@/components/ui/field";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 
 import { saveEvent, type EventFormState } from "@/app/actions/events";
 import {
@@ -51,6 +51,47 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
   const needsConfirmation = state.status === "needs_confirmation";
   const isCreate = !initial.id;
 
+  // ── Unsaved-changes guard ────────────────────────────────────────────────
+  //
+  // 📌 Tracks TOUCHED, not diffed. One `onInput` on the <form> rather than
+  // controlling twelve inputs — controlling them would fight the `state.values`
+  // echo-back below, which exists because React 19 resets an uncontrolled form
+  // when its action resolves. Typing a character and deleting it still reads
+  // dirty; that is the standard trade and what Next's own example does.
+  const [dirty, setDirty] = useState(false);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
+
+  // 🪤 Only a SAVED state clears the flag. `needs_confirmation`, `invalid`,
+  // `overlap`, `conflict` and `error` must all stay dirty: nothing was written,
+  // the officer's values are echoed back into the fields, and losing them is
+  // precisely the harm this guards. Render-phase derived state rather than an
+  // effect, because useActionState has no reset — same idiom as merge-panel.tsx.
+  const [seenState, setSeenState] = useState(state);
+  if (state !== seenState) {
+    setSeenState(state);
+    if (state.status === "saved") {
+      setDirty(false);
+      setConfirmingDiscard(false);
+    }
+  }
+
+  // Tab close and reload, which no in-app control can catch.
+  //
+  // 📌 This is NOT the `window.confirm` the codebase forbids (preset-row.tsx,
+  // merge-panel.tsx). That rule is about the app opening a blocking native
+  // dialog as its own UI, where a two-click control is strictly better. This
+  // opens nothing — it registers intent with the browser, which may then show
+  // its own prompt while the page is being torn down. There is no in-app
+  // alternative for a tab close: it is this or silence.
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
   // React 19 resets an uncontrolled form once its action resolves, so every
   // defaultValue below has to come from the values the server echoed back —
   // otherwise showing the warnings silently reverts the officer's edits, and
@@ -76,7 +117,12 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
         };
 
   return (
-    <form action={formAction} className="flex flex-col gap-6 border border-misa-border bg-white px-4 py-4" noValidate>
+    <form
+      action={formAction}
+      onInput={() => setDirty(true)}
+      className="flex flex-col gap-6 border border-misa-border bg-white px-4 py-4"
+      noValidate
+    >
       {initial.id && <input type="hidden" name="id" value={initial.id} />}
 
       {state.status === "overlap" && (
@@ -323,12 +369,48 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
                 : "SAVE CHANGES"}
           </button>
         )}
-        <Link
-          href="/admin/events"
-          className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
-        >
-          Cancel
-        </Link>
+        {/* Cancel discarded silently — it is a plain <Link>, so a filled-in
+            form vanished on one click with no warning.
+
+            `onNavigate` (Next 16, next/link) is the supported way to cancel a
+            client-side navigation. Next's own recipe calls window.confirm in
+            here; this codebase forbids that, so the armed state is the two-click
+            control used by preset-row.tsx and merge-panel.tsx instead.
+
+            🪤 Every button here is type="button". This sits INSIDE the event
+            <form>, so a bare <button> would submit it — and preset-row's nested
+            <form> cannot be copied for the same reason. */}
+        {confirmingDiscard ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs">Discard your changes?</span>
+            <Link
+              href="/admin/events"
+              className="text-sm text-misa-critical underline underline-offset-4"
+            >
+              Discard
+            </Link>
+            <button
+              type="button"
+              onClick={() => setConfirmingDiscard(false)}
+              className="px-2 py-1 text-xs underline underline-offset-4"
+            >
+              Keep editing
+            </button>
+          </div>
+        ) : (
+          <Link
+            href="/admin/events"
+            onNavigate={(event) => {
+              if (dirty) {
+                event.preventDefault();
+                setConfirmingDiscard(true);
+              }
+            }}
+            className="text-sm text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+          >
+            Cancel
+          </Link>
+        )}
       </div>
 
       {isCreate && (
