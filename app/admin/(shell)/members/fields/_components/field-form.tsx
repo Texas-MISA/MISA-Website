@@ -215,7 +215,7 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
 
         <div>
           <button type="submit" disabled={pending} className={BUTTON_PRIMARY}>
-            {pending ? "SAVING…" : isCreate ? "CREATE FIELD" : "SAVE CHANGES"}
+            {pending ? "Saving…" : isCreate ? "Create field" : "Save changes"}
           </button>
         </div>
       </div>

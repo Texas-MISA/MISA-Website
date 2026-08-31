@@ -266,7 +266,7 @@ function Fields({
             disabled={pending}
             className={BUTTON_QUIET_SM}
           >
-            SAVE
+            Save
           </button>
 
           <button
@@ -276,7 +276,7 @@ function Fields({
             disabled={pending || !canApproveNow || status === "present"}
             className={BUTTON_PRIMARY_SM}
           >
-            {pending ? "SAVING…" : "APPROVE"}
+            {pending ? "Saving…" : "Approve"}
           </button>
 
           {/* Why Approve is dead, on screen rather than in a `title`.
@@ -343,7 +343,7 @@ function RejectForm({
           disabled={pending}
           className={BUTTON_QUIET_SM}
         >
-          {pending ? "REJECTING…" : "REJECT"}
+          {pending ? "Rejecting…" : "Reject"}
         </button>
       </div>
     </form>
@@ -410,7 +410,7 @@ function ReopenForm({
           disabled={pending}
           className={BUTTON_QUIET_SM}
         >
-          {pending ? "REOPENING…" : "REOPEN"}
+          {pending ? "Reopening…" : "Reopen"}
         </button>
       </div>
     </form>

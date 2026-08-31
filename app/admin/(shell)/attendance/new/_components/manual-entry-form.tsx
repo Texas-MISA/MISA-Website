@@ -130,7 +130,7 @@ export function ManualEntryForm({
           disabled={pending}
           className={BUTTON_PRIMARY_SM}
         >
-          {pending ? "RECORDING…" : "RECORD CHECK-IN"}
+          {pending ? "Recording…" : "Record check-in"}
         </button>
       </div>
     </form>

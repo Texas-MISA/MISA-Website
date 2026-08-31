@@ -70,11 +70,11 @@ export function FieldArchive({
         >
           {pending
             ? archived
-              ? "RESTORING…"
-              : "ARCHIVING…"
+              ? "Restoring…"
+              : "Archiving…"
             : archived
-              ? "RESTORE THIS FIELD"
-              : "ARCHIVE THIS FIELD"}
+              ? "Restore this field"
+              : "Archive this field"}
         </button>
       </form>
 

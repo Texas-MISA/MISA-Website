@@ -57,7 +57,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
           href={`/admin/events?series=${state.seriesId}&term=all`}
           className={`mt-4 ${BUTTON_PRIMARY_SM}`}
         >
-          REVIEW THE SERIES
+          Review the series
         </Link>
       </div>
     );
@@ -223,7 +223,7 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
           disabled={pending}
           className={`w-fit ${BUTTON_PRIMARY}`}
         >
-          {pending ? "CREATING…" : "CREATE SERIES"}
+          {pending ? "Creating…" : "Create series"}
         </button>
         <Link
           href="/admin/events"

@@ -76,7 +76,7 @@ export function EventLifecycle({
             <input type="hidden" name="id" value={eventId} />
             <input type="hidden" name="status" value="published" />
             <button type="submit" disabled={statusPending} className={buttonClass}>
-              PUBLISH
+              Publish
             </button>
           </form>
         )}
@@ -86,7 +86,7 @@ export function EventLifecycle({
             <input type="hidden" name="id" value={eventId} />
             <input type="hidden" name="status" value="draft" />
             <button type="submit" disabled={statusPending} className={buttonClass}>
-              UNPUBLISH
+              Unpublish
             </button>
           </form>
         )}
@@ -96,7 +96,7 @@ export function EventLifecycle({
             <input type="hidden" name="id" value={eventId} />
             <input type="hidden" name="status" value="cancelled" />
             <button type="submit" disabled={statusPending} className={buttonClass}>
-              CANCEL EVENT
+              Cancel event
             </button>
           </form>
         )}
@@ -106,7 +106,7 @@ export function EventLifecycle({
         <form action={duplicateAction}>
           <input type="hidden" name="id" value={eventId} />
           <button type="submit" disabled={duplicatePending} className={buttonClass}>
-            DUPLICATE +1 WEEK
+            Duplicate +1 week
           </button>
         </form>
 
@@ -117,7 +117,7 @@ export function EventLifecycle({
             disabled={deletePending || attendanceCount > 0}
             className={`${buttonClass} border-misa-critical/50 text-misa-critical`}
           >
-            DELETE
+            Delete
           </button>
         </form>
 

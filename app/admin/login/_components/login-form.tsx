@@ -65,7 +65,7 @@ export function LoginForm({ next }: { next?: string }) {
         disabled={pending}
         className={`mt-1 w-full ${BUTTON_PRIMARY}`}
       >
-        {pending ? "SIGNING IN…" : "SIGN IN"}
+        {pending ? "Signing in…" : "Sign in"}
       </button>
     </form>
   );

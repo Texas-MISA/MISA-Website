@@ -351,7 +351,7 @@ export function MemberFilters({
           onClick={() => router.push("/admin/members")}
           className={BUTTON_QUIET_SM}
         >
-          CLEAR
+          Clear
         </button>
       )}
     </div>

@@ -344,7 +344,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
               disabled={pending}
               className={`w-fit ${BUTTON_PRIMARY}`}
             >
-              {pending ? "SAVING…" : "SAVE AS DRAFT"}
+              {pending ? "Saving…" : "Save as draft"}
             </button>
             <button
               type="submit"
@@ -353,7 +353,7 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
               disabled={pending}
               className={`w-fit ${BUTTON_OUTLINE}`}
             >
-              {pending ? "SAVING…" : "PUBLISH NOW"}
+              {pending ? "Saving…" : "Publish now"}
             </button>
           </>
         ) : (
@@ -363,10 +363,10 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
             className={`w-fit ${BUTTON_PRIMARY}`}
           >
             {pending
-              ? "SAVING…"
+              ? "Saving…"
               : needsConfirmation
-                ? "SAVE ANYWAY"
-                : "SAVE CHANGES"}
+                ? "Save anyway"
+                : "Save changes"}
           </button>
         )}
         {/* Cancel discarded silently — it is a plain <Link>, so a filled-in

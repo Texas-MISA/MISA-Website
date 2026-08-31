@@ -139,7 +139,7 @@ export default async function AdminEventsPage({
         title="Events"
         action={
           <Link href="/admin/events/new" className={BUTTON_PRIMARY_SM}>
-            NEW EVENT
+            New event
           </Link>
         }
       />

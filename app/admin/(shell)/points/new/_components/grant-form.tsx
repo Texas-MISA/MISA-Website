@@ -169,7 +169,7 @@ export function GrantForm({
             disabled={pending || selected.size === 0}
             className={BUTTON_PRIMARY_SM}
           >
-            {pending ? "GRANTING…" : "GRANT POINTS"}
+            {pending ? "Granting…" : "Grant points"}
           </button>
           {/* On screen rather than in a `title`: a disabled button is not
               focusable, so the tooltip this replaces was unreachable by

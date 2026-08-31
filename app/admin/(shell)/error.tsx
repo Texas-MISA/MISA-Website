@@ -53,13 +53,13 @@ export default function AdminError({
           onClick={() => unstable_retry()}
           className={BUTTON_PRIMARY_SM}
         >
-          TRY AGAIN
+          Try again
         </button>
         <Link
           href="/admin"
           className={BUTTON_QUIET_SM}
         >
-          BACK TO THE DASHBOARD
+          Back to the dashboard
         </Link>
       </div>
 

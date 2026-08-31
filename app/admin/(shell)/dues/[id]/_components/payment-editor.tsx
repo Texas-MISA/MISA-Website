@@ -198,7 +198,7 @@ export function PaymentEditor({
         disabled={pending}
         className={`mt-5 ${BUTTON_PRIMARY_SM}`}
       >
-        {pending ? "SAVING…" : "SAVE"}
+        {pending ? "Saving…" : "Save"}
       </button>
     </form>
   );

@@ -60,7 +60,7 @@ export function VoidPaymentForm({ id }: { id: string }) {
         disabled={pending || state.status === "done"}
         className={`mt-4 ${BUTTON_QUIET_SM}`}
       >
-        {pending ? "VOIDING…" : "VOID THIS PAYMENT"}
+        {pending ? "Voiding…" : "Void this payment"}
       </button>
     </form>
   );

@@ -125,7 +125,7 @@ export default async function AdminAttendancePage({
             href={`/admin/attendance/new${suffix}`}
             className={BUTTON_PRIMARY_SM}
           >
-            ADD A CHECK-IN
+            Add a check-in
           </Link>
         }
         description="Every submission the check-in form has produced. A pending row is missing its event link, its member link, or both — open one to see what the member typed and what it most likely meant."

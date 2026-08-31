@@ -231,7 +231,7 @@ export default async function AdminPointsPage({
             href={`/admin/points/new${suffix}`}
             className={BUTTON_PRIMARY_SM}
           >
-            GRANT POINTS
+            Grant points
           </Link>
         }
         description="Points awarded outside of event attendance — volunteering, recruiting, competition placings, and corrections. Every one carries a reason and the officer who made it. A voided adjustment stays here, struck through, and stops counting immediately."

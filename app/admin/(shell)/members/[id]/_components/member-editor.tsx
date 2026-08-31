@@ -195,7 +195,7 @@ function NotesEditor({
             disabled={pending}
             className={BUTTON_QUIET_SM}
           >
-            {pending ? "SAVING…" : "SAVE NOTES"}
+            {pending ? "Saving…" : "Save notes"}
           </button>
 
           {state.status === "done" && (

@@ -322,7 +322,7 @@ export default async function AdminDuesPage({
         title="Dues"
         action={
           <Link href="/admin/dues/import" className={BUTTON_PRIMARY_SM}>
-            IMPORT A STATEMENT
+            Import a statement
           </Link>
         }
         description="Every payment reconciled from a Venmo statement. A member counts as official for a term when a live payment covers it — nothing here is ticked by hand, and voiding a payment takes that status away again."

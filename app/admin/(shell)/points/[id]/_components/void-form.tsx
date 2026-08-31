@@ -57,7 +57,7 @@ export function VoidForm({ id }: { id: string }) {
         disabled={pending || state.status === "done"}
         className={`mt-4 ${BUTTON_QUIET_SM}`}
       >
-        {pending ? "VOIDING…" : "VOID THIS ADJUSTMENT"}
+        {pending ? "Voiding…" : "Void this adjustment"}
       </button>
     </form>
   );

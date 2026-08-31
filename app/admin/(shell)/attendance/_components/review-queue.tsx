@@ -105,7 +105,7 @@ export function ReviewQueue({
           disabled={pending || selected.size === 0}
           className={BUTTON_PRIMARY_SM}
         >
-          {pending ? "ASSIGNING…" : "ASSIGN"}
+          {pending ? "Assigning…" : "Assign"}
         </button>
 
         {/* On screen rather than in a `title`: a disabled button is not

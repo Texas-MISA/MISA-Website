@@ -38,7 +38,7 @@ export default async function MemberFieldsPage() {
         title="Custom fields"
         action={
           <Link href="/admin/members/fields/new" className={BUTTON_PRIMARY_SM}>
-            NEW FIELD
+            New field
           </Link>
         }
       />

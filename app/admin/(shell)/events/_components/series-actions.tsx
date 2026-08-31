@@ -139,7 +139,7 @@ export function SeriesActions({
               disabled={publishPending}
               className={buttonClass}
             >
-              PUBLISH ALL {draftCount} DRAFTS
+              Publish all {draftCount} drafts
             </button>
           </form>
         )}
@@ -153,7 +153,7 @@ export function SeriesActions({
               disabled={publishPending}
               className={buttonClass}
             >
-              PUBLISH THE REST
+              Publish the rest
             </button>
           </form>
         )}
@@ -191,7 +191,7 @@ export function SeriesActions({
             onClick={() => setConfirming(true)}
             className={`${buttonClass} border-misa-critical/50 text-misa-critical`}
           >
-            CANCEL WHOLE SERIES
+            Cancel whole series
           </button>
         )}
       </div>
