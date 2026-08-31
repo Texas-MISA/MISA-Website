@@ -594,3 +594,64 @@ React's `<!-- -->` separators and makes the missing child obvious.
 
 📌 `npm run lint`, `npx tsc --noEmit`, `npm run build` and 1094 tests were all
 clean with this live. It is a defect only a human or a browser can see.
+
+### A branch cut from a migration commit carries that migration's dependency
+
+🔴 **Proved on 2026-08-31 by the phase-4 merge.** `v2-phase-4-admin` was branched
+from the roster-terms commit so it would style the term-aware screens. That also
+means its code **reads a schema production did not have**: `member_directory` as
+one row per (member, term), and `dues_paid_term`. Production was at `…000028`.
+
+**Merging alone would have rendered the error boundary on `/admin/members`,
+`/leaderboard` and the dues screens of the live club website.** Migration 29 was
+pushed first, then the code — which is the "push them together" rule the repo
+already carried for migration 28, arriving from a direction nobody had written
+down: not a new feature's migration, but an *ancestor's*.
+
+**Before any merge to `main`: `npx supabase migration list --linked`.** A row
+whose `remote` is empty is code waiting to 500 in production.
+
+### A doc's claim about production is a claim; the system is the fact
+
+The same merge found the repo wrong about production **twice**, and either could
+have misled it:
+
+- `CLAUDE.md` and `tasks.md` said local was ahead of the remote by **two**
+  migrations. 28 had already shipped; only 29 was missing.
+- The state table named `main` as `904adf5` when the head was `09fc482` — two
+  steps stale. Checking phase 2's merge status against that wrong commit
+  returned the wrong answer, and only re-checking against the true head showed
+  phase 2 had been live all along.
+
+📌 This is the rule the production-wipe entry states for **row counts**, holding
+equally for **schema level** and **head commit**. `migration list --linked`,
+`git log origin/main -1`, and a query beat any sentence in this repository —
+including the sentences in this file.
+
+### A 200 is not a working page
+
+An error boundary answers **200**. So a deploy check that reads status codes
+proves only that the server responded.
+
+**Check content.** After the phase-4 deploy, every public route was fetched and
+grepped for the boundary's own copy; `/leaderboard`, the page most exposed to
+migration 29, was confirmed to render real content.
+
+📌 **And confirm the NEW build is the one serving.** A content marker unique to
+the deploy does it: the caps strip meant `/admin/login` had to serve `Sign in`
+with zero `SIGN IN`, which no cached earlier build could produce.
+
+### Checking a secret is set must not write it to disk
+
+🪤 **`npx vercel env ls production` lists names, environments and age, with
+values shown as `Encrypted`.** That is the check. **Never `vercel env pull`**
+for it — that downloads real production secrets onto the filesystem.
+
+⚠️ **Rotating an env var requires a REDEPLOY.** Changing the value in the
+dashboard does not reach the running deployment, which reads it at build time.
+
+🪤 **`CHECKIN_ORIGIN_PEPPER`'s in-app warning cannot confirm the happy path.**
+The event page's line renders only once that event has check-ins, so with 0
+attendance it is silent whether or not the pepper exists. The end-to-end check is
+after the first real event: the event should read *"Origin checking is on. N of M
+non-cellular check-ins came from one network…"* rather than naming the variable.

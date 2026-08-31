@@ -344,9 +344,9 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 |---|---|
 | **0** | Amend `CLAUDE.md` precedence. Install the three packages. Re-skin shadcn out of default state. Define the elevation vocabulary and the radius scale. Read §0, §4, §5, §10, §12 in full. |
 | **1** | ✅ **COMPLETE, gate passed 2026-08-19.** Home page + header. Record below. |
-| **2** | ✅ **BUILT, awaiting officer review.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Record below. |
+| **2** | ✅ **LIVE.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Record below. |
 | **3** | ⏸️ **DEFERRED, not skipped.** `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched. Taken out of order on the officer's instruction (2026-08-27): phase 4 was asked for first. ⚠️ **Its debt is still outstanding** — the `--misa-muted`-on-grey AA failure on those three pages is phase 3's, and phase 4 must not silently absorb it. |
-| **4** | 🏗️ **IN PROGRESS (2026-08-27), branch `v2-phase-4-admin`.** `/admin` under scanability rules, screen by screen, suite green between screens. Brief below. |
+| **4** | ✅ **MERGED AND LIVE 2026-08-31.** `/admin` under scanability rules, screen by screen, suite green between screens. Its five held-back accessibility findings were decided by the officer and built the same day, then walked in a browser. Brief below. 🔓 **Shipping it required pushing migration 29 to production first** — the branch was cut from the roster-terms commit, so its code depends on a schema the remote did not have. |
 | **5** | ~~Replace `DESIGN.md`~~ ✅ **done early, 2026-08-19.** What remains: reconcile `docs/invariants.md` for every invariant retired, each with its replacement argued; final record in `build-log.md` and `tasks.md` |
 
 📌 **Do not pre-suppress detector findings.** v1 added ten `design-system-font-size`

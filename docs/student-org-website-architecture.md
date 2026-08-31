@@ -1,9 +1,18 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.78
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19.** 🏗️ A **v2 visual redesign is in progress — phases 0, 1, 2 and 4 complete; phase 3 deferred; phase 5 outstanding.**
+**Version:** 1.79
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 3 deferred; phase 5 outstanding.**
 **Last updated:** August 2026
 
+> **v1.79: phase 4 and the term-scoped roster are LIVE, and the migration went out first.**
+>
+> Officer instruction, 2026-08-31. `main` fast-forwarded 18 commits to `e3266e6`; production is on schema `…000029`.
+>
+> - 🔴 **The merge required pushing migration 29 to production BEFORE the code, and that ordering is the whole lesson.** The branch was cut from the roster-terms commit, so its code reads `member_directory` as one row per (member, term) and expects `dues_paid_term`. Production was still at `…000028`. Merging alone would have rendered the error boundary on `/admin/members`, `/leaderboard` and the dues screens **on the live club website**. §2.1's "database is disposable" rule is about local; **production is the opposite, and a branch cut from a migration commit carries that migration's dependency whether or not anyone remembers.**
+> - ⚠️ **The repo's own notes were wrong about the remote's schema level** — they said local was ahead by *two* migrations when 28 had already shipped and only 29 was missing. **`npx supabase migration list --linked` is the fact**; a row whose `remote` is empty is code waiting to 500. The same applied to the recorded head commit, which was two steps stale.
+> - ✅ **Verified by rendered response, not status code** — an error boundary answers 200 too. All nine public routes came back 200 with no boundary, and the new build was confirmed live by the caps strip (`/admin/login` serves `Sign in`, zero `SIGN IN`).
+> - ✅ **`CHECKIN_ORIGIN_PEPPER` is set in Vercel Production**, confirmed by listing names. 🪤 Its in-app warning cannot verify this until an event has check-ins, so the real check is after the first event.
+>
 > **v1.78: the five accessibility findings phase 4 held back are all decided and built.**
 >
 > Officer decisions, 2026-08-31, on the `v2-phase-4-admin` branch. Five commits, `b4898f4` → `cf00cfb`. 📌 **This is the first phase-4 work that is NOT presentation-only** — it changes behaviour and user-visible copy by decision, which is precisely why these five were held for an officer instead of being absorbed. Still no route, view or schema change, so §2–§6 do not move.
@@ -86,7 +95,8 @@
 > **v1.72: v2 phase 2 rebuilt the five content pages from the home page.**
 >
 > `/about`, `/projects`, `/gallery`, `/officers` and `/contact` are rebuilt, on
-> the branch `v2-phase-2` and awaiting officer review. `PageHero` moved to
+> the branch `v2-phase-2` and awaiting officer review. ✅ **Since merged — phase 2
+> is LIVE**; see v1.79 above. `PageHero` moved to
 > `ground="field"` and is inherited by three phase-3 pages; `/gallery` reads the
 > real photo pool and four invented constants were deleted; `--misa-muted` on the
 > grey page ground was found to fail AA at 4.33:1 against a documented 4.63:1.
