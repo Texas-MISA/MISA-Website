@@ -706,10 +706,16 @@ Real photographs are live on the home page **locally only**.
   ⚠️ **Muted is still fine on white** (4.84:1) and that is where the header, the
   footer, `KpiPlate` and `OfficerCard` use it. The rule is narrow and worth
   stating exactly: **`--misa-muted` may sit on Paper, never on Vellum.**
-  ⚠️ `/attend`, `/lookup`, `/leaderboard` and `officer-invite` also put muted on
-  grey in places. They are phase 3 and were left standing rather than touched
-  from outside their phase; the smallest margin on the five phase-2 pages is now
-  **4.84:1**.
+  ⚠️ `/attend`, `/lookup`, `/leaderboard` and `/officer-invite/[token]` also put
+  muted on grey in places. They are phase 3 and were left standing rather than
+  touched from outside their phase; the smallest margin on the five phase-2 pages
+  is now **4.84:1**. 📌 **15 `misa-muted` occurrences across those four surfaces**
+  (lookup 9, attend 4, leaderboard 1, officer-invite 1) — **not all of them fail**,
+  only the ones on grey, so each is measured on the ground it actually sits on
+  rather than swapped wholesale. 🪤 **All four live under `app/(public)/`,
+  `officer-invite` included** — it is outside `/admin` (see `proxy.ts`), which
+  makes `app/officer-invite` a plausible-looking path that does not exist.
+  Tracked in `tasks.md`.
   🔴 **The same pairing bit again in phase 4, and that is the useful part: the
   rule is about a GROUND MOVING UNDER INK, not about a list of pages.** Making
   the admin ground Vellum re-created the failure in four new places that had been

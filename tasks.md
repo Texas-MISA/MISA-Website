@@ -339,6 +339,62 @@ The two paths this entry was weighing, kept because the reasoning still applies 
 
 ---
 
+## ♿ NOT STARTED — the `--misa-muted` AA contrast failures on the phase-3 surfaces (2026-08-31)
+
+⬅️ **Officer, 2026-08-31: fix these.** The last functional debt on the deferred
+phase-3 pages, and it is on **live** pages — `/attend` is what members use at an
+event.
+
+**The failure:** `--misa-muted` (`#6f7275`) measures **4.33:1 on Vellum**
+(`--misa-panel`, `#f2f2f3`) and **fails WCAG AA**, which needs 4.5:1. The same
+ink on Paper (white) is **4.84:1** and passes. Only the background differs.
+
+**The fix** is `--misa-secondary` (`#4a4d50`, **7.60:1**) wherever muted sits on
+grey. `DESIGN.md`'s rule is deliberately narrow: **muted may sit on Paper, never
+on Vellum.**
+
+⚠️ **DO NOT swap all 15 occurrences.** Muted on white is correct and must stay —
+that is where the header, footer, `KpiPlate` and `OfficerCard` use it. Each has
+to be **measured on the ground it actually sits on, compositing any alpha**:
+
+| Surface | `misa-muted` occurrences |
+|---|---|
+| `/lookup` (`page.tsx`, `_components/lookup-form.tsx`) | 9 |
+| `/attend` (`_components/checkin-form.tsx`) | 4 |
+| `/leaderboard` (`page.tsx`) | 1 |
+| `/officer-invite/[token]` (`page.tsx`) | 1 |
+
+🔴 **This has been "fixed" once already and came back, which is the thing to
+understand before starting.** Phase 2 found the same pairing on three public
+pages, fixed those three, and recorded the smallest remaining margin as 4.84:1.
+Phase 4 then moved `/admin`'s ground from white to grey and it reappeared in four
+new places. **The defect is a ground moving under ink, not a list of pages** — so
+fixing this list does not close it either. Full evidence in
+[`docs/invariants.md`](docs/invariants.md) §The officer UI, and moving a page
+ground; the narrow rule is in `DESIGN.md` §Design invariants.
+
+📌 **The numbers were themselves wrong before phase 2 measured properly** —
+`DESIGN.md` had recorded 4.63:1 and called it "the smallest margin in the
+system"; both halves were false. Any re-measure goes through a formula validated
+on the WCAG reference pairs (`#767676` on white = 4.54, black on white = 21.00),
+never by eye.
+
+⬅️ **Two ways to take it, and it is worth deciding deliberately:**
+
+1. **Contrast only, now** — a token swap on the failing lines, no visual rework.
+   Small, shippable, and it takes a live accessibility failure off member-facing
+   pages without waiting for phase 3.
+2. **Fold into phase 3** — these pages are due a rebuild anyway
+   (`/attend`, `/leaderboard`, `/lookup` have never had a design), so the swap
+   would happen inside it. Keeps the debt with its phase, but leaves the failure
+   live until phase 3 is scheduled.
+
+🪤 **Whichever is chosen, it is a `<Section>`/ground question first.** Check what
+ground each of these actually renders on before swapping a token — a page that
+should be on Paper is a different fix from ink that should be secondary.
+
+---
+
 ## 📋 Requested, planned, NOT STARTED — RSVP events (2026-08-19)
 
 A second kind of event: members RSVP through a shareable link instead of using `/attend`, and officers tick people off the list to write their attendance. Full plan, with the schema, the six phases and the test list, in [`docs/rsvp-events.md`](docs/rsvp-events.md). **Nothing is built** — no migration, no route, no action.
