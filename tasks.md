@@ -339,11 +339,19 @@ The two paths this entry was weighing, kept because the reasoning still applies 
 
 ---
 
-## ♿ NOT STARTED — the `--misa-muted` AA contrast failures on the phase-3 surfaces (2026-08-31)
+## ♿ FOLDED INTO PHASE 3 — the `--misa-muted` AA contrast failures on the phase-3 surfaces (2026-08-31)
 
-⬅️ **Officer, 2026-08-31: fix these.** The last functional debt on the deferred
-phase-3 pages, and it is on **live** pages — `/attend` is what members use at an
-event.
+⬅️ **DECIDED by the officer, 2026-09-01: option 2 — fold this into phase 3, do
+not fix it standalone.** The swap happens inside the rebuild of `/attend`,
+`/leaderboard` and `/lookup` rather than as a token-only patch before it. **The
+consequence is accepted deliberately: the AA failure stays LIVE on member-facing
+pages until phase 3 is scheduled and shipped**, and `/attend` is what members use
+at an event. Nothing below is cancelled — it is now phase 3's checklist, and
+phase 3 does not pass its gate with any of it outstanding.
+
+⬅️ *(Superseded instruction, kept for the reasoning: "Officer, 2026-08-31: fix
+these." The last functional debt on the deferred phase-3 pages, and it is on
+**live** pages.)*
 
 **The failure:** `--misa-muted` (`#6f7275`) measures **4.33:1 on Vellum**
 (`--misa-panel`, `#f2f2f3`) and **fails WCAG AA**, which needs 4.5:1. The same
@@ -379,15 +387,14 @@ system"; both halves were false. Any re-measure goes through a formula validated
 on the WCAG reference pairs (`#767676` on white = 4.54, black on white = 21.00),
 never by eye.
 
-⬅️ **Two ways to take it, and it is worth deciding deliberately:**
+⬅️ **Two ways it could have been taken — ✅ 2 was chosen (officer, 2026-09-01):**
 
-1. **Contrast only, now** — a token swap on the failing lines, no visual rework.
-   Small, shippable, and it takes a live accessibility failure off member-facing
-   pages without waiting for phase 3.
-2. **Fold into phase 3** — these pages are due a rebuild anyway
+1. ~~**Contrast only, now**~~ — a token swap on the failing lines, no visual
+   rework. Small and shippable, but **not taken**.
+2. ✅ **Fold into phase 3** — these pages are due a rebuild anyway
    (`/attend`, `/leaderboard`, `/lookup` have never had a design), so the swap
-   would happen inside it. Keeps the debt with its phase, but leaves the failure
-   live until phase 3 is scheduled.
+   happens inside it. Keeps the debt with its phase; **the accepted cost is that
+   the failure stays live until phase 3 ships.**
 
 🪤 **Whichever is chosen, it is a `<Section>`/ground question first.** Check what
 ground each of these actually renders on before swapping a token — a page that

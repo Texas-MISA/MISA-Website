@@ -345,7 +345,7 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 | **0** | Amend `CLAUDE.md` precedence. Install the three packages. Re-skin shadcn out of default state. Define the elevation vocabulary and the radius scale. Read §0, §4, §5, §10, §12 in full. |
 | **1** | ✅ **COMPLETE, gate passed 2026-08-19.** Home page + header. Record below. |
 | **2** | ✅ **LIVE.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Record below. |
-| **3** | ⏸️ **DEFERRED, not skipped.** `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched. Taken out of order on the officer's instruction (2026-08-27): phase 4 was asked for first. ⚠️ **Its debt is still outstanding** — the `--misa-muted`-on-grey AA failure on those three pages is phase 3's, and phase 4 must not silently absorb it. |
+| **3** | ⏸️ **DEFERRED, not skipped.** `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched. Taken out of order on the officer's instruction (2026-08-27): phase 4 was asked for first. 🔓 **The `--misa-muted`-on-Vellum AA failure on those three pages was FOLDED INTO THIS PHASE by the officer on 2026-09-01**, rather than patched standalone first — so it is now a gate condition here, and **the failure stays live on member-facing pages until this phase ships**, which was the accepted cost. The 15 occurrences and the measurement rule are in [`../tasks.md`](../tasks.md) §the `--misa-muted` AA contrast failures. 🪤 It is a ground question before it is a token swap — check what ground each page renders on first. |
 | **4** | ✅ **MERGED AND LIVE 2026-08-31.** `/admin` under scanability rules, screen by screen, suite green between screens. Its five held-back accessibility findings were decided by the officer and built the same day, then walked in a browser. Brief below. 🔓 **Shipping it required pushing migration 29 to production first** — the branch was cut from the roster-terms commit, so its code depends on a schema the remote did not have. |
 | **5** | ~~Replace `DESIGN.md`~~ ✅ **done early, 2026-08-19.** What remains: reconcile `docs/invariants.md` for every invariant retired, each with its replacement argued; final record in `build-log.md` and `tasks.md` |
 
@@ -745,6 +745,8 @@ midnight; it passed on both re-runs and on the final gate. It exercises
 ⚠️ **Phase 3's debt is still outstanding and phase 4 did not absorb it.**
 `/attend`, `/leaderboard` and `/lookup` still carry the `--misa-muted`-on-Vellum
 failure, and they were left standing rather than touched from outside their phase.
+📌 **The officer confirmed that disposition on 2026-09-01:** it is fixed inside
+phase 3, not before it.
 
 ---
 
