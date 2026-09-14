@@ -209,9 +209,6 @@ function CheckinFields({
         />
         <span>
           This is my first MISA event
-          <span className="mt-0.5 block text-xs text-misa-muted">
-            Tick this and we&apos;ll show you your details before adding you.
-          </span>
         </span>
       </label>
 
@@ -237,28 +234,8 @@ function CheckinFields({
         {pending ? "Checking in…" : "Check in"}
       </button>
 
-      {/* 🔓 Check-in location verification discloses itself, deliberately
-          (docs/checkin-location-verification.md, open decision 1).
-
-          The site is public and the repository is public, so a form that
-          quietly profiled the network you submitted from would be a worse
-          surprise than this sentence is a deterrent. It is written in the
-          unconditional present because that is the truth: capture runs on
-          EVERY check-in regardless of any per-event setting, which is what
-          lets an officer turn verification on after an event. Saying "we may"
-          or naming a condition would be describing the toggle, not the
-          collection.
-
-          🪤 It says what is stored, not just that something is. "We note the
-          network" invites the reading that an address is kept; no address ever
-          is. */}
-      <p className="text-sm leading-[1.6] text-misa-muted">
-        When you check in we record a scrambled, one-way fingerprint of the
-        network you used, so officers can see which check-ins came from
-        somewhere other than the event. Your IP address is never stored, the
-        fingerprint cannot be traced between events, and it never affects your
-        points on its own.
-      </p>
+      {/* The check-in location-verification disclosure was removed here at the
+          officer's instruction. Capture itself is unchanged. */}
     </form>
   );
 }
