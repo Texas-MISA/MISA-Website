@@ -19,7 +19,6 @@ export default function AttendPage() {
     <>
       <PageHero
         title="Event Check-In"
-        subhead="At a MISA event? Enter your details and you're done."
       />
       {/* 🪤 `ground="white"` is not decoration. Every control in the form
           fills with `bg-misa-panel` (see `controlClass` in components/ui/
