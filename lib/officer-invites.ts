@@ -41,7 +41,7 @@ export const INVITE_TTL_HOURS = 72;
  * Per-IP redemption attempts per RATE_LIMIT_WINDOW_MINUTES, in the invite's own
  * throttle bucket (see hashClientIp's `scope` in lib/request-ip.ts).
  *
- * Far below RATE_LIMIT_MAX (90), and sized differently on purpose: that number
+ * Far below RATE_LIMIT_MAX (200), and sized differently on purpose: that number
  * is a ROOM CAPACITY, because a venue's NAT puts a whole meeting behind one
  * address. Nobody redeems an invite in a crowd — a legitimate caller does this
  * once. The limit is not what stops a brute force (43 characters of base64url

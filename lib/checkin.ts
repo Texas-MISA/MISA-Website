@@ -29,13 +29,14 @@ export const ORPHAN_WINDOW_HOURS = 48;
 // and everyone shares the venue's IP, 30 would have let barely 15 people
 // through. Sized for the room, not for the request count.
 //
-// ⚠️ Which means the room is the thing to re-check when attendance grows. At
-// 90 the ceiling is ~90 returning members or ~45 first-timers per 10 minutes
-// behind one address; a 150-person event turns the rest away with a throttle
-// message. §2.2's capacity check has the arithmetic. Raise this alongside
-// event size — it is a room capacity, not a security tuning knob, and the
-// honeypot plus the 48-hour window are what actually bound abuse.
-export const RATE_LIMIT_MAX = 90;
+// ⚠️ Which means the room is the thing to re-check when attendance grows.
+// Raised 90 → 200 on 2026-09-14 (officer) for the first event after
+// production was emptied, where every attendee is a first-timer. At 200 the
+// ceiling is ~200 returning members or ~100 first-timers per 10 minutes
+// behind one address. §2.2's capacity check has the arithmetic. Raise this
+// alongside event size — it is a room capacity, not a security tuning knob,
+// and the honeypot plus the 48-hour window are what actually bound abuse.
+export const RATE_LIMIT_MAX = 200;
 export const RATE_LIMIT_WINDOW_MINUTES = 10;
 
 /**
