@@ -26,20 +26,24 @@ import { Wordmark } from "@/components/ui/wordmark";
 // means re-measuring at the xl breakpoint (1280) as well as at a wide
 // viewport, where the left group is the tight one.
 //
-// 🔓 **RE-MEASURED 2026-09-18**, after the member portal folded Leaderboard and
-// My Attendance into one "Portal" item. The pieces are viewport-independent —
-// left group 225px, right cluster 137px (was 272), wordmark 82px, 32px gutter —
-// so the clearance at any width is arithmetic from those:
+// 🔓 **RE-MEASURED 2026-09-18**, after the member portal replaced everything
+// right of the wordmark — Leaderboard, My Attendance and the Check In button —
+// with ONE navy MEMBER PORTAL button. The pieces are viewport-independent at
+// `xl` — left group 225px, right side 117px (was 272), wordmark 82px, 32px
+// gutter — so the clearance at any width is arithmetic from those:
 //
-//   1280   342px left   430px right    ← 1280 is the tight width, and the
-//   1450   427px left   515px right      LEFT is the tight side again
-//   1646   525px left   613px right    (measured live: 518 / 606)
+//   1280   342px left   450px right    ← 1280 is the tight width, and the
+//   1450   427px left   535px right      LEFT is the tight side again
+//   1646   525px left   633px right    (measured live: 518 / 626)
 //
-// 📌 The right gained 135px and the left did not move. **The left is the
+// 📌 The right gained 155px and the left did not move. **The left is the
 // tighter side again** — it was the looser one after the 2026-08-23 measure
 // (342 left / 295 right), when `/projects` left the nav and the wordmark grew
 // from 48px to 82px, and the tighter one before that (285 / 312). Relisting
 // `/projects` spends the left, so that is the side to re-measure first.
+//
+// 🪤 **Below `xl` the tight spot is the PHONE, not the desktop**: the button
+// sits beside the centred wordmark on its own. See the note on the button.
 
 /**
  * Public pages, left of the wordmark.
@@ -69,25 +73,28 @@ const SITE_NAV = [
 ] as const;
 
 /**
- * Member-facing pages, right of the wordmark: ONE item since the member portal
- * (docs/member-portal-plan.md, phase 1). "Portal" opens the /portal hub, which
- * links the leaderboard and My Attendance, and it stays current on every
- * /portal/* page. Check In keeps its own button beside it rather than moving
- * behind the hub — it is the one a member does against a clock.
+ * The member portal's ONE way in from the site: the navy button right of the
+ * wordmark, on every public page, reading MEMBER PORTAL (officer, 2026-09-18 —
+ * "one blue button to the portal", labelled exactly that).
  *
- * 📌 This used to be two direct links, Leaderboard and My Attendance, and the
- * argument for them still holds: they belong in the nav rather than behind a
- * link somebody has to be told about, because a member who cannot find them
- * asks an officer, and ending that is the whole point of Stage 7. The hub keeps
- * them one click from every page; trading the direct links for it was the
- * officer's call (2026-09-18).
+ * 🔓 **Check-in lives ONLY inside the portal (officer, 2026-09-18).** The header
+ * links none of /portal/attend, /portal/leaderboard or /portal/lookup directly;
+ * members reach all three through the hub, and so does the 404 recovery nav.
+ * The printed QR codes are unaffected — they point at /attend, which redirects
+ * to /portal/attend, and that page is inside the portal.
+ *
+ * 📌 This replaced, in one day, two direct links (Leaderboard, My Attendance),
+ * then a "Portal" text item, and the old navy Check In button. Stage 7's
+ * argument for member links in the nav — a member who cannot find the tools
+ * asks an officer — is answered by the button being on every page; the tools
+ * are one click behind it.
  *
  * The hub, the leaderboard and the lookup carry `robots: { index: false,
  * follow: false }` (§9 #1), so linking them makes them crawlable but not
  * indexable — which is exactly what that meta tag is for. /portal/attend stays
  * indexable, as /attend always was.
  */
-const MEMBER_NAV = [{ href: "/portal", label: "Portal" }] as const;
+const PORTAL = { href: "/portal", label: "Member Portal" } as const;
 
 /**
  * One list for the mobile panel, which stacks and has no wordmark to clear —
@@ -107,8 +114,9 @@ const MEMBER_NAV = [{ href: "/portal", label: "Portal" }] as const;
 const MOBILE_NAV = [
   ...SITE_NAV.filter((item) => item.href !== "/admin/login"),
   { href: "/contact", label: "Contact" },
-  ...MEMBER_NAV,
-  { href: "/portal/attend", label: "Check In" },
+  // Also the navy button in the bar above, which the sheet repeats the way it
+  // used to repeat Check In: the sheet is the complete list.
+  PORTAL,
   { href: "/admin/login", label: "Admin" },
 ] as const;
 
@@ -120,12 +128,13 @@ export function SiteHeader() {
   const [open, setOpen] = useState(false);
 
   // The home page deliberately has no active item. An item is also current on
-  // the pages BENEATH it, so "Portal" stays lit on every /portal/* page:
+  // the pages BENEATH it, so the portal is current on every /portal/* page:
   // `aria-current="page"` on the exact match, `"true"` on the ancestor — "you
   // are in this section, not on this page", GOV.UK's service-navigation
   // convention. `${href}/`, never a bare prefix, so /officers can never claim
-  // /officer-invite. In the mobile sheet that lights both Portal and Check In
-  // on /portal/attend, which is accurate: the section and the page.
+  // /officer-invite. The navy button carries the attribute but no visual state
+  // of its own, as Check In never had one; the sheet's Member Portal item turns
+  // navy like any other.
   //
   // The return type is spelled out because `aria-current` takes a union, and
   // inferred literals would widen to `string`.
@@ -199,35 +208,24 @@ export function SiteHeader() {
           <span className="sr-only">Home</span>
         </Link>
 
-        {/* Member nav + the check-in call to action, right */}
-        <div className="flex items-center gap-[18px]">
-          <nav aria-label="Member" className="hidden xl:block">
-            <ul className="flex items-center gap-[18px]">
-              {MEMBER_NAV.map((item) => {
-                const active = current(item.href);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={active}
-                      className={`${NAV_ITEM} whitespace-nowrap ${
-                        active
-                          ? "border-b border-misa-blue pb-0.5 text-foreground"
-                          : "text-misa-muted hover:text-foreground"
-                      }`}
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
+        {/* The member portal's one door, right — at every width, so a phone
+            sees it without opening the sheet. Sentence case in the DOM (the
+            skin uppercases it).
 
-          <Link href="/portal/attend" className={BUTTON_SOLID_NAVY_SM}>
-            Check In
-          </Link>
-        </div>
+            🪤 **MEMBER PORTAL is ~40px wider than CHECK IN was, and on a phone
+            it sits beside the CENTRED wordmark, which wins the z-order.** At
+            the shared `sm` padding it measured 116.6px: 2.4px clear of the
+            mark at a 360px viewport, 25px UNDER it at 320. So below `sm` it
+            takes `px-3` (10px clear at 360, 18 at 375), and below 360px it
+            stacks MEMBER over PORTAL at min-content width rather than slide
+            under the logo. Re-measure before lengthening the label. */}
+        <Link
+          href={PORTAL.href}
+          aria-current={current(PORTAL.href)}
+          className={`${BUTTON_SOLID_NAVY_SM} whitespace-nowrap max-sm:px-3 max-[360px]:w-min max-[360px]:whitespace-normal max-[360px]:text-center max-[360px]:leading-[1.1]`}
+        >
+          Member portal
+        </Link>
       </div>
 
       {/* Mobile nav panel */}

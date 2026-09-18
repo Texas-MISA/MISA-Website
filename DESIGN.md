@@ -438,10 +438,11 @@ Roles, not sizes. `components/ui/section.tsx` owns the vertical rhythm.
   **opaque**, or the container shows through the whole card instead of the seam.
 - 📌 **The nav cannot grow without measuring.** The wordmark is absolutely centred
   and wins the z-order, so an overflowing item silently disappears. 🔓
-  **Re-measured 2026-09-18 at 1280: 342px left, 430px right.** The member portal
-  folded Leaderboard and My Attendance into one "Portal" item, so the right
-  cluster fell from 272px to 137px and the right gained 135px. ⚠️ **The left is
-  the tighter side again.** History: 342 / 295 on 2026-08-23, when `/projects`
+  **Re-measured 2026-09-18 at 1280: 342px left, 450px right.** Everything right
+  of the wordmark — Leaderboard, My Attendance and the Check In button — became
+  one navy MEMBER PORTAL button, so the right side fell from 272px to 117px and
+  gained 155px. ⚠️ **The left is the tighter side again** on desktop; on a phone
+  the tight spot is that button beside the centred wordmark. History: 342 / 295 on 2026-08-23, when `/projects`
   left the nav and the wordmark became the real logo (48px → 82px wide — the
   right lost exactly half that, because the mark is centred), and 285 / 312
   before that.
@@ -815,7 +816,7 @@ scope) stayed in `CLAUDE.md`; invariants with evidence are in `docs/invariants.m
 
 ### Nav clearance
 
-- 🪤 **The site header's nav cannot grow without measuring at 1280.** The wordmark is absolutely centred and wins the z-order; an overflowing item disappears silently. 🔓 **RE-MEASURED 2026-09-18: 342px clearance left, 430px right** (342 / 295 on 2026-08-23). Left group 225px, right cluster 137px (was 272, until the member portal folded Leaderboard and My Attendance into one "Portal" item), wordmark 82px, 32px gutter. **The left is the tighter side again.** Relisting `/projects` spends part of the left; any sixth item needs a fresh measurement.
+- 🪤 **The site header's nav cannot grow without measuring at 1280.** The wordmark is absolutely centred and wins the z-order; an overflowing item disappears silently. 🔓 **RE-MEASURED 2026-09-18: 342px clearance left, 450px right** (342 / 295 on 2026-08-23). Left group 225px; the right side is now ONE navy MEMBER PORTAL button, 117px (was 272 — Leaderboard, My Attendance and Check In); wordmark 82px, 32px gutter. **The left is the tighter side again.** Relisting `/projects` spends part of the left; any sixth item needs a fresh measurement. 🪤 **On a phone the button sits beside the centred wordmark alone, and it is the tight spot**: `px-3` below `sm` (10px clear at 360), stacked onto two lines below 360px.
 
 ### Design skill precedence
 

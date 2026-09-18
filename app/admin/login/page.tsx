@@ -33,11 +33,13 @@ export default async function AdminLoginPage({
           </h1>
           <p className="mt-2 text-center text-sm text-misa-secondary">
             For MISA officers only. Members check in at{" "}
+            {/* The portal, not /portal/attend: check-in lives only inside the
+                portal (officer, 2026-09-18). */}
             <a
-              href="/portal/attend"
+              href="/portal"
               className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
             >
-              /portal/attend
+              /portal
             </a>
             .
           </p>

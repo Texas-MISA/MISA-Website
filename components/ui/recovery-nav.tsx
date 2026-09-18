@@ -20,18 +20,20 @@ import { buttonClass } from "@/components/ui/button";
 // `controlClass` on `/contact` and `Tag` on `/projects`, found in the same
 // sweep.
 //
-// 📌 These seven are the places somebody who is lost actually wants: the front
+// 📌 These six are the places somebody who is lost actually wants: the front
 // door, what the club is, the thing they may have been mid-way through, and the
-// member portal with its three pages. Check In is on the list deliberately — a
-// member who mistypes a URL on the way to checking in is the one visitor here
-// with a clock running — so it stays a direct link rather than one click behind
-// the portal hub.
+// member portal.
+//
+// 🔓 **There is deliberately NO Check In here (officer, 2026-09-18): check-in
+// lives only inside the portal.** It used to be a direct link, argued for as
+// the one visitor with a clock running; a member who mistypes a URL on the way
+// to checking in now goes through Member Portal, one click more. The printed QR
+// codes do not pass through here at all — /attend redirects to /portal/attend.
 
 const DESTINATIONS = [
   ["/", "Home"],
   ["/about", "About Us"],
   ["/portal", "Member Portal"],
-  ["/portal/attend", "Check In"],
   ["/portal/leaderboard", "Leaderboard"],
   ["/portal/lookup", "My Attendance"],
   ["/contact", "Contact Us"],
