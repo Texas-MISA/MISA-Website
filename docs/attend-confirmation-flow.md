@@ -6,6 +6,15 @@ the reference for *why*; `lib/checkin.ts`, `app/actions/attendance.ts`, and
 `tests/checkin.test.ts` covers every row of the decision table below. The
 normative summary now lives in the architecture doc (§4.2, §4.3, §6, v1.22).
 
+**Label reworded 2026-09-17 (officer, doc v1.80).** The checkbox reads "This is my
+first MISA event, or my first time checking in here"; it was "This is my first
+MISA event". Copy only — every decision, property and table row below is
+unchanged, and "First-time box" throughout this document still names that one
+control. The rewording closes a gap between the label and what the box has always
+meant (*"I am not on the roster yet"*): a member added by an officer or carried in
+from a roster import is on file but has never used this form, and the old label
+told them to leave it unticked.
+
 One deliberate departure from the plan as written, decided while building:
 **`RATE_LIMIT_MAX` rose from 30 to 90.** Verification item 5 requires the confirm
 step to be throttled like any other submission, so a first-timer spends two slots
