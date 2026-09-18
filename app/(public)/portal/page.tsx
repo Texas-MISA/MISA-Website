@@ -65,7 +65,7 @@ const DESTINATIONS = [
     href: "/portal/lookup",
     title: "My Attendance",
     body: "Look up your own MISA attendance, points and dues status.",
-    action: "Look up my attendance",
+    action: "Look up your attendance",
     variant: "outline",
   },
 ] as const;
