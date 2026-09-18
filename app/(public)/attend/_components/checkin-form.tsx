@@ -141,8 +141,8 @@ function CheckinFields({
       {state.status === "unmatched" && (
         <Banner role="alert">
           We don&apos;t have that info on file. Check your EID and email for a
-          typo and try again — or, if this is your first MISA event, tick the
-          box below.
+          typo and try again — or, if this is your first MISA event or your
+          first time checking in here, tick the box below.
         </Banner>
       )}
       {state.status === "rate_limited" && (
@@ -208,7 +208,7 @@ function CheckinFields({
           className={`mt-1 ${CHECKBOX}`}
         />
         <span>
-          This is my first MISA event
+          This is my first MISA event, or my first time checking in here
         </span>
       </label>
 
