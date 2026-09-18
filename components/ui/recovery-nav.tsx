@@ -29,9 +29,9 @@ import { buttonClass } from "@/components/ui/button";
 const DESTINATIONS = [
   ["/", "Home"],
   ["/about", "About Us"],
-  ["/attend", "Check In"],
-  ["/leaderboard", "Leaderboard"],
-  ["/lookup", "My Attendance"],
+  ["/portal/attend", "Check In"],
+  ["/portal/leaderboard", "Leaderboard"],
+  ["/portal/lookup", "My Attendance"],
   ["/contact", "Contact Us"],
 ] as const;
 

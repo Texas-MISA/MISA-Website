@@ -239,7 +239,7 @@ export default async function LeaderboardPage() {
           Want your own breakdown — which events you attended, what&apos;s still
           pending, and why your total is what it is?{" "}
           <Link
-            href="/lookup"
+            href="/portal/lookup"
             className="text-misa-blue underline hover:text-misa-blue-dark"
           >
             Look up your attendance

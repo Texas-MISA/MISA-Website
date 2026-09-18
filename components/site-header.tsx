@@ -78,8 +78,8 @@ const SITE_NAV = [
  * officer, and ending that is the whole point of Stage 7.
  */
 const MEMBER_NAV = [
-  { href: "/leaderboard", label: "Leaderboard" },
-  { href: "/lookup", label: "My Attendance" },
+  { href: "/portal/leaderboard", label: "Leaderboard" },
+  { href: "/portal/lookup", label: "My Attendance" },
 ] as const;
 
 /**
@@ -101,7 +101,7 @@ const MOBILE_NAV = [
   ...SITE_NAV.filter((item) => item.href !== "/admin/login"),
   { href: "/contact", label: "Contact" },
   ...MEMBER_NAV,
-  { href: "/attend", label: "Check In" },
+  { href: "/portal/attend", label: "Check In" },
   { href: "/admin/login", label: "Admin" },
 ] as const;
 
@@ -203,7 +203,7 @@ export function SiteHeader() {
             </ul>
           </nav>
 
-          <Link href="/attend" className={BUTTON_SOLID_NAVY_SM}>
+          <Link href="/portal/attend" className={BUTTON_SOLID_NAVY_SM}>
             Check In
           </Link>
         </div>

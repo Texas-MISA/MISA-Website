@@ -3142,9 +3142,17 @@ $$;
                        page and no Contact nav item, and puts the About FAQ
                        band and the footer address in its place. Still in the
                        mobile sheet, which stacks and has no wordmark to clear
-/attend                Public check-in form
-/leaderboard           Public standings
-/lookup                Member self-service attendance history
+/portal/attend         Public check-in form
+/portal/leaderboard    Public standings
+/portal/lookup         Member self-service attendance history
+/attend                308 → /portal/attend      (member portal phase 1, v1.81)
+/leaderboard           308 → /portal/leaderboard
+/lookup                308 → /portal/lookup
+                       🔓 PERMANENT redirects in next.config.ts's redirects(),
+                       query string carried through. Printed QR codes,
+                       group-chat links and bookmarks point at these three, so
+                       the entries are never deleted — tests/portal.test.ts
+                       asserts all three. Not routes on disk any more
 /officer-invite/[token]
                        Redeem an officer invitation — set a password, against
                        the address the inviter pinned, or one the recipient

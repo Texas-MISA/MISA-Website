@@ -34,10 +34,10 @@ export default async function AdminLoginPage({
           <p className="mt-2 text-center text-sm text-misa-secondary">
             For MISA officers only. Members check in at{" "}
             <a
-              href="/attend"
+              href="/portal/attend"
               className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
             >
-              /attend
+              /portal/attend
             </a>
             .
           </p>

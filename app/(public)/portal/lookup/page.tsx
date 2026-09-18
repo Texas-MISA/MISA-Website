@@ -50,7 +50,7 @@ export default function LookupPage() {
         <p className="mt-2 text-sm text-misa-muted">
           Both have to match the same member, which is why this shows more than{" "}
           <Link
-            href="/leaderboard"
+            href="/portal/leaderboard"
             className="text-misa-blue underline hover:text-misa-blue-dark"
           >
             the leaderboard

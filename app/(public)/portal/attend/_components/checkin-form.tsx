@@ -363,7 +363,7 @@ function ResultPanel({
           word for it. */}
       <p className="mt-4 text-sm text-misa-muted">
         <Link
-          href="/lookup"
+          href="/portal/lookup"
           className="text-misa-blue underline hover:text-misa-blue-dark"
         >
           Check your points and attendance

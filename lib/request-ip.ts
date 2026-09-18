@@ -9,8 +9,8 @@ import { headers } from "next/headers";
 //
 // ⚠️ Imports next/headers, so this module must NEVER be imported by
 // lib/checkin.ts. That file is deliberately free of next/* imports because
-// app/(public)/attend/_components/checkin-form.tsx (a Client Component) imports
-// ORPHAN_WINDOW_HOURS from it.
+// app/(public)/portal/attend/_components/checkin-form.tsx (a Client Component)
+// imports ORPHAN_WINDOW_HOURS from it.
 
 /**
  * A stable, scoped hash of the requesting client's IP.
