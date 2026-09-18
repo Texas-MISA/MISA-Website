@@ -20,15 +20,17 @@ import { buttonClass } from "@/components/ui/button";
 // `controlClass` on `/contact` and `Tag` on `/projects`, found in the same
 // sweep.
 //
-// 📌 These six are the places somebody who is lost actually wants: the front
+// 📌 These seven are the places somebody who is lost actually wants: the front
 // door, what the club is, the thing they may have been mid-way through, and the
-// two member-facing pages. `/attend` is on the list deliberately — a member who
-// mistypes a URL on the way to checking in is the one visitor here with a clock
-// running.
+// member portal with its three pages. Check In is on the list deliberately — a
+// member who mistypes a URL on the way to checking in is the one visitor here
+// with a clock running — so it stays a direct link rather than one click behind
+// the portal hub.
 
 const DESTINATIONS = [
   ["/", "Home"],
   ["/about", "About Us"],
+  ["/portal", "Member Portal"],
   ["/portal/attend", "Check In"],
   ["/portal/leaderboard", "Leaderboard"],
   ["/portal/lookup", "My Attendance"],

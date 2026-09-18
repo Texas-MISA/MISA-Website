@@ -3142,6 +3142,9 @@ $$;
                        page and no Contact nav item, and puts the About FAQ
                        band and the footer address in its place. Still in the
                        mobile sheet, which stacks and has no wordmark to clear
+/portal                Member portal hub — links to the three member tools and
+                       to officer sign-in. Static, robots noindex. The header's
+                       one "Portal" item opens it   (member portal phase 1)
 /portal/attend         Public check-in form
 /portal/leaderboard    Public standings
 /portal/lookup         Member self-service attendance history

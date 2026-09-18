@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
 
 import nextConfig from "@/next.config";
@@ -25,5 +27,18 @@ describe("member portal redirects", () => {
         { source: "/lookup", destination: "/portal/lookup", permanent: true },
       ])
     );
+  });
+});
+
+describe("the portal hub", () => {
+  it("carries robots noindex", () => {
+    // Per page, never on a portal layout: /portal/attend is indexable, and a
+    // layout-level robots would de-index it silently. The leaderboard and
+    // lookup pages carry their own copy, asserted in tests/lookup.test.ts.
+    const source = readFileSync(
+      new URL("../app/(public)/portal/page.tsx", import.meta.url),
+      "utf8"
+    );
+    expect(source).toContain("robots: { index: false, follow: false }");
   });
 });
