@@ -1,6 +1,6 @@
 # Member portal plan
 
-> 📋 **NOT BUILT.** Written 2026-09-18. **Rollback point:** the tag `pre-portal-2026-09-18` (commit `ce5bda7`), which is production as of that date.
+> ✅ **PHASE 1 BUILT on `portal-phase-1` (2026-09-18), verified locally, awaiting the officer's go-ahead to merge.** See [Phase 1 record](#phase-1-record-2026-09-18) at the end of the phase. Written 2026-09-18. **Rollback point:** the tag `pre-portal-2026-09-18` (commit `ce5bda7`), which is production as of that date.
 > **Current goal: phase 1 only.** Phases 2–4 (houses and bingo) are **on hold** until the officer has more information about how the house system works.
 
 ## Goal
@@ -91,21 +91,53 @@ These were found by grep. Re-run the grep before and after the move, because the
 ### Rollout
 1. Branch `portal-phase-1` from `main`. Do the work, and run `npm run lint`, `npm run build` and `npm test` locally (Docker plus `npx supabase start`).
 2. Local walkthrough on the dev server, **pinned to local** (check the `Environments:` banner). Do a real check-in, a lookup, and view the leaderboard at both `/portal/*` and the old URLs.
-3. `git push origin portal-phase-1` for a **Vercel preview URL**. Repeat the walkthrough there, including the redirects via curl.
-4. With the officer's go-ahead, merge to `main`, **not on an event day**. Then smoke-test production: `curl -sI https://www.txmisa.org/attend` should return `308` and `location: /portal/attend`, and all three pages should load.
-5. **Rollback, if needed:** Vercel **Instant Rollback** to the `ce5bda7` deployment (seconds, no rebuild), then `git revert` the merge on `main`. There's no migration, so nothing on the database side needs undoing.
+3. `git push origin portal-phase-1` for a **Vercel preview URL**. Repeat the walkthrough there, including the redirects via curl. ⚠️ **No check-ins on the preview** (officer, 2026-09-18): a preview reads and writes the PRODUCTION database ([`local-testing-plan.md`](local-testing-plan.md)), so a real check-in there writes a real row. The preview gets page loads, the redirects via curl, and at most one lookup with an obviously fake EID — which proves the Server Action works on the moved route and writes only a throttle row. Check robots in the HTML `<meta>`, not the headers: Vercel adds `X-Robots-Tag: noindex` to every preview response.
+4. With the officer's go-ahead, merge to `main` with `git merge --no-ff`, **not on an event day** — first confirm no event's check-in window is open (`npx supabase db query --linked`, one line). Then smoke-test production: `curl -sI https://www.txmisa.org/attend` should return `308` and `location: /portal/attend`, and all four pages should load with their content.
+5. **Rollback, if needed:** Vercel **Instant Rollback** to the `ce5bda7` deployment (seconds, no rebuild), then on `main` revert **the portal commits only** — `git revert --no-edit f5d2d85..portal-phase-1`, which reverts every portal commit after the seed fix, newest first. ⚠️ Not `git revert -m 1 <merge>`: the branch also carries two docs commits for behaviour that is already live (`4d1698d`, `6efba64`), and reverting the merge would take those too. 🪤 After an Instant Rollback, Vercel stops assigning the production domain to new deployments automatically, so the revert's deployment has to be promoted by hand. There's no migration, so nothing on the database side needs undoing — and the 308s carry `cache-control: public, max-age=0, must-revalidate`, so browsers revalidate rather than keep a redirect the rolled-back build would answer with a 404.
 
 ### Verification checklist
-- [ ] `/portal`, `/portal/attend`, `/portal/leaderboard` and `/portal/lookup` return 200.
-- [ ] `/attend`, `/leaderboard` and `/lookup` return **308** to the new paths, **with the query string preserved**.
-- [ ] A real check-in on `/portal/attend` succeeds locally and on the preview. The first-time confirmation step still works.
-- [ ] A lookup by EID works, and the rate limit still applies.
-- [ ] The leaderboard and lookup HTML still contain `noindex`. The attend page's robots are unchanged.
-- [ ] The header's Portal item is active on `/portal/*`, Check In goes to `/portal/attend`, and the mobile sheet has no duplicate keys.
-- [ ] 404 recovery links point at the live paths.
-- [ ] `/admin`, `/admin/login` and `/officer-invite/<token>` are unchanged.
-- [ ] `npm test` (including `docs.test.ts` §5 and `security.test.ts`), `npm run build` and `npm run lint` are all green.
-- [ ] `grep -rnE '"/(attend|leaderboard|lookup)"' app components lib tests` returns nothing.
+Ticked items were verified **locally** on 2026-09-18 (dev server pinned to the local stack); the preview and production rows are still open.
+- [x] `/portal`, `/portal/attend`, `/portal/leaderboard` and `/portal/lookup` return 200 **with their content** (each page's own `<h1>`, no error boundary).
+- [x] `/attend`, `/leaderboard` and `/lookup` return **308** to the new paths, **with the query string preserved** (`/lookup?eid=zz&y=2` → `/portal/lookup?eid=zz&y=2`). `/attend/` takes two hops; a POST to `/attend` gets a method-keeping 308.
+- [x] A real check-in on `/portal/attend` succeeds locally — a seed member typed in lower case, linked to the stored upper-case EID — and the first-time confirmation step creates the member and the row. ⚠️ **Not on the preview**, by decision: see Rollout step 3.
+- [x] A lookup by EID works, shows the new check-in, and writes its throttle row (the rate limit's own bucket).
+- [x] The hub, leaderboard and lookup HTML contain `noindex, nofollow`. The attend page has no robots meta, as before.
+- [x] The header's Portal item is current on `/portal` (`page`) and every `/portal/*` page (`true`), Check In goes to `/portal/attend`, and the mobile sheet has seven unique items. `/officers` does not claim `/officer-invite`.
+- [x] 404 recovery links point at the live paths (both 404s, including one under `/portal`).
+- [x] `/admin` (307 to login), `/admin/login` (now naming `/portal/attend`) and `/officer-invite/<token>` are otherwise unchanged.
+- [x] `npm test` (1,097 across 38 files, including `docs.test.ts` §5 and `security.test.ts`), `npm run build`, `npx tsc --noEmit` and `npm run lint` are all green.
+- [x] `grep -rnE '"/(attend|leaderboard|lookup)"' app components lib tests | grep -vE '^tests/portal\.test\.ts:|:[0-9]+:\s*//'` returns nothing, and neither does `grep -rnE '^\s*/(attend|leaderboard|lookup)\s*$'` over the same folders. 📌 The unfiltered grep **can never come back empty**: two comments name the feature (`portal/leaderboard/page.tsx:35`, `app/actions/member-merge.ts:504`) and `tests/portal.test.ts` holds the old paths as the redirect sources it asserts. The second grep exists because the visible text `/attend` on `/admin/login` was on a line of its own, where the first cannot see it.
+- [ ] Preview: the four pages, the three 308s (with `cache-control`), robots meta, header, and one fake-EID lookup.
+- [ ] Production, after the merge: the same, plus `https://txmisa.org/attend` (no `www`), since a QR code may carry the apex domain.
+
+### Phase 1 record (2026-09-18)
+
+Built on `portal-phase-1`, cut from `ce5bda7`. Every commit is lint-, build- and test-clean on its own.
+
+| Commit | What |
+|---|---|
+| `4d1698d` | The v1.80 docs for the first-timer checkbox wording (live since `ce5bda7`), committed on their own first, as the officer chose |
+| `6efba64` | This plan and its `CLAUDE.md` row |
+| `f5d2d85` | **The local seed fix — not portal work**, see below |
+| `c8a9238` | The move, the three redirects, every internal link, §5, `tests/portal.test.ts` |
+| `f395f69` | The hub, its noindex assertion, "Member Portal" in the 404 recovery nav |
+| `d493183` | One "Portal" nav item, section-aware `aria-current`, the re-measured clearance |
+| `bba4266` | "Look up your attendance" — found by the `web-design-guidelines` pre-ship review |
+| the docs commit | Doc v1.81, this record, and the rest of the docs |
+
+**Where the build departed from the plan above:**
+- **The hub is three stacked rows, not a three-up card grid.** Three equal cards side by side is the feature-row tell `design-taste-frontend` bans, and a third of the column cannot fit "My Attendance" at the Title size. Rows also match the narrow single column the member pages use. Only the button's weight varies: Check In is primary.
+- **No hero subhead**, like `/attend`'s, which the officer removed in `9efceb6`. The card titles are the destination pages' own headings and the one-line bodies are their own `metadata.description`, so the hub adds no copy of its own that could drift.
+- **The header change is its own commit**, carrying the clearance numbers with it, so reverting it alone leaves the docs true.
+- **`tests/portal.test.ts` is new.** It asserts the three permanent redirects (nothing else would notice one going missing) and the hub's noindex.
+- **Nav clearance at 1280: 342px left, 430px right** (was 342 / 295). The right cluster fell from 272px to 137px, so the left is the tighter side again.
+
+🔴 **The local stack was broken before this began, and fixing it came first.** `seed.sql` had two "still to come" events dated 1 and 8 September. By 2026-09-18 the published one was past, the bulk insert gave it attendance, and the seed's own assert (202 present rows) read 218 and rolled back the WHOLE seed. So `db reset` left a local database with migrations and no data, and **23 tests failed against it** — every one data-dependent, none related to this work. `f5d2d85` moves both events to December, still Fall 2026. **They expire again on 1 December 2026**; move them forward rather than raising the count.
+
+**Found and flagged, not fixed** — this phase is a pure move:
+- `/portal/lookup` still says "Both have to match the same member", which has been false since the gate became the EID alone on 2026-08-25.
+- The disclosure drift described under *Invariants to carry over* below.
+- The sticky header has no matching `scroll-padding-top`, so a focused element can sit under it when tabbing backwards (the pre-ship review; site-wide and pre-existing).
 
 ---
 
@@ -122,6 +154,6 @@ These were found by grep. Re-run the grep before and after the move, because the
 
 ## Invariants to carry over (all phases)
 - The leaderboard stays `force-dynamic` and noindex; never `revalidatePath` on it.
-- `/attend` keeps its check-in, origin-capture and disclosure behaviour unchanged.
+- `/attend` keeps its check-in and origin-capture behaviour unchanged. ⚠️ **Its location disclosure no longer exists**: hotfix `c3890a1` (2026-09-14) removed the sentence at the officer's instruction, and only a comment marks where it was (`checkin-form.tsx`). Capture itself is unchanged. `CLAUDE.md`'s invariant "`/attend` carries a disclosure sentence…" and `docs/checkin-location-verification.md` still describe it; that drift predates this plan and is flagged for a separate fix. Nothing here may "restore" the sentence.
 - No `data-reveal` on nodes that mount after first paint.
 - No unauthenticated route returns an email or EID. `tests/security.test.ts` still allows only `leaderboard` for anon.

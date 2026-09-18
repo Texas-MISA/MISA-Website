@@ -7,7 +7,12 @@ each.
 
 ```
 app/(public)/           landing, /about, /gallery, /officers, /projects, /contact,
-                        /attend, /leaderboard, /lookup, /officer-invite/[token].
+                        /officer-invite/[token], and portal/: the member portal
+                        hub plus /portal/attend, /portal/leaderboard and
+                        /portal/lookup (moved there 2026-09-18; the old paths
+                        are permanent redirects in next.config.ts). No
+                        portal/layout.tsx — robots stays per page, because
+                        /portal/attend is indexable and the other three are not.
                         layout.tsx holds the shared header/footer, mounts
                         RevealObserver once, and 🔓 since 2026-08-19 carries the
                         PUBLIC PAGE GROUND — `bg-misa-panel` on <main>, a flat
@@ -27,9 +32,11 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         Hero and its floating plate cluster — replaces PageHero
                         on the HOME PAGE ONLY). 🔓 PageHero itself was REBUILT in
                         v2 phase 2 (ground="field", dead size/tagline props
-                        deleted) and EIGHT pages render it: the five content
+                        deleted) and NINE pages render it: the five content
                         pages plus /attend, /lookup and /leaderboard, which are
-                        phase 3 and inherit it. 🔓 **CENTRED as of 2026-08-23
+                        phase 3 and inherit it, and the /portal hub that has
+                        linked those three since 2026-09-18 (they live under
+                        /portal now too). 🔓 **CENTRED as of 2026-08-23
                         (officer), reversing phase 2's left-alignment** — one
                         component, so all eight moved together. §4.3's
                         anti-centre bias is a bias, not a prohibition, and the
@@ -391,6 +398,10 @@ public/                 partners/ (4 logos); misa-logo.png (the real wordmark,
 tests/                  Vitest — integration tests against the local stack
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()
+next.config.ts          redirects() only: /attend, /leaderboard and /lookup →
+                        /portal/*, PERMANENT (308, query string carried). 🔓
+                        NEVER delete one — printed QR codes point at /attend.
+                        tests/portal.test.ts asserts all three
 vercel.json             function region pinned to cle1 (us-east-2) — in-repo
 ```
 

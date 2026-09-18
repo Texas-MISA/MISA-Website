@@ -2,7 +2,7 @@
 
 **Status:** **built** 2026-07-31, same day it was decided. This document remains
 the reference for *why*; `lib/checkin.ts`, `app/actions/attendance.ts`, and
-`app/(public)/attend/_components/checkin-form.tsx` are the implementation, and
+`app/(public)/portal/attend/_components/checkin-form.tsx` are the implementation, and
 `tests/checkin.test.ts` covers every row of the decision table below. The
 normative summary now lives in the architecture doc (§4.2, §4.3, §6, v1.22).
 

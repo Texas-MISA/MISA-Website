@@ -65,7 +65,8 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/attend`, `/leaderboard`, `/lookup` | ⏳ **NOT YET REBUILT** (phase 3, deferred). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure. |
+| `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT** (phase 3, deferred). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure. |
+| `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows each with one button; no muted ink on the grey ground. Phase 3 owns the member area's real design and may re-compose it. |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
@@ -177,10 +178,11 @@ side the surface is `Panel` (or a `bg-white` frame where a `<form>` needs its ow
 `action`, which `Panel` does not forward), and the shell owns the ground.
 
 🔓 **`PageHero` moved from a flat `bg-misa-blue` to `ground="field"` in phase 2**,
-so the site has ONE navy hero treatment rather than two. ⚠️ **Eight pages render
+so the site has ONE navy hero treatment rather than two. ⚠️ **Nine pages render
 it** — the five phase-2 pages plus `/attend`, `/lookup` and `/leaderboard`, which
-are phase 3. Those three inherit any change to it and were measured at the phase-2
-gate rather than assumed. Its dead `size="home"` and `tagline` props were deleted.
+are phase 3, and the `/portal` hub that has linked those three since 2026-09-18
+(they live under `/portal` now). The phase-3 three inherit any change to it and
+were measured at the phase-2 gate rather than assumed. Its dead `size="home"` and `tagline` props were deleted.
 🔓 **It is CENTRED as of 2026-08-23 (officer), reversing phase 2's
 left-alignment.** Phase 2 left-aligned it because §4.3's anti-centre bias binds
 at `DESIGN_VARIANCE 8` and a centred hero repeated across eight pages was the

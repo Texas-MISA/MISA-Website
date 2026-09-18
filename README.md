@@ -52,7 +52,8 @@ npx supabase db push          # apply pending migrations to the linked project
 
 ```
 app/(public)/     the public site: landing, about, gallery, officers,
-                  projects, contact, and /attend
+                  projects, contact, and the member portal (/portal:
+                  check-in, leaderboard, attendance lookup)
 app/admin/        officer area: login, dashboard, events, attendance, points,
                   members (directory, import, merge, saved views, custom
                   fields) and dues

@@ -1,8 +1,20 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.80
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 3 deferred; phase 5 outstanding.**
+**Version:** 1.81
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 3 deferred; phase 5 outstanding.** 🧭 **Member portal phase 1 (`/portal`) is BUILT on `portal-phase-1`, awaiting the officer's go-ahead to merge.**
 **Last updated:** September 2026
+
+> **v1.81: the member pages move under `/portal`, and the old URLs are permanent redirects.**
+>
+> Officer instruction, 2026-09-18 ([`member-portal-plan.md`](member-portal-plan.md), phase 1). Built on `portal-phase-1`, not yet merged. Rollback point: the tag `pre-portal-2026-09-18` (`ce5bda7`).
+>
+> - **`/attend`, `/leaderboard` and `/lookup` became `/portal/attend`, `/portal/leaderboard` and `/portal/lookup`**, moved with `git mv` so history follows, and a static hub at `/portal` lists the three (§5, §10). No page's copy, behaviour or data access changed, and there is no migration and no new environment variable — undoing it is a code revert.
+> - 🔓 **The old paths are PERMANENT redirects in `next.config.ts` — 308, method kept, query string carried through — and are never deleted.** Printed QR codes, group-chat links and bookmarks point at them. `tests/portal.test.ts` asserts all three, because nothing else would notice one going missing: `tests/docs.test.ts` walks `page.tsx` and `route.ts`, and a redirect is neither. Vercel serves Next's 308s with `cache-control: public, max-age=0, must-revalidate`, so a browser revalidates rather than pinning the redirect — which is what keeps an Instant Rollback clean.
+> - **The header's two member items became one, "Portal"** (the officer's call); Check In keeps its own button, since it is the one a member does against a clock. An item is now current on the pages beneath it as well: `aria-current="page"` on the exact match, `"true"` on a section ancestor. Re-measured at 1280: **342px left, 430px right** — the left is the tighter side again.
+> - **robots stays per page.** The hub, the leaderboard and the lookup are noindex; `/portal/attend` is indexable, as `/attend` was. There is deliberately no portal layout to carry a shared robots key, because one would silently de-index the check-in page.
+> - 📌 **§5's `/portal` row is not enforced by the test.** The route check is a substring match, so `/portal/attend` alone satisfies "§5 lists /portal". The row is there because it was written, not because anything would fail without it.
+> - 🪤 **Two local traps the move hit, neither visible in the code.** A running dev server holds handles inside `app/`, so on Windows `git mv` of a route folder fails with *Permission denied* until it is stopped. And a `.next/dev/types/validator.ts` written by a dev server started before the move still imports the old page paths; `tsconfig.json` includes it, so `next build` fails type-checking on a module that no longer exists until it is deleted or a fresh dev server rewrites it.
+> - **Unchanged, and checked:** `/admin`, `/admin/login` (its pointer to check-in now names `/portal/attend`), `/officer-invite/[token]`, `proxy.ts`, both Server Actions, the rate-limit buckets (keyed by name, not path), and v2 phase 3 — which still owns these pages' redesign and the `--misa-muted` AA failure on them.
 
 > **v1.80: `/attend`'s first-timer checkbox now names both cases it covers.**
 >
@@ -3876,9 +3888,14 @@ Two, and they earn a place here on the bar #12 and #13 set: the first changes wh
                              UNMOUNTED since v1.61, so no designed page queries
                              the database. Remounting it restores
                              `export const dynamic = "force-dynamic"` too
-    /attend/page.tsx
-    /leaderboard/page.tsx    Stage 7
-    /lookup/page.tsx         Stage 7
+    /portal/page.tsx         member portal hub (v1.81) — static, noindex
+    /portal/attend/page.tsx
+    /portal/leaderboard/page.tsx
+                             Stage 7
+    /portal/lookup/page.tsx  Stage 7
+                             The three moved under /portal in v1.81 (they were
+                             /attend, /leaderboard, /lookup — now permanent
+                             redirects in next.config.ts, never deleted)
     /officer-invite/[token]/page.tsx
                              migration 24 — redeem an officer invitation.
                              Unauthenticated and OUTSIDE /admin on purpose:
