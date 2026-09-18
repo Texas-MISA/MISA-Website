@@ -23,9 +23,15 @@ import { Section } from "@/components/ui/section";
 // 📌 **Rows, not a three-up card grid.** Three equal cards side by side is the
 // feature-row tell `design-taste-frontend` bans, and at `sm` a third of the
 // column is too narrow for "My Attendance" at the Title size. Rows also keep
-// the narrow single column the three member pages themselves use. Exactly one
-// property varies between them — the button's weight — because check-in is
-// the one a member does against a clock.
+// the narrow single column the three member pages themselves use.
+//
+// 🔓 **All three buttons are formatted the SAME — one skin, one width
+// (officer, 2026-09-18).** Check In was first built as the lone primary with
+// the other two in outline, on the argument that check-in is the one done
+// against a clock; the officer overruled that. Check-in now lives only inside
+// the portal, so this page is its door, and no tool here outranks another.
+// The width is fixed rather than fitted so the three buttons line up as one
+// column; it is sized to the longest label, "Look up your attendance".
 //
 // 🔓 **robots is per page, and must never move to a portal layout.** The hub,
 // /portal/leaderboard and /portal/lookup are noindex; /portal/attend is
@@ -52,23 +58,28 @@ const DESTINATIONS = [
     title: "Event Check-In",
     body: "Check in to a MISA event.",
     action: "Check in",
-    variant: "primary",
   },
   {
     href: "/portal/leaderboard",
     title: "Leaderboard",
     body: "Current-term standings for MISA members.",
     action: "See the standings",
-    variant: "outline",
   },
   {
     href: "/portal/lookup",
     title: "My Attendance",
     body: "Look up your own MISA attendance, points and dues status.",
     action: "Look up your attendance",
-    variant: "outline",
   },
 ] as const;
+
+// One skin for every destination (see the header note), full width on a phone
+// and one fixed width beside the text from `sm`, so the column of buttons is
+// straight. `whitespace-nowrap` so a label can never break inside the width.
+const DESTINATION_BUTTON = buttonClass({
+  variant: "primary",
+  className: "mt-5 w-full shrink-0 whitespace-nowrap sm:mt-0 sm:w-64",
+});
 
 export default function PortalPage() {
   return (
@@ -101,13 +112,7 @@ export default function PortalPage() {
                   {destination.body}
                 </p>
               </div>
-              <Link
-                href={destination.href}
-                className={buttonClass({
-                  variant: destination.variant,
-                  className: "mt-5 w-full shrink-0 sm:mt-0 sm:w-auto",
-                })}
-              >
+              <Link href={destination.href} className={DESTINATION_BUTTON}>
                 {destination.action}
               </Link>
             </Panel>
