@@ -261,7 +261,12 @@ components/shadcn/      🏗️ shadcn/ui components, added on demand with
                         import. Never point it back
 components/             site-header.tsx (4-item nav incl. Admin — was 5 until
                         /projects was unlisted 2026-08-23 — absolutely centred
-                        wordmark, navy Check In. 🪤 MOBILE_NAV drops Admin BY
+                        wordmark, then ONE member item, "Portal" (was
+                        Leaderboard + My Attendance until the member portal,
+                        2026-09-18), and the navy Check In → /portal/attend.
+                        An item is current on the pages beneath it too:
+                        aria-current "page" on the exact match, "true" on the
+                        section ancestor. 🪤 MOBILE_NAV drops Admin BY
                         HREF, not by slice index: the old slice(0,4) meant "no
                         Admin" only while Admin sat at index 4, and unlisting a
                         page swept it back in), site-footer.tsx

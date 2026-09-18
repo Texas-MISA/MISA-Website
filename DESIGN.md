@@ -436,11 +436,13 @@ Roles, not sizes. `components/ui/section.tsx` owns the vertical rhythm.
   **opaque**, or the container shows through the whole card instead of the seam.
 - 📌 **The nav cannot grow without measuring.** The wordmark is absolutely centred
   and wins the z-order, so an overflowing item silently disappears. 🔓
-  **Re-measured 2026-08-23 at 1280: 342px left, 295px right** (was 285 / 312).
-  Two changes moved it in opposite directions — `/projects` left the nav, and the
-  wordmark became the real logo and grew 48px → 82px wide. ⚠️ **The right is now
-  the tighter side**; it was the looser one before, and it lost exactly half the
-  wordmark's growth because the mark is centred.
+  **Re-measured 2026-09-18 at 1280: 342px left, 430px right.** The member portal
+  folded Leaderboard and My Attendance into one "Portal" item, so the right
+  cluster fell from 272px to 137px and the right gained 135px. ⚠️ **The left is
+  the tighter side again.** History: 342 / 295 on 2026-08-23, when `/projects`
+  left the nav and the wordmark became the real logo (48px → 82px wide — the
+  right lost exactly half that, because the mark is centred), and 285 / 312
+  before that.
 
 ---
 
@@ -811,7 +813,7 @@ scope) stayed in `CLAUDE.md`; invariants with evidence are in `docs/invariants.m
 
 ### Nav clearance
 
-- 🪤 **The site header's nav cannot grow without measuring at 1280.** The wordmark is absolutely centred and wins the z-order; an overflowing item disappears silently. 🔓 **RE-MEASURED 2026-08-23: 342px clearance left, 295px right.** Left group 225px, right cluster 272px, wordmark 82px, 32px gutter. Right is now the tighter side. Relisting `/projects` spends part of the left; any sixth item needs a fresh measurement.
+- 🪤 **The site header's nav cannot grow without measuring at 1280.** The wordmark is absolutely centred and wins the z-order; an overflowing item disappears silently. 🔓 **RE-MEASURED 2026-09-18: 342px clearance left, 430px right** (342 / 295 on 2026-08-23). Left group 225px, right cluster 137px (was 272, until the member portal folded Leaderboard and My Attendance into one "Portal" item), wordmark 82px, 32px gutter. **The left is the tighter side again.** Relisting `/projects` spends part of the left; any sixth item needs a fresh measurement.
 
 ### Design skill precedence
 

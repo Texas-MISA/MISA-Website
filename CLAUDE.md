@@ -219,7 +219,7 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - **React 19 resets an uncontrolled `<form action={…}>` after the action resolves.** Echo submitted values back in server state; drive every `defaultValue` from them; pass a **string, never `undefined`**.
 - **Never build a timestamp with `new Date("2026-09-01T18:00")`.** Use `centralWallTimeToInstant()` from `lib/events.ts`.
 - **Server Components own date formatting.** `Intl.DateTimeFormat` in a Client Component produces a hydration diff.
-- 📌 **Officer sign-in is the "Admin" NAV item** (`/admin/login`). 🔓 **RE-MEASURED 2026-08-23 at 1280: 342px left clearance, 295px right.** The right is the tighter side. Any sixth nav item needs a fresh measurement. *(See `DESIGN.md` §Nav clearance for the full accounting.)*
+- 📌 **Officer sign-in is the "Admin" NAV item** (`/admin/login`). 🔓 **RE-MEASURED 2026-09-18 at 1280: 342px left clearance, 430px right** — the member portal folded two member items into one "Portal". The LEFT is the tighter side again. Any sixth nav item needs a fresh measurement. *(See `DESIGN.md` §Nav clearance for the full accounting.)*
 - 🪤 **Global CSS must live inside a Tailwind cascade layer.** An unlayered rule beats every layered one regardless of specificity.
 - 🔓 **The scroll reveal's revealed state is `clip-path: none`, NOT `inset(0 0 0 0)`.** `inset(0 0 0 0)` clips descendants; `none` does not. `wipe` keeps its own `inset()` rule because `none` is not interpolable from `inset(0 100% 0 0)`.
 - 🪤 **The scroll reveal's hidden state is scoped to `html.js`.** `reveal.tsx` must never gain `"use client"` — the observer is the separate `reveal-observer.tsx`, mounted once in the public layout.

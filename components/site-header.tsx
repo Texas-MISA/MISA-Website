@@ -26,20 +26,20 @@ import { Wordmark } from "@/components/ui/wordmark";
 // means re-measuring at the xl breakpoint (1280) as well as at a wide
 // viewport, where the left group is the tight one.
 //
-// 🔓 **RE-MEASURED 2026-08-23**, after two changes that moved this in opposite
-// directions: `/projects` left the nav (four items, not five) and the wordmark
-// became the real logo, growing from 48px wide to 82px. The pieces are
-// viewport-independent — left group 225px, right cluster 272px, wordmark 82px,
-// 32px gutter — so the clearance at any width is arithmetic from those:
+// 🔓 **RE-MEASURED 2026-09-18**, after the member portal folded Leaderboard and
+// My Attendance into one "Portal" item. The pieces are viewport-independent —
+// left group 225px, right cluster 137px (was 272), wordmark 82px, 32px gutter —
+// so the clearance at any width is arithmetic from those:
 //
-//   1280   342px left   295px right    ← the tight one, and the number to beat
-//   1450   427px left   380px right
-//   1646   525px left   478px right    (measured live: 518 / 471)
+//   1280   342px left   430px right    ← 1280 is the tight width, and the
+//   1450   427px left   515px right      LEFT is the tight side again
+//   1646   525px left   613px right    (measured live: 518 / 606)
 //
-// 📌 Compare the previous figures, 285 left / 312 right at 1280. The left gained
-// 57px by losing a nav item; the right LOST 17px, which is exactly half the
-// wordmark's 34px growth, since it is centred. Both sides have room, but note
-// the right is now the tighter of the two — it was the looser one before.
+// 📌 The right gained 135px and the left did not move. **The left is the
+// tighter side again** — it was the looser one after the 2026-08-23 measure
+// (342 left / 295 right), when `/projects` left the nav and the wordmark grew
+// from 48px to 82px, and the tighter one before that (285 / 312). Relisting
+// `/projects` spends the left, so that is the side to re-measure first.
 
 /**
  * Public pages, left of the wordmark.
@@ -69,18 +69,25 @@ const SITE_NAV = [
 ] as const;
 
 /**
- * Member-facing pages, right of the wordmark.
+ * Member-facing pages, right of the wordmark: ONE item since the member portal
+ * (docs/member-portal-plan.md, phase 1). "Portal" opens the /portal hub, which
+ * links the leaderboard and My Attendance, and it stays current on every
+ * /portal/* page. Check In keeps its own button beside it rather than moving
+ * behind the hub — it is the one a member does against a clock.
  *
- * Both carry `robots: { index: false, follow: false }` (§9 #1), so linking
- * them from the nav makes them crawlable but not indexable — which is exactly
- * what that meta tag is for. They belong in the nav rather than behind a link
- * somebody has to be told about: a member who cannot find them asks an
- * officer, and ending that is the whole point of Stage 7.
+ * 📌 This used to be two direct links, Leaderboard and My Attendance, and the
+ * argument for them still holds: they belong in the nav rather than behind a
+ * link somebody has to be told about, because a member who cannot find them
+ * asks an officer, and ending that is the whole point of Stage 7. The hub keeps
+ * them one click from every page; trading the direct links for it was the
+ * officer's call (2026-09-18).
+ *
+ * The hub, the leaderboard and the lookup carry `robots: { index: false,
+ * follow: false }` (§9 #1), so linking them makes them crawlable but not
+ * indexable — which is exactly what that meta tag is for. /portal/attend stays
+ * indexable, as /attend always was.
  */
-const MEMBER_NAV = [
-  { href: "/portal/leaderboard", label: "Leaderboard" },
-  { href: "/portal/lookup", label: "My Attendance" },
-] as const;
+const MEMBER_NAV = [{ href: "/portal", label: "Portal" }] as const;
 
 /**
  * One list for the mobile panel, which stacks and has no wordmark to clear —
@@ -112,8 +119,22 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
-  // The home page deliberately has no active item.
-  const isActive = (href: string) => pathname === href;
+  // The home page deliberately has no active item. An item is also current on
+  // the pages BENEATH it, so "Portal" stays lit on every /portal/* page:
+  // `aria-current="page"` on the exact match, `"true"` on the ancestor — "you
+  // are in this section, not on this page", GOV.UK's service-navigation
+  // convention. `${href}/`, never a bare prefix, so /officers can never claim
+  // /officer-invite. In the mobile sheet that lights both Portal and Check In
+  // on /portal/attend, which is accurate: the section and the page.
+  //
+  // The return type is spelled out because `aria-current` takes a union, and
+  // inferred literals would widen to `string`.
+  const current = (href: string): "page" | "true" | undefined =>
+    pathname === href
+      ? "page"
+      : pathname.startsWith(`${href}/`)
+        ? "true"
+        : undefined;
 
   return (
     // `header-lift` adds the scroll-driven shadow — see globals.css. It needs
@@ -126,12 +147,12 @@ export function SiteHeader() {
         <nav aria-label="Main" className="hidden xl:block">
           <ul className="flex items-center gap-[22px]">
             {SITE_NAV.map((item) => {
-              const active = isActive(item.href);
+              const active = current(item.href);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
-                    aria-current={active ? "page" : undefined}
+                    aria-current={active}
                     className={`${NAV_ITEM} ${
                       active
                         ? "border-b border-misa-blue pb-0.5 text-foreground"
@@ -183,12 +204,12 @@ export function SiteHeader() {
           <nav aria-label="Member" className="hidden xl:block">
             <ul className="flex items-center gap-[18px]">
               {MEMBER_NAV.map((item) => {
-                const active = isActive(item.href);
+                const active = current(item.href);
                 return (
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      aria-current={active ? "page" : undefined}
+                      aria-current={active}
                       className={`${NAV_ITEM} whitespace-nowrap ${
                         active
                           ? "border-b border-misa-blue pb-0.5 text-foreground"
@@ -218,13 +239,13 @@ export function SiteHeader() {
         >
           <ul className="px-5 py-2 sm:px-8">
             {MOBILE_NAV.map((item) => {
-              const active = isActive(item.href);
+              const active = current(item.href);
               return (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     onClick={() => setOpen(false)}
-                    aria-current={active ? "page" : undefined}
+                    aria-current={active}
                     className={`block py-3 ${NAV_ITEM} ${
                       active ? "text-misa-blue" : "text-foreground"
                     }`}
