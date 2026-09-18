@@ -23,7 +23,13 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
     - A seed member checking in with a lower-case EID, and a first-timer confirmed into the roster.
     - A lookup showing the new row and writing its throttle row, and the leaderboard listing the new member.
     - `aria-current` correct on eight paths.
-    - Nav clearance re-measured at 1280: **342 left / 430 right**. The left is the tighter side again.
+    - Nav clearance re-measured at 1280: **342 left / 450 right** (after the officer review below). The left is the tighter side again.
+
+  - 🔁 **The officer reviewed the first build the same day and changed two things, both built.**
+    - **The header became ONE navy MEMBER PORTAL button, and check-in now lives only inside the portal.** Nothing outside `/portal` links `/portal/attend` — the "Portal" text item and the Check In button are gone, and the 404 list and `/admin/login` point members at `/portal`.
+    - **The hub's three buttons are formatted the same.** Check In had been the lone primary.
+    - 🪤 **The longer label moved the header's tight spot from the desktop to the phone.** Beside the centred wordmark, which wins the z-order, MEMBER PORTAL at the shared padding cleared the mark by 2.4px at 360 and ran 25px under it at 320. CHECK IN never came close. It now takes `px-3` below `sm` and stacks below 360px.
+    - 🪤 **A hidden browser tab could not measure any of that**: Chrome defers iframe loads and pauses `requestAnimationFrame` there, so every probe timed out. Measuring a clone of the button with the mobile styles set inline was synchronous and gave the numbers, and the generated `@media` rules were then read back from the stylesheet to confirm the classes exist.
 
   - ⚠️ **What the preview cannot be used for:** it reads and writes the production database, so this phase's preview check is render and redirects only, by the officer's decision.
 

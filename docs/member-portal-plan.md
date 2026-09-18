@@ -11,6 +11,9 @@ Group every member-facing tool under `txmisa.org/portal`. Members don't need an 
 - **`/admin` stays separate.** It's a different audience with real auth: the `proxy.ts` matcher, `/admin/login`, `next=` redirects and `revalidatePath` calls all assume that path. The portal links to it; it doesn't contain it. `/officer-invite/[token]` doesn't move either.
 - **Only officers edit house bingo.** Members watch it update live.
 - **Live means polling, not Supabase Realtime.** The view re-reads on the server every 5–10 seconds (`router.refresh()` on an interval). No table gets a new anon grant, and all reads stay server-side.
+- **The site has ONE way in: a navy button reading MEMBER PORTAL** (officer, after reviewing the build, 2026-09-18). It replaces the header's member links and its Check In button.
+- 🔓 **Check-in lives only inside the portal.** Nothing outside `/portal` links `/portal/attend` — not the header, the mobile sheet, the 404 recovery nav or `/admin/login`. The printed QR codes are unaffected: `/attend` redirects to `/portal/attend`, which is inside the portal.
+- **The hub's buttons are formatted the same** — one skin, one width.
 
 ---
 
@@ -102,9 +105,10 @@ Ticked items were verified **locally** on 2026-09-18 (dev server pinned to the l
 - [x] A real check-in on `/portal/attend` succeeds locally — a seed member typed in lower case, linked to the stored upper-case EID — and the first-time confirmation step creates the member and the row. ⚠️ **Not on the preview**, by decision: see Rollout step 3.
 - [x] A lookup by EID works, shows the new check-in, and writes its throttle row (the rate limit's own bucket).
 - [x] The hub, leaderboard and lookup HTML contain `noindex, nofollow`. The attend page has no robots meta, as before.
-- [x] The header's Portal item is current on `/portal` (`page`) and every `/portal/*` page (`true`), Check In goes to `/portal/attend`, and the mobile sheet has seven unique items. `/officers` does not claim `/officer-invite`.
-- [x] 404 recovery links point at the live paths (both 404s, including one under `/portal`).
-- [x] `/admin` (307 to login), `/admin/login` (now naming `/portal/attend`) and `/officer-invite/<token>` are otherwise unchanged.
+- [x] The header's one navy button reads MEMBER PORTAL on every public page, including the homepage. It goes to `/portal` and is current there (`page`) and on every `/portal/*` page (`true`). The header, the mobile sheet (six unique items) and the 404 recovery nav link nothing under `/portal/attend`. `/officers` does not claim `/officer-invite`.
+- [x] The hub's three buttons share one class: navy, white text, 256px wide, left edges aligned, and no label overflows.
+- [x] 404 recovery links point at the live paths (both 404s, including one under `/portal`), with no Check In among them.
+- [x] `/admin` (307 to login), `/admin/login` (now pointing members at `/portal`) and `/officer-invite/<token>` are otherwise unchanged.
 - [x] `npm test` (1,097 across 38 files, including `docs.test.ts` §5 and `security.test.ts`), `npm run build`, `npx tsc --noEmit` and `npm run lint` are all green.
 - [x] `grep -rnE '"/(attend|leaderboard|lookup)"' app components lib tests | grep -vE '^tests/portal\.test\.ts:|:[0-9]+:\s*//'` returns nothing, and neither does `grep -rnE '^\s*/(attend|leaderboard|lookup)\s*$'` over the same folders. 📌 The unfiltered grep **can never come back empty**: two comments name the feature (`portal/leaderboard/page.tsx:35`, `app/actions/member-merge.ts:504`) and `tests/portal.test.ts` holds the old paths as the redirect sources it asserts. The second grep exists because the visible text `/attend` on `/admin/login` was on a line of its own, where the first cannot see it.
 - [ ] Preview: the four pages, the three 308s (with `cache-control`), robots meta, header, and one fake-EID lookup.
@@ -123,14 +127,18 @@ Built on `portal-phase-1`, cut from `ce5bda7`. Every commit is lint-, build- and
 | `f395f69` | The hub, its noindex assertion, "Member Portal" in the 404 recovery nav |
 | `d493183` | One "Portal" nav item, section-aware `aria-current`, the re-measured clearance |
 | `bba4266` | "Look up your attendance" — found by the `web-design-guidelines` pre-ship review |
-| the docs commit | Doc v1.81, this record, and the rest of the docs |
+| `0e622c8` | Doc v1.81, this record, and the rest of the docs |
+| `a9fdd8c` | **Officer review:** one navy MEMBER PORTAL button in place of everything right of the wordmark; check-in reachable only inside the portal |
+| `f97d9c0` | **Officer review:** the hub's three buttons formatted the same |
+| the follow-up docs commit | This record and the docs, brought in line with the two above |
 
 **Where the build departed from the plan above:**
-- **The hub is three stacked rows, not a three-up card grid.** Three equal cards side by side is the feature-row tell `design-taste-frontend` bans, and a third of the column cannot fit "My Attendance" at the Title size. Rows also match the narrow single column the member pages use. Only the button's weight varies: Check In is primary.
+- **The hub is three stacked rows, not a three-up card grid.** Three equal cards side by side is the feature-row tell `design-taste-frontend` bans, and a third of the column cannot fit "My Attendance" at the Title size. Rows also match the narrow single column the member pages use. It first shipped with Check In as the lone primary button; **the officer asked for all three formatted the same**, so they now share one navy skin and one 256px width (full width on a phone).
+- **The header is one navy button, MEMBER PORTAL, and check-in lives only inside the portal** (officer, after reviewing the first build). The plan above recommended a "Portal" text item beside a Check In button pointed at `/portal/attend`; that was built and then replaced. 🪤 **The longer label is the tight spot on a phone**, not on desktop: beside the centred wordmark, at the shared padding, it cleared the mark by 2.4px at a 360px viewport and ran 25px under it at 320. It takes `px-3` below `sm` (10.4px clear at 360) and stacks MEMBER over PORTAL below 360px (33px clear at 320).
 - **No hero subhead**, like `/attend`'s, which the officer removed in `9efceb6`. The card titles are the destination pages' own headings and the one-line bodies are their own `metadata.description`, so the hub adds no copy of its own that could drift.
 - **The header change is its own commit**, carrying the clearance numbers with it, so reverting it alone leaves the docs true.
 - **`tests/portal.test.ts` is new.** It asserts the three permanent redirects (nothing else would notice one going missing) and the hub's noindex.
-- **Nav clearance at 1280: 342px left, 430px right** (was 342 / 295). The right cluster fell from 272px to 137px, so the left is the tighter side again.
+- **Nav clearance at 1280: 342px left, 450px right** (was 342 / 295). The right side fell from 272px to one 117px button, so the left is the tighter side again.
 
 🔴 **The local stack was broken before this began, and fixing it came first.** `seed.sql` had two "still to come" events dated 1 and 8 September. By 2026-09-18 the published one was past, the bulk insert gave it attendance, and the seed's own assert (202 present rows) read 218 and rolled back the WHOLE seed. So `db reset` left a local database with migrations and no data, and **23 tests failed against it** — every one data-dependent, none related to this work. `f5d2d85` moves both events to December, still Fall 2026. **They expire again on 1 December 2026**; move them forward rather than raising the count.
 

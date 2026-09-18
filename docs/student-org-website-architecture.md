@@ -10,7 +10,8 @@
 >
 > - **`/attend`, `/leaderboard` and `/lookup` became `/portal/attend`, `/portal/leaderboard` and `/portal/lookup`**, moved with `git mv` so history follows, and a static hub at `/portal` lists the three (§5, §10). No page's copy, behaviour or data access changed, and there is no migration and no new environment variable — undoing it is a code revert.
 > - 🔓 **The old paths are PERMANENT redirects in `next.config.ts` — 308, method kept, query string carried through — and are never deleted.** Printed QR codes, group-chat links and bookmarks point at them. `tests/portal.test.ts` asserts all three, because nothing else would notice one going missing: `tests/docs.test.ts` walks `page.tsx` and `route.ts`, and a redirect is neither. Vercel serves Next's 308s with `cache-control: public, max-age=0, must-revalidate`, so a browser revalidates rather than pinning the redirect — which is what keeps an Instant Rollback clean.
-> - **The header's two member items became one, "Portal"** (the officer's call); Check In keeps its own button, since it is the one a member does against a clock. An item is now current on the pages beneath it as well: `aria-current="page"` on the exact match, `"true"` on a section ancestor. Re-measured at 1280: **342px left, 430px right** — the left is the tighter side again.
+> - **Everything right of the header's wordmark became ONE navy button, MEMBER PORTAL** (officer, 2026-09-18) — it replaced the Leaderboard and My Attendance links and the Check In button. 🔓 **Check-in lives only inside the portal**: the header, the mobile sheet, the 404 recovery nav and `/admin/login` all send members to `/portal`, and nothing outside it links `/portal/attend`; the printed QR codes still land there through `/attend`'s redirect. An item is now current on the pages beneath it as well: `aria-current="page"` on the exact match, `"true"` on a section ancestor. Re-measured at 1280: **342px left, 450px right** — the left is the tighter side again. 🪤 On a phone the button is the tight spot, beside the centred wordmark: `px-3` below `sm`, stacked onto two lines below 360px.
+> - **The hub's three buttons are formatted the same** (officer): one navy skin, one width, one straight column. Check In was first built as the lone primary; with check-in reachable only through the hub, no tool there outranks another.
 > - **robots stays per page.** The hub, the leaderboard and the lookup are noindex; `/portal/attend` is indexable, as `/attend` was. There is deliberately no portal layout to carry a shared robots key, because one would silently de-index the check-in page.
 > - 📌 **§5's `/portal` row is not enforced by the test.** The route check is a substring match, so `/portal/attend` alone satisfies "§5 lists /portal". The row is there because it was written, not because anything would fail without it.
 > - 🪤 **Two local traps the move hit, neither visible in the code.** A running dev server holds handles inside `app/`, so on Windows `git mv` of a route folder fails with *Permission denied* until it is stopped. And a `.next/dev/types/validator.ts` written by a dev server started before the move still imports the old page paths; `tsconfig.json` includes it, so `next build` fails type-checking on a module that no longer exists until it is deleted or a fresh dev server rewrites it.
@@ -3156,7 +3157,9 @@ $$;
                        mobile sheet, which stacks and has no wordmark to clear
 /portal                Member portal hub — links to the three member tools and
                        to officer sign-in. Static, robots noindex. The header's
-                       one "Portal" item opens it   (member portal phase 1)
+                       one navy MEMBER PORTAL button opens it, and it is the
+                       only way in to check-in from the site (officer): nothing
+                       outside /portal links /portal/attend (portal phase 1)
 /portal/attend         Public check-in form
 /portal/leaderboard    Public standings
 /portal/lookup         Member self-service attendance history

@@ -14,13 +14,19 @@ Plan and full record in [`docs/member-portal-plan.md`](docs/member-portal-plan.m
 redirects in `next.config.ts` that must never be deleted**, because printed QR codes point at
 `/attend`. No copy, behaviour, data access or migration changed.
 
+- ✅ **Officer review of the first build, 2026-09-18, and both changes are built:**
+  - The homepage — the whole site — has **one navy button, MEMBER PORTAL**, in place of everything right of the wordmark.
+  - 🔓 **Check-in lives only inside the portal.** Nothing outside `/portal` links `/portal/attend`: not the header, the mobile sheet, the 404 list or `/admin/login`. The QR redirect is untouched.
+  - **The hub's three buttons are formatted the same:** one navy skin, one width.
+  - 🪤 **The longer label is tight on phones.** It takes `px-3` below `sm` and stacks onto two lines below 360px, so it clears the centred wordmark.
+
 - ✅ **Verified locally**, pinned to the local stack:
   - a real check-in and a first-timer check-in with confirm on `/portal/attend`;
   - a lookup with its throttle row;
   - the leaderboard;
   - all three 308s, with query strings kept and a POST keeping its method;
   - noindex on the hub, leaderboard and lookup, and none on attend;
-  - the header's section-aware `aria-current`, the mobile sheet and the 404 recovery links;
+  - the header's single MEMBER PORTAL button and section-aware `aria-current`, the mobile sheet and the 404 recovery links, none reaching `/portal/attend`;
   - `/admin` unchanged.
   - Lint, `tsc`, build and **1,097 tests across 38 files** are green.
 - ⬜ **Preview:** `git push -u origin portal-phase-1`. Load the pages, curl the redirects, and do at most one fake-EID lookup. 🔴 **No check-ins:** the preview writes to production's database.

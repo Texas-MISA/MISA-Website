@@ -66,7 +66,7 @@ planned. Every value here was read off the running application on 2026-08-19.
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
 | `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT** (phase 3, deferred). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure. |
-| `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows each with one button; no muted ink on the grey ground. Phase 3 owns the member area's real design and may re-compose it. |
+| `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows, each with one navy button of one fixed width, all formatted the same (officer); no muted ink on the grey ground. The header's MEMBER PORTAL button is the site's one way in. Phase 3 owns the member area's real design and may re-compose it. |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
