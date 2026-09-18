@@ -18,6 +18,7 @@ redirects in `next.config.ts` that must never be deleted**, because printed QR c
   - The homepage — the whole site — has **one navy button, MEMBER PORTAL**, in place of everything right of the wordmark.
   - 🔓 **Check-in lives only inside the portal.** Nothing outside `/portal` links `/portal/attend`: not the header, the mobile sheet, the 404 list or `/admin/login`. The QR redirect is untouched.
   - **The hub's three buttons are formatted the same:** one navy skin, one width.
+  - **The hub's copy is the officer's:** *Event Check-In* / CHECK IN, *Points Leaderboard* / LEADERBOARD, *My Attendance* / LOOKUP. The shared width is 160px, sized to "Leaderboard".
   - 🪤 **The longer label is tight on phones.** It takes `px-3` below `sm` and stacks onto two lines below 360px, so it clears the centred wordmark.
 
 - ✅ **Verified locally**, pinned to the local stack:

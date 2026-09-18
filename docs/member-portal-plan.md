@@ -106,7 +106,7 @@ Ticked items were verified **locally** on 2026-09-18 (dev server pinned to the l
 - [x] A lookup by EID works, shows the new check-in, and writes its throttle row (the rate limit's own bucket).
 - [x] The hub, leaderboard and lookup HTML contain `noindex, nofollow`. The attend page has no robots meta, as before.
 - [x] The header's one navy button reads MEMBER PORTAL on every public page, including the homepage. It goes to `/portal` and is current there (`page`) and on every `/portal/*` page (`true`). The header, the mobile sheet (six unique items) and the 404 recovery nav link nothing under `/portal/attend`. `/officers` does not claim `/officer-invite`.
-- [x] The hub's three buttons share one class: navy, white text, 256px wide, left edges aligned, and no label overflows.
+- [x] The hub's three buttons share one class: navy, white text, 160px wide, left edges aligned, and no label overflows. They read CHECK IN, LEADERBOARD and LOOKUP under *Event Check-In*, *Points Leaderboard* and *My Attendance*.
 - [x] 404 recovery links point at the live paths (both 404s, including one under `/portal`), with no Check In among them.
 - [x] `/admin` (307 to login), `/admin/login` (now pointing members at `/portal`) and `/officer-invite/<token>` are otherwise unchanged.
 - [x] `npm test` (1,097 across 38 files, including `docs.test.ts` §5 and `security.test.ts`), `npm run build`, `npx tsc --noEmit` and `npm run lint` are all green.
@@ -130,12 +130,13 @@ Built on `portal-phase-1`, cut from `ce5bda7`. Every commit is lint-, build- and
 | `0e622c8` | Doc v1.81, this record, and the rest of the docs |
 | `a9fdd8c` | **Officer review:** one navy MEMBER PORTAL button in place of everything right of the wordmark; check-in reachable only inside the portal |
 | `f97d9c0` | **Officer review:** the hub's three buttons formatted the same |
-| the follow-up docs commit | This record and the docs, brought in line with the two above |
+| `94cd6ab` | This record and the docs, brought in line with the two above |
+| the copy commit | **Officer review:** the hub's titles and button labels, and the shared button width re-sized to them |
 
 **Where the build departed from the plan above:**
-- **The hub is three stacked rows, not a three-up card grid.** Three equal cards side by side is the feature-row tell `design-taste-frontend` bans, and a third of the column cannot fit "My Attendance" at the Title size. Rows also match the narrow single column the member pages use. It first shipped with Check In as the lone primary button; **the officer asked for all three formatted the same**, so they now share one navy skin and one 256px width (full width on a phone).
+- **The hub is three stacked rows, not a three-up card grid.** Three equal cards side by side is the feature-row tell `design-taste-frontend` bans, and a third of the column cannot fit "My Attendance" at the Title size. Rows also match the narrow single column the member pages use. It first shipped with Check In as the lone primary button; **the officer asked for all three formatted the same**, so they now share one navy skin and one fixed width (full width on a phone) — 160px, sized to the longest label, "Leaderboard" (139.5px natural).
 - **The header is one navy button, MEMBER PORTAL, and check-in lives only inside the portal** (officer, after reviewing the first build). The plan above recommended a "Portal" text item beside a Check In button pointed at `/portal/attend`; that was built and then replaced. 🪤 **The longer label is the tight spot on a phone**, not on desktop: beside the centred wordmark, at the shared padding, it cleared the mark by 2.4px at a 360px viewport and ran 25px under it at 320. It takes `px-3` below `sm` (10.4px clear at 360) and stacks MEMBER over PORTAL below 360px (33px clear at 320).
-- **No hero subhead**, like `/attend`'s, which the officer removed in `9efceb6`. The card titles are the destination pages' own headings and the one-line bodies are their own `metadata.description`, so the hub adds no copy of its own that could drift.
+- **No hero subhead**, like `/attend`'s, which the officer removed in `9efceb6`. The one-line bodies are each destination page's own `metadata.description`. **The card titles and button labels are the officer's copy** (2026-09-18): *Event Check-In* / Check in, *Points Leaderboard* / Leaderboard, *My Attendance* / Lookup. They were first built from each page's own heading, and "Points Leaderboard" deliberately differs from the leaderboard page's own "Leaderboard".
 - **The header change is its own commit**, carrying the clearance numbers with it, so reverting it alone leaves the docs true.
 - **`tests/portal.test.ts` is new.** It asserts the three permanent redirects (nothing else would notice one going missing) and the hub's noindex.
 - **Nav clearance at 1280: 342px left, 450px right** (was 342 / 295). The right side fell from 272px to one 117px button, so the left is the tighter side again.

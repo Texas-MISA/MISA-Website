@@ -31,7 +31,8 @@ import { Section } from "@/components/ui/section";
 // against a clock; the officer overruled that. Check-in now lives only inside
 // the portal, so this page is its door, and no tool here outranks another.
 // The width is fixed rather than fitted so the three buttons line up as one
-// column; it is sized to the longest label, "Look up your attendance".
+// column; it is sized to the longest label, "Leaderboard" (139.5px natural at
+// this size, so 160px). Re-measure before lengthening a label.
 //
 // 🔓 **robots is per page, and must never move to a portal layout.** The hub,
 // /portal/leaderboard and /portal/lookup are noindex; /portal/attend is
@@ -49,9 +50,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-// Titles are each destination page's own heading, and the one-line bodies are
-// each page's own `metadata.description`, so nothing here is new copy that can
-// drift from the page it describes.
+// 🔓 Titles and button labels are the OFFICER'S COPY (2026-09-18), not the
+// destination pages' own headings — "Points Leaderboard" here, "Leaderboard"
+// on the page itself. The one-line bodies are still each page's own
+// `metadata.description`. Button labels are sentence case in the DOM; the
+// skin uppercases them.
 const DESTINATIONS = [
   {
     href: "/portal/attend",
@@ -61,15 +64,15 @@ const DESTINATIONS = [
   },
   {
     href: "/portal/leaderboard",
-    title: "Leaderboard",
+    title: "Points Leaderboard",
     body: "Current-term standings for MISA members.",
-    action: "See the standings",
+    action: "Leaderboard",
   },
   {
     href: "/portal/lookup",
     title: "My Attendance",
     body: "Look up your own MISA attendance, points and dues status.",
-    action: "Look up your attendance",
+    action: "Lookup",
   },
 ] as const;
 
@@ -78,7 +81,7 @@ const DESTINATIONS = [
 // straight. `whitespace-nowrap` so a label can never break inside the width.
 const DESTINATION_BUTTON = buttonClass({
   variant: "primary",
-  className: "mt-5 w-full shrink-0 whitespace-nowrap sm:mt-0 sm:w-64",
+  className: "mt-5 w-full shrink-0 whitespace-nowrap sm:mt-0 sm:w-40",
 });
 
 export default function PortalPage() {
