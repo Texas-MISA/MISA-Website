@@ -305,8 +305,16 @@ values
   ('Rained Out Tabling',    'Cancelled due to weather', 'Speedway', '2026-08-02 15:00-05','2026-08-02 18:00-05', 1, 'social','cancelled','00000000-0000-4000-8000-5eed00000001'),
   -- Still to come, so the schedule UI has both and the member detail page has
   -- an *upcoming* event to paint (attended / missed / upcoming, §4.5).
-  ('Fall Kickoff',          'First meeting of the fall', 'UTC 3.102', '2026-09-01 18:00-05','2026-09-01 19:00-05', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
-  ('Fall Info Session',     'Not announced yet', 'TBD', '2026-09-08 18:00-05','2026-09-08 19:00-05', 1, 'general_and_other','draft','00000000-0000-4000-8000-5eed00000001');
+  --
+  -- 🪤 These two are the FIRST dates in this file to expire, before the 1
+  -- January 2027 rollover. They were 1 and 8 September until 2026-09-18, when
+  -- the published one had quietly become past: the bulk insert above gave it
+  -- attendance, the present count read 218 against 202, and the assert rolled
+  -- back the whole seed, leaving `db reset` with an EMPTY local database and 23
+  -- failing tests. Moved to December (CST, hence -06). The same thing happens
+  -- again on 1 December 2026; move them forward rather than raising the count.
+  ('Fall Kickoff',          'First meeting of the fall', 'UTC 3.102', '2026-12-01 18:00-06','2026-12-01 19:00-06', 1, 'general_and_other','published','00000000-0000-4000-8000-5eed00000001'),
+  ('Fall Info Session',     'Not announced yet', 'TBD', '2026-12-08 18:00-06','2026-12-08 19:00-06', 1, 'general_and_other','draft','00000000-0000-4000-8000-5eed00000001');
 
 -- @chunk attendance-bulk
 -- Deterministic pseudo-randomness so the seed is reproducible.
