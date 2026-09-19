@@ -122,3 +122,8 @@ __pycache__/
 # unlinked in 2024-08-14, and it is why adding a photo here publishes it even
 # if no slot points at it yet.
 pictures/
+
+# Personal, non-project files that happen to sit in this working directory.
+# The repository is PUBLIC and history is not takeable-back, so keep them out
+# of reach of a broad `git add -A`. Better still, keep them outside the repo.
+Claude outputs/
