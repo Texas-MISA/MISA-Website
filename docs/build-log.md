@@ -34,6 +34,10 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 
   - ⚠️ **What the preview cannot be used for:** it reads and writes the production database, so this phase's preview check is render and redirects only, by the officer's decision.
 
+  - ⚠️ **Open: the officer could not see the MISA logo — the link home — in the preview**, and it does not reproduce. The branch renders it at true 320, 360 and 390px viewports and on desktop: the mask PNG returns 200, and the logo is the topmost element at its centre. Production renders it with byte-identical `.wordmark` CSS. The preview's login wall covers every path equally, the site's own CSS and JS included, so the protection alone does not explain a missing mask image. 🪤 **`--window-size` cannot render a phone in headless Chrome**: it enforces a ~500px minimum and crops, which put the logo at x≈258 in both "390" and "320" shots and looked exactly like a layout bug. True phone renders need device-metrics emulation over the DevTools protocol.
+
+  - ⏭️ **Next task (officer, 2026-09-18): a UI redesign of the member portal and every page in it** — v2 phase 3, un-deferred and widened to the `/portal` hub. It follows this phase's merge.
+
 ✅ **Phase 4 and the term-scoped roster went LIVE (2026-08-31).** `main` fast-forwarded 18 commits to `e3266e6`; production on schema `…000029`.
 
   - 🔴 **The migration had to go out BEFORE the code, and this is the entry to remember.** `v2-phase-4-admin` was cut from the roster-terms commit, so its code reads `member_directory` as one row per (member, term) and expects `dues_paid_term`. Production was still at `…000028`. Merging on its own would have put the error boundary on `/admin/members`, `/leaderboard` and the dues screens **of the live club website**. Migration 29 was pushed first (0 members on production, so dropping `members.active` was lossless), then the code. **A branch cut from a migration commit carries that migration's dependency whether or not anyone remembers it.**

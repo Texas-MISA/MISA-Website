@@ -1,7 +1,7 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
 **Version:** 1.81
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 3 deferred; phase 5 outstanding.** 🧭 **Member portal phase 1 (`/portal`) is BUILT on `portal-phase-1`, awaiting the officer's go-ahead to merge.**
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** 🧭 **Member portal phase 1 (`/portal`) is BUILT on `portal-phase-1`, awaiting the officer's go-ahead to merge.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
 **Last updated:** September 2026
 
 > **v1.81: the member pages move under `/portal`, and the old URLs are permanent redirects.**
@@ -15,7 +15,8 @@
 > - **robots stays per page.** The hub, the leaderboard and the lookup are noindex; `/portal/attend` is indexable, as `/attend` was. There is deliberately no portal layout to carry a shared robots key, because one would silently de-index the check-in page.
 > - 📌 **§5's `/portal` row is not enforced by the test.** The route check is a substring match, so `/portal/attend` alone satisfies "§5 lists /portal". The row is there because it was written, not because anything would fail without it.
 > - 🪤 **Two local traps the move hit, neither visible in the code.** A running dev server holds handles inside `app/`, so on Windows `git mv` of a route folder fails with *Permission denied* until it is stopped. And a `.next/dev/types/validator.ts` written by a dev server started before the move still imports the old page paths; `tsconfig.json` includes it, so `next build` fails type-checking on a module that no longer exists until it is deleted or a fresh dev server rewrites it.
-> - **Unchanged, and checked:** `/admin`, `/admin/login` (its pointer to check-in now names `/portal/attend`), `/officer-invite/[token]`, `proxy.ts`, both Server Actions, the rate-limit buckets (keyed by name, not path), and v2 phase 3 — which still owns these pages' redesign and the `--misa-muted` AA failure on them.
+> - **Unchanged, and checked:** `/admin`, `/admin/login` (apart from its pointer, which now sends members to `/portal`), `/officer-invite/[token]`, `proxy.ts`, both Server Actions, and the rate-limit buckets (keyed by name, not path).
+> - ⏭️ **Next task (officer, 2026-09-18): a UI redesign of the member portal and every page in it** — the hub, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup`. That is v2 phase 3, un-deferred and widened to take in the hub. It stays presentation-only and owns the `--misa-muted`-on-Vellum AA failure on these pages.
 
 > **v1.80: `/attend`'s first-timer checkbox now names both cases it covers.**
 >
