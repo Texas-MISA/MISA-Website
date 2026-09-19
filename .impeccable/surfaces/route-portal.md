@@ -158,14 +158,15 @@ decided in `receipts/diverge.md`.
   360×640: check-in bottom ≈311px (today 424), all three in the first screen.
   Adopted because it keeps the tool on the page ground with each destination's
   name and explanation in one read — Operate ranks that above expression — and
-  makes equal formatting structural. **Needs the officer's yes on two copy and
-  composition calls: dropping the button labels, and the short band.**
+  makes equal formatting structural. ✅ **The officer approved A as proposed on
+  2026-09-19 — including both calls it needed a yes on: dropping the separate
+  button labels, and the short hub-only band.**
 - **B — "The field console": REJECTED.** The whole hub on the drawn navy field:
   three full-width white buttons carrying the names, descriptions beneath in
   white/80. Faster still (check-in bottom ≈198px), but it makes the hero the
   control surface where DESIGN.md §Grounds gives controls the `white` ground and
   the field to heroes and feature bands, and it puts each description after its
-  button. Recorded for the officer, who may overrule.
+  button. Shown to the officer beside A; not chosen.
 
 ## Evidence
 Adopted lookups from `receipts/evidence.md` (raw output in
