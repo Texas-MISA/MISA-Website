@@ -54,7 +54,7 @@ redirects in `next.config.ts` that must never be deleted**, because printed QR c
 - ⏭️ **NEXT TASK (officer, 2026-09-18): a UI redesign of the member portal and EVERY page in it** — the `/portal` hub, `/portal/attend`, `/portal/leaderboard` and `/portal/lookup`, and any page added under `/portal` later. This is **v2 phase 3, un-deferred and widened to take in the hub**. Plan in [`docs/frontend-redesign-v2-plan.md`](docs/frontend-redesign-v2-plan.md). It still owns the `--misa-muted`-on-Vellum AA fix below, and still changes presentation only — check-in, lookup and leaderboard behaviour stay as they are. Phase 1 merges first. 🧰 **It runs through the design toolkit** (the section above): `/design-brief` for each of the four surfaces, then `/design-gate`.
 - 📌 **Flagged, not fixed** — natural candidates for the redesign:
   - `/portal/lookup`'s "Both have to match the same member" has been stale since the EID-alone gate (2026-08-25).
-  - `CLAUDE.md`'s disclosure invariant still describes the sentence that hotfix `c3890a1` removed.
+  - ✅ ~~`CLAUDE.md`'s disclosure invariant still describes the sentence that hotfix `c3890a1` removed.~~ Resolved 2026-09-19: the officer confirmed the removal in the `portal-attend` brief interview, and CLAUDE.md, §9 #15 (v1.83) and `docs/checkin-location-verification.md` now say so.
   - There is no `scroll-padding-top` under the sticky header.
 
 ---

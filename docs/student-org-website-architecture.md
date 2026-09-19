@@ -1,8 +1,12 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.82
+**Version:** 1.83
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** 🧭 **Member portal phase 1 (`/portal`) is BUILT on `portal-phase-1`, awaiting the officer's go-ahead to merge.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
 **Last updated:** September 2026
+
+> **v1.83: §9 #15 is reversed — `/portal/attend` carries no capture disclosure (officer).**
+>
+> Hotfix `c3890a1` (2026-09-14) removed the disclosure sentence at the officer's instruction without updating this document, `CLAUDE.md` or the verification spec. On 2026-09-19, asked in the `portal-attend` design brief's interview whether the redesign should restore it, the officer chose to keep it removed. Capture is unchanged: origins are still recorded on every self check-in. #15 keeps its original argument as the record of what was reversed.
 
 > **v1.82: the design toolkit — six skills with one owner each, a pipeline per surface, and checks that fail when a skill was skipped or ignored.**
 >
@@ -3871,7 +3875,7 @@ Two, and they earn a place here on the bar #12 and #13 set: the first changes wh
 
     📌 The per-event toggle defaults to **on** and gates *derivation*, not collection — see #15.
 
-15. **Whether `/attend` discloses the capture** — ✅ **Yes, in one plain sentence, in the unconditional present tense.** The recommendation was already "yes" when the toggle was per-event; it became unavoidable once capture was made unconditional. `events.verify_origin` controls whether the officer's review screen *derives* flags, not whether origins are *recorded* — and that asymmetry is deliberate, because it is exactly what lets an officer turn verification on a week after an event and see the flags appear with no backfill. So the sentence describes collection that always happens; hedging it with "we may" or naming the toggle would be describing the wrong thing. It also says what is stored rather than merely that something is, because "we note the network you used" invites the reading that an address is kept, and none ever is. The site is public and the repository is public: a check-in form that quietly profiled the network you submitted from would be a worse surprise than the sentence is a deterrent.
+15. **Whether `/attend` discloses the capture** — 🔓 **REVERSED (v1.83): no.** Removed by hotfix `c3890a1` on 2026-09-14 at the officer's instruction; confirmed by the officer on 2026-09-19. Capture is unchanged. *The original decision, kept as the record of what was reversed:* ✅ **Yes, in one plain sentence, in the unconditional present tense.** The recommendation was already "yes" when the toggle was per-event; it became unavoidable once capture was made unconditional. `events.verify_origin` controls whether the officer's review screen *derives* flags, not whether origins are *recorded* — and that asymmetry is deliberate, because it is exactly what lets an officer turn verification on a week after an event and see the flags appear with no backfill. So the sentence describes collection that always happens; hedging it with "we may" or naming the toggle would be describing the wrong thing. It also says what is stored rather than merely that something is, because "we note the network you used" invites the reading that an address is kept, and none ever is. The site is public and the repository is public: a check-in form that quietly profiled the network you submitted from would be a worse surprise than the sentence is a deterrent.
 
     📌 **Retention is still open.** The digests are meaningful only within one event, so they should not outlive it by much — the recommendation is an opportunistic purge of `checkin_origin` rows older than one term, in the style of `checkin_throttle`'s prune, so no scheduled job is added. Nothing has been built.
 

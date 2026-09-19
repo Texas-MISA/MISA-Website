@@ -153,7 +153,7 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - 📌 **ADVISORY ONLY.** Rejects no check-in, moves no row to `pending`, withholds no points, writes no `admin_audit` row.
 - 🔓 **`event_id` is INSIDE the hash.** `sha256(PEPPER || event_id || normalize(ip))` — unjoinable across events is the feature. Never optimise it out.
 - 🔓 **`CHECKIN_ORIGIN_PEPPER` is a server-only env secret, never a repo literal.** IPv4 SHA-256 is reversible on a laptop. Missing is **safe, not broken**: every row reads *origin unknown*.
-- 🔓 **The toggle gates DERIVATION, NOT COLLECTION.** `events.verify_origin` controls the review screen; capture runs unconditionally on every self check-in. `/attend` carries a disclosure sentence in the **unconditional** present tense.
+- 🔓 **The toggle gates DERIVATION, NOT COLLECTION.** `events.verify_origin` controls the review screen; capture runs unconditionally on every self check-in. ⚠️ **`/portal/attend` carries NO disclosure sentence** — removed by hotfix `c3890a1` (2026-09-14) at the officer's instruction, and confirmed by the officer on 2026-09-19 in the portal redesign's brief (§9 #15, v1.83). Capture is unchanged. If a disclosure ever returns, it is one sentence in the **unconditional** present tense.
 - 🪤 **NEVER capture for `source = 'admin_manual'`.** Holds structurally — `resolveCheckin` has exactly one caller.
 - 🪤 **The insert fails open.** An advisory signal must never turn away a member at the door.
 - 🪤 **A missing address yields `unknown` and NO digest — never a hash of a placeholder string.**

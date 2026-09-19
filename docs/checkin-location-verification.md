@@ -239,8 +239,9 @@ no migration.
 🔓 **The consequence, stated plainly: the toggle does not control collection.**
 Capture runs on every self check-in whether the event's flag is on or off — that
 is precisely what makes flipping it afterwards work. An officer who turns it off
-is choosing not to *look*, not choosing not to *record*. This belongs in the
-`/attend` disclosure sentence, not only in this document. See *Open decisions*.
+is choosing not to *look*, not choosing not to *record*. This belonged in the
+`/attend` disclosure sentence, not only in this document — 🔓 which the officer
+has since removed (see *Open decisions* 1).
 
 🪤 **Adding a column to `events` is not free elsewhere.** `app/actions/events.ts`
 carries **five separate literal column lists** for events, and the audit
@@ -466,7 +467,12 @@ person. If it is ever going to be quoted at a member, it should not ship.
 
 ## Open decisions
 
-1. ~~Does `/attend` disclose it?~~ — ✅ **DECIDED AND BUILT: yes.** One plain
+1. ~~Does `/attend` disclose it?~~ — 🔓 **REVERSED: no, by the officer.** The
+   sentence below was built, then removed by hotfix `c3890a1` (2026-09-14) at the
+   officer's instruction, and the officer confirmed the removal on 2026-09-19 in
+   the portal redesign's brief. Capture is unchanged; there is no on-page
+   disclosure. The original decision is kept below as the record of what was
+   reversed. — **Originally DECIDED AND BUILT: yes.** One plain
    sentence under the check-in button, written in the **unconditional present
    tense** because that is the truth — capture runs on every check-in regardless
    of the event's toggle, so hedging it with "we may", or describing the toggle,
@@ -625,7 +631,8 @@ app/(public)/portal/attend/_components/checkin-form.tsx
    column lists in `app/actions/events.ts`.
 6. **The pills** — on the event attendance list. 📌 The queue was **deliberately
    skipped**; see *Where it surfaces* for why.
-7. **The `/attend` disclosure sentence**, per open decision 1.
+7. **The `/attend` disclosure sentence**, per open decision 1. 🔓 Removed
+   2026-09-14 (`c3890a1`); see open decision 1.
 
 🔍 **Then the whole thing was reviewed, and the review found six defects in code
 that had already passed 1,098 tests, lint, `tsc` and a clean build.** They are
