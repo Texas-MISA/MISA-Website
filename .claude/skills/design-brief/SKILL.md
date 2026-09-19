@@ -14,7 +14,8 @@ what turns the brief guard on for its files.
 
 ## Hard limits — every step
 - **The visual authority is `DESIGN.md`, the established world.** Never a
-  replacement world: no `/impeccable init`, no `/impeccable document`, no
+  replacement world: no `/impeccable init`, no `/impeccable document` that
+  overwrites or merges DESIGN.md (its sidecar-only refresh is fine), no
   "redesign replaces DESIGN.md" path. PRODUCT.md already exists.
 - **`ui-ux-pro-max` is lookups only:** `search.py "<query>" --domain <domain>`.
   Never `--design-system`, never `--persist` — it writes a `design-system/…/MASTER.md`
