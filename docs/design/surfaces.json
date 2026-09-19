@@ -1,0 +1,29 @@
+{
+  "$comment": "The design surface registry (DESIGN.md §Design toolkit). The brief guard hook, tests/design-receipts.test.ts, tests/ui and /design-gate all read this one file. status: 'legacy' (not yet through the pipeline, receipts not required), 'in-progress' (brief required before any edit, receipts not yet required), 'rebuilt' (every required receipt must exist, be fresh, and show an adopted finding). Registering a surface is how a redesign starts; a registered surface cannot be edited without its brief.",
+  "surfaces": {
+    "portal-hub": {
+      "mode": "operate",
+      "status": "legacy",
+      "routes": ["/portal"],
+      "files": ["app/(public)/portal/page.tsx"]
+    },
+    "portal-attend": {
+      "mode": "operate",
+      "status": "legacy",
+      "routes": ["/portal/attend"],
+      "files": ["app/(public)/portal/attend/"]
+    },
+    "portal-leaderboard": {
+      "mode": "operate",
+      "status": "legacy",
+      "routes": ["/portal/leaderboard"],
+      "files": ["app/(public)/portal/leaderboard/"]
+    },
+    "portal-lookup": {
+      "mode": "operate",
+      "status": "legacy",
+      "routes": ["/portal/lookup"],
+      "files": ["app/(public)/portal/lookup/"]
+    }
+  }
+}
