@@ -1,5 +1,26 @@
 # Install UI/Design Skills — Instructions for Claude Code
 
+> 📌 **STATUS, 2026-09-18: the toolkit is COMMITTED — nothing below needs running on a fresh clone.** The skills live in `.claude/skills/`, the hooks in `.claude/settings.json`, the shadcn MCP in `.mcp.json`, and the roster, pipeline and enforcement in `DESIGN.md` §Design toolkit. The original instruction file follows unchanged, kept for its update and rollback commands; its §5 "decide before committing" was decided: **commit**.
+>
+> **Verify the toolkit (fresh clone, or after an update):**
+>
+> ```bash
+> ls .claude/skills        # design-gate design-taste-frontend emil-design-eng
+>                          # frontend-design impeccable ui-ux-pro-max web-design-guidelines
+> node .claude/skills/impeccable/scripts/detect.mjs --json app components   # → []
+> PYTHONIOENCODING=utf-8 python .claude/skills/ui-ux-pro-max/scripts/search.py "form labels" --domain ux
+> npx vitest run tests/design-tokens.test.ts tests/design-detector.test.ts tests/design-receipts.test.ts
+> npm run test:ui          # needs the local stack; red on legacy surfaces is expected
+> ```
+>
+> In Claude Code, `/mcp` should list `shadcn` (approve it on first launch), and the Agent tool should offer `design-reviewer`.
+>
+> **Updating a skill** is the commands in §2, then **commit the diff and read it** — a skill runs with full agent permissions. `skills-lock.json` pins five of the six; `impeccable` is pinned by its own `version:` (4.1.1), because the `npx skills` route installs a different build (§2.2). 🪤 **Installing `ui-ux-pro-max` drops six unrequested extra skills** (brand, banner-design, design, design-system, slides, ui-styling) — remove them again; the roster already assigns their concerns.
+>
+> 🪤 **§5's gitignore lines and §6's `settings.local.json` hook are out of date.** The hooks moved to the committed `.claude/settings.json`.
+
+---
+
 **How to use this file:** save it in your project root and tell Claude Code:
 > Read `install-ui-skills.md` and follow it. Ask me before running anything that writes outside `.claude/`.
 

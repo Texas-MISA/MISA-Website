@@ -1,8 +1,19 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.81
+**Version:** 1.82
 **Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** 🧭 **Member portal phase 1 (`/portal`) is BUILT on `portal-phase-1`, awaiting the officer's go-ahead to merge.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
 **Last updated:** September 2026
+
+> **v1.82: the design toolkit — six skills with one owner each, a pipeline per surface, and checks that fail when a skill was skipped or ignored.**
+>
+> Officer instruction, 2026-09-18: before the portal's UI redesign (v2 phase 3), build a site-wide system around the prominent UI skills that makes sure they are actually used, in a meaningful way. Built on `design-toolkit`, stacked on `portal-phase-1`. Tooling and tests only — no page, route, action, `lib/` module or migration changed. The whole of it is written in `DESIGN.md` §Design toolkit.
+>
+> - **The diagnosis it answers is v1's, in the v2 plan's own words:** v1 "treated the installed skills as advisory and hand-rolled everything." Nothing checked that a skill ran. The phase records bear it out — `web-design-guidelines` is recorded in phase 4 only.
+> - **Six third-party skills, one owner per concern.** `design-taste-frontend` leads Persuade surfaces; `impeccable` (Operate) leads `/portal` and `/admin`; `frontend-design` (Anthropic, new) only diverges — two concepts per surface, never shipped code; `ui-ux-pro-max` (new) is cited as evidence and never overrides a token; `emil-design-eng` owns motion; `web-design-guidelines` reviews code. Plus the shadcn MCP (`.mcp.json`, new) for components, and a `design-reviewer` agent for the rendered page.
+> - 🔓 **The skills are COMMITTED now** (officer) — this reverses v1.66's gitignore, whose note below is kept for the reasoning. All six are MIT or Apache-2.0; the tree was scanned for credentials before committing. 🪤 Installing `ui-ux-pro-max` also dropped SIX unrequested skills into `.claude/skills/` (brand, banner-design, design, design-system, slides, ui-styling); all six were removed, because each is a second opinion on concerns the roster already assigns.
+> - **Enforcement, in the order it bites:** a PreToolUse hook refuses edits to a registered surface until its brief exists; `tests/design-receipts.test.ts` fails a `rebuilt` surface whose receipts are missing, undisposed, **changed nothing** (no adopted finding in a commit on the surface) or **stale**; `tests/design-tokens.test.ts` measures the palette's pairings from `globals.css`; `tests/design-detector.test.ts` fails on any impeccable finding outside an EMPTY baseline; `npm run test:ui` (Playwright + axe, new) runs WCAG A/AA, 360px overflow and no-JS reveals on every public route and registered surface.
+> - 📌 **What the first axe run found.** Every public page and all four portal pages pass on FIRST RENDER — including the three still carrying the `--misa-muted` failure, because that ink appears in states a first render does not show. The suite therefore also walks `/portal/lookup`'s result states, and a seeded member's result fails axe on `definition-list` (a malformed `<dl>`). That is phase 3's to fix; red on a `legacy` surface is expected, and a `rebuilt` one must be green.
+> - 🪤 **The brief guard sees Edit/Write only.** A shell edit is not intercepted, so the receipts test — not the hook — is the enforcement that cannot be walked around. The human-only bypass for an urgent check-in fix is `MISA_DESIGN_GUARD=off` in the environment Claude Code was launched with.
 
 > **v1.81: the member pages move under `/portal`, and the old URLs are permanent redirects.**
 >
@@ -287,6 +298,7 @@
 > them, but the first `polish` run on a public page will suggest replacing the
 > `<Hatch>` placeholders — that is the rule working, not a defect to chase.
 >
+> ⬅️ *(Superseded by v1.82: the skills are committed now.)*
 > 🪤 **The skills are gitignored, so the doc is the only reinstall path.**
 > `.claude/skills/`, `.claude/settings.local.json` and `skills-lock.json` are
 > all ignored; `docs/install-ui-skills.md` is committed precisely because

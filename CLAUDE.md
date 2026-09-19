@@ -11,7 +11,8 @@ This file provides guidance to Claude Code when working with code in this reposi
 | [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md) | **The source of truth.** § references throughout this file point into it. Update it and bump its version header whenever a decision changes. |
 | [`tasks.md`](tasks.md) | Short-horizon checklist, the state table (migration counts live there and nowhere else), and open items. |
 | [`docs/build-log.md`](docs/build-log.md) | Stage-by-stage history — what shipped each phase, what broke, what the walkthroughs found. Read it when you need to know *why* something is the way it is. |
-| [`DESIGN.md`](DESIGN.md) | 🎨 **THE DESIGN SOURCE OF TRUTH, site-wide, and it is v2 as of 2026-08-19.** Grounds, elevation, surfaces, type ramp, spacing, reveal variants, layout-family budget, photography pipeline, design invariants (photography, headshots, marquee, nav clearance) and design skill precedence. ⚠️ Marks which surfaces are **NOT YET REBUILT**. |
+| [`DESIGN.md`](DESIGN.md) | 🎨 **THE DESIGN SOURCE OF TRUTH, site-wide, and it is v2 as of 2026-08-19.** Grounds, elevation, surfaces, type ramp, spacing, reveal variants, layout-family budget, photography pipeline, design invariants (photography, headshots, marquee, nav clearance) and the **design toolkit** (2026-09-18: one owner per skill, the per-surface pipeline, and what enforces it). ⚠️ Marks which surfaces are **NOT YET REBUILT**. |
+| [`docs/design/`](docs/design/) | 🧰 **The design toolkit's records (2026-09-18).** `surfaces.json` is the registry the brief-guard hook, `tests/design-receipts.test.ts` and `tests/ui` all read; `surfaces/<surface>/` holds each surface's brief and receipts; `templates/` the blanks. 🔓 **A registered surface cannot be edited until its `brief.md` exists** — the hook refuses, and `MISA_DESIGN_GUARD=off` at launch is the human-only bypass. Run the review half with `/design-gate <surface>`. |
 | [`docs/design-v1-superseded.md`](docs/design-v1-superseded.md) | The v1 design system, kept verbatim for its reasoning. **Historical.** Where it and `DESIGN.md` disagree, `DESIGN.md` wins. |
 | [`docs/invariants.md`](docs/invariants.md) | **The long form of all invariants below,** with measurements and failures. The short form here is the rule; that file is the evidence. |
 | [`docs/layout.md`](docs/layout.md) | **Full annotated layout** — every file, module and component with one-line annotations. Extracted from this file to save context. |
@@ -59,6 +60,7 @@ npm run lint                # eslint (flat config in eslint.config.mjs)
 
 npm test                    # all tests (needs: Docker Desktop up, npx supabase start)
 npm run test:watch
+npm run test:ui             # Playwright + axe on every public route and design surface (local stack; not in npm test)
 npx vitest run tests/checkin.test.ts -t "<test name>"
 ```
 
@@ -240,7 +242,7 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 
 ## Design
 
-**[`DESIGN.md`](DESIGN.md) is the design source of truth.** It records all v2 design rules — grounds, surfaces, type ramp, photography pipeline, invariants, skill precedence, and which surfaces are NOT YET REBUILT. Read it before any visual change.
+**[`DESIGN.md`](DESIGN.md) is the design source of truth.** It records all v2 design rules — grounds, surfaces, type ramp, photography pipeline, invariants, the design toolkit (roster, pipeline, enforcement), and which surfaces are NOT YET REBUILT. Read it before any visual change; a redesign runs through its pipeline, starting with a brief.
 
 ## Layout
 

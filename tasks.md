@@ -6,6 +6,19 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## 🧰 Design toolkit — BUILT on `design-toolkit` (stacked on `portal-phase-1`), AWAITING REVIEW (2026-09-18)
+
+Officer instruction: before the portal's UI redesign, a site-wide system around the prominent UI skills that makes sure they are **actually used, in a meaningful way**. The whole of it is `DESIGN.md` §Design toolkit; doc v1.82. Tooling and tests only — no page, route, action, `lib/` or migration changed.
+
+- **Roster:** one owner per concern — `design-taste-frontend` leads Persuade, `impeccable` leads Operate (`/portal`, `/admin`; officer), `frontend-design` diverges only, `ui-ux-pro-max` is evidence only, `emil-design-eng` owns motion, `web-design-guidelines` reviews code, the shadcn MCP sources components, the `design-reviewer` agent walks the rendered page.
+- **Pipeline per surface:** brief → diverge → evidence → build → `/design-gate` review → officer. Surfaces are registered in `docs/design/surfaces.json`; the four portal pages are registered as `legacy`.
+- **Enforcement:** the brief guard hook refuses edits to a registered surface without its brief; `tests/design-receipts.test.ts` fails a `rebuilt` surface whose receipts are missing, undisposed, changed nothing, or stale; `tests/design-tokens.test.ts` and `tests/design-detector.test.ts` (empty baseline) in `npm test`; `npm run test:ui` runs axe, 360px overflow and no-JS reveals.
+- 🔓 **The skills are committed** (officer) — `.claude/skills/`, `.claude/settings.json`, `.claude/agents/`, `.mcp.json`, `skills-lock.json`.
+- 📌 **`npm run test:ui` is RED on one check, correctly:** `/portal/lookup`'s seeded-member result fails axe `definition-list`. Everything else — six public pages and four portal pages, first render — passes. The `--misa-muted` failure is not visible to axe on first render; phase 3 must walk every state.
+- ⏭️ **Next: v2 phase 3, the portal redesign, run THROUGH this system** — starting with `docs/design/surfaces/<surface>/brief.md` for each portal surface. Merge order: `portal-phase-1`, then this branch.
+
+---
+
 ## 🧭 Member portal phase 1 — BUILT on `portal-phase-1`, AWAITING MERGE (2026-09-18)
 
 Plan and full record in [`docs/member-portal-plan.md`](docs/member-portal-plan.md); doc v1.81.

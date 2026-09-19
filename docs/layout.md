@@ -258,6 +258,41 @@ scripts/build-photos.mjs  pictures/{home,projects,officers,gallery} ->
                         photographs, and gallery is the marquee's pool — a
                         client's office sign scrolling past in a band of member
                         photos is a category error
+scripts/design/brief-guard.mjs  PreToolUse hook (.claude/settings.json): REFUSES an
+                        Edit/Write to a registered design surface's files until
+                        docs/design/surfaces/<surface>/brief.md exists.
+                        MISA_DESIGN_GUARD=off at Claude Code's LAUNCH is the
+                        human-only bypass. 🪤 Sees Edit/Write only — a shell
+                        edit is not intercepted; the receipts test backstops it
+scripts/design/receipts.mjs  the receipt checker, shared by
+                        tests/design-receipts.test.ts and /design-gate (CLI:
+                        node scripts/design/receipts.mjs [surface]). A rebuilt
+                        surface fails on a missing or wrong-skill receipt, an
+                        undisposed finding, NO adopted finding in a commit on the
+                        surface, or a surface commit after review that no
+                        receipt names (stale)
+docs/design/surfaces.json  THE design surface registry (DESIGN.md §Design
+                        toolkit): mode, status legacy|in-progress|rebuilt,
+                        routes, files. The hook, the receipts test and
+                        tests/ui all read it — registering a surface enrols it
+                        everywhere at once
+docs/design/surfaces/<surface>/  brief.md + receipts/<step>.md (+ each skill's
+                        raw output). Templates in docs/design/templates/
+.claude/                COMMITTED since 2026-09-18. skills/ holds the design
+                        toolkit (impeccable 4.1.1, design-taste-frontend,
+                        emil-design-eng, web-design-guidelines, frontend-design,
+                        ui-ux-pro-max — pinned by skills-lock.json, impeccable
+                        by its own version) plus the first-party design-gate;
+                        agents/design-reviewer.md walks a surface in Chrome;
+                        settings.json carries the brief guard and impeccable's
+                        hooks. settings.local.json stays machine-local
+.mcp.json               the shadcn MCP server (npx shadcn mcp — the PINNED
+                        package, not @latest). 🔴 Never `shadcn init`
+.impeccable/baseline.json  detector findings accepted as standing — EMPTY at
+                        2026-09-18; tests/design-detector.test.ts fails on any
+                        finding outside it
+playwright.config.ts    npm run test:ui — drives `next dev` on :3100, which reads
+                        the LOCAL stack via .env.development.local
 supabase/migrations/    versioned SQL
 supabase/seed.sql
 components/shadcn/      🏗️ shadcn/ui components, added on demand with
@@ -398,7 +433,13 @@ public/                 partners/ (4 logos); misa-logo.png (the real wordmark,
                         build-photos.mjs from the gitignored pictures/ — do not
                         hand-edit, and read the photography invariant before
                         adding to it
-tests/                  Vitest — integration tests against the local stack
+tests/                  Vitest — integration tests against the local stack.
+                        design-tokens, design-detector and design-receipts are
+                        the toolkit's pure checks (no database)
+tests/ui/               Playwright + axe (npm run test:ui, NOT part of npm
+                        test): WCAG A/AA, no overflow at 360px, no reveal hidden
+                        without JS — on every public route and every registered
+                        surface, plus /portal/lookup's result states
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()
 next.config.ts          redirects() only: /attend, /leaderboard and /lookup →

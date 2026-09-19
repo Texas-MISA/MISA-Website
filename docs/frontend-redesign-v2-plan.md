@@ -1,8 +1,11 @@
 # Frontend redesign v2 — plan
 
 **Status: PART-BUILT.** ✅ Phases 0, 1, 2 and **4** are complete and recorded
-below. ⏸️ **Phase 3 is deferred** (taken out of order at the officer's request);
-phase 5 is outstanding. *Written 2026-08-17 as "NOT BUILT", after v1 was built
+below. ⏭️ **Phase 3 is NEXT** (officer, 2026-09-18): the UI redesign of the member
+portal and every page in it, run through the design toolkit (`DESIGN.md` §Design
+toolkit, 2026-09-18). An earlier phase-3 build on `v2-phase-3-member-pages` was
+scrapped unmerged by the officer on 2026-09-18 and must not be reused. Phase 5
+is outstanding. *Written 2026-08-17 as "NOT BUILT", after v1 was built
 and scrapped — the phase records below are the history since.*
 Supersedes [`frontend-redesign-plan.md`](frontend-redesign-plan.md) wherever the
 two disagree; that document's decision table is partly reversed below.
@@ -128,6 +131,12 @@ are a separate list.
 
 ## Skill routing
 
+⬅️ **SUPERSEDED 2026-09-18 by `DESIGN.md` §Design toolkit**, which gives each of
+six skills one concern, adds `frontend-design`, `ui-ux-pro-max`, the shadcn MCP
+and a `design-reviewer` agent, makes `impeccable` the lead on Operate surfaces
+(`/portal`, `/admin`), and adds the receipts and tests that fail when a skill was
+skipped. The table below is the phase 0–4 routing, kept for the reasoning.
+
 `design-taste-frontend` is primary. The others serve it:
 
 | Skill | Role | Wins on |
@@ -181,8 +190,9 @@ gain.
   Radius, colour, shadow and type all move to this project's system on install.
 - **motion** — `motion/react`. ⚠️ §3.A: any component using it is an isolated
   leaf with `"use client"`. Server Components stay server components.
-- **Phosphor** — one icon family for the whole project, one `strokeWidth`.
-  Retires the hand-rolled hamburger SVG, which §3.C bans.
+- ~~**Phosphor**~~ **Lucide** (see the 🔓 note above) — one icon family for the
+  whole project, one `strokeWidth`. Retires the hand-rolled hamburger SVG, which
+  §3.C bans.
 
 **One system per project.** No mixing shadcn with Radix Themes or Material.
 
