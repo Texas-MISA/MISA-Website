@@ -1,9 +1,12 @@
 # Frontend redesign v2 — plan
 
 **Status: PART-BUILT.** ✅ Phases 0, 1, 2 and **4** are complete and recorded
-below. ⏭️ **Phase 3 is NEXT** (officer, 2026-09-18): the UI redesign of the member
-portal and every page in it, run through the design toolkit (`DESIGN.md` §Design
-toolkit, 2026-09-18). An earlier phase-3 build on `v2-phase-3-member-pages` was
+below. 🏗️ **Phase 3 is IN PROGRESS** (officer, 2026-09-18): the UI redesign of the
+member portal and every page in it, run through the design toolkit (`DESIGN.md`
+§Design toolkit, 2026-09-18). ✅ **All four surfaces were briefed on 2026-09-19 —
+interview, two concepts and evidence each, with the officer adopting a concept
+and approving the copy for every one. The builds are what remain**; start at
+*Phase 3 brief* below. An earlier phase-3 build on `v2-phase-3-member-pages` was
 scrapped unmerged by the officer on 2026-09-18 and must not be reused. Phase 5
 is outstanding. *Written 2026-08-17 as "NOT BUILT", after v1 was built
 and scrapped — the phase records below are the history since.*
@@ -383,7 +386,7 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 | **0** | Amend `CLAUDE.md` precedence. Install the three packages. Re-skin shadcn out of default state. Define the elevation vocabulary and the radius scale. Read §0, §4, §5, §10, §12 in full. |
 | **1** | ✅ **COMPLETE, gate passed 2026-08-19.** Home page + header. Record below. |
 | **2** | ✅ **LIVE.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Record below. |
-| **3** | ⏭️ **NEXT (officer, 2026-09-18): the UI redesign of the member portal and EVERY page in it** — the `/portal` hub, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup`, and anything added under `/portal` later. It follows the merge of [member portal phase 1](member-portal-plan.md). *(Was: ⏸️ DEFERRED, not skipped.)* Originally `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched, and that constraint stands. Taken out of order on the officer's instruction (2026-08-27): phase 4 was asked for first. 🔓 **The `--misa-muted`-on-Vellum AA failure on those three pages was FOLDED INTO THIS PHASE by the officer on 2026-09-01**, rather than patched standalone first — so it is now a gate condition here, and **the failure stays live on member-facing pages until this phase ships**, which was the accepted cost. The 15 occurrences and the measurement rule are in [`../tasks.md`](../tasks.md) §the `--misa-muted` AA contrast failures. 🪤 It is a ground question before it is a token swap — check what ground each page renders on first. 📌 **The three pages live under `/portal` since 2026-09-18** ([`member-portal-plan.md`](member-portal-plan.md) phase 1: `app/(public)/portal/attend`, `…/leaderboard`, `…/lookup`, with the old URLs as permanent redirects), and the phase now also covers the `/portal` hub, which was built from shared primitives only so as not to pre-empt this phase's design. 🧰 **It runs through `DESIGN.md` §Design toolkit** (built 2026-09-18 on `design-toolkit`, stacked on `portal-phase-1`), with `impeccable` (Operate) as lead: `/design-brief` per surface → build → `/design-gate`. **Its gate:** all four portal surfaces `rebuilt` in `docs/design/surfaces.json` with passing receipts, `npm run test:ui` green on their routes and states (it fails three of those states today), then the officer. ⚠️ **Before the briefs:** correct PRODUCT.md's stale member-identity line and refresh the v1-era `.impeccable/design.json` sidecar (`tasks.md`). |
+| **3** | ⏭️ **NEXT (officer, 2026-09-18): the UI redesign of the member portal and EVERY page in it** — the `/portal` hub, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup`, and anything added under `/portal` later. It follows the merge of [member portal phase 1](member-portal-plan.md). *(Was: ⏸️ DEFERRED, not skipped.)* Originally `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched, and that constraint stands. Taken out of order on the officer's instruction (2026-08-27): phase 4 was asked for first. 🔓 **The `--misa-muted`-on-Vellum AA failure on those three pages was FOLDED INTO THIS PHASE by the officer on 2026-09-01**, rather than patched standalone first — so it is now a gate condition here, and **the failure stays live on member-facing pages until this phase ships**, which was the accepted cost. The 15 occurrences and the measurement rule are in [`../tasks.md`](../tasks.md) §the `--misa-muted` AA contrast failures. 🪤 It is a ground question before it is a token swap — check what ground each page renders on first. 📌 **The three pages live under `/portal` since 2026-09-18** ([`member-portal-plan.md`](member-portal-plan.md) phase 1: `app/(public)/portal/attend`, `…/leaderboard`, `…/lookup`, with the old URLs as permanent redirects), and the phase now also covers the `/portal` hub, which was built from shared primitives only so as not to pre-empt this phase's design. 🧰 **It runs through `DESIGN.md` §Design toolkit** (built 2026-09-18 on `design-toolkit`, stacked on `portal-phase-1`), with `impeccable` (Operate) as lead: `/design-brief` per surface → build → `/design-gate`. **Its gate:** all four portal surfaces `rebuilt` in `docs/design/surfaces.json` with passing receipts, `npm run test:ui` green on their routes and states (it fails three of those states today), then the officer. ✅ **Both prerequisites are done (2026-09-19):** PRODUCT.md's member-identity line is corrected and the sidecar is refreshed from v2 (`f0cb15a`). ✅ **And all four briefs are written** — see *Phase 3 brief* below for the adopted concepts, the per-surface gate bars and the approved copy. |
 | **4** | ✅ **MERGED AND LIVE 2026-08-31.** `/admin` under scanability rules, screen by screen, suite green between screens. Its five held-back accessibility findings were decided by the officer and built the same day, then walked in a browser. Brief below. 🔓 **Shipping it required pushing migration 29 to production first** — the branch was cut from the roster-terms commit, so its code depends on a schema the remote did not have. |
 | **5** | ~~Replace `DESIGN.md`~~ ✅ **done early, 2026-08-19.** What remains: reconcile `docs/invariants.md` for every invariant retired, each with its replacement argued; final record in `build-log.md` and `tasks.md` |
 
@@ -397,6 +400,104 @@ against the ramp that actually ships, or not at all.
 first scan, and it is not v2's doing: `app/(public)/_components/upcoming-events.tsx:87`
 sets `text-[21px]`, which is off the documented ramp today. Leave findings like
 this standing until the section that owns them is rebuilt.
+
+---
+
+## Phase 3 brief — the member portal (BRIEFS DONE 2026-09-19, BUILD NEXT)
+
+**Start here for the build.** Each surface's own brief is the binding document,
+and `impeccable` loads it automatically on every command against that route:
+
+| Surface | Route | Brief | Receipts |
+|---|---|---|---|
+| `portal-hub` | `/portal` | `.impeccable/surfaces/route-portal.md` | `docs/design/surfaces/portal-hub/receipts/` |
+| `portal-attend` | `/portal/attend` | `.impeccable/surfaces/route-portal-attend.md` | `…/portal-attend/receipts/` |
+| `portal-leaderboard` | `/portal/leaderboard` | `.impeccable/surfaces/route-portal-leaderboard.md` | `…/portal-leaderboard/receipts/` |
+| `portal-lookup` | `/portal/lookup` | `.impeccable/surfaces/route-portal-lookup.md` | `…/portal-lookup/receipts/` |
+
+All four are `in-progress` in `docs/design/surfaces.json`, so **the brief guard
+no longer blocks their files** — steps 1–3 of the pipeline are complete and
+committed (`9c8cb63`, `52771c2`, `24c2680`, `11beda2`, plus the officer's
+approvals).
+
+### What the officer settled in the interviews (2026-09-19)
+
+- **Hub:** members arrive mostly on a phone at an event; **all three
+  destinations stay equal and in order** (check-in, leaderboard, lookup);
+  design for three, not five; **nothing else is added**; the one anti-goal is
+  *slower to check in*.
+- **Check-in:** the failure at the door is **first-timer confusion over the
+  checkbox's wording**; the success screen is read by the member alone; **the
+  capture disclosure stays removed** (§9 #15, v1.83).
+- **Leaderboard:** three real audiences — the race at the top, members finding
+  themselves, and **the page itself projected at meetings**; 50–150 members;
+  **top 10 recognised**; no name filter.
+- **My Attendance:** members come for **points, dues, then events**, on a phone
+  straight after check-in; the stale "Both have to match the same member"
+  sentence is **removed, not replaced**; the anti-goal is the portal reading as
+  several different products.
+
+### The adopted concept per surface, and its gate bar
+
+Every surface adopted **concept A**; the rejected B and its reasons are in each
+`receipts/diverge.md`, and the officer may still overrule.
+
+| Surface | Adopted shape | Measured bar for the gate |
+|---|---|---|
+| Hub | One shared-rule plate, three whole-row links, a navy key column, under a short hub-only field band | Check-in row's bottom **≤ 424px at 360×640** (today 424, estimated ≈311); still two taps from the header |
+| Check-in | The same short band, the form on white at a tighter rhythm, the box label plus an inline reassurance, a 48px full-width button | Check in button **fully on the first screen at 360×640** (today cut at 671; estimated ≈628), with 8px the floor on any gap |
+| Leaderboard | **No navy hero**: a white title row with the term set large, one table, recognised places larger, a navy cut line after rank ≤ 10, compact rows below | **The whole top 10 on the first screen at 1280×720** (today 6 rows), names never below 16px (today 14px) |
+| My Attendance | Short band, then one sheet in the officer's order: name, the four numbers, pending, dues, events, grants | Field **and** button on the first phone screen; **no sideways scroll to read whether you attended**; the `definition-list` axe fault gone |
+
+### Copy the officer approved, to be built verbatim
+
+- **Check-in box:** *"I haven't checked in with this form before"*, with *"Not
+  sure? Tick it. If we already have you, we'll use your existing record, never a
+  second one."* beneath. Review step: *"Check your details before we add you"* /
+  *"We found you. Confirm to check in."*, buttons *"Confirm and check in"* and
+  *"Edit details"*. Result link: *"See your points and attendance"*.
+- **Leaderboard:** all-zero banner *"Nobody has points yet this term, so
+  everyone is tied at zero. Totals appear after the first event."*; lookup line
+  *"Want to see how your total adds up? Look up your attendance."*
+- **My Attendance:** band line *"Enter your UT EID to see where you stand this
+  term."*; reset button *"Look up another EID"*; unpaid dues *"You're not paid up
+  for {term} yet. Dues are worked out from payments we've matched to you — if
+  you've paid recently, ask an officer."* 🔓 **The officer cut "rather than
+  paying twice" from the proposal**; the sentence ends at "ask an officer".
+
+### Three stale claims the briefs found, for the build to correct
+
+Each was found by measuring rather than reading, and none is a behaviour change:
+1. 🐛 **The leaderboard's column head is NOT sticky**, though the page's comment
+   says it is — `THead`'s `sticky` is opt-in and paired with `Table`'s
+   `maxHeight`. The brief makes it stick, below the 61px site header.
+2. 🐛 **`/portal/lookup`'s result carries a comment arguing the opposite of the
+   page's own header** — it says dues status is allowed *because* the gate is the
+   EID alone, where the header records that the EID-alone gate removed the
+   argument that justified it.
+3. 🐛 **The `definition-list` axe fault is in the stat block**: each stat's group
+   puts a `<p>` note inside the `<dl>`'s `<div>`. The note becomes a second
+   `<dd>`.
+
+### How to run a build
+
+1. Read the surface's brief (impeccable loads it; `node
+   .claude/skills/impeccable/scripts/surface-brief.mjs read route:/portal/...`
+   prints it).
+2. Build only that surface's files, against `DESIGN.md`. **Do not** run
+   `/impeccable init`, `/impeccable document` onto `DESIGN.md`, or
+   `ui-ux-pro-max --persist`.
+3. `/design-gate <surface>` writes the review receipts (lead self-review,
+   impeccable critique and audit, `web-design-guidelines`, the `design-reviewer`
+   agent, the detector, `emil-design-eng` for motion), then run the checkers:
+   `node scripts/design/receipts.mjs <surface>` and `npx vitest run
+   tests/design-receipts.test.ts`.
+4. `npm run test:ui` must be green on the surface once it is `rebuilt` (it needs
+   a running `npm run dev` on the local stack).
+5. Flip `status` to `rebuilt` in `docs/design/surfaces.json`, and update
+   `DESIGN.md`'s surface table in the same commit — they must agree.
+6. 🪤 **Merge the branch, never squash it**: the receipts name commits that must
+   stay in the branch's history.
 
 ---
 

@@ -1,7 +1,7 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
 **Version:** 1.83
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** 🧭 **Member portal phase 1 (`/portal`) is BUILT on `portal-phase-1`, awaiting the officer's go-ahead to merge.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** 🧭 **Member portal phase 1 (`/portal`) is BUILT on `portal-phase-1`, awaiting the officer's go-ahead to merge.** 🏗️ **v2 phase 3 (the UI redesign of the member portal and every page in it) is IN PROGRESS: all four portal surfaces were briefed on 2026-09-19 — interview, two concepts, evidence and an officer-adopted concept each — and the builds are what remain.**
 **Last updated:** September 2026
 
 > **v1.83: §9 #15 is reversed — `/portal/attend` carries no capture disclosure (officer).**
