@@ -403,7 +403,7 @@ this standing until the section that owns them is rebuilt.
 
 ---
 
-## Phase 3 brief — the member portal (BRIEFS DONE 2026-09-19, BUILD NEXT)
+## Phase 3 brief — the Portal Rebuild (BRIEFS DONE 2026-09-19, BUILD NEXT)
 
 **Start here for the build.** Each surface's own brief is the binding document,
 and `impeccable` loads it automatically on every command against that route:
@@ -419,6 +419,53 @@ All four are `in-progress` in `docs/design/surfaces.json`, so **the brief guard
 no longer blocks their files** — steps 1–3 of the pipeline are complete and
 committed (`9c8cb63`, `52771c2`, `24c2680`, `11beda2`, plus the officer's
 approvals).
+
+### 📛 The name: **the Portal Rebuild**
+
+Refer to this work as **the Portal Rebuild**. It is v2 phase 3, it covers the
+four `/portal` surfaces and nothing else, and it changes presentation only.
+Its brief is this section; its per-surface briefs are the table above.
+
+### The build, in parts
+
+A skeleton for the planning session to refine, not a schedule to follow
+blindly. Each part ends somewhere demonstrable, which is the same rule the
+stages use.
+
+| Part | Scope | Ends when |
+|---|---|---|
+| **0 — Baseline** | Local stack up, dev server on the local env, re-measure each surface at 360×640 / 768 / 1280×720 / 1280×800 and record the numbers. Confirm `npm test` and `npm run test:ui` are at their known state (three states red today). | The four briefs' "measured" tables are re-confirmed on today's code, or corrected. |
+| **1 — Shared portal vocabulary** | What three of the four surfaces share: the **short field band** (hub, check-in, My Attendance), the 48px control sizes, and the stacked-row pattern. Decide what becomes a component in `components/ui/` and what stays per-page. 🪤 A primitive earns its place by a **second** caller; the band has three. | The band exists once, `PageHero` is untouched, and nothing else imports a copy of it. |
+| **2 — `/portal` hub** | The smallest surface, and it sets the row-link and key-column pattern the others borrow. | Its bar is met, `/design-gate portal-hub` receipts pass, `rebuilt` in the registry and DESIGN.md's table. |
+| **3 — `/portal/attend`** | The most states: twelve, plus pre-hydration. The new box label and review copy land here. | Its bar is met and every state is designed and gated, not just the happy path. |
+| **4 — `/portal/lookup`** | The most complex result, and the surface carrying most of the muted-ink debt. Stacked event rows below `sm`, the `definition-list` fix, the announced result. | Its bar is met; axe is green on the result and the miss. |
+| **5 — `/portal/leaderboard`** | The odd one out: no hero, its own type scale, the column head made sticky. Independent of parts 1–4, so it can move earlier if the planning session prefers. | Its bar is met, including the projector measurement at 1280×720. |
+| **6 — Contrast sweep and suite** | The `--misa-muted`-on-Vellum AA fix across the portal, re-measured per pairing on the ground each text actually sits on. `npm run test:ui` green on every portal route and state; `npm test` green; detector clean. | No muted ink on Vellum anywhere in `/portal`, and the suite is green. |
+| **7 — Merge and handoff** | `DESIGN.md`'s surface table and `docs/design/surfaces.json` agree; `tasks.md` and `build-log.md` record what the phase found; the officer's gate. | Merged (**never squashed** — receipts name commits), with `portal-phase-1` merged first. |
+
+**Suggested order: 2 → 3 → 4 → 5**, because the hub is the smallest user of the
+shared band and the cheapest place to get it wrong, and the leaderboard shares
+nothing with the other three. A planning session may re-order it with a reason.
+
+### Open items the planning session must decide
+
+- 🪤 **`/officer-invite/[token]` is not a registered design surface** and never
+  was, but it carries one muted-on-Vellum occurrence and DESIGN.md's AA note
+  has always counted it with the portal's. Decide: fix it as a one-line
+  contrast change inside part 6, or register it as its own surface (which means
+  its own brief before its files can be touched). It is outside `/portal` and
+  outside `/admin`, so no other phase owns it.
+- 🔓 **The muted-ink count has moved since DESIGN.md recorded it.** Re-counted
+  2026-09-19: **14 occurrences across five files** — `/portal/lookup` 9 (page 1,
+  form 8), `/portal/attend` 2 (the disclosure hotfix removed two of the four),
+  `/portal/leaderboard` 1, the `/portal` hub 1 (which did not exist when the
+  note was written), and `/officer-invite` 1. Not all of them fail; each is
+  measured on the ground it actually sits on.
+- **Whether the short band is one component or three page-local treatments**,
+  and if one, where it lives and what it is called.
+- **Whether any surface needs `emil-design-eng` before the build** rather than
+  at its gate: the leaderboard drops a reveal, and check-in's outcome swap may
+  want one.
 
 ### What the officer settled in the interviews (2026-09-19)
 
