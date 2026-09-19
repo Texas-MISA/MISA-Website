@@ -826,11 +826,12 @@ scope) stayed in `CLAUDE.md`; invariants with evidence are in `docs/invariants.m
 
 ### Design toolkit (2026-09-18) — the roster, the pipeline, and what enforces them
 
-Replaces "Design skill precedence". v1 failed because it "treated the installed skills as advisory and hand-rolled everything" (`docs/frontend-redesign-v2-plan.md`); this section makes skill use **checkable**. The skills, agent and hooks are **committed** (`.claude/`), so every clone carries the same toolkit. All six third-party skills are MIT or Apache-2.0.
+Replaces "Design skill precedence". v1 failed because it "treated the installed skills as advisory and hand-rolled everything" (`docs/frontend-redesign-v2-plan.md`); this section makes skill use **checkable**. The skills, agent, hooks and the `/design-brief` + `/design-gate` skills are **committed** (`.claude/`), so every clone carries the same toolkit. Licences: `.claude/third-party-licenses/`.
 
-**Precedence, unchanged:**
+**Precedence:**
 - **The Invariants in `CLAUDE.md` outrank every skill, without exception.** Then this file. Then the skill that owns the concern below.
-- 📌 **`DESIGN.md` is the design source of truth for the WHOLE site.** No skill re-picks grounds, elevation, radii, palette or the type ramp.
+- 📌 **`DESIGN.md` is the design source of truth for the WHOLE site, and it is hand-written.** No skill re-picks grounds, elevation, radii, palette or the type ramp. Outside a surface's pipeline, no aesthetic skill is primary.
+- 🔴 **Forbidden, because each one writes a rival source of truth:** impeccable's "redesign replaces DESIGN.md" path (every redesign here is new work *inside* this world), `/impeccable init` and `/impeccable document` (PRODUCT.md exists; DESIGN.md is not regenerated from code), `ui-ux-pro-max --design-system` and `--persist` (it writes `design-system/…/MASTER.md`, "the Global Source of Truth"), and `shadcn init`. `tests/design-receipts.test.ts` fails if a `design-system/` directory appears or DESIGN.md loses its hand-written sections.
 - ⚠️ **Skill conflicts settled here are not relitigated.** Refused: dark mode, real imagery, eyebrow ban, mono-as-costume, 65–75ch measure, one-marquee-per-page, em-dash ban, "no oversized H1". Adopted: no coloured border-left above 1px, entrance variety, themed browser surfaces, emil's easing and durations.
 - If two skills conflict and nothing here settles it, ask the officer. Don't average them.
 
@@ -838,27 +839,39 @@ Replaces "Design skill precedence". v1 failed because it "treated the installed 
 
 | Concern | Owner | Limits |
 |---|---|---|
-| Lead, **Persuade** surfaces (home, the five content pages) | `design-taste-frontend` | Owns composition, layout family, image strategy, its §14 pre-flight. |
-| Lead, **Operate** surfaces (`/portal/*`, `/admin`) | `impeccable` (Operate mode, craft-floor) | Officer, 2026-09-18, for the portal; `/admin` already ran this way in phase 4. |
-| Divergence | `frontend-design` (Anthropic) | Exactly two concepts per surface, for the lead to adopt or reject. **Never writes shipped code.** |
-| Reference data | `ui-ux-pro-max` | Cited as evidence (UX guidelines, pairings). **Never overrides** a token, the ramp or the palette. Windows: `PYTHONIOENCODING=utf-8 python .claude/skills/ui-ux-pro-max/scripts/search.py "<q>" --domain ux`. |
-| Motion | `emil-design-eng` | Always wins on easing, duration, and whether to animate at all. |
-| Components | shadcn MCP (`.mcp.json`) | Adds into `components/shadcn/` (the `ui` alias), then wrapped in `components/ui/`. 🔴 **`shadcn init` stays forbidden** — it overwrote `button.tsx` once. |
+| Lead, **Persuade** surfaces (home, the five content pages) | `design-taste-frontend` | Owns composition, layout family, image strategy, its `## 14. FINAL PRE-FLIGHT CHECK`. |
+| Lead, **Operate** surfaces (`/portal/*`, `/admin`) | `impeccable` (Operate mode, craft-floor) | Officer, 2026-09-18, for the portal; `/admin` already ran this way in phase 4. Its `shape` interview writes every surface's brief. |
+| Divergence | `frontend-design` — the Apache-2.0 skill from `anthropics/skills`, not the commercially licensed plugin | Exactly two concepts per surface, for the lead to adopt or reject. **Never writes shipped code.** |
+| Reference data | `ui-ux-pro-max` | **Lookups only** (`search.py "<q>" --domain ux`), each cited in the brief by id. Never overrides a token, the ramp or the palette. Windows: prefix `PYTHONIOENCODING=utf-8`. |
+| Motion | `emil-design-eng` | Always wins on easing, duration, and whether to animate at all. Reviews in its required format. |
+| Components | shadcn MCP (`.mcp.json`) | Search and view through the MCP; `shadcn add … --dry-run` before any add, never `--overwrite`; it lands in `components/shadcn/` (the `ui` alias) and is wrapped in `components/ui/`; then run the MCP's `get_audit_checklist`. 🔴 `shadcn init` stays forbidden — it overwrote `button.tsx` once. |
 | Code review | `web-design-guidelines` | Its accessibility findings override aesthetic preference. |
-| Rendered review | `design-reviewer` agent (`.claude/agents/`) | Local stack only — previews write to production. |
+| Rendered review | `design-reviewer` agent (`.claude/agents/`) | Claude in Chrome, or Playwright when the extension is absent. Local stack only — previews write to production. |
 | Fixed checks | impeccable detector, Playwright + axe, token contrast | See enforcement. |
 
-**The pipeline, per surface** (a surface is a page or hub registered in `docs/design/surfaces.json`):
-1. **Brief** — `docs/design/surfaces/<surface>/brief.md` from `docs/design/templates/brief.md`: mode, lead, job, every state, invariants carried in, layout families.
-2. **Diverge** — `frontend-design`, two concepts; the lead adopts or rejects each.
-3. **Evidence** — `ui-ux-pro-max` lookups, cited in the brief.
-4. **Build** — the lead drives; shadcn MCP sources; emil on any motion.
-5. **Review** — `/design-gate <surface>`: lead self-review, `impeccable critique` + `audit`, `web-design-guidelines`, the `design-reviewer` agent at 360/768/1280, the detector, emil if it moves.
-6. **Gate** — the checkers green, then the officer.
+**The pipeline, per surface** (a page or hub registered in `docs/design/surfaces.json` — registering one is how its redesign starts):
+1. **Brief** — `/design-brief <surface>`: impeccable's `shape` interview with the officer, written from `docs/design/templates/brief.md` and persisted with impeccable's `surface-brief.mjs` at `.impeccable/surfaces/<slug>.md` — **impeccable's own brief, so the lead loads it on every command** rather than a document nothing reads.
+2. **Diverge** — `frontend-design`, two concepts; the lead adopts or rejects each, with reasons.
+3. **Evidence** — `ui-ux-pro-max` lookups (EV1, EV2…); every adopted one cited in the brief.
+4. **Build** — the lead drives; the shadcn MCP sources components; emil on any motion.
+5. **Review** — `/design-gate <surface>`: the lead's self-review, `impeccable critique` + `audit`, `web-design-guidelines`, the `design-reviewer` agent at 360/768/1280, the detector, emil if it moves.
+6. **Gate** — the checkers green, then the officer. Changes the officer asks for are recorded in `receipts/officer.md` with their commits.
 
 **What enforces it:**
-- 🔓 **A brief before any edit.** `.claude/settings.json` runs `scripts/design/brief-guard.mjs` as a PreToolUse hook: an Edit/Write to a registered surface's files is **refused** until its brief exists. Registering a surface is how its redesign starts.
-- 🔓 **Receipts.** Each step writes `receipts/<step>.md` (template `docs/design/templates/receipt.md`) plus the skill's raw output. `scripts/design/receipts.mjs`, run by `tests/design-receipts.test.ts`, fails a surface marked `rebuilt` when a receipt is missing or names the wrong skill; when a finding has no disposition or a rejection has no reason; **when no review finding was adopted in a commit that touches the surface** — the skills ran but changed nothing; or **when a surface commit after review is named by no receipt** (stale).
+- 🔓 **A brief before any edit.** `.claude/settings.json` runs `scripts/design/brief-guard.mjs` as a PreToolUse hook: an Edit/Write to a registered surface's files is **refused** until its brief exists. The human-only bypass, for an urgent non-design fix, is `MISA_DESIGN_GUARD=off` in the environment Claude Code is launched with.
+- 🔓 **Receipts that prove use, not presence.** Each step writes `docs/design/surfaces/<surface>/receipts/<step>.md` (template `docs/design/templates/receipt.md`) plus the skill's raw output. `scripts/design/receipts.mjs`, run by `tests/design-receipts.test.ts`, fails a surface once it is `rebuilt` (and its brief once it is `in-progress`) when:
+  - the brief is missing, unfilled, or declares a different mode than the registry;
+  - a receipt is missing or names the wrong skill, a finding has no disposition, or anything not adopted has no reason;
+  - diverge has fewer than two concepts; an adopted evidence lookup is never cited in the brief; the detector's JSON has a hit the receipt does not dispose of;
+  - **no REVIEW finding was adopted in a commit that touches the surface** — the skills ran but changed nothing. Adopting a concept does not count; that is how every build starts;
+  - **a surface commit lands after a review step and no receipt names it** (stale). The pre-build steps are exempt, since the build is their purpose;
+  - a SHA is unquoted — 🪤 YAML reads `1836e72` as the float 1.836e+75 — or is not in the branch's history. **Merge a branch that carries receipts; never squash it.**
 - **Token contrast** — `tests/design-tokens.test.ts` measures the sanctioned pairings from `app/globals.css`, and asserts muted-on-Vellum still fails so the rule is re-read if the palette moves.
 - **Detector regression** — `tests/design-detector.test.ts` fails on any finding in `app/` or `components/` outside `.impeccable/baseline.json` (empty, 2026-09-18). impeccable's PostToolUse/Stop hooks still advise during edits.
-- **Rendered** — `npm run test:ui` (`tests/ui/`, Playwright + axe, local stack): WCAG A/AA, no overflow at 360, no reveal hidden without JS, on every public route and every registered surface, plus `/portal/lookup`'s result states. Red on a `legacy` surface is expected; a `rebuilt` one must be green.
+- **Rendered** — `npm run test:ui` (`tests/ui/`, Playwright + axe, local stack, not part of `npm test`): WCAG 2.0–2.2 A/AA, no overflow at 360px, no reveal hidden without JS, on every public route (plus `/admin/login` and the 404) and every registered surface — **and the states a first render never shows**: `/portal/lookup`'s result and miss, and `/portal/attend`'s field errors, miss and both first-timer confirmations, reached against a short-lived local event. Each state test asserts it reached its state before axe runs. It reuses a running `npm run dev` (found through Next's `.next/dev/lock`) and never anything else on a port. Red on a `legacy` surface is expected; a `rebuilt` one must be green.
+
+**What it cannot catch, stated so nobody assumes it does:**
+- 🪤 The hook sees Edit/Write only; a shell edit is not intercepted. The receipts test is the backstop that cannot be walked around.
+- A change to a shared primitive in `components/ui/` does not make any surface stale. It is reviewed by the gate of whatever surface it was made for, and seen by `test:ui` everywhere.
+- Axe cannot judge hierarchy, clarity or taste. That is the design-reviewer's and the officer's job, and a green `test:ui` is not a design review.
+- A receipt records a decision; it cannot prove the decision was good. The officer's gate still exists.

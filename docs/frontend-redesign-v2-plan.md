@@ -152,6 +152,34 @@ reason, never silently.
 
 ---
 
+## Design toolkit research (2026-09-18) — what was considered, and why
+
+The officer asked for a site-wide system around the prominent UI skills and
+plugins, one that makes sure they are actually used. The survey below is what
+the roster in `DESIGN.md` §Design toolkit was chosen from. It is recorded so the
+choices are not relitigated from scratch: anything not adopted has a reason, and
+a reason can be revisited when its premise changes.
+
+| Candidate | Disposition | Why |
+|---|---|---|
+| `impeccable` (pbakaus, Apache-2.0) | ✅ kept — **Operate lead** | Its Operate mode and craft-floor already governed `/admin` in phase 4; its `shape` interview writes the surface brief it then loads on every command; its detector is a deterministic check. |
+| `design-taste-frontend` (Leonxlnx, MIT) | ✅ kept — **Persuade lead** | Led phases 1–2; §14 is a real pre-flight. |
+| `emil-design-eng` (Emil Kowalski, MIT) | ✅ kept — motion | Narrow and complementary; already wins on motion. |
+| `web-design-guidelines` (Vercel, MIT per README) | ✅ kept — code review | Fetches the current guidelines per run; recorded only in phase 4 until now. |
+| `frontend-design` — the Apache-2.0 **skill** in `anthropics/skills` | ✅ added — divergence only | Pushes a single committed aesthetic, which is exactly what conflicts with a fixed identity — so it is confined to proposing two concepts. The **plugin** of the same name in `anthropics/claude-code` is under Anthropic's commercial terms and was not vendored. |
+| `ui-ux-pro-max` (nextlevelbuilder, MIT) | ✅ added — evidence only | A searchable guideline database, useful as cited evidence. 🪤 Its installer adds six companion skills (removed), and its `--persist` writes a rival "source of truth" (forbidden, and tested). |
+| shadcn MCP (official) | ✅ added | Search/view/add against `components.json`'s registries. Configured by hand; `init` stays forbidden. |
+| Playwright + `@axe-core/playwright` | ✅ added | The de-facto rendered a11y check; runs locally, no CI needed. |
+| OneRedOak's `design-review` agent | ♻️ adapted | Became `.claude/agents/design-reviewer.md`, driving Claude in Chrome (already connected) with Playwright as the fallback, instead of adding Playwright MCP. |
+| Playwright MCP, Chrome DevTools MCP | ❌ not adopted | Overlap with Claude in Chrome and the Playwright suite. Chrome DevTools MCP's performance traces are the reason to revisit if performance becomes a design concern. |
+| Figma MCP | ❌ not adopted | There is no Figma source; the design lives in `DESIGN.md` and the code. |
+| pa11y / pa11y-ci | ❌ not adopted | axe through Playwright does the same job and can reach states. |
+| Lighthouse CI | ❌ not adopted | Needs CI, which the officer chose not to add (tests + receipts instead). |
+| `bergside/awesome-design-skills` | ❌ not installed | A style-preset registry; presets are the opposite of a fixed identity. Named in the original install doc, §2.5. |
+| Vercel `react-best-practices` | ❌ not adopted (yet) | React/Next performance, not UI design. A candidate if performance work starts. |
+
+---
+
 ## Foundation and packages
 
 Per §2.A and Appendix A. **Verify `package.json` before every install (§3.F).**

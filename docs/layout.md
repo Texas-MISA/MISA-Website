@@ -260,39 +260,51 @@ scripts/build-photos.mjs  pictures/{home,projects,officers,gallery} ->
                         photos is a category error
 scripts/design/brief-guard.mjs  PreToolUse hook (.claude/settings.json): REFUSES an
                         Edit/Write to a registered design surface's files until
-                        docs/design/surfaces/<surface>/brief.md exists.
+                        its brief (the registry's `brief` path) exists.
                         MISA_DESIGN_GUARD=off at Claude Code's LAUNCH is the
                         human-only bypass. 🪤 Sees Edit/Write only — a shell
                         edit is not intercepted; the receipts test backstops it
 scripts/design/receipts.mjs  the receipt checker, shared by
                         tests/design-receipts.test.ts and /design-gate (CLI:
                         node scripts/design/receipts.mjs [surface]). A rebuilt
-                        surface fails on a missing or wrong-skill receipt, an
-                        undisposed finding, NO adopted finding in a commit on the
-                        surface, or a surface commit after review that no
-                        receipt names (stale)
+                        surface fails on an unfilled brief, a missing or
+                        wrong-skill receipt, an undisposed finding, one concept,
+                        an uncited evidence lookup, an undisposed detector hit,
+                        NO adopted REVIEW finding in a commit on the surface, a
+                        surface commit after a review that no receipt names
+                        (stale), or an unquoted SHA (YAML reads 1836e72 as a
+                        float)
 docs/design/surfaces.json  THE design surface registry (DESIGN.md §Design
                         toolkit): mode, status legacy|in-progress|rebuilt,
-                        routes, files. The hook, the receipts test and
+                        routes, files, brief. The hook, the receipts test and
                         tests/ui all read it — registering a surface enrols it
                         everywhere at once
-docs/design/surfaces/<surface>/  brief.md + receipts/<step>.md (+ each skill's
-                        raw output). Templates in docs/design/templates/
+docs/design/surfaces/<surface>/receipts/  <step>.md + each skill's raw output.
+                        Templates in docs/design/templates/
+.impeccable/surfaces/<slug>.md  the surface BRIEFS — impeccable's own format,
+                        written with its surface-brief.mjs, so impeccable loads
+                        the brief on every command. Tracked (.gitignore)
 .claude/                COMMITTED since 2026-09-18. skills/ holds the design
                         toolkit (impeccable 4.1.1, design-taste-frontend,
                         emil-design-eng, web-design-guidelines, frontend-design,
                         ui-ux-pro-max — pinned by skills-lock.json, impeccable
-                        by its own version) plus the first-party design-gate;
-                        agents/design-reviewer.md walks a surface in Chrome;
-                        settings.json carries the brief guard and impeccable's
-                        hooks. settings.local.json stays machine-local
+                        by its own version) plus the first-party design-brief
+                        (steps 1–3) and design-gate (steps 5–6);
+                        agents/design-reviewer.md walks a surface in Chrome, or
+                        Playwright without the extension; settings.json carries
+                        the brief guard and impeccable's hooks;
+                        third-party-licenses/ the upstream licence texts.
+                        settings.local.json stays machine-local
 .mcp.json               the shadcn MCP server (npx shadcn mcp — the PINNED
                         package, not @latest). 🔴 Never `shadcn init`
 .impeccable/baseline.json  detector findings accepted as standing — EMPTY at
                         2026-09-18; tests/design-detector.test.ts fails on any
                         finding outside it
-playwright.config.ts    npm run test:ui — drives `next dev` on :3100, which reads
-                        the LOCAL stack via .env.development.local
+playwright.config.ts    npm run test:ui. 🪤 Next 16 LOCKS a project against a
+                        second `next dev`, so it REUSES the dev server named in
+                        .next/dev/lock and otherwise starts one on :3100 — never
+                        whatever else answers on a port (a `next start` reads
+                        .env.local, i.e. production)
 supabase/migrations/    versioned SQL
 supabase/seed.sql
 components/shadcn/      🏗️ shadcn/ui components, added on demand with
@@ -437,9 +449,13 @@ tests/                  Vitest — integration tests against the local stack.
                         design-tokens, design-detector and design-receipts are
                         the toolkit's pure checks (no database)
 tests/ui/               Playwright + axe (npm run test:ui, NOT part of npm
-                        test): WCAG A/AA, no overflow at 360px, no reveal hidden
-                        without JS — on every public route and every registered
-                        surface, plus /portal/lookup's result states
+                        test): WCAG 2.0–2.2 A/AA, no overflow at 360px, no reveal
+                        hidden without JS — on every public route and every
+                        registered surface, plus the states a first render never
+                        shows (lookup's result and miss; attend's field errors,
+                        miss and both first-timer confirmations). global-setup.ts
+                        reuses tests/global-setup.ts's readLocalStack() and
+                        sweeps leftover "TEST ui-gate" events
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()
 next.config.ts          redirects() only: /attend, /leaderboard and /lookup →

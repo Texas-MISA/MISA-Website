@@ -5,17 +5,18 @@
 > **Verify the toolkit (fresh clone, or after an update):**
 >
 > ```bash
-> ls .claude/skills        # design-gate design-taste-frontend emil-design-eng
+> ls .claude/skills        # design-brief design-gate design-taste-frontend emil-design-eng
 >                          # frontend-design impeccable ui-ux-pro-max web-design-guidelines
+> npx playwright install chromium   # once per machine, for npm run test:ui
 > node .claude/skills/impeccable/scripts/detect.mjs --json app components   # → []
 > PYTHONIOENCODING=utf-8 python .claude/skills/ui-ux-pro-max/scripts/search.py "form labels" --domain ux
 > npx vitest run tests/design-tokens.test.ts tests/design-detector.test.ts tests/design-receipts.test.ts
-> npm run test:ui          # needs the local stack; red on legacy surfaces is expected
+> npm run test:ui          # local stack; reuses a running npm run dev. Red on legacy surfaces is expected
 > ```
 >
 > In Claude Code, `/mcp` should list `shadcn` (approve it on first launch), and the Agent tool should offer `design-reviewer`.
 >
-> **Updating a skill** is the commands in §2, then **commit the diff and read it** — a skill runs with full agent permissions. `skills-lock.json` pins five of the six; `impeccable` is pinned by its own `version:` (4.1.1), because the `npx skills` route installs a different build (§2.2). 🪤 **Installing `ui-ux-pro-max` drops six unrequested extra skills** (brand, banner-design, design, design-system, slides, ui-styling) — remove them again; the roster already assigns their concerns.
+> **Updating a skill** is the commands in §2, then **commit the diff and read it** — a skill runs with full agent permissions — and re-fetch its licence into `.claude/third-party-licenses/`. `skills-lock.json` pins five of the six; `impeccable` is pinned by its own `version:` (4.1.1), because the `npx skills` route installs a different build (§2.2). 🪤 **Installing `ui-ux-pro-max` drops six unrequested extra skills** (brand, banner-design, design, design-system, slides, ui-styling) — remove them again; the roster already assigns their concerns.
 >
 > 🪤 **§5's gitignore lines and §6's `settings.local.json` hook are out of date.** The hooks moved to the committed `.claude/settings.json`.
 
