@@ -1,29 +1,33 @@
 {
-  "$comment": "The design surface registry (DESIGN.md §Design toolkit). The brief guard hook, tests/design-receipts.test.ts, tests/ui and /design-gate all read this one file. status: 'legacy' (not yet through the pipeline, receipts not required), 'in-progress' (brief required before any edit, receipts not yet required), 'rebuilt' (every required receipt must exist, be fresh, and show an adopted finding). Registering a surface is how a redesign starts; a registered surface cannot be edited without its brief.",
+  "$comment": "The design surface registry (DESIGN.md §Design toolkit). The brief guard hook, tests/design-receipts.test.ts, tests/ui and /design-brief + /design-gate all read this one file. Registering a surface is how its redesign starts: from then on its files cannot be edited until `brief` exists. `brief` is impeccable's surface brief for the first route (surface-brief.mjs path route:<route>), so the lead loads it on every command. status: 'legacy' (registered, not yet through the pipeline), 'in-progress' (brief must be complete), 'rebuilt' (every receipt must pass).",
   "surfaces": {
     "portal-hub": {
       "mode": "operate",
       "status": "legacy",
       "routes": ["/portal"],
-      "files": ["app/(public)/portal/page.tsx"]
+      "files": ["app/(public)/portal/page.tsx"],
+      "brief": ".impeccable/surfaces/route-portal.md"
     },
     "portal-attend": {
       "mode": "operate",
       "status": "legacy",
       "routes": ["/portal/attend"],
-      "files": ["app/(public)/portal/attend/"]
+      "files": ["app/(public)/portal/attend/"],
+      "brief": ".impeccable/surfaces/route-portal-attend.md"
     },
     "portal-leaderboard": {
       "mode": "operate",
       "status": "legacy",
       "routes": ["/portal/leaderboard"],
-      "files": ["app/(public)/portal/leaderboard/"]
+      "files": ["app/(public)/portal/leaderboard/"],
+      "brief": ".impeccable/surfaces/route-portal-leaderboard.md"
     },
     "portal-lookup": {
       "mode": "operate",
       "status": "legacy",
       "routes": ["/portal/lookup"],
-      "files": ["app/(public)/portal/lookup/"]
+      "files": ["app/(public)/portal/lookup/"],
+      "brief": ".impeccable/surfaces/route-portal-lookup.md"
     }
   }
 }

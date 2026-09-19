@@ -49,6 +49,8 @@ describe("the contrast formula", () => {
 describe("sanctioned pairings pass AA", () => {
   const vellum = () => token("misa-panel");
   const pairings: [string, () => string, () => string][] = [
+    ["heading ink on Paper", () => token("foreground"), () => PAPER],
+    ["heading ink on Vellum", () => token("foreground"), vellum],
     ["body on Paper", () => token("misa-body"), () => PAPER],
     ["body on Vellum", () => token("misa-body"), vellum],
     ["secondary on Paper", () => token("misa-secondary"), () => PAPER],
@@ -57,6 +59,7 @@ describe("sanctioned pairings pass AA", () => {
     ["navy on Paper", () => token("misa-blue"), () => PAPER],
     ["navy on Vellum", () => token("misa-blue"), vellum],
     ["Paper on navy", () => PAPER, () => token("misa-blue")],
+    ["Paper on pressed navy", () => PAPER, () => token("misa-blue-dark")],
     ["caution on Paper", () => token("misa-caution"), () => PAPER],
     ["caution on its wash", () => token("misa-caution"), () => token("misa-caution-wash")],
     ["critical on Paper", () => token("misa-critical"), () => PAPER],

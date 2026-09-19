@@ -20,6 +20,19 @@ given), which reads the local Supabase stack. Never a Vercel preview and
 never www.txmisa.org: previews write to the production database.
 Open a new tab; do not reuse the user's tabs. Trigger no `alert`/`confirm`.
 
+**If the Chrome tools are unavailable** (the extension is not connected),
+do not stop and do not guess: drive the same walk with Playwright, which the
+repo has (`npx playwright` via Bash; `tests/ui/design-gate.spec.ts` shows how
+to reach each state, including opening a short-lived local event for
+`/portal/attend`). Screenshot each route × width × state to your scratchpad
+and Read the images. Say in your report which browser you used.
+
+**Some states need data.** `/portal/attend`'s states exist only while an event
+is open; `/portal/lookup`'s result needs a seed EID. The automated suite
+already covers axe on those states — your job there is what axe cannot see:
+hierarchy, whether the next action is obvious, spacing, focus order, and how
+it feels on a 360px phone.
+
 ## The walk
 For each route, at 1280, 768, then 360 px:
 - **Every state in the brief**, including errors and empty results. Use only

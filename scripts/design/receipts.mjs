@@ -5,14 +5,16 @@
 //   node scripts/design/receipts.mjs [surface ...]     (default: every surface)
 //
 // A receipt is docs/design/surfaces/<surface>/receipts/<step>.md with YAML
-// frontmatter. It proves three things the phase records could not:
+// frontmatter. Together they prove what the phase records never could:
 //   1. the skill RAN       — `output` points at its committed raw output;
-//   2. it was READ         — every finding carries a disposition, and a
-//                            rejection carries a reason;
-//   3. it MATTERED         — at least one finding was adopted, in a commit
-//                            that touches the surface's files.
-// Plus freshness: a surface file changed after review, by a commit no receipt
-// names as a fix, means the shipped code is not the reviewed code.
+//   2. it was READ         — every finding carries a disposition, and anything
+//                            not adopted carries a reason;
+//   3. it MATTERED         — at least one REVIEW finding was adopted, in a
+//                            commit that touches the surface's files;
+//   4. it was USED         — two concepts were weighed, every evidence lookup
+//                            the lead adopted is cited in the brief, and every
+//                            detector hit has a disposition;
+//   5. it is FRESH         — no surface commit after a review goes unnamed.
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, statSync } from "node:fs";
@@ -46,9 +48,20 @@ export const STEPS = {
   motion: "emil-design-eng",
 };
 
-// Steps whose findings can count as "a skill changed the outcome".
+// Never required. The officer's own review at the gate: changes the officer
+// asked for, each a finding with its fix commit, so freshness can name them.
+// It never counts as "a skill changed the outcome" — the officer is not one.
+export const OPTIONAL_STEPS = { officer: "officer" };
+
+// Steps that come BEFORE the build (steps 2–3). Their `commit` records what
+// the concepts were drawn against; the build that follows is their purpose, so
+// freshness never applies to them — every build commit would read as stale.
+const PRE_BUILD_STEPS = new Set(["diverge", "evidence"]);
+
+// Steps whose adopted findings prove a skill changed the outcome. `diverge`
+// is generation, not review — adopting a concept is how every build starts,
+// so it would satisfy the rule on its own and prove nothing.
 const REVIEW_STEPS = [
-  "diverge",
   "lead",
   "critique",
   "audit",
@@ -57,9 +70,23 @@ const REVIEW_STEPS = [
   "motion",
 ];
 
+// The brief's required headings. They mirror docs/design/templates/brief.md,
+// which follows impeccable's shape brief plus what this project adds.
+export const BRIEF_HEADINGS = [
+  "## Mode and lead",
+  "## Job and audience",
+  "## Outcome and proof",
+  "## States",
+  "## Constraints carried in",
+  "## Diverge",
+  "## Evidence",
+];
+const BRIEF_PLACEHOLDER = /Operate \| Persuade|<surface>|<route>|\bTODO\b/;
+
 const DISPOSITIONS = new Set(["adopted", "rejected", "deferred"]);
+const SHA = /^[0-9a-f]{7,40}$/;
 const MOTION_SIGNAL =
-  /data-reveal|from ["']motion|animate-|transition-|@keyframes|useReducedMotion/;
+  /data-reveal|from ["']motion|animate-|transition-|duration-\d|@keyframes|useReducedMotion/;
 
 export function loadRegistry(root = ROOT) {
   return JSON.parse(
@@ -67,21 +94,35 @@ export function loadRegistry(root = ROOT) {
   );
 }
 
+// --literal-pathspecs: route folders carry glob characters — `[token]` is a
+// character class to git unless told otherwise.
 function git(root, args) {
-  return execFileSync("git", args, { cwd: root, encoding: "utf8" }).trim();
+  return execFileSync("git", ["--literal-pathspecs", ...args], {
+    cwd: root,
+    encoding: "utf8",
+  }).trim();
 }
 
-function listFiles(root, entries) {
+// A registry entry is a file, or a directory with or without a trailing
+// slash; both callers (this and brief-guard.mjs) match it the same way.
+export function surfacePaths(surface) {
+  return surface.files.map((f) => f.replace(/\/+$/, ""));
+}
+
+export function ownsPath(surface, rel) {
+  return surfacePaths(surface).some((p) => rel === p || rel.startsWith(p + "/"));
+}
+
+function listFiles(root, surface) {
   const out = [];
-  for (const entry of entries) {
+  for (const entry of surfacePaths(surface)) {
     const abs = path.join(root, entry);
     if (!existsSync(abs)) continue;
     if (statSync(abs).isFile()) {
       out.push(abs);
       continue;
     }
-    const tracked = git(root, ["ls-files", "--", entry]);
-    for (const f of tracked.split("\n").filter(Boolean)) {
+    for (const f of git(root, ["ls-files", "--", entry]).split("\n").filter(Boolean)) {
       out.push(path.join(root, f));
     }
   }
@@ -89,7 +130,7 @@ function listFiles(root, entries) {
 }
 
 export function surfaceMoves(root, surface) {
-  return listFiles(root, surface.files).some((f) =>
+  return listFiles(root, surface).some((f) =>
     MOTION_SIGNAL.test(readFileSync(f, "utf8"))
   );
 }
@@ -107,22 +148,61 @@ export function requiredSteps(root, surface) {
   );
 }
 
+// 🪤 An unquoted SHA is not always a string: YAML reads `1836e72` as the float
+// 1.836e+75 and `1234567` as an integer. The message says how to fix it,
+// because "commit 1.836e+75 does not exist" would send anyone the wrong way.
+function shaProblem(label, value) {
+  if (typeof value !== "string") {
+    return `${label} must be a QUOTED string — YAML read ${JSON.stringify(value)} as a ${typeof value}`;
+  }
+  if (!SHA.test(value)) return `${label} "${value}" is not a commit SHA`;
+  return null;
+}
+
+// The brief is impeccable's surface brief (.impeccable/surfaces/<slug>.md), so
+// the lead loads it on every command. Existence is the hook's job; this checks
+// that it was actually filled in, for the mode the registry says.
+export function checkBrief(surface, root = ROOT) {
+  const problems = [];
+  if (!surface.brief) return ["registry entry has no `brief` path"];
+  const file = path.join(root, surface.brief);
+  if (!existsSync(file)) return [`missing brief ${surface.brief}`];
+  const text = readFileSync(file, "utf8");
+  if (!/^---\r?\n[\s\S]*?primary_target:[\s\S]*?\r?\n---/.test(text)) {
+    problems.push(
+      "brief has no impeccable frontmatter — write it with surface-brief.mjs (see the template)"
+    );
+  }
+  for (const h of BRIEF_HEADINGS) {
+    if (!text.includes(h)) problems.push(`brief is missing "${h}"`);
+  }
+  if (BRIEF_PLACEHOLDER.test(text)) problems.push("brief still has template placeholders");
+  const mode = /\*\*Mode:\*\*\s*(Operate|Persuade)/i.exec(text)?.[1]?.toLowerCase();
+  if (mode !== surface.mode) {
+    problems.push(`brief's **Mode:** is "${mode ?? "missing"}", registry says "${surface.mode}"`);
+  }
+  return problems;
+}
+
 // Returns a list of problems; an empty list means the surface passes.
 export function checkSurface(name, surface, root = ROOT) {
-  const problems = [];
   const dir = path.join(root, "docs/design/surfaces", name);
   const rel = (p) => path.relative(root, p).split(path.sep).join("/");
 
   if (!LEADS[surface.mode]) {
-    problems.push(`mode must be persuade or operate, got "${surface.mode}"`);
-    return problems;
+    return [`mode must be persuade or operate, got "${surface.mode}"`];
   }
-  if (!existsSync(path.join(dir, "brief.md"))) {
-    problems.push(`missing ${rel(path.join(dir, "brief.md"))}`);
-  }
+  const problems = [...checkBrief(surface, root)];
+  const briefText =
+    surface.brief && existsSync(path.join(root, surface.brief))
+      ? readFileSync(path.join(root, surface.brief), "utf8")
+      : "";
 
   const receipts = {};
-  for (const step of requiredSteps(root, surface)) {
+  const optional = Object.keys(OPTIONAL_STEPS).filter((s) =>
+    existsSync(path.join(dir, "receipts", `${s}.md`))
+  );
+  for (const step of [...requiredSteps(root, surface), ...optional]) {
     const file = path.join(dir, "receipts", `${step}.md`);
     if (!existsSync(file)) {
       problems.push(`missing receipt ${rel(file)}`);
@@ -137,24 +217,41 @@ export function checkSurface(name, surface, root = ROOT) {
     }
     receipts[step] = r;
 
-    const owner = STEPS[step] === "lead" ? LEADS[surface.mode] : STEPS[step];
+    const declared = STEPS[step] ?? OPTIONAL_STEPS[step];
+    const owner = declared === "lead" ? LEADS[surface.mode] : declared;
     if (r.skill !== owner) {
       problems.push(`${step}: skill must be "${owner}", got "${r.skill}"`);
     }
     for (const key of ["command", "date", "commit", "output"]) {
-      if (!r[key]) problems.push(`${step}: missing "${key}"`);
-    }
-    if (r.output) {
-      const out = path.join(dir, "receipts", r.output);
-      if (!existsSync(out) || readFileSync(out, "utf8").trim() === "") {
-        problems.push(`${step}: output "${r.output}" is missing or empty`);
+      if (r[key] === undefined || r[key] === null || r[key] === "") {
+        problems.push(`${step}: missing "${key}"`);
       }
     }
-    if (r.commit) {
-      try {
-        git(root, ["cat-file", "-e", `${r.commit}^{commit}`]);
-      } catch {
-        problems.push(`${step}: commit ${r.commit} does not exist`);
+    let output = null;
+    if (r.output) {
+      const out = path.join(dir, "receipts", String(r.output));
+      if (!existsSync(out) || readFileSync(out, "utf8").trim() === "") {
+        problems.push(`${step}: output "${r.output}" is missing or empty`);
+      } else {
+        output = readFileSync(out, "utf8");
+      }
+    }
+    if (r.commit !== undefined) {
+      const bad = shaProblem(`${step}: commit`, r.commit);
+      if (bad) problems.push(bad);
+      else {
+        try {
+          git(root, ["cat-file", "-e", `${r.commit}^{commit}`]);
+          try {
+            git(root, ["merge-base", "--is-ancestor", r.commit, "HEAD"]);
+          } catch {
+            problems.push(
+              `${step}: commit ${r.commit} is not in this branch's history — receipts must name commits that survive; merge, never squash`
+            );
+          }
+        } catch {
+          problems.push(`${step}: commit ${r.commit} does not exist`);
+        }
       }
     }
     if (!Array.isArray(r.findings)) {
@@ -170,30 +267,65 @@ export function checkSurface(name, surface, root = ROOT) {
       if (f?.disposition !== "adopted" && !f?.reason) {
         problems.push(`${label}: a ${f?.disposition ?? "finding"} needs a reason`);
       }
-      if (f?.disposition === "adopted" && !f?.fix_commit) {
-        problems.push(`${label}: an adopted finding needs fix_commit`);
+      if (f?.disposition === "adopted" && step !== "evidence" && step !== "diverge") {
+        if (f?.fix_commit === undefined) {
+          problems.push(`${label}: an adopted finding needs fix_commit`);
+        } else {
+          const bad = shaProblem(`${label}: fix_commit`, f.fix_commit);
+          if (bad) problems.push(bad);
+        }
+      }
+    }
+
+    // Used, not just run.
+    if (step === "diverge" && r.findings.length < 2) {
+      problems.push("diverge: needs at least two concepts — one concept is a decision, not a divergence");
+    }
+    if (step === "evidence") {
+      if (r.findings.length === 0) {
+        problems.push("evidence: no lookups recorded — the reference skill was not used");
+      }
+      for (const f of r.findings) {
+        if (f?.disposition === "adopted" && f?.id && !briefText.includes(String(f.id))) {
+          problems.push(`evidence ${f.id}: adopted but never cited in the brief`);
+        }
+      }
+    }
+    if (step === "detector" && output !== null) {
+      let hits;
+      try {
+        hits = JSON.parse(output);
+      } catch {
+        hits = null;
+      }
+      if (!Array.isArray(hits)) {
+        problems.push("detector: output must be the detector's --json array");
+      } else if (hits.length !== r.findings.length) {
+        problems.push(
+          `detector: the output has ${hits.length} hit(s) but the receipt disposes of ${r.findings.length} — every hit needs a disposition`
+        );
       }
     }
   }
 
-  // It mattered: an adopted review finding, fixed in a commit on this surface.
-  const surfacePaths = surface.files.map((f) => f.replace(/\/$/, ""));
+  // Mattered: an adopted REVIEW finding, fixed in a commit on this surface.
   const touchesSurface = (sha) => {
     try {
-      const changed = git(root, ["show", "--name-only", "--format=", sha]);
-      return changed
+      return git(root, ["show", "--name-only", "--format=", sha])
         .split("\n")
-        .some((c) => surfacePaths.some((p) => c === p || c.startsWith(p + "/")));
+        .some((c) => ownsPath(surface, c));
     } catch {
       return false;
     }
   };
-  const fixCommits = new Set();
   let mattered = false;
   for (const step of REVIEW_STEPS) {
     for (const f of receipts[step]?.findings ?? []) {
-      if (f?.fix_commit) fixCommits.add(String(f.fix_commit));
-      if (f?.disposition === "adopted" && f.fix_commit && touchesSurface(f.fix_commit)) {
+      if (
+        f?.disposition === "adopted" &&
+        typeof f.fix_commit === "string" &&
+        touchesSurface(f.fix_commit)
+      ) {
         mattered = true;
       }
     }
@@ -204,38 +336,35 @@ export function checkSurface(name, surface, root = ROOT) {
     );
   }
 
-  // Freshness: every surface change after the earliest review is a named fix.
-  const reviewed = Object.values(receipts)
-    .map((r) => r.commit)
-    .filter(Boolean);
-  if (reviewed.length > 0) {
-    let base;
+  // Fresh: per REVIEW step, every surface commit after that step's review is a
+  // fix some receipt names (the officer receipt included). Pre-build steps are
+  // exempt — see PRE_BUILD_STEPS.
+  const named = Object.values(receipts)
+    .flatMap((r) => (Array.isArray(r.findings) ? r.findings : []))
+    .map((f) => f?.fix_commit)
+    .filter((s) => typeof s === "string");
+  const isNamed = (sha) => named.some((k) => sha.startsWith(k));
+  const staleSteps = new Map();
+  for (const [step, r] of Object.entries(receipts)) {
+    if (PRE_BUILD_STEPS.has(step)) continue;
+    if (typeof r.commit !== "string" || !SHA.test(r.commit)) continue;
+    let later = [];
     try {
-      base = git(root, ["merge-base", "--octopus", ...reviewed.map(String)]);
-    } catch {
-      base = null;
-    }
-    if (base) {
-      const later = git(root, [
-        "log",
-        "--format=%H",
-        `${base}..HEAD`,
-        "--",
-        ...surfacePaths,
-      ])
+      later = git(root, ["log", "--format=%H", `${r.commit}..HEAD`, "--", ...surfacePaths(surface)])
         .split("\n")
         .filter(Boolean);
-      const known = [...fixCommits];
-      for (const sha of later) {
-        const named = known.some((k) => sha.startsWith(k) || k.startsWith(sha));
-        const isReviewed = reviewed.some((k) => sha.startsWith(String(k)));
-        if (!named && !isReviewed) {
-          problems.push(
-            `stale: ${sha.slice(0, 7)} changed the surface after review and no receipt names it — re-run /design-gate`
-          );
-        }
-      }
+    } catch {
+      continue; // reported above as a missing or foreign commit
     }
+    for (const sha of later) {
+      if (isNamed(sha)) continue;
+      staleSteps.set(sha, [...(staleSteps.get(sha) ?? []), step]);
+    }
+  }
+  for (const [sha, steps] of staleSteps) {
+    problems.push(
+      `stale: ${sha.slice(0, 7)} changed the surface after the ${steps.join(", ")} review and no receipt names it — re-run those steps, or record it in receipts/officer.md if the officer asked for it`
+    );
   }
 
   return problems;
@@ -253,8 +382,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       failed = true;
       continue;
     }
-    const problems = checkSurface(name, s);
-    console.log(`${name} (${s.status}): ${problems.length ? "FAIL" : "ok"}`);
+    const problems = s.status === "legacy" ? [] : checkSurface(name, s);
+    console.log(`${name} (${s.status}): ${s.status === "legacy" ? "not started" : problems.length ? "FAIL" : "ok"}`);
     for (const p of problems) console.log(`  - ${p}`);
     if (problems.length && s.status === "rebuilt") failed = true;
   }
