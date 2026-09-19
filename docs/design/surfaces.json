@@ -24,7 +24,7 @@
     },
     "portal-lookup": {
       "mode": "operate",
-      "status": "legacy",
+      "status": "in-progress",
       "routes": ["/portal/lookup"],
       "files": ["app/(public)/portal/lookup/"],
       "brief": ".impeccable/surfaces/route-portal-lookup.md"
