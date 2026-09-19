@@ -76,8 +76,11 @@ look like v1. Do not read "it has the grey background" as "it has been done."
 📌 **From 2026-09-18 a rebuild's status also lives in `docs/design/surfaces.json`**
 (§Design toolkit), which the tests read. This table is for people; that file is
 for the checks. **They must agree** — a surface is ✅ here only once it is
-`rebuilt` there and its receipts pass. The four portal surfaces are registered as
-`legacy`; the phase 1, 2 and 4 surfaces predate the toolkit and are not registered.
+`rebuilt` there and its receipts pass. 🔓 **All four portal surfaces are
+`in-progress` as of 2026-09-19: each has a brief, two concepts and its evidence,
+and the officer has adopted a concept for each** (`/design-brief` steps 1–3; the
+builds and `/design-gate` are what remain). The phase 1, 2 and 4 surfaces predate
+the toolkit and are not registered.
 
 ---
 
