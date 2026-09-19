@@ -62,13 +62,16 @@ dev.log
 docs/VenmoStatement_*.csv
 !docs/VenmoStatement_August_2026.csv
 
-# UI design skills (docs/install-ui-skills.md, 2026-08-16). Vendored third-party
-# skill files — kept local rather than committed. Reinstall with the commands in
-# that doc; the precedence rule that governs them IS committed, in CLAUDE.md.
-# settings.local.json is machine-local regardless and carries Impeccable's hook.
-.claude/skills/
+# UI design skills are COMMITTED as of 2026-09-18 (DESIGN.md §Design toolkit), so
+# every clone carries the same pinned toolkit. All six are MIT or Apache-2.0.
+# settings.local.json stays machine-local; the shared hooks are in settings.json.
 .claude/settings.local.json
-skills-lock.json
+__pycache__/
+
+# Playwright's run output (npm run test:ui).
+/test-results/
+/playwright-report/
+/blob-report/
 
 # 📌 DESIGN.md, PRODUCT.md and .impeccable/design.json are NOT ignored, and that
 # is deliberate (2026-08-17). They are Impeccable OUTPUT rather than vendored
@@ -84,6 +87,9 @@ skills-lock.json
 .impeccable/*
 !.impeccable/design.json
 !.impeccable/config.json
+# The detector findings accepted as standing (tests/design-detector.test.ts).
+# Untracked, every clone would scan against an empty file it never received.
+!.impeccable/baseline.json
 
 # Real photographs of members. THIS REPOSITORY IS PUBLIC.
 #
