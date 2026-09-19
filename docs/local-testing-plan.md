@@ -73,7 +73,10 @@ before reading the screen.
 ## The passes
 
 `npm test` covers the cores and the boundary; these are the things a test cannot
-see. One sitting each, in this order — later rows depend on earlier writes.
+see. 📌 **`npm run test:ui` (2026-09-18) now automates the mechanical half of passes
+1, 2 and 9** — axe at WCAG 2.2 AA, 360px overflow and JS-off reveals on every public
+and portal route, plus lookup's result and miss and check-in's field errors, miss and
+both first-timer confirmations. What stays here is what axe cannot judge. One sitting each, in this order — later rows depend on earlier writes.
 
 | # | Area | Route | Exercise | What it proves |
 |---|---|---|---|---|
@@ -85,7 +88,7 @@ see. One sitting each, in this order — later rows depend on earlier writes.
 | 6 | Export | `/admin/members/export` | CSV, xlsx and clipboard of the same filter; open the xlsx in Excel | No repair prompt; the formula guard fires on text and not on `bonus_points`; one audit row per export |
 | 7 | Dues | `/admin/dues`, `/dues/import` | Import `docs/VenmoStatement_August_2026.csv`, then import it again | The txn-id dedupe; a summer row flagged, not rewritten |
 | 8 | Officer turnover | `/admin/officers`, `/officer-invite/[token]` | Mint pinned + open invites; redeem one; expire one; try self-revocation | Claim-before-create, single use, refusal to lock the team out |
-| 9 | Member-facing | `/portal`, `/portal/leaderboard`, `/portal/lookup` (the old paths 308 here) | EID alone, email alone, both; a term with no completed events | The conjunction gate, one message for every miss, `—` for a null rate |
+| 9 | Member-facing | `/portal`, `/portal/leaderboard`, `/portal/lookup` (the old paths 308 here) | A known EID, a typo'd EID; a term with no completed events | The EID-alone gate (officer, 2026-08-25 — it was EID **and** email), one message for every miss, `—` for a null rate |
 
 ⚠️ **Pass 1 is the one with the most to find**, because `/about`, `/projects`,
 `/gallery`, `/officers` and `/contact` have not been rebuilt yet — walking them

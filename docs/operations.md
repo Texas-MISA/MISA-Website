@@ -40,6 +40,25 @@ Stage 4 added `tests/events.test.ts` (pure — DST, half-open windows, edit-impa
 
 Test identities are obviously fake (`T3-…` IDs, `example.edu`); fixture events live in 2030, each test in its own 7-day slot so no 48-hour orphan window reaches a neighbour's events.
 
+## The design toolkit's checks (2026-09-18)
+
+`DESIGN.md` §Design toolkit is the rule; this is what running it locally costs.
+
+```bash
+npx playwright install chromium        # once per machine
+npm run test:ui                        # Playwright + axe; NOT part of npm test
+node scripts/design/receipts.mjs       # receipt checker, every registered surface
+```
+
+🪤 **Next 16 LOCKS a project against a second `next dev`** (`.next/dev/lock`, written by the running server with its pid and URL). A second one exits with *Another next dev server is already running*. `playwright.config.ts` therefore **reuses the server the lock names** when that pid is alive, and otherwise starts its own on :3100. It never reuses whatever else answers on a port: a `next start` reads `.env.local`, which is production.
+🪤 **On Windows, stopping `npm run dev` leaves its `next dev` child running** — the port keeps answering and the lock stays held. `taskkill /PID <pid> /T /F` with the pid from `.next/dev/lock` (Next prints the same command when it refuses a second server).
+🪤 **While `test:ui` runs, check-in on the local stack is OPEN.** The `/portal/attend` state tests open a real event (`TEST ui-gate …`) for the run and delete it afterwards; `tests/ui/global-setup.ts` sweeps any left by a crashed run. Don't run it in the middle of a local check-in walkthrough. None of those states writes attendance.
+🪤 **`/portal/lookup` allows 30 lookups per window per network; each run spends two.** A rate-limited run fails its state tests loudly — they assert the state they reached before axe runs — so wait out the window rather than suspecting the page.
+🪤 **The impeccable detector exits 2 when it finds anything.** Read its `--json` stdout, not its exit code; `tests/design-detector.test.ts` shows how.
+🪤 **Quote every SHA in a receipt.** YAML reads `1836e72` as the float 1.836e+75 and `1234567` as an integer; the checker names the problem, but only after the fact.
+📌 **`ui-ux-pro-max` needs no encoding flag on Windows.** Its `search.py` re-wraps stdout and stderr as UTF-8 itself (lines 36–39); an earlier note here said `PYTHONIOENCODING=utf-8` was required, which was set pre-emptively and never observed to fail.
+📌 **The brief guard blocks Claude's Edit/Write on a registered surface's files until its brief exists.** To make an urgent non-design fix there, a person relaunches Claude Code with `MISA_DESIGN_GUARD=off` in its environment; Claude cannot set it.
+
 ## Check-in location verification (migration 28)
 
 **`CHECKIN_ORIGIN_PEPPER` must be set wherever check-ins are recorded.** Any long

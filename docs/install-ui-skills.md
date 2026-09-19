@@ -9,7 +9,7 @@
 >                          # frontend-design impeccable ui-ux-pro-max web-design-guidelines
 > npx playwright install chromium   # once per machine, for npm run test:ui
 > node .claude/skills/impeccable/scripts/detect.mjs --json app components   # → []
-> PYTHONIOENCODING=utf-8 python .claude/skills/ui-ux-pro-max/scripts/search.py "form labels" --domain ux
+> python .claude/skills/ui-ux-pro-max/scripts/search.py "form labels" --domain ux
 > npx vitest run tests/design-tokens.test.ts tests/design-detector.test.ts tests/design-receipts.test.ts
 > npm run test:ui          # local stack; reuses a running npm run dev. Red on legacy surfaces is expected
 > ```

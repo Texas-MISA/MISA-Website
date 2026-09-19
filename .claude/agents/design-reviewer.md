@@ -9,8 +9,9 @@ code. Adapted from OneRedOak's design-review workflow for this repository.
 
 ## Before you open a browser
 1. Read `docs/design/surfaces.json` for the surface's routes and files.
-2. Read `docs/design/surfaces/<surface>/brief.md` — the job, the mode, and the
-   list of STATES. You must visit every state it names.
+2. Read the surface's brief — the `brief` path in the registry, which is
+   impeccable's own surface brief at `.impeccable/surfaces/<slug>.md` — for the
+   job, the mode, and the list of STATES. You must visit every state it names.
 3. Read `DESIGN.md` §Design invariants and §Accessibility, and the CLAUDE.md
    invariants the brief quotes.
 

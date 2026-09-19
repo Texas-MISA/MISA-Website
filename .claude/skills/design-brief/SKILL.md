@@ -48,8 +48,10 @@ Record the decision under the brief's `## Diverge`.
 ## Step 3 — Evidence (owner: ui-ux-pro-max)
 For each decision the brief leaves open (form feedback, tap targets, error
 wording, table density…):
-`PYTHONIOENCODING=utf-8 python .claude/skills/ui-ux-pro-max/scripts/search.py "<2–5 terms>" --domain ux`
-(other domains: `typography`, `color`, `chart`, `stack`). Save the raw output as
+`python .claude/skills/ui-ux-pro-max/scripts/search.py "<2–5 terms>" --domain ux`
+(also `--domain web` or `react`, and `--stack nextjs` or `--stack shadcn` for
+stack-specific guidance; `color` and `typography` return palettes and pairings,
+which may be cited but never adopted over DESIGN.md's). Save the raw output as
 `receipts/evidence.output.md`. `receipts/evidence.md` gives each lookup an id
 (EV1, EV2…) and a disposition — adopted only if it actually decides something.
 **Every adopted id must be cited in the brief's `## Evidence`**; the checker
