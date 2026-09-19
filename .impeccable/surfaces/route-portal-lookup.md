@@ -172,21 +172,23 @@ decided in `receipts/diverge.md`.
   first screen, against a button cut at 615–654 today), and the member's numbers
   at ≈300 instead of 517. Adopted because it keeps the officer's order with each
   part in its own voice and wears check-in's shape, which is the officer's named
-  anti-goal answered. **Gate measurement: the sheet is long on a phone, so the
-  order carries the weight.**
+  anti-goal answered. ✅ **The officer approved A as proposed on 2026-09-19.**
+  **Gate measurement: the sheet is long on a phone, so the order carries the
+  weight.**
 - **B — "One ledger": REJECTED.** Numbers compressed to a summary line with dues
   beside the name, then every event, pending check-in and grant merged into one
   chronological list. It flattens the officer's order, asserts a single timeline
   across three record types that only coincidentally share one, and leaves the
   explanation of granted points nowhere to live. Recorded for the officer.
-- **Shared by both, and PROPOSED copy for the officer:** dues unpaid reads
-  *"You're not paid up for Fall 2026 yet. Dues are worked out from payments
-  we've matched to you — if you've paid recently, ask an officer rather than
-  paying twice."*; the reset button reads *"Look up another EID"*; the band's
-  one line reads *"Enter your UT EID to see where you stand this term."* The
-  term note, pending note and events note keep today's sentences, which are
-  accurate. **Dues is a status, not a verdict:** paid is an affirm pill, unpaid
-  a neutral one — never critical.
+- **Shared by both, with copy ✅ APPROVED by the officer on 2026-09-19, with one
+  amendment:** dues unpaid reads *"You're not paid up for Fall 2026 yet. Dues
+  are worked out from payments we've matched to you — if you've paid recently,
+  ask an officer."* 🔓 **The officer cut the proposal's closing clause, "rather
+  than paying twice"** — the sentence ends at "ask an officer". The reset button
+  reads *"Look up another EID"*; the band's one line reads *"Enter your UT EID
+  to see where you stand this term."* The term note, pending note and events
+  note keep today's sentences, which are accurate. **Dues is a status, not a
+  verdict:** paid is an affirm pill, unpaid a neutral one — never critical.
 
 ## Evidence
 Adopted lookups from `receipts/evidence.md` (raw output in
