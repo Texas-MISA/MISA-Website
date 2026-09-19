@@ -149,15 +149,18 @@ decided in `receipts/diverge.md`.
   cut line after the last recognised rank, compact rows below. Estimated: the
   top 10 end ≈677 of 720 at 1280×720; rank 3 ends ≈333 at 360×640. It serves
   all three audiences in one ranking and reuses the light-ground primitives for
-  every state. **Needs the officer's yes: it is the only public page without
-  the navy hero. Gate measurement: a tie at rank 10 can push the last
-  recognised row past the fold at 1280×720.**
+  every state. ✅ **The officer approved A as proposed on 2026-09-19 —
+  including being the only public page without the navy hero** (chosen over
+  keeping the hub's short band, which would cost the projector its full top
+  10). **Gate measurement: a tie at rank 10 can push the last recognised row
+  past the fold at 1280×720.**
 - **B — "The honours board": REJECTED.** The top 10 in white on the navy field
   hero, the rest in a table below. The stronger picture of the top, but it
   splits one ranking into two structures, makes every member finding their own
   row scroll past a screen of navy first, and needs on-navy variants of the
   error and empty primitives that don't exist. Recorded for the officer.
-- **Shared by both, and PROPOSED copy for the officer:** recognised places are
+- **Shared by both, with copy ✅ APPROVED by the officer on 2026-09-19 (both
+  lines):** recognised places are
   marked by rank (rank ≤ 10, ties share) and only once someone has points; the
   rank is printed on every row; the all-zero banner reads *"Nobody has points
   yet this term, so everyone is tied at zero. Totals appear after the first
