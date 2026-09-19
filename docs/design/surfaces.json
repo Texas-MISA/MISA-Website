@@ -17,7 +17,7 @@
     },
     "portal-leaderboard": {
       "mode": "operate",
-      "status": "legacy",
+      "status": "in-progress",
       "routes": ["/portal/leaderboard"],
       "files": ["app/(public)/portal/leaderboard/"],
       "brief": ".impeccable/surfaces/route-portal-leaderboard.md"
