@@ -92,7 +92,8 @@ States 9–12 replace the form, and each carries the link to `/portal/lookup`.
 - **May change (officer, 2026-09-19):** the navy page hero; the wording of the
   results and the four banners; the checkbox's label and the review step's
   heading, sentence and button labels; the lookup link under the results. Any
-  new copy is shown to the officer before it ships.
+  new copy is shown to the officer before it ships — the box, review and lookup
+  wording under *Diverge* already has been, and is approved.
 - **The checkbox wording is the design problem the officer named.** Whatever it
   says must stay true to the decision table in
   `docs/attend-confirmation-flow.md`: **the box is a hint, not an instruction**.
@@ -179,14 +180,16 @@ decided in `receipts/diverge.md`.
   an inline reassurance, a 48px full-width Check in at ≈628px on a 640px screen,
   banners and outcomes in place in the same sheet, outcomes status-coded. It
   meets the bar with no JavaScript and covers nothing. **Risk: 12px of slack at
-  360×640** — a gate measurement, not an assumption.
+  360×640** — a gate measurement, not an assumption. ✅ **The officer approved A
+  as proposed on 2026-09-19.**
 - **B — "The pinned action": REJECTED.** Full hero kept, Check in pinned in a
   sticky bottom bar. At scroll 0 the bar covers the email field and the checkbox
   — the very control the officer named — it fights the phone keyboard (a fix
   needs JavaScript on a form that must work before hydration), it risks WCAG
   2.4.11 on a site with no scroll padding, and it hides the reassurance behind a
   disclosure.
-- **Copy both concepts share, PROPOSED for the officer:**
+- **Copy both concepts share — ✅ APPROVED by the officer on 2026-09-19, all
+  three parts:**
   - Box label *"I haven't checked in with this form before"* (was "This is my
     first MISA event, or my first time checking in here"), with *"Not sure? Tick
     it. If we already have you, we'll use your existing record, never a second
