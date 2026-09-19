@@ -3,7 +3,7 @@
   "surfaces": {
     "portal-hub": {
       "mode": "operate",
-      "status": "legacy",
+      "status": "in-progress",
       "routes": ["/portal"],
       "files": ["app/(public)/portal/page.tsx"],
       "brief": ".impeccable/surfaces/route-portal.md"
