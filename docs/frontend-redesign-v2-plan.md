@@ -420,41 +420,144 @@ no longer blocks their files** — steps 1–3 of the pipeline are complete and
 committed (`9c8cb63`, `52771c2`, `24c2680`, `11beda2`, plus the officer's
 approvals).
 
+### 🧭 Where the build stands (2026-09-19)
+
+**Branch `design-toolkit`**, stacked on `portal-phase-1`. Parts 0, 1 and part
+2's build are committed; **no surface is `rebuilt` yet** — all four are still
+`in-progress`, so `tests/design-receipts.test.ts` checks their briefs but does
+not yet fail on their receipts.
+
+| Part | State | Commit |
+|---|---|---|
+| 0 — Baseline | ✅ done | `debeca2` |
+| 1 — Shared vocabulary | ✅ done | `fa7c2e5` |
+| 2 — `/portal` hub | 🏗️ **build done, gate pending** | `d827ac7` |
+| 3–7 | ⏭️ not started | — |
+
+**Suite state, re-confirmed at part 0 and unchanged since:** `npm test` 41 files
+/ 1142 tests green; `npm run test:ui` **39 pass / 3 fail**, and the three are
+`/portal/lookup`'s member result (`definition-list (1): dl`) and both of
+`/portal/attend`'s first-timer confirmations (`color-contrast (3): … > dt`).
+Parts 3 and 4 own all three.
+
+⏭️ **The immediate next step is the rest of part 2:** `/design-gate portal-hub`,
+its six receipts (`lead`, `critique`, `audit`, `guidelines`, `design-review`,
+`detector`, plus `motion` — required for this surface), at least one review
+finding adopted in a commit that touches the surface, then `rebuilt` in
+`surfaces.json` **and** DESIGN.md's table in one commit.
+
+🪤 **Two gate rules make the per-surface order mandatory rather than stylistic.**
+The checker fails a surface with *"no review finding was adopted in a commit
+touching this surface"* if the gate changed nothing, and fails it as **stale** if
+any commit touches it after a review without a receipt naming that commit as a
+`fix_commit`. **Once a surface is `rebuilt`, stop touching its files.**
+
+📌 **The gate bars are NOT in the suite.** `playwright.config.ts` has no
+`projects` array and no viewport matrix — one Desktop Chrome project at
+1280×720, plus a per-test `setViewportSize({ width: 360, height: 800 })` used
+only for the overflow check. Every bar in the four briefs is a **fold position**
+at 360×640 or 1280×720, so "green `test:ui`" and "the bar is met" are different
+claims and only the second needs a person or the `design-reviewer` agent.
+
+🪤 **Measuring method, learned the hard way at part 0.** To read a settled
+layout, load the page and **remove the `js` class from `<html>`** — that drops
+the reveal transition along with the rule, so the geometry snaps. Forcing
+`data-revealed` is what `design-gate.spec.ts` does and is correct *in
+Playwright*, but it starts a 0.7s transition and **a background browser tab
+never advances it**, so an interactive read appears frozen and even an
+`!important` override looks as though it did not apply. An un-settled read of a
+`[data-reveal="up"]` node is **18px low**.
+
 ### 📛 The name: **the Portal Rebuild**
 
 Refer to this work as **the Portal Rebuild**. It is v2 phase 3, it covers the
 four `/portal` surfaces and nothing else, and it changes presentation only.
 Its brief is this section; its per-surface briefs are the table above.
 
-### The build, in parts
+### The build, in parts — ✅ REVISED AND UNDER WAY (2026-09-19)
 
-A skeleton for the planning session to refine, not a schedule to follow
-blindly. Each part ends somewhere demonstrable, which is the same rule the
-stages use.
+🔓 **The skeleton below was revised by the planning session and parts 0–2 are
+built.** Three changes, each forced by something measured rather than preferred:
+
+1. **Part 1 widened** from "the band, 48px controls, the stacked-row pattern" to
+   *every* shared-primitive addition the phase needs. The leaderboard's sticky
+   head turned out to require a `components/ui/table.tsx` change (see *Three
+   stale claims* → the sticky-head entry, and `member-table.tsx`'s own note on
+   why a head cannot stick inside the scroll wrapper). Left in part 5 that
+   change would land **after three surfaces were gated and `/admin`'s eleven
+   tables were live**. Done once, additively, up front, the surface order stops
+   depending on it.
+2. 🔴 **Part 6 LOST the contrast sweep for the four surfaces.** Each surface's
+   muted-ink fix now lands **inside that surface's own build part, before its
+   gate**. `scripts/design/receipts.mjs` fails a surface as **stale** when a
+   commit touches its files after a review step and no receipt names that commit
+   as a `fix_commit` — and the old part 6 touched lookup, attend and leaderboard
+   after all of them had been gated. **As written, the skeleton would have
+   failed `npm test` the moment the surfaces were marked `rebuilt`.** Part 6
+   keeps only what is *outside* the four: `/officer-invite`, the shared
+   primitives re-measured, and the suite.
+3. **Part 0 gained a receipts dry-run.** `node scripts/design/receipts.mjs
+   <surface>` prints each surface's required set, and whether `motion.md` is
+   required is *computed* from a grep of the surface's own files. It differs per
+   surface — **hub, attend and leaderboard need one; lookup does not** — and
+   concept A changes those files, so the set can move under the build.
+
+Each part ends somewhere demonstrable, which is the same rule the stages use.
 
 | Part | Scope | Ends when |
 |---|---|---|
-| **0 — Baseline** | Local stack up, dev server on the local env, re-measure each surface at 360×640 / 768 / 1280×720 / 1280×800 and record the numbers. Confirm `npm test` and `npm run test:ui` are at their known state (three states red today). | The four briefs' "measured" tables are re-confirmed on today's code, or corrected. |
-| **1 — Shared portal vocabulary** | What three of the four surfaces share: the **short field band** (hub, check-in, My Attendance), the 48px control sizes, and the stacked-row pattern. Decide what becomes a component in `components/ui/` and what stays per-page. 🪤 A primitive earns its place by a **second** caller; the band has three. | The band exists once, `PageHero` is untouched, and nothing else imports a copy of it. |
-| **2 — `/portal` hub** | The smallest surface, and it sets the row-link and key-column pattern the others borrow. | Its bar is met, `/design-gate portal-hub` receipts pass, `rebuilt` in the registry and DESIGN.md's table. |
-| **3 — `/portal/attend`** | The most states: twelve, plus pre-hydration. The new box label and review copy land here. | Its bar is met and every state is designed and gated, not just the happy path. |
-| **4 — `/portal/lookup`** | The most complex result, and the surface carrying most of the muted-ink debt. Stacked event rows below `sm`, the `definition-list` fix, the announced result. | Its bar is met; axe is green on the result and the miss. |
-| **5 — `/portal/leaderboard`** | The odd one out: no hero, its own type scale, the column head made sticky. Independent of parts 1–4, so it can move earlier if the planning session prefers. | Its bar is met, including the projector measurement at 1280×720. |
-| **6 — Contrast sweep and suite** | The `--misa-muted`-on-Vellum AA fix across the portal, re-measured per pairing on the ground each text actually sits on. `npm run test:ui` green on every portal route and state; `npm test` green; detector clean. | No muted ink on Vellum anywhere in `/portal`, and the suite is green. |
-| **7 — Merge and handoff** | `DESIGN.md`'s surface table and `docs/design/surfaces.json` agree; `tasks.md` and `build-log.md` record what the phase found; the officer's gate. | Merged (**never squashed** — receipts name commits), with `portal-phase-1` merged first. |
+| **0 — Baseline** ✅ `debeca2` | Local stack up, dev server on the local env, re-measure each surface at 360×640 / 768 / 1280×720 / 1280×800, record the numbers, and run the receipts dry-run per surface. Confirm `npm test` and `npm run test:ui` are at their known state. | ✅ **Done.** `npm test` 41 files / 1142 tests green; `test:ui` 39 pass / 3 fail, exactly the documented three. Briefs re-confirmed or corrected; the muted counts fixed in three documents. |
+| **1 — Shared portal vocabulary** ✅ `fa7c2e5` | *(Widened — see above.)* Every shared-primitive addition the phase needs, all additive, all opt-in, no default moved. | ✅ **Done.** `portal-band.tsx` (PortalBand), `buttonClass({ touch })` for the 48px floor, `table.tsx`'s `scroll={false}` + `<THead sticky="page">`, `status-region.tsx` (StatusRegion). Suite unchanged at 39/3. |
+| **2 — `/portal` hub** 🏗️ `d827ac7` | The smallest surface, and it sets the row-link and key-column pattern the others borrow. | 🏗️ **BUILD DONE, GATE PENDING.** Bar met with 96px to spare (check-in row bottom **423 → 328** at 360×640, bar ≤424; all three destinations now on the first screen). ⏭️ Remaining: `/design-gate portal-hub`, its receipts, and `rebuilt` in the registry **and** DESIGN.md's table in one commit. |
+| **3 — `/portal/attend`** | The most states: twelve, plus pre-hydration. The new box label and review copy land here, **and both of its muted-on-Vellum occurrences** (`:336` and `:364`). | Its bar is met **in the idle state**, every state is designed and gated — not just the happy path — and the two red `color-contrast` checks are green. |
+| **4 — `/portal/lookup`** | The most complex result, and the surface carrying 9 of the 13 muted occurrences. Stacked event rows below `sm`, the `definition-list` fix, the announced result, the stale sentence removed, the contradictory dues comment corrected. | Its bar is met; axe is green on the result and the miss; no sideways scroll to read whether you attended. |
+| **5 — `/portal/leaderboard`** | The odd one out: no hero, its own type scale, the column head made genuinely sticky (using part 1's white page-sticky variant), **and its two stale `active member` comments corrected**. | Its bar is met — **ten rows** on the first screen at 1280×720 — including the projector measurement. |
+| **6 — Outside the four surfaces, and the suite** | *(Narrowed — see above.)* `/officer-invite/[token]`'s one muted line; the shared primitives re-measured on the grounds the portal now puts them on; the full suite. **Touches no registered surface's files**, which is the point. | No muted ink on Vellum anywhere in `/portal` or `/officer-invite`; `npm test` green and `test:ui` green on all 42. |
+| **7 — Records, merge and handoff** | `DESIGN.md`'s surface table and `docs/design/surfaces.json` agree; `PageHero`'s "NINE pages render this" corrected to five; `tasks.md` and `build-log.md` record what the phase found; the officer's gate. | Merged (**never squashed** — receipts name commits), with `portal-phase-1` merged first. |
 
-**Suggested order: 2 → 3 → 4 → 5**, because the hub is the smallest user of the
-shared band and the cheapest place to get it wrong, and the leaderboard shares
-nothing with the other three. A planning session may re-order it with a reason.
+**Order, fixed: 2 → 3 → 4 → 5.** Part 1 retires the shared-primitive risk up
+front, so the order follows the **bars** rather than the dependencies:
 
-### Open items the planning session must decide
+- **Hub first** — the only surface where the band is the *only* new thing, and
+  its bar was soft (≤424 was *today's* number, against an estimate of 311). The
+  cheapest place to discover what the band actually measures, and the band's
+  height is the input to check-in's slack.
+- **Check-in second** — the band's tightest consumer and the one bar that can
+  fail on a handful of pixels. It must be built when the band's height is a
+  measured fact rather than an estimate.
+- **Lookup third** — takes the band as given (the third caller proves the
+  primitive), reuses check-in's announce-and-focus answer, and carries the most
+  work of the four.
+- **Leaderboard last** — it shares nothing, so its position is free; and it is
+  the only surface whose concept **drops the navy hero**, the largest visual
+  departure and the likeliest thing an officer revisits at a gate. Better that
+  conversation happens with the other three settled. It can move earlier or run
+  in parallel without disturbing anything.
 
-- 🪤 **`/officer-invite/[token]` is not a registered design surface** and never
-  was, but it carries one muted-on-Vellum occurrence and DESIGN.md's AA note
-  has always counted it with the portal's. Decide: fix it as a one-line
-  contrast change inside part 6, or register it as its own surface (which means
-  its own brief before its files can be touched). It is outside `/portal` and
-  outside `/admin`, so no other phase owns it.
+### ✅ Decisions taken by the planning session (2026-09-19)
+
+- ✅ **`/officer-invite/[token]`: fix the contrast line in part 6, do NOT
+  register it.** Four measured reasons, not a preference:
+  - `tests/ui/design-gate.spec.ts` builds its route list **from
+    `surfaces.json`** and calls `page.goto(route)` on each. Registering puts
+    the literal string `/officer-invite/[token]` into that list, and there is
+    no fixture that mints a visitable token.
+  - 🔓 **"Only `sha256(token)` is stored; never return it from a read"** means
+    a Playwright fixture cannot recover a raw token from the database. It would
+    have to mint one through the officer UI — a signed-in fixture, for a page
+    carrying one muted line.
+  - `brief-guard.mjs` keys off **`surface.brief` existing, not `status`**.
+    Registering it would block *any* edit, the one-line fix included, until an
+    officer interview happened.
+  - It is neither `/portal` nor `/admin`, and the Portal Rebuild "covers the
+    four `/portal` surfaces and nothing else".
+
+  🪤 **But it is more than one line of debt, and part 6 must say so rather than
+  leave it silent.** It uses a raw `<section className="px-6 py-16">` instead of
+  `<Section>`, an h1 at `34 → 42px` which is on no ramp row, and a hand-rolled
+  `border-misa-caution/45` banner instead of `Banner`. Part 6 fixes the contrast
+  and **records the rest in DESIGN.md's surface table as a named exception** —
+  an unrebuilt v1-idiom surface with its drift listed. Phase 5 places it.
 - 🔓 **The muted-ink count has moved since DESIGN.md recorded it.** ✅
   **RE-COUNTED 2026-09-19 against the RENDERED pages: 13 occurrences across
   FOUR files** — `/portal/lookup` 9 (page 1, form 8), `/portal/attend` 2 (the
@@ -465,11 +568,45 @@ nothing with the other three. A planning session may re-order it with a reason.
   line uses `--misa-secondary`. `tasks.md` had the hub right and the attend
   count wrong; `DESIGN.md` had attend right and the hub wrong. Both corrected.
   **Count rendered class attributes, not grep hits.**
-- **Whether the short band is one component or three page-local treatments**,
-  and if one, where it lives and what it is called.
-- **Whether any surface needs `emil-design-eng` before the build** rather than
-  at its gate: the leaderboard drops a reveal, and check-in's outcome swap may
-  want one.
+- ✅ **The short band is ONE component: `components/ui/portal-band.tsx`,
+  exporting `PortalBand`.** Built in part 1, adopted by the hub in part 2.
+  - Three callers. `CLAUDE.md`: a primitive is justified by a **second** caller
+    — and phase 4's lesson was the opposite case, `PageHeader`,
+    `SectionHeading` and `Table` sitting at zero call sites while 25 pages kept
+    their copies.
+  - `tests/design-receipts.test.ts` asserts **"no file belongs to two
+    surfaces"**, so a band inside any one surface's `files` entry could not be
+    shared. `components/ui/` belongs to none.
+  - DESIGN.md states it outright: **"a change to a shared primitive in
+    `components/ui/` does not make any surface stale."** A hub-local file could
+    not be edited in part 3 or 4 without reopening the hub's receipts.
+  - 🪤 **It must never become a `PageHero` variant.** Full reasoning in
+    `DESIGN.md` §Components.
+- ✅ **The three bars are settled** (2026-09-19), each recorded in its own
+  brief: check-in's first-screen bar is **IDLE-ONLY** (the unmatched state is
+  measured and reported, but does not gate); the leaderboard's is **TEN ROWS**
+  at 1280×720, with a boundary tie at rank 10 a *named accepted overflow*; and
+  lookup's link to the leaderboard **goes with the stale sentence** — nothing
+  replaces it, the hub is the junction, and the pair is one-way by decision.
+- ⏭️ **`emil-design-eng` runs at each surface's gate, not before the build.**
+  Nothing in the four concepts adds motion; the hub and the leaderboard *remove*
+  a reveal, and removal needs no motion design. 🪤 But the receipts checker
+  computes whether `motion.md` is required from a grep of the surface's own
+  files, so **removing the last `data-reveal` can change the required set under
+  the build** — re-run `node scripts/design/receipts.mjs <surface>` before
+  assuming. Today it requires `motion.md` for hub, attend and leaderboard, and
+  **not** for lookup.
+
+### ⚠️ The one open item left, and it needs the officer
+
+🔴 **Changing the check-in checkbox label orphans the unmatched banner.**
+`checkin-form.tsx:143-146` points at the box using the *old* label's words — "if
+this is your first MISA event or your first time checking in here, tick the box
+below" — and the approved copy replaces that label with *"I haven't checked in
+with this form before"*. The brief permits changing "the four banners" but the
+approved-copy list has **no replacement**. Part 3 drafts one and shows it to the
+officer before it ships, per the brief's own rule. **This is the only place in
+the phase that generates member-facing copy the officer has not already seen.**
 
 ### What the officer settled in the interviews (2026-09-19)
 

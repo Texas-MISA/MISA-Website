@@ -602,9 +602,9 @@ half is worth anything.**
 | Group | Modules |
 |---|---|
 | layout | `section.tsx` (public only), `panel.tsx`, `page-header.tsx` |
-| type | `heading.tsx` (Headline/Title/Eyebrow/Lead), `chevron-section.tsx` (PageHero) |
+| type | `heading.tsx` (Headline/Title/Eyebrow/Lead), `chevron-section.tsx` (PageHero), `portal-band.tsx` (PortalBand) |
 | controls | `button.tsx` (`buttonClass` + named constants), `field.tsx`, `chip.tsx` |
-| feedback | `banner.tsx` (Banner + ReadError), `pill.tsx`, `empty-state.tsx` |
+| feedback | `banner.tsx` (Banner + ReadError), `pill.tsx`, `empty-state.tsx`, `status-region.tsx` (StatusRegion) |
 | data | `table.tsx` |
 | content | `partners.tsx`, `kpi-plate.tsx`, `activities.tsx`, `officer-card.tsx`, `hatch.tsx`, `photo-slot.tsx`, `wordmark.tsx` |
 | motion | `reveal.tsx` (server-safe) + `reveal-observer.tsx` (client) |
@@ -649,6 +649,44 @@ half is worth anything.**
   height. The gallery masonry is the one place that wants intrinsic heights.
 - 📌 **`empty-state.tsx` is never a `<Hatch>`.** A hatch means "a photograph
   belongs here"; an empty state means "there is no data."
+- 🔓 **`PortalBand` is the portal's short field band (v2 phase 3), and it is NOT
+  a `PageHero` variant.** `PageHero` serves the five phase-2 content pages, and
+  its page-hero ramp row (`34 → 44 → 52`), its `data-reveal="rise"` headline and
+  its subhead slot are *their* contract; a `short` prop there would put the
+  portal's decisions inside five pages that never asked for them. The two share
+  `<Section ground="field">` and the notch and nothing else. It exists for
+  **height**: 131px at 360 against `PageHero`'s 177px, and that 46px is most of
+  the margin `/portal/attend`'s first-screen bar needs. 🪤 It carries **no
+  `data-reveal`** — the hub's anti-goal is "slower to check in", and a band held
+  at `opacity: 0` until the observer fires is exactly that. 🪤 The notch cuts a
+  fixed **48px**, deepest at the left and right edges and zero at the centre,
+  which is why a *centred* h1 survives at this height and a left-aligned one
+  would not. **Three callers** — the hub, check-in and lookup.
+- 🔓 **`StatusRegion` is one always-mounted atomic announcer** (v2 phase 3), for
+  `/portal/attend` and `/portal/lookup`. 🪤 It exists because **a live region
+  must be in the DOM BEFORE its contents change**: a node that mounts already
+  carrying its text is not an announcement, which is what check-in's result and
+  review panels do today. So it is a separate `sr-only` region, never a `role`
+  on the message node and never a wrapper around conditional siblings — an empty
+  wrapper in a `flex … gap-*` row is still a flex item and still adds a gap.
+  Render it unconditionally with an empty string, never `{msg && <StatusRegion>}`.
+- 🔓 **`buttonClass({ touch: true })` raises a control to the 48px native
+  minimum** (v2 phase 3). No size reached it — `md` is **39px** and `lg` is
+  **43px** — and 39px is the figure all three portal briefs measured. 🪤 It is a
+  separate axis from `size`, not a fourth size: a hit-area floor and a type step
+  compose rather than compete. `min-h`, so a wrapping label grows rather than
+  clips.
+- 🔓 **`Table` has two kinds of sticky head, and they stick to different
+  things.** `<THead sticky>` sticks inside the table's own scrollport and pairs
+  with `maxHeight` (the officer directory). **`<THead sticky="page">` sticks to
+  the VIEWPORT** and requires `<Table scroll={false}>` — inside the
+  `overflow-x-auto` wrapper there is no viewport to stick to, because
+  `overflow-x: auto` computes overflow-y to `auto` and the head then sticks to a
+  box as tall as the table. 🐛 **The page variant fills WHITE**: `Th` is
+  `--misa-muted`, 4.84:1 on Paper but **4.33:1 on Vellum**, so a Vellum sticky
+  head would have introduced the exact AA failure phase 3 exists to remove.
+  🪤 `scroll={false}` is only for a table that genuinely cannot overflow — the
+  wrapper is also what makes an overflowing table keyboard-scrollable (2.1.1).
 - 🏗️ **shadcn/ui components write to `components/shadcn/`**, never
   `components/ui/`. `shadcn init` used the default alias once and overwrote this
   project's own `button.tsx`, which 45 files import.

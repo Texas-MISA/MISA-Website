@@ -370,7 +370,23 @@ components/             site-header.tsx (4-item nav incl. Admin — was 5 until
                           type      heading.tsx (Headline/Title/Eyebrow/Lead —
                                     ground-aware via an .on-navy variant, not a
                                     prop), chevron-section.tsx (PageHero — navy
-                                    field, grid overlay, chevron notch)
+                                    field, grid overlay, chevron notch. 🪤 NINE
+                                    pages rendered this until v2 phase 3; the
+                                    four /portal surfaces are leaving it, so
+                                    re-count before quoting the number),
+                                    portal-band.tsx (PortalBand — v2 phase 3,
+                                    the portal's SHORT field band. 🪤 NOT a
+                                    PageHero variant: that component is the five
+                                    content pages' contract. It exists for
+                                    height — 131px at 360 against PageHero's
+                                    177, which is most of the margin
+                                    /portal/attend's first-screen bar needs — and
+                                    carries NO data-reveal, because a band held
+                                    at opacity 0 until the observer fires is the
+                                    hub's anti-goal in CSS. 🪤 The notch cuts a
+                                    fixed 48px, deepest at the edges and zero at
+                                    the centre, which is why a CENTRED h1
+                                    survives at this height)
                           controls  button.tsx (buttonClass + named constants —
                                     class strings, not components, because every
                                     call site is already an <a>, a <Link> or a
@@ -402,7 +418,21 @@ components/             site-header.tsx (4-item nav incl. Admin — was 5 until
                                     BOTH 404s — it was written out verbatim in
                                     two files, and its hover silently stopped
                                     working the day the page ground became the
-                                    colour it filled with)
+                                    colour it filled with),
+                                    status-region.tsx (StatusRegion — v2 phase
+                                    3, ONE always-mounted atomic sr-only
+                                    announcer for /portal/attend and
+                                    /portal/lookup. 🪤 It exists because a live
+                                    region must be in the DOM BEFORE its
+                                    contents change: a node that MOUNTS already
+                                    carrying its text announces nothing, which
+                                    is what check-in's result and review panels
+                                    do today. Never a role on the message node,
+                                    never a wrapper around conditional siblings
+                                    — an empty wrapper in a flex gap-* row is
+                                    still a flex item and still adds a gap.
+                                    Render it unconditionally with an empty
+                                    string)
                           data      table.tsx (Table/THead/Tr/Th/Td, with the row
                                     hover none of the eight admin tables had —
                                     🔓 and v2 phase 4 is where they finally got
