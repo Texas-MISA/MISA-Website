@@ -218,11 +218,32 @@ export function SiteHeader() {
             mark at a 360px viewport, 25px UNDER it at 320. So below `sm` it
             takes `px-3` (10px clear at 360, 18 at 375), and below 360px it
             stacks MEMBER over PORTAL at min-content width rather than slide
-            under the logo. Re-measure before lengthening the label. */}
+            under the logo. Re-measure before lengthening the label.
+
+            🔓 **`max-sm:min-h-12` is the 48px touch floor, and it is scoped to
+            the PHONE on purpose** (v2 phase 3, round 1a). `sm` measured 29.0px
+            tall at 360 — rect top 15.5, bottom 44.5 — under the 44px floor, on
+            the site's one door to a portal whose own briefs cite the native
+            minimum because `/portal/attend` is used standing up at a door. It
+            is the same 48px `buttonClass({ touch: true })` applies, written as
+            a breakpoint rather than that flag because `touch` has no
+            breakpoint form and the flag would raise the DESKTOP header too:
+            the `xl` bar was measured and signed off on 2026-09-18 at 29px in
+            an `h-15` shell, and a 48px button there is a change to chrome
+            nobody asked for rather than a fix to a measured failure. `max-sm`
+            is the line this button already draws for its own padding.
+
+            🪤 **`min-h`, not `h`** — below 360px the label wraps to two lines
+            and a fixed height would clip it.
+
+            📌 **The height is the only thing that moved.** Horizontal geometry
+            is untouched, so the 3.0px between this button's left edge and the
+            wordmark's right edge at 360 is unchanged and still not a
+            collision — re-measured after the change. */}
         <Link
           href={PORTAL.href}
           aria-current={current(PORTAL.href)}
-          className={`${BUTTON_SOLID_NAVY_SM} whitespace-nowrap max-sm:px-3 max-[360px]:w-min max-[360px]:whitespace-normal max-[360px]:text-center max-[360px]:leading-[1.1]`}
+          className={`${BUTTON_SOLID_NAVY_SM} whitespace-nowrap max-sm:min-h-12 max-sm:px-3 max-[360px]:w-min max-[360px]:whitespace-normal max-[360px]:text-center max-[360px]:leading-[1.1]`}
         >
           Member portal
         </Link>
