@@ -38,6 +38,34 @@ npm test
 > [!WARNING]
 > `.env.local` points at the **remote** project, so `npm run dev` reads production unless something stops it. `.env.development.local` (gitignored) pins dev to the local stack. Check the dev server's banner reads `Environments: .env.development.local, .env.local` before trusting a local walkthrough — the remote carries the same seed data, so the wrong target looks entirely correct.
 
+### On a fresh clone: the two env files git does not carry
+
+Both are gitignored (`.env*.local`) and **neither is in the repository**, so a new
+machine has to recreate them. Nothing here needs to be copied off another
+computer.
+
+```bash
+npx supabase status        # prints the local URL, anon key and service_role key
+```
+
+Put those three into **`.env.development.local`** as `NEXT_PUBLIC_SUPABASE_URL`
+(`http://127.0.0.1:54321`), `NEXT_PUBLIC_SUPABASE_ANON_KEY` and
+`SUPABASE_SERVICE_ROLE_KEY`. These are the Supabase CLI's **well-known local dev
+keys** — identical on every machine and not secrets; they are gitignored only
+because the filename pattern catches them.
+
+**`.env.local`** points at the remote project and is written by `vercel env pull`
+(needs `npx vercel link` once). It additionally carries `CHECKIN_ORIGIN_PEPPER`
+for local dev — any non-empty string works locally, and a **missing** pepper is
+safe rather than broken: every check-in origin simply reads *origin unknown*
+(`docs/checkin-location-verification.md`). Production's pepper is set in Vercel
+and is a different value.
+
+> [!CAUTION]
+> Do not run `vercel env pull` to *inspect* a production value — it writes real
+> production secrets to disk. `npx vercel env ls production` prints names and
+> `Encrypted`, never values.
+
 Common commands:
 
 ```bash
