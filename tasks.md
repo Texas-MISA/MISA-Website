@@ -492,15 +492,22 @@ never by eye.
 ground each of these actually renders on before swapping a token — a page that
 should be on Paper is a different fix from ink that should be secondary.
 
-### ⏭️ Deferred out of the portal-attend gate (2026-09-20) — both for part 6
+### ✅ Deferred out of the portal-attend gate (2026-09-20) — BOTH DONE in round 1a (2026-09-20)
 
-Two findings the `design-reviewer` raised at `/portal/attend`'s gate that are
-real, measured, and **not that surface's to fix**. Each is recorded with its
-number rather than its description, so the next person re-derives rather than
-trusts. Receipts: `docs/design/surfaces/portal-attend/receipts/design-review.md`
-(DR3, DR4) and `…/audit.md` (T4, the same input finding raised independently).
+Two findings the `design-reviewer` raised at `/portal/attend`'s gate that were
+real, measured, and **not that surface's to fix**. Each was recorded with its
+number rather than its description, so the next person re-derived rather than
+trusted — and both numbers survived re-derivation, with one correction noted
+under item 1. Receipts:
+`docs/design/surfaces/portal-attend/receipts/design-review.md` (DR3, DR4) and
+`…/audit.md` (T4, the same input finding raised independently).
 
-1. 🔴 **The text inputs have no boundary meeting WCAG 1.4.11's 3:1.** On the
+✅ **Both were fixed in v2 phase 3 round 1a**, ahead of the remaining surface
+gates, because a `components/ui/` change landing after a surface is gated leaves
+it reviewed against a rendering that no longer ships. Neither surface's files
+were touched, so `portal-hub` and `portal-attend` stay `rebuilt` and not stale.
+
+1. ✅ **DONE — the text inputs had no boundary meeting WCAG 1.4.11's 3:1.** On the
    white sheet the Vellum fill is **1.12:1** (`#f2f2f3` on `#ffffff`) and the
    `rgba(29,31,32,0.2)` hairline composites to **≈1.53:1** against white and
    **≈1.36:1** against the fill it encloses. 🪤 **It is created by the fix for
@@ -509,10 +516,33 @@ trusts. Receipts: `docs/design/surfaces/portal-attend/receipts/design-review.md`
    sheet instead. The fill comes from `controlClass` in
    `components/ui/field.tsx`, **shared with /admin and every form on the site**,
    so the fix is a border weight or colour that has to be re-measured against 25
-   admin forms and eleven tables. Part 6 already owns "the shared primitives
-   re-measured on the grounds the portal now puts them on"; this is the first
-   named item in it.
-2. **The header's MEMBER PORTAL button is 29.0px tall at 360** (rect top 15.5,
+   admin forms and eleven tables.
+
+   ✅ **Fixed with a new `--misa-control-edge` token (`#858687`), NOT by moving
+   `--misa-border`** — Frame also frames every card, panel and photograph, and
+   it defines `--misa-plate-edge` by derivation, so moving it repaints the site
+   and splits that pair into two apparent weights. Measured before and after on
+   the running site: **77 controls across nine `/admin` screens**, plus
+   `/portal/attend`, `/portal/lookup` and `/contact`, went from
+   `rgba(29,31,32,0.2)` to `#858687` — **3.65:1 on Paper, 3.26:1 on Vellum**,
+   and Vellum is both the control interior and `/admin`'s page ground, so one
+   value answers both. 📌 **All 77 sit on WHITE**, inside a `Panel`, not on the
+   grey `<main>`; the token clears 3:1 on either. The 19 `<th>` and 46 `<tr>`
+   table borders are **identical before and after**, which is the point of not
+   moving the global token.
+   ⚠️ **The hover state had to move with it** — `--misa-blue/50` was **2.95:1**
+   on white and **2.85:1** on the fill, so a control that passed at rest dropped
+   below the bar exactly when pointed at. Now `/55` (**3.35:1** / **3.24:1**),
+   the smallest step that clears both.
+   📌 **One number here was wrong and is corrected.** The receipts recorded the
+   hairline at ≈1.53:1 and ≈1.36:1; re-derived against a formula validated on
+   the WCAG reference pairs they are **1.51:1 and 1.35:1** — and that pair is
+   itself only one reading, since a background paints under the border, so what
+   actually painted was Frame over the control's own fill (`#c7c7c8`, **1.69:1**
+   against the sheet, **1.51:1** against the fill). All four failed, so the
+   finding stands under every reading. **An opaque token has one reading and the
+   question does not arise again.**
+2. ✅ **DONE — the header's MEMBER PORTAL button was 29.0px tall at 360** (rect top 15.5,
    bottom 44.5), under the 44px phone floor, with **3.0px** between its left
    edge and the wordmark's right edge (wordmark 131.6–213.6, button
    216.6–325.1). `components/site-header.tsx`, site-wide chrome. 📌 **This is
@@ -521,6 +551,21 @@ trusts. Receipts: `docs/design/surfaces/portal-attend/receipts/design-review.md`
    own note says "on a phone the tight spot is that button beside the centred
    wordmark". Now it has a number. Any sixth nav item, or any change to that
    button, starts here.
+
+   ✅ **Fixed with `max-sm:min-h-12` — the 48px floor, scoped to the phone.**
+   Re-measured after: **48.0px tall at 320, 360, 375 and 390** (rect top 6.0,
+   bottom 54.0 in the 60px bar), and **unchanged at 29.0px from `sm` up** — 640,
+   655, 768, 1280 and 1646 all still read top 15.5 / bottom 44.5. The desktop
+   bar was measured and signed off on 2026-09-18 at that height, so raising it
+   there would be a change to chrome rather than a fix to a measured failure;
+   `max-sm` is the line this button already draws for its own padding.
+   📌 **The button was NOT moved, resized horizontally or relabelled.** Height
+   only, so the clearances are unchanged — and were re-measured to confirm it:
+   **3.0px at 360**, 25.6 at 320, 10.4 at 375, 18.1 at 390, 626.1 at 1646 (which
+   reproduces the 626 already recorded in `site-header.tsx`). Zero horizontal
+   overflow at every width. ⚠️ **3.0px at 360 is still the tight spot** — not a
+   collision, and no worse than before, but it is the first thing to re-measure
+   if the label or the padding ever changes.
 
 ---
 

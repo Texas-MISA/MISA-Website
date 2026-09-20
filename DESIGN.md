@@ -1,7 +1,7 @@
 ---
 name: Texas MISA
 description: A navy-and-white institutional drawing set, now with depth — a drawn navy field, a flat grey page, and white surfaces lifted off it. Square structure, softened plates, hairline rules.
-version: 2.1
+version: 2.2
 status: Written from what phase 1 of the v2 redesign actually shipped (2026-08-19). Sections marked NOT YET REBUILT describe surfaces still running the v1 system.
 colors:
   drafting-navy: "#16305c"
@@ -16,6 +16,7 @@ colors:
   hairline: "rgba(29, 31, 32, 0.16)"
   frame: "rgba(29, 31, 32, 0.2)"
   plate-edge: "#bfbfc2"
+  control-edge: "#858687"
   poche-light: "#2c4b7c"
   poche-dark: "#26436f"
   caution: "#8a5a12"
@@ -132,6 +133,7 @@ Unchanged from v1 in value. Two additions and one clarification.
 | Hairline | `rgba(29,31,32,0.16)` | Section rules, shared-plate grid gaps |
 | Frame | `rgba(29,31,32,0.2)` | Card and image frames on a **known** ground |
 | **Plate Edge** | `#bfbfc2` | 🆕 Frames on an **unknown** ground |
+| **Control Edge** | `#858687` | 🆕 The boundary of a **form control**, and only that |
 
 🪤 **Frame is alpha; Plate Edge is its opaque twin, and the difference is not
 pedantry.** A floating plate crosses the navy field, another plate, and white —
@@ -139,6 +141,35 @@ pedantry.** A floating plate crosses the navy field, another plate, and white �
 so one border read as two weights. Plate Edge is exactly `rgba(29,31,32,0.2)`
 resolved over Vellum Shade, so the edge looks the same whatever passes beneath.
 **Use Frame when you know what is behind; use Plate Edge when you do not.**
+
+🔓 **Control Edge is neither of those, and it is a CONTRAST floor rather than a
+shade** (v2 phase 3, round 1a). WCAG **1.4.11** asks 3:1 of the visual
+information that identifies a user interface component, measured against the
+colours adjacent to it — and a text input has two adjacent colours at once: the
+surface it sits on and its own Vellum interior. Frame cleared neither. The
+numbers, re-derived against a formula validated on the WCAG reference pairs:
+Frame over a control's own fill is `#c7c7c8`, **1.69:1** against a white sheet
+and **1.51:1** against the fill; over white it is `#d2d2d2`, **1.51:1** and
+**1.35:1**; and the fill is **1.12:1** from a white sheet. An empty input was a
+rectangle with no measurable edge. Control Edge measures **3.65:1 on Paper and
+3.26:1 on Vellum** — one value, because Vellum is both the interior of every
+control and `/admin`'s page ground.
+
+🪤 **It is deliberately NOT a move of Frame.** Darkening Frame repaints every
+card, panel and photograph on the site, and it would break Frame's own
+definition-by-derivation of Plate Edge, so the two would stop reading as one
+weight. 1.4.11 does not ask it of them either: a card frame encloses content
+that is already legible, while an empty input has no text of its own and its
+boundary is the only thing saying a control is there. 📌 Built the way Plate
+Edge was built — Graphite (`#1d1f20`) resolved opaque, here at 54% over white —
+so it joins the neutral family rather than introducing a hue.
+
+⚠️ **A control's INTERACTION states are held to the same 3:1.** The hover
+border was `--misa-blue/50`, which composites to **2.95:1** on a white sheet and
+**2.85:1** on the fill — so a control that passed at rest dropped below the bar
+exactly when it was pointed at. It is `/55` (**3.35:1** and **3.24:1**), the
+smallest step that clears both. Focus (solid navy, 13.03:1) and `aria-invalid`
+(Critical, 8.63:1) were already clear.
 
 ### Tertiary (the hatch)
 
@@ -365,6 +396,15 @@ Barlow (`--font-sans`) and Barlow Condensed (`--font-display`). Unchanged.
 | `Headline` | `30 → 42` px at `sm` | 600, `1`, `-0.02em` |
 | `Title` | `26 → 34` px at `sm` | 600, `1.02`, `-0.015em` |
 | Card title | `22 → 26` px | 600, `1.05` |
+
+🪤 **The card title is `<Title size="card">`, never `<Title className="text-[22px]
+sm:text-[26px]">`.** Both are plain arbitrary-value utilities, so they tie on
+specificity and Tailwind v4 emits them ascending — the LARGER always wins, and
+the override silently renders the `Title` default (26 → 34) instead. The class
+is in the attribute, so a grep confirms the intent and only `getComputedStyle`
+shows the result. `components/ui/activities.tsx` shipped exactly that on the
+HOME page from the bento grid's build until v2 phase 3 round 1a; the row above
+is what it renders now, measured at **22px below `sm` and 26px at and above it**.
 | `Lead` | `18` px | `1.65`, max `74ch` |
 | Body | `16` px | `1.6` |
 | `Eyebrow` | `12` px | 500, `0.14em`, uppercase |
@@ -873,6 +913,23 @@ Real photographs are live on the home page **locally only**.
   inactive control, but that item exists so the shape of the section is visible
   to everyone, so the exemption did not apply to its own purpose. `white/55`
   (**5.05:1**) is the first ramp step that passes, solved rather than picked.
+- 🔓 **NON-TEXT contrast is a separate bar from AA text contrast, and the system
+  had never been measured against it** (WCAG **1.4.11**, v2 phase 3 round 1a).
+  It wants 3:1 of whatever identifies a control, against **each** adjacent
+  colour — for an input that is the surface outside AND its own fill inside.
+  Every form control on the site failed it: 3 on `/portal/attend` and **77
+  across nine `/admin` screens**, all at 1.51:1 or below. Fixed with
+  `--misa-control-edge`; see §Colors for the derivation. ⚠️ **States count** —
+  the hover border failed at 2.95:1 while the rest state passed. 📌 A bordered
+  BUTTON or chip is a different case: its visible text label identifies it, so
+  its border is not load-bearing the way an empty input's is, and `FilterChip`
+  and the `quiet` button keep Frame deliberately.
+- **A touch target on a phone is measured, not assumed.** The header's Member
+  portal button measured **29.0px** tall at 360 — under the 44px floor, on the
+  site's one door to the portal — and now takes the 48px floor below `sm`
+  (`max-sm:min-h-12`). 🪤 Scoped to the phone: the `xl` bar was measured and
+  signed off at 29px in an `h-15` shell, and raising it there is a change to
+  chrome rather than a fix to a failure.
 - **A gradient is not one ground.** Measure at both ends.
 - **Reduced motion** is honoured: all reveals resolve, marquees stop.
 - **The skip link** is the first focusable thing in the document.
