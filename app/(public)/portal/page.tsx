@@ -57,8 +57,18 @@ import { Section } from "@/components/ui/section";
 // 🪤 This page sits on the grey page ground, where `--misa-muted` measures
 // 4.33:1 and FAILS AA — so the officer line uses `--misa-secondary`, which is
 // 7.60:1 there. The cells are white; their body copy is the secondary ink the
-// token names for card copy. This page renders ZERO muted ink, and the
-// 2026-09-19 count that said 1 was a grep hit on this very comment.
+// token names for card copy. **This page's own content renders ZERO muted
+// ink**, and the 2026-09-19 count that said 1 was a grep hit on this very
+// comment.
+//
+// 🪤 Scope that claim to THIS FILE, which is what an earlier draft of this
+// comment failed to do. Measured at the gate: `--misa-muted` *is* on the
+// rendered route — the footer's `txmisa@gmail.com` at every width, and the
+// four desktop nav items at 1280 — because the header and footer are shared
+// chrome this surface does not own. Neither is a failure: both sit on WHITE at
+// 4.84:1, which is the ground the token is allowed on. The route is clean and
+// so is the file; "the page renders zero muted ink" was the stronger claim and
+// it was not true. Lowest ratio anywhere on the route is 7.60:1.
 
 export const metadata: Metadata = {
   title: "Member Portal",
@@ -136,23 +146,50 @@ export default function PortalPage() {
                 href={destination.href}
                 aria-labelledby={`${destination.slug}-title`}
                 aria-describedby={`${destination.slug}-body`}
-                className="group flex items-stretch focus-visible:-outline-offset-2"
+                className="group flex items-stretch [-webkit-tap-highlight-color:transparent] focus-visible:-outline-offset-2"
               >
-                <span className="flex-1 px-6 py-5">
+                {/* 🪤 A `<div>`, not a `<span>`. This wrapper contains an
+                    `<h2>`, and a `<span>` is phrasing content that may not
+                    hold a heading — an `<a>` in a flow-content position may.
+                    React's `validateDOMNesting` does NOT warn on this shape,
+                    so a clean console was not evidence it was right; it was
+                    found by reading the rendered markup.
+
+                    🪤 `min-w-0` is load-bearing on a flex child. Without it
+                    the item's automatic minimum size is its content's, so a
+                    long destination title cannot wrap and would push the 48px
+                    key off the row instead — the failure the brief's "each
+                    title wrapping cleanly inside its row beside the key" at
+                    360 is about. */}
+                <div className="min-w-0 flex-1 px-6 py-5">
                   <Title
                     as="h2"
                     id={`${destination.slug}-title`}
-                    className="text-misa-blue transition-colors duration-150 group-hover:text-misa-blue-dark"
+                    // 📌 The CARD TITLE ramp row (22 → 26px), not `Title`'s own
+                    // 26 → 34. A ramp STEP, never a one-off size. The page h1
+                    // uses this same component at its default, so before this
+                    // the band's title and the three things under it measured
+                    // identically (26 at 360, 34 at 1280) and the plate had no
+                    // level cue against the band.
+                    //
+                    // 🔴 It is `size="card"` and NOT `className="text-[22px]
+                    // sm:text-[26px]"`, because the className form silently
+                    // loses the specificity tie to the component's own base
+                    // size — see the long note on `Title` in
+                    // `components/ui/heading.tsx`. This was written the broken
+                    // way first and caught only by reading the computed style.
+                    size="card"
+                    className="text-misa-blue transition-colors duration-150 group-hover:text-misa-blue-dark group-active:text-misa-blue-dark"
                   >
                     {destination.title}
                   </Title>
-                  <span
+                  <p
                     id={`${destination.slug}-body`}
-                    className="mt-1 block leading-[1.6] text-misa-secondary"
+                    className="mt-1 leading-[1.6] text-misa-secondary"
                   >
                     {destination.body}
-                  </span>
-                </span>
+                  </p>
+                </div>
 
                 {/* The navy key: 48px wide and full height, so the three stack
                     into one navy stripe down the plate's edge, broken only by
@@ -161,10 +198,31 @@ export default function PortalPage() {
                     a label repeating the title beside it. `items-stretch` on
                     the row is what makes the key full-bleed rather than a
                     floating square, and `w-12` is the 48px the brief asks of
-                    every target. */}
+                    every target.
+
+                    🔴 The key carries its OWN white focus ring, and that is
+                    not belt-and-braces — it is the one place on this page the
+                    system's ground rule bites. `app/globals.css:318` draws
+                    `:focus-visible` as `2px solid var(--misa-blue)`, and the
+                    comment two lines above it says why `.on-navy` exists: "a
+                    navy ring is invisible" on navy. The row link spans BOTH
+                    grounds — white cell, then this navy key — so its single
+                    navy ring is 13:1 across the cell and **1:1 where it
+                    crosses the key**, i.e. the indicator simply stopped at the
+                    seam. `.on-navy` cannot fix it: that selector flips the
+                    ring of a focused element INSIDE a navy section, and what
+                    is focused here is the whole row, not the key.
+
+                    So the key redraws the ring in white over its own 48px.
+                    The two segments meet at the seam and read as one
+                    continuous indicator that changes colour with the ground —
+                    which is exactly what the `.on-navy` flip does everywhere
+                    else, applied within a single component. 🪤 Keep this in
+                    step with the row's `-outline-offset-2`: both rings are
+                    inset by the same 2px, which is what makes them line up. */}
                 <span
                   aria-hidden="true"
-                  className="flex w-12 shrink-0 items-center justify-center bg-misa-blue text-white transition-colors duration-150 group-hover:bg-misa-blue-dark"
+                  className="flex w-12 shrink-0 items-center justify-center bg-misa-blue text-white transition-colors duration-150 group-hover:bg-misa-blue-dark group-active:bg-misa-blue-dark group-focus-visible:outline-2 group-focus-visible:-outline-offset-2 group-focus-visible:outline-white"
                 >
                   <ChevronRight className="size-5" strokeWidth={2} />
                 </span>
@@ -173,11 +231,27 @@ export default function PortalPage() {
           ))}
         </ul>
 
-        <p className="mt-8 text-sm text-misa-secondary">
+        {/* 📌 Body size (16px), not `text-sm`. 14px is on NO row of DESIGN.md
+            §The ramp — it has 12 (Eyebrow) and 16 (Body) and nothing between —
+            and the detector cannot see it, because it reads arbitrary
+            `text-[Npx]` values against the ramp and `text-sm` is neither. The
+            de-emphasis this line wants comes from the INK (`--misa-secondary`,
+            7.60:1 on this grey ground) and from its position outside the
+            plate, not from shrinking it below the ramp's floor.
+
+            🪤 `inline-block py-1` on the link is a TAP TARGET, not padding for
+            looks: at 14px with no padding the hit area measured 39 × 17px,
+            under even WCAG 2.2's 24px floor, on a page whose every other
+            target is 48px+ (EV1). The padding sits on the `<Link>` so the
+            target is the words themselves.
+
+            `mt-6`, not `mt-8`: at 360×640 the line was landing at y 632 on a
+            640px screen — visible enough to notice, never enough to read. */}
+        <p className="mt-6 text-misa-secondary">
           Officers:{" "}
           <Link
             href="/admin/login"
-            className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+            className="inline-block py-1 text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
           >
             sign in
           </Link>

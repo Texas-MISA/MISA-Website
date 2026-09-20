@@ -43,16 +43,46 @@ export function Headline({
   );
 }
 
-/** The subsection heading — activity and case-study row titles. */
+/**
+ * The subsection heading — activity and case-study row titles.
+ *
+ * 🔴 **`size` exists because appending a smaller size class to this component
+ * DOES NOT WORK, and had already failed silently in shipped code.** Both sizes
+ * are plain arbitrary-value utilities, so they tie on specificity (0,1,0) and
+ * the winner is whichever Tailwind emits LAST. Tailwind v4 sorts arbitrary
+ * values ASCENDING — `.text-[22px]` at stylesheet line 3066, `.text-[26px]` at
+ * 3074 — so **the larger value always wins** and `<Title className="text-[22px]
+ * sm:text-[26px]">` renders at 26 → 34, the default, every time.
+ *
+ * 🐛 Measured on the running site at the portal-hub gate (2026-09-19):
+ * `components/ui/activities.tsx:98` passes `text-[22px] sm:text-[26px]` and the
+ * home page's activity titles render at **34px** at 1280. That is a live
+ * defect on a phase-1 surface, it has been there since the bento grid was
+ * built, and no test or detector sees it — the class IS in the attribute, so a
+ * grep confirms the intent and only a computed-style read shows the result.
+ * **This is the "measure rendered class attributes, not grep hits" rule with
+ * teeth: here even the rendered attribute lies, and only `getComputedStyle`
+ * tells the truth.** Fixing `activities.tsx` is NOT this surface's to do — it
+ * is recorded for v2 phase 3 part 6, which is the part that owns work outside
+ * the four portal surfaces.
+ *
+ * So the size is a prop that SWAPS the base classes rather than an override
+ * that races them. `card` is DESIGN.md §The ramp's "Card title" row.
+ */
 export function Title({
   children,
   as: Tag = "h3",
   className = "",
+  size = "title",
   ...rest
-}: HeadlineProps) {
+}: HeadlineProps & { size?: "title" | "card" }) {
+  const RAMP = {
+    title: "text-[26px] leading-[1.02] tracking-[-0.015em] sm:text-[34px]",
+    card: "text-[22px] leading-[1.05] tracking-[-0.015em] sm:text-[26px]",
+  } as const;
   return (
     <Tag
-      className={`font-display text-[26px] leading-[1.02] font-semibold tracking-[-0.015em] text-balance sm:text-[34px] ${className}`.trim()}
+      className={`font-display ${RAMP[size]} font-semibold text-balance ${className}`.trim()}
       {...rest}
     >
       {children}
