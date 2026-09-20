@@ -49,6 +49,25 @@ export type TableProps = {
    * anything useful, so pass one.
    */
   label?: string;
+  /**
+   * Drop the scroll wrapper entirely.
+   *
+   * 🔓 **Added for the Portal Rebuild (v2 phase 3), and it is what makes a
+   * PAGE-sticky head possible at all.** `overflow-x-auto` with a `visible`
+   * overflow-y computes overflow-y to `auto`, so the wrapper is a scroll
+   * container in both axes — see the note on `maxHeight` in
+   * `members/_components/member-table.tsx`. A `position: sticky` `<thead>`
+   * inside it sticks to THAT box, and with no height limit the box is as tall
+   * as the table, so the head never visibly sticks to anything. Removing the
+   * wrapper is what lets the head stick to the viewport instead.
+   *
+   * 🪤 **Only pass this for a table that genuinely cannot overflow.** The
+   * leaderboard is three narrow columns and measures 305px inside a 305px
+   * frame at 360 — it has no `minWidth` and nothing to scroll. Any table that
+   * needs `minWidth` must keep the wrapper, because the wrapper is also what
+   * makes the overflow keyboard-reachable (WCAG 2.1.1).
+   */
+  scroll?: boolean;
 };
 
 export function Table({
@@ -56,8 +75,23 @@ export function Table({
   minWidth,
   maxHeight,
   label,
+  scroll = true,
   className = "",
 }: TableProps) {
+  // 🪤 No wrapper means no `role="region"`, and that is correct rather than a
+  // regression: the region exists so a scrollPORT can be focused and scrolled
+  // from the keyboard. A table with no scrollport has nothing to scroll, and a
+  // focusable region announcing "Table" around static content is noise.
+  if (!scroll) {
+    return (
+      <table
+        className={`w-full border-collapse bg-white text-left text-sm ${minWidth ?? ""} ${className}`.trim()}
+      >
+        {children}
+      </table>
+    );
+  }
+
   // 🐛 **The white ground is a correctness control, not a taste one**, and it
   // belongs here rather than at each call site. Three things in this file fill
   // with `bg-misa-panel` — the sticky `<THead>`, `Tr`'s hover, and every
@@ -90,26 +124,58 @@ export function Table({
 }
 
 /**
- * `sticky` pairs with `Table`'s `maxHeight`. It needs an opaque ground of its
- * own, or the rows scroll visibly underneath it.
+ * Two kinds of sticky, and they stick to different things.
+ *
+ * - `sticky` (the officer default) pairs with `Table`'s `maxHeight`: the head
+ *   sticks inside the table's own scrollport. It needs an opaque ground of its
+ *   own, or the rows scroll visibly underneath it — hence Vellum.
+ * - 🔓 **`sticky="page"` sticks to the VIEWPORT**, for a long table that is
+ *   itself the page. Added for the Portal Rebuild (v2 phase 3), because the
+ *   leaderboard runs 50–150 rows with no height cap and the Rank / Member /
+ *   Points labels have to survive the scroll. It requires `<Table scroll={false}>`
+ *   — inside the scroll wrapper there is no viewport to stick to — and it takes
+ *   a `stickyTop` offset so it lands *below* the site header rather than under
+ *   it (EV3: sticky navigation must not obscure content).
+ *
+ * 🐛 **The page variant fills WHITE, and that is a contrast fix rather than a
+ * preference.** `Th` is `text-misa-muted` (`#6f7275`), which is 4.84:1 on Paper
+ * and **4.33:1 on Vellum — below AA**. The officer variant gets away with
+ * `bg-misa-panel` only because it predates the measurement; making a new sticky
+ * head Vellum would have introduced the exact failure v2 phase 3 exists to
+ * remove, in the same commit that removed thirteen others. **Any new opaque
+ * ground under muted ink is a contrast decision.**
  */
 export function THead({
   children,
   sticky = false,
+  /**
+   * The offset for `sticky="page"`, as a Tailwind class. The site header is
+   * `sticky top-0` and measures **61px** (re-measured 2026-09-18, DESIGN.md
+   * §Nav clearance), so the leaderboard passes `top-[61px]`.
+   *
+   * 🪤 **The number lives at the call site on purpose.** A `--misa-header-h`
+   * token here would be a second source of truth for a height that nothing
+   * enforces — `site-header.tsx` derives its 61px from padding, not from a
+   * variable — and this codebase has already paid for two-sources-for-one-fact
+   * once (migration 21's pinned-term defect). One caller, one number, one
+   * comment naming the measurement.
+   */
+  stickyTop = "top-0",
 }: {
   children: ReactNode;
-  sticky?: boolean;
+  sticky?: boolean | "page";
+  stickyTop?: string;
 }) {
+  const base = "[&_th]:border-b [&_th]:border-misa-border";
+  const position =
+    sticky === "page"
+      ? `sticky ${stickyTop} z-10 bg-white`
+      : sticky
+        ? "sticky top-0 z-10 bg-misa-panel"
+        : "";
+
   return (
-    <thead
-      className={
-        sticky
-          ? "sticky top-0 z-10 bg-misa-panel [&_th]:border-b [&_th]:border-misa-border"
-          : "[&_th]:border-b [&_th]:border-misa-border"
-      }
-    >
-      {children}
-    </thead>
+    <thead className={`${position} ${base}`.trim()}>{children}</thead>
   );
 }
 

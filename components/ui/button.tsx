@@ -74,6 +74,26 @@ export type ButtonClassOptions = {
   size?: ButtonSize;
   /** Fill the container — full-width submits on narrow forms. */
   block?: boolean;
+  /**
+   * Raise the control to the **48px native touch minimum**.
+   *
+   * 🔓 **Added for the Portal Rebuild (v2 phase 3), because no size reached it.**
+   * `md` measures **39px** (15px text, `leading-none`, `py-3`) and `lg` measures
+   * **43px** (`py-3.5`) — those are the 39px all three portal briefs recorded.
+   * The web floor is 24 CSS px, but the portal's briefs cite the NATIVE minimum
+   * (44pt iOS / 48dp Android) because `/portal/attend` is used standing up at a
+   * door, one-handed, in a hurry.
+   *
+   * 🪤 **It is a separate axis from `size`, not a fourth size**, and that is
+   * deliberate. Size is the visual step on the ramp; this is a hit-area floor,
+   * and the two compose — a `sm` toolbar button on a phone can want the floor
+   * without wanting `md`'s type. Folding it into `SIZE` would have forced a
+   * choice between them.
+   *
+   * 🪤 **`min-h`, not `h`.** A label that wraps must be allowed to grow; a fixed
+   * height would clip the second line rather than push the box down.
+   */
+  touch?: boolean;
   className?: string;
 };
 
@@ -89,9 +109,17 @@ export function buttonClass({
   variant = "primary",
   size = "md",
   block = false,
+  touch = false,
   className = "",
 }: ButtonClassOptions = {}): string {
-  return [BASE, VARIANT[variant], SIZE[size], block ? "w-full" : "", className]
+  return [
+    BASE,
+    VARIANT[variant],
+    SIZE[size],
+    touch ? "min-h-12" : "",
+    block ? "w-full" : "",
+    className,
+  ]
     .filter(Boolean)
     .join(" ");
 }
