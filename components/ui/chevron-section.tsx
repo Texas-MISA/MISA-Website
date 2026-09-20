@@ -42,12 +42,18 @@ import { Section } from "@/components/ui/section";
 // to `HomeHero` in phase 1, and grep confirmed no call site passed either. The
 // `size="home"` branch had been unreachable since that commit.
 //
-// 🪤 **NINE pages render this, not the five phase 2 rebuilt.** `/attend`,
-// `/lookup` and `/leaderboard` are phase 3 and were not redesigned — they
-// inherit this hero and nothing else — and the `/portal` hub that links them
-// (member portal phase 1) is the ninth. The three moved under `/portal` then
-// too. Any change here is a change to all four, so they get measured at the
-// gate even though they are out of scope.
+// 🔓 **FIVE pages render this, and they are exactly the five phase 2 rebuilt** —
+// `/about`, `/projects`, `/gallery`, `/officers`, `/contact`. Verified by call
+// site on 2026-09-20, not assumed.
+//
+// 🪤 **It used to be NINE, and the four that left are the reason this comment
+// is worth reading.** `/portal`, `/portal/attend`, `/portal/leaderboard` and
+// `/portal/lookup` all inherited this hero without ever having been designed
+// around it — so a change here was silently a change to four pages that were
+// out of scope. The officer removed the navy header from every portal page on
+// 2026-09-20 (`components/ui/portal-sheet.tsx`), which ended that coupling:
+// this component now serves only pages that chose it. **The blast radius of a
+// change here is the five content pages and nothing else.**
 //
 // 🪤 **`.chevron-notch` is a `clip-path`, and a clip-path clips DESCENDANTS.**
 // Nothing may overhang the hero's bottom edge; a plate positioned to overlap

@@ -7,6 +7,54 @@ related_targets: ["app/(public)/portal/lookup/page.tsx","app/(public)/portal/loo
 
 # Surface brief: portal-lookup (`/portal/lookup`)
 
+## 🔴 OFFICER OVERRIDE, 2026-09-20 — READ THIS BEFORE THE REST
+
+**"the navy header at the top of each page should be removed for all pages in
+the portal. the design skills can come up with a replacement."**
+
+Given against a screenshot of `/portal` on the deployed preview with the navy
+band circled, and scoped to **every** page in the portal. It post-dates
+everything below, so **where this section and the rest of this brief disagree,
+this section wins** — including the *Diverge* entry recording the adopted
+concept, which was written when the band was still the portal's hero.
+
+**The replacement, proposed by `frontend-design` and adopted by the officer:
+"the sheet is the page."** Every `/portal` page is one white **`.sheet`** lying
+on the grey page ground, its title a masthead above a rule that bleeds to the
+sheet's edges. Built as `components/ui/portal-sheet.tsx` (`PortalSheet`), four
+callers. 🗑️ `PortalBand` is **deleted** — zero call sites, and a primitive with
+none has not ended the drift it was written to end.
+
+What this means for any concept in this brief that mentions a band or a navy
+hero:
+
+- **There is no navy band, and no `PageHero`, on any portal page.** Zero
+  `.chevron-notch` and zero `.ground-field` elements in any portal `<main>`,
+  verified at 1280 on all four routes.
+- **The page title is the sheet's masthead**, not a band's centred h1. Still an
+  `<h1>`; still this surface's existing approved copy.
+- **`PortalSheet` owns the `<Section ground="page">`**, because a `.sheet` on a
+  white ground is an invisible rectangle wearing a shadow. Do not wrap it in
+  another section, and do not give it a white one.
+- **The sheet supplies the white** that `controlClass`'s `bg-misa-panel` inputs
+  need in order not to be the colour of what is behind them. That guarantee
+  moved from `<Section ground="white">` to the sheet; it did not go away.
+- **No back link.** The adopted concept showed one; it was built, measured and
+  removed, because the site header's MEMBER PORTAL button already links
+  `/portal` from every page and the duplicate cost 40px.
+- Navy survives in the portal **only on controls** — the hub's key columns and
+  the submit buttons. That is the Rare Navy Rule, not a leftover.
+
+🪤 **A measurement trap this override introduced, and it already cost one wrong
+comment.** The sheet's padding narrows the content column, and a line nested
+inside a flex row gets *less* than that column — check-in's box reassurance sits
+after a 16px checkbox and a 12px gap, so its text column is the content column
+**minus 28px**. Measure the column the text is actually in.
+
+Full record: `docs/design/surfaces/portal-hub/receipts/officer.md` and
+`…/portal-attend/receipts/officer.md`, plus
+`docs/frontend-redesign-v2-plan.md` §"THE PORTAL HAS NO NAVY HEADER".
+
 ## Mode and lead
 - **Mode:** Operate — a member on their phone, usually just after checking in,
   looking up their own standing for the term.
@@ -140,7 +188,9 @@ Officer interview, 2026-09-19.
 - **Attendance states stay words, not colour alone** (`Pill` affirm / neutral,
   and upcoming deliberately unframed: it is the absence of an outcome).
 - **Consistency with the portal is the officer's anti-goal**, so this page's
-  shape follows the hub's and check-in's short band unless a concept argues
+  shape follows the hub's and check-in's page surface — 🔴 **since
+  2026-09-20 that is the SHEET, not a band** (see the officer override at the
+  top of this brief) — unless a concept argues
   otherwise on the record.
 - **Motion:** the result mounts after first paint, so it carries no
   `data-reveal`, ever.
@@ -191,7 +241,10 @@ DESIGN.md, the ones this surface touches:
 ## Diverge
 `frontend-design` proposed two concepts (`receipts/diverge.output.md`); the lead
 decided in `receipts/diverge.md`.
-- **A — "The receipt": ADOPTED.** The portal's short navy band, then one white
+- **A — "The receipt": ADOPTED.** 🔴 **Its hero is SUPERSEDED: there is no
+  navy band on any portal page since the officer removed it on 2026-09-20.**
+  Read "the portal's short navy band" below as "the portal sheet's masthead";
+  everything else in the concept stands. The portal's short navy band, then one white
   sheet read in the officer's order: name and term, the four numbers with the
   total largest, pending check-ins, dues, events, points granted separately.
   Estimated at 360×640: the field ≈238–288 and the button ≈304–352 (both on the

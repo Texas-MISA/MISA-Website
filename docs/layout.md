@@ -32,11 +32,16 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         Hero and its floating plate cluster — replaces PageHero
                         on the HOME PAGE ONLY). 🔓 PageHero itself was REBUILT in
                         v2 phase 2 (ground="field", dead size/tagline props
-                        deleted) and NINE pages render it: the five content
-                        pages plus /attend, /lookup and /leaderboard, which are
-                        phase 3 and inherit it, and the /portal hub that has
-                        linked those three since 2026-09-18 (they live under
-                        /portal now too). 🔓 **CENTRED as of 2026-08-23
+                        deleted) and FIVE pages render it, exactly the five
+                        content pages -- counted by call site 2026-09-20.
+                        It was NINE until then: the four /portal surfaces all
+                        inherited this hero without being designed around it,
+                        so a change here was silently a change to four
+                        out-of-scope pages. The officer removed the navy header
+                        from every portal page on 2026-09-20 (portal-sheet.tsx)
+                        and ended that coupling -- the blast radius here is now
+                        the five content pages and nothing else.
+                        🔓 **CENTRED as of 2026-08-23
                         (officer), reversing phase 2's left-alignment** — one
                         component, so all eight moved together. §4.3's
                         anti-centre bias is a bias, not a prohibition, and the

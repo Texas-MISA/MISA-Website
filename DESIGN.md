@@ -65,7 +65,7 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/portal/attend` | ✅ **v2 — REBUILT 2026-09-20** (phase 3, the Portal Rebuild, part 3; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, “Fit the first screen”, then the officer’s 2026-09-20 header removal: the page is one white `.sheet` on the grey ground (`PortalSheet`), the form at the `xs` rhythm with 16px gaps, every label visible above its field, a 48px full-width Check in. 🔓 **Its bar is a fold position and the tightest number in the phase** — at a true 360×640 under the 61px sticky header, IDLE, the Check in button’s bottom edge is **607.7px against a 640 fold**, where it was cut at 668. Measured independently twice (the lead at 611 with a classic scrollbar, the `design-reviewer` at 610.5 with it suppressed). All **twelve** states are designed and gated, not just the happy path, and **both** of its muted-on-Vellum occurrences are gone — lowest ratio anywhere in its `<main>`, measured on every state, is **8.51:1**. 🪟 `/portal/attend` stays **indexable**; robots is per page and must never move to a portal layout. |
+| `/portal/attend` | ✅ **v2 — REBUILT 2026-09-20** (phase 3, the Portal Rebuild, part 3; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, “Fit the first screen”, then the officer’s 2026-09-20 header removal: the page is one white `.sheet` on the grey ground (`PortalSheet`), the form at the `xs` rhythm with 16px gaps, every label visible above its field, a 48px full-width Check in. 🔓 **Its bar is a fold position and the tightest number in the phase** — at a true 360×640 under the 61px sticky header, IDLE, the Check in button’s bottom edge is **607.7px against a 640 fold**, where it was cut at 668. At its gate it measured 610.5 — independently twice, the lead at 611 with a classic scrollbar and the `design-reviewer` at 610.5 with it suppressed — and the officer’s 2026-09-20 header removal improved it to 607.7. All **twelve** states are designed and gated, not just the happy path, and **both** of its muted-on-Vellum occurrences are gone — lowest ratio anywhere in its `<main>`, measured on every state, is **8.51:1**. 🪟 `/portal/attend` stays **indexable**; robots is per page and must never move to a portal layout. |
 | `/portal/leaderboard`, `/portal/lookup` (were `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3’s parts 4 and 5 are next.** Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — nine occurrences on `/portal/lookup`, one on `/portal/leaderboard` — plus the `definition-list` axe fault on `/portal/lookup`’s result, which is the one check `npm run test:ui` still fails. 🧰 **Rebuilt through §Design toolkit**: both are registered in `docs/design/surfaces.json` with a brief, two concepts, evidence and an officer-adopted concept each; the builds and their gates are what remain. |
 | `/portal` (the member portal hub) | ✅ **v2 — REBUILT 2026-09-19** (phase 3, the Portal Rebuild; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, "the title block", then the officer’s 2026-09-20 header removal: one white `.sheet` on the grey ground (`PortalSheet`) whose body is a shared-rule plate whose three cells are each a whole-row `<Link>` with a 48px navy key. Equal formatting is structural — one `.map` over one shape. No `data-reveal` anywhere, deliberately. The header's MEMBER PORTAL button is still the site's one way in. 🔓 Its bar, measured settled at 360×640 under the 61px sticky header: the check-in row's bottom edge at **265.5px** against "at or above 424". 🔴 **No navy header** — zero `.chevron-notch` and zero `.ground-field` in any portal `<main>`; the only navy left in the portal body is the three key columns and the submit buttons, which are controls. |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
@@ -189,11 +189,15 @@ side the surface is `Panel` (or a `bg-white` frame where a `<form>` needs its ow
 `action`, which `Panel` does not forward), and the shell owns the ground.
 
 🔓 **`PageHero` moved from a flat `bg-misa-blue` to `ground="field"` in phase 2**,
-so the site has ONE navy hero treatment rather than two. ⚠️ **Nine pages render
-it** — the five phase-2 pages plus `/attend`, `/lookup` and `/leaderboard`, which
-are phase 3, and the `/portal` hub that has linked those three since 2026-09-18
-(they live under `/portal` now). The phase-3 three inherit any change to it and
-were measured at the phase-2 gate rather than assumed. Its dead `size="home"` and `tagline` props were deleted.
+so the site has ONE navy hero treatment rather than two. 🔓 **FIVE pages render
+it, and they are exactly the five phase-2 pages** — `/about`, `/projects`,
+`/gallery`, `/officers`, `/contact`. Counted by call site 2026-09-20. 🪤 **It
+was NINE until that day**: the four `/portal` surfaces all inherited this hero
+without having been designed around it, so a change here was silently a change
+to four out-of-scope pages. The officer's removal of the navy header from every
+portal page (§Components, `PortalSheet`) ended that coupling — **the blast
+radius of a change here is now the five content pages and nothing else.** Its
+dead `size="home"` and `tagline` props were deleted.
 🔓 **It is CENTRED as of 2026-08-23 (officer), reversing phase 2's
 left-alignment.** Phase 2 left-aligned it because §4.3's anti-centre bias binds
 at `DESIGN_VARIANCE 8` and a centred hero repeated across eight pages was the
