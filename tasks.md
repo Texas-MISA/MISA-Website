@@ -436,7 +436,7 @@ to be **measured on the ground it actually sits on, compositing any alpha**:
 | Surface | `misa-muted` occurrences | On Vellum? |
 |---|---|---|
 | `/portal/lookup` (`page.tsx` 1, `_components/lookup-form.tsx` 8) | 9 | all on white today |
-| `/portal/attend` (`_components/checkin-form.tsx` `:336`, `:364`) | 2 | **both** — `Panel ground="panel"` |
+| ~~`/portal/attend`~~ | ✅ **0** | ✅ **FIXED 2026-09-20, part 3.** Was 2, both on Vellum. `:336` went by moving the review panel's GROUND to white and the ink to Secondary Graphite (7.60:1), not by recolouring in place; `:364` painted no text at all (the `<p>` set the token and its only child was a link setting its own ink), which is why nothing ever caught it. |
 | `/portal/leaderboard` (`page.tsx` `:238`) | 1 | on white today |
 | `/officer-invite/[token]` (`page.tsx` `:135`) | 1 | **yes** — a raw `<section>` on the page ground |
 | `/portal` hub | **0** | — |
@@ -446,10 +446,14 @@ twice.** It said `/portal/attend` 4; the 2026-09-14 disclosure hotfix took it to
 **2**. And `DESIGN.md` counted the hub at 1 where this file always said 0 — the
 hub's single grep hit is `portal/page.tsx:42`, the **comment** explaining why its
 officer line uses `--misa-secondary`. **Count rendered class attributes, not grep
-hits.** New total: **13 across four files.**
+hits.** New total was **13 across four files**; ✅ **part 3 took it to 11 across
+three** on 2026-09-20, and the lowest ratio anywhere in `/portal/attend`'s
+`<main>` — measured on every one of its twelve states — is now **8.51:1**.
 
-📌 **Two of the four Vellum failures are caught by `npm run test:ui`, and two are
-not.** Axe names `color-contrast (3): … > dt` — the three review-step labels at
+📌 **Two of the four Vellum failures were caught by `npm run test:ui`, and two
+were not.** ✅ Both of `/portal/attend`'s are now fixed, and the suite went 39
+pass / 3 fail → **41 / 1**; the one left is `/portal/lookup`'s `definition-list`,
+which part 4 owns. Axe names `color-contrast (3): … > dt` — the three review-step labels at
 `checkin-form.tsx:336`. It never reaches a terminal check-in screen, so
 `:364`'s muted link line — which renders on **all four** of present, pending,
 duplicate and refused — has never been seen by an automated check. Neither has
@@ -486,6 +490,36 @@ never by eye.
 🪤 **Whichever is chosen, it is a `<Section>`/ground question first.** Check what
 ground each of these actually renders on before swapping a token — a page that
 should be on Paper is a different fix from ink that should be secondary.
+
+### ⏭️ Deferred out of the portal-attend gate (2026-09-20) — both for part 6
+
+Two findings the `design-reviewer` raised at `/portal/attend`'s gate that are
+real, measured, and **not that surface's to fix**. Each is recorded with its
+number rather than its description, so the next person re-derives rather than
+trusts. Receipts: `docs/design/surfaces/portal-attend/receipts/design-review.md`
+(DR3, DR4) and `…/audit.md` (T4, the same input finding raised independently).
+
+1. 🔴 **The text inputs have no boundary meeting WCAG 1.4.11's 3:1.** On the
+   white sheet the Vellum fill is **1.12:1** (`#f2f2f3` on `#ffffff`) and the
+   `rgba(29,31,32,0.2)` hairline composites to **≈1.53:1** against white and
+   **≈1.36:1** against the fill it encloses. 🪤 **It is created by the fix for
+   the other problem:** `ground="white"` exists so the Vellum controls are not
+   the colour of the page behind them — and on white they are 1.12:1 from the
+   sheet instead. The fill comes from `controlClass` in
+   `components/ui/field.tsx`, **shared with /admin and every form on the site**,
+   so the fix is a border weight or colour that has to be re-measured against 25
+   admin forms and eleven tables. Part 6 already owns "the shared primitives
+   re-measured on the grounds the portal now puts them on"; this is the first
+   named item in it.
+2. **The header's MEMBER PORTAL button is 29.0px tall at 360** (rect top 15.5,
+   bottom 44.5), under the 44px phone floor, with **3.0px** between its left
+   edge and the wordmark's right edge (wordmark 131.6–213.6, button
+   216.6–325.1). `components/site-header.tsx`, site-wide chrome. 📌 **This is
+   the 360 measurement the nav-clearance invariant does not have** — CLAUDE.md
+   records that clearance as re-measured 2026-09-18 **at 1280 only**, while its
+   own note says "on a phone the tight spot is that button beside the centred
+   wordmark". Now it has a number. Any sixth nav item, or any change to that
+   button, starts here.
 
 ---
 

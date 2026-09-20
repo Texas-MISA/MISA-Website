@@ -10,7 +10,7 @@
     },
     "portal-attend": {
       "mode": "operate",
-      "status": "in-progress",
+      "status": "rebuilt",
       "routes": ["/portal/attend"],
       "files": ["app/(public)/portal/attend/"],
       "brief": ".impeccable/surfaces/route-portal-attend.md"

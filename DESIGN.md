@@ -65,7 +65,8 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3 is NEXT** (officer, 2026-09-18: the UI redesign of the member portal and every page in it). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — `npm run test:ui` catches it on `/portal/attend`'s first-timer confirmation, and a `definition-list` fault on `/portal/lookup`'s result. 🧰 **Rebuilt through §Design toolkit**: all four portal surfaces are registered in `docs/design/surfaces.json`, so their files are guarded until each has a brief (`/design-brief`). |
+| `/portal/attend` | ✅ **v2 — REBUILT 2026-09-20** (phase 3, the Portal Rebuild, part 3; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, “Fit the first screen”: the short `PortalBand` in place of `PageHero`, the form on white at the `xs` rhythm with 16px gaps, every label visible above its field, a 48px full-width Check in. 🔓 **Its bar is a fold position and the tightest number in the phase** — at a true 360×640 under the 61px sticky header, IDLE, the Check in button’s bottom edge is **610.5px against a 640 fold**, where it was cut at 668. Measured independently twice (the lead at 611 with a classic scrollbar, the `design-reviewer` at 610.5 with it suppressed). All **twelve** states are designed and gated, not just the happy path, and **both** of its muted-on-Vellum occurrences are gone — lowest ratio anywhere in its `<main>`, measured on every state, is **8.51:1**. 🪟 `/portal/attend` stays **indexable**; robots is per page and must never move to a portal layout. |
+| `/portal/leaderboard`, `/portal/lookup` (were `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3’s parts 4 and 5 are next.** Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — nine occurrences on `/portal/lookup`, one on `/portal/leaderboard` — plus the `definition-list` axe fault on `/portal/lookup`’s result, which is the one check `npm run test:ui` still fails. 🧰 **Rebuilt through §Design toolkit**: both are registered in `docs/design/surfaces.json` with a brief, two concepts, evidence and an officer-adopted concept each; the builds and their gates are what remain. |
 | `/portal` (the member portal hub) | ✅ **v2 — REBUILT 2026-09-19** (phase 3, the Portal Rebuild; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, "the title block": a short `PortalBand`, then one shared-rule plate whose three cells are each a whole-row `<Link>` with a 48px navy key. Equal formatting is structural — one `.map` over one shape. No `data-reveal` anywhere, deliberately. The header's MEMBER PORTAL button is still the site's one way in. 🔓 Its bar, measured settled at 360×640 under the 61px sticky header: the check-in row's bottom edge at **325px** against "at or above 424". |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
@@ -76,11 +77,12 @@ look like v1. Do not read "it has the grey background" as "it has been done."
 📌 **From 2026-09-18 a rebuild's status also lives in `docs/design/surfaces.json`**
 (§Design toolkit), which the tests read. This table is for people; that file is
 for the checks. **They must agree** — a surface is ✅ here only once it is
-`rebuilt` there and its receipts pass. 🔓 **All four portal surfaces are
-`in-progress` as of 2026-09-19: each has a brief, two concepts and its evidence,
-and the officer has adopted a concept for each** (`/design-brief` steps 1–3; the
-builds and `/design-gate` are what remain). The phase 1, 2 and 4 surfaces predate
-the toolkit and are not registered.
+`rebuilt` there and its receipts pass. 🔓 **Two of the four portal surfaces are
+`rebuilt` as of 2026-09-20 — `portal-hub` and `portal-attend`, seven receipts
+each.** The other two are `in-progress`: each has a brief, two concepts and its
+evidence, and the officer has adopted a concept for each (`/design-brief` steps
+1–3), so the builds and `/design-gate` are what remain. The phase 1, 2 and 4
+surfaces predate the toolkit and are not registered.
 
 ---
 
@@ -705,6 +707,38 @@ half is worth anything.**
   separate axis from `size`, not a fourth size: a hit-area floor and a type step
   compose rather than compete. `min-h`, so a wrapping label grows rather than
   clips.
+- 🔓 **`Banner` takes `size`, and a heading may sit inside it** (v2 phase 3
+  part 3). `size="md"` is `px-6 py-6 text-base`, for the one shape that needs
+  it: an outcome sheet that is not a notice beside the task but the screen that
+  ends it, whose sentence is body copy rather than the 14px a notice is set in.
+  🪤 **A prop, not an appended `px-6 py-6`** — equal-specificity utilities are
+  decided by emission order, the same tie that made `<Title className="text-[22px]">`
+  render at 26px. `sm` is the default and all 24 existing call sites are
+  byte-identical. It also takes `tabIndex={-1}`, for the error-summary pattern:
+  after a failed submit, focus moves to the explanation. 🐛 **And the tone rule
+  needed one clarification the day a heading first went inside one:** *"the text
+  stays body-coloured"* was written about the **message**. A heading in a banner
+  takes Graphite like every other heading — `/portal/attend`'s outcome `<h2>`
+  inherited Body Graphite and rendered a different ink from the review step's
+  heading two screens earlier.
+- 🔴 **A neutral `Banner` and a text input are THE SAME COLOUR, and on a white
+  ground that matters** (v2 phase 3 part 3). `Banner`'s `info` tone and
+  `controlClass` both fill with `--misa-panel`, so on `ground="white"` an
+  `info` banner above a stack of empty inputs computes the identical
+  `rgb(242,242,243)` at 1.12:1 against the sheet — and reads as one more empty
+  control rather than as a message. `/portal/attend`'s unmatched alert, the one
+  screen its redesign existed to rescue, shipped that way until the gate
+  measured it. **On a white ground, an alert that matters takes a status tone**;
+  `info` is for "nothing to do here".
+- 🔓 **`HeadlineProps` takes `tabIndex?: -1`** (v2 phase 3 part 3), typed to
+  `-1` so no heading can enter the tab order. For one case: a screen that
+  replaces another in place, where the element the person was focused on has
+  been unmounted and focus would otherwise fall to `<body>` — so the next Tab
+  restarts above the site header. 🪤 **Only for a screen that CONTINUES a
+  task.** A terminal outcome asks nothing, so a polite `StatusRegion` is correct
+  there and moving focus is an interruption. That split is also what keeps the
+  announcement rule down to one line: *the region carries only what nothing else
+  announces*, and a focused heading announces itself.
 - 🔓 **`Table` has two kinds of sticky head, and they stick to different
   things.** `<THead sticky>` sticks inside the table's own scrollport and pairs
   with `maxHeight` (the officer directory). **`<THead sticky="page">` sticks to
