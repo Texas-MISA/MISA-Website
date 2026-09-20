@@ -420,6 +420,59 @@ no longer blocks their files** — steps 1–3 of the pipeline are complete and
 committed (`9c8cb63`, `52771c2`, `24c2680`, `11beda2`, plus the officer's
 approvals).
 
+### 🔴 THE PORTAL HAS NO NAVY HEADER (officer, 2026-09-20)
+
+**"the navy header at the top of each page should be removed for all pages in
+the portal. the design skills can come up with a replacement."** Given against a
+screenshot of `/portal` on the deployed preview with the band circled, after the
+officer said the two rebuilt surfaces "both look similar to what existed
+before".
+
+✅ **Done for ALL FOUR surfaces in `ca5cd06`**, not just the two that were
+`rebuilt` — the instruction said every portal page.
+
+**The replacement, adopted by the officer: "the sheet is the page."** Each
+portal page is one white `.sheet` lying on the grey page ground, its title a
+masthead above a rule that bleeds to the sheet's edges. 🔓 **Composition, not
+colour** — the public pages are stacked full-bleed sections, and a navy hero on
+a page whose whole job is a form was applying a *brochure* device to a *tool*.
+`.sheet` already existed (`DESIGN.md` §Surfaces, `globals.css:594`) and already
+ships on `/about`; nothing was invented. The rejected concept, "title and rule",
+kept the title on the page ground with the tool as a separate surface below.
+
+| | |
+|---|---|
+| `components/ui/portal-sheet.tsx` | **NEW.** `PortalSheet`, four callers. |
+| `components/ui/portal-band.tsx` | 🗑️ **DELETED** — zero call sites once both callers converted, and a primitive with none has not ended the drift it was written to end. |
+| `/portal`, `/portal/attend` | 🔒 frozen; each carries a `receipts/officer.md` naming `ca5cd06`, or `receipts.mjs` fails them as **stale**. |
+| `/portal/leaderboard`, `/portal/lookup` | Header removal **only**. Parts 5 and 4 still own their designs. |
+
+🔴 **The first build of this LOST check-in's bar**, which is the thing to carry
+forward: removing the band and adding the concept's back link put the button at
+**647.7** against a 640 fold — worse than the 610.5 the band version measured.
+The band was ~60px of chrome; the narrower sheet column and the back link spent
+~70. Removing the back link (−40px — **the site header already links `/portal`
+from every page**) and tightening the sheet's phone padding brought it to
+**607.7, 32.3px of slack**. The hub went **325 → 265.5** against its ≤424 bar.
+
+⚠️ **And a comment asserted an unmeasured number AGAIN**, one commit after part
+3's gate recorded that exact lesson — it claimed a padding change fixed a text
+wrap, having measured the content column rather than the **text** column the
+line actually sits in (they differ by the checkbox's 28px). Refinement to the
+rule: **measure the column the text is actually in.**
+
+🚨 **Two process failures worth fixing before part 4:**
+1. **A rejected concept that its own receipt flagged for the officer was never
+   put to them.** Hub concept B ("the field console", the whole hub on the navy
+   field) says in `diverge.md`: *"recorded for the officer, who may overrule at
+   the brief review."* It was recorded and not escalated, and the officer's
+   "looks similar" came a day later.
+2. **The gate's reviews have NOT seen the sheet.** The seven steps ran against
+   `a38a2b3`. The officer receipts record the instruction, the concepts and the
+   lead's re-run measurements, and explicitly claim nothing more. If the two
+   surfaces should be re-gated rather than amended, that is a decision to take
+   before part 4 rather than after.
+
 ### 🧭 Where the build stands (2026-09-19)
 
 **Branch `design-toolkit`**, stacked on `portal-phase-1`. Parts 0–3 are
@@ -641,7 +694,7 @@ front, so the order follows the **bars** rather than the dependencies:
   count wrong; `DESIGN.md` had attend right and the hub wrong. Both corrected.
   **Count rendered class attributes, not grep hits.**
 - ✅ **The short band is ONE component: `components/ui/portal-band.tsx`,
-  exporting `PortalBand`.** Built in part 1, adopted by the hub in part 2.
+  exporting `PortalBand`.** Built in part 1, adopted by the hub in part 2. 🗑️ **SUPERSEDED 2026-09-20:** the officer removed the navy header from every portal page, so the band has no callers and is deleted. Its replacement is `portal-sheet.tsx` (`PortalSheet`), which inherits every argument below — four simultaneous callers, shared code belongs in `components/ui/`, and no file may belong to two surfaces.
   - Three callers. `CLAUDE.md`: a primitive is justified by a **second** caller
     — and phase 4's lesson was the opposite case, `PageHeader`,
     `SectionHeading` and `Table` sitting at zero call sites while 25 pages kept
@@ -689,7 +742,7 @@ questions** — both are shared-code work with a named owner, tracked in
 button at 29px tall with 3px of clearance at 360 (`site-header.tsx`). **Part 6
 owns both.**
 
-**2. The band's h1 restates the header button that was just tapped.**
+✅ **2. MOOT since 2026-09-20 — the band is gone.** The band's h1 restates the header button that was just tapped.**
 `PortalBand title="Member Portal"` renders 61→191 at 360, directly under the
 header's current-marked **MEMBER PORTAL** button — two identical phrases within
 90px, costing 130.5px on the page whose named anti-goal is height. The brief
@@ -699,7 +752,7 @@ but **the officer approved concept A *as proposed*, and what was proposed was
 re-titling it reopens the thing they said yes to. 🪤 It is also the page's
 specificity: the notch is what makes the hub unmistakably this site's, so
 shrinking it trades identity for pixels the bar does not currently need (99px
-of margin). *Not a change to `PortalBand` — it is the hub's `title` prop.*
+of margin). *Closed by the header removal: the h1 is now a masthead inside the sheet, not a 131px navy band. The copy is unchanged.*
 
 **3. At 360 the destination rows rake 93 / 118 / 144px.** The bodies wrap to
 one, two and three lines, so the least-urgent destination is the largest object

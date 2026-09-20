@@ -65,9 +65,9 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/portal/attend` | ✅ **v2 — REBUILT 2026-09-20** (phase 3, the Portal Rebuild, part 3; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, “Fit the first screen”: the short `PortalBand` in place of `PageHero`, the form on white at the `xs` rhythm with 16px gaps, every label visible above its field, a 48px full-width Check in. 🔓 **Its bar is a fold position and the tightest number in the phase** — at a true 360×640 under the 61px sticky header, IDLE, the Check in button’s bottom edge is **610.5px against a 640 fold**, where it was cut at 668. Measured independently twice (the lead at 611 with a classic scrollbar, the `design-reviewer` at 610.5 with it suppressed). All **twelve** states are designed and gated, not just the happy path, and **both** of its muted-on-Vellum occurrences are gone — lowest ratio anywhere in its `<main>`, measured on every state, is **8.51:1**. 🪟 `/portal/attend` stays **indexable**; robots is per page and must never move to a portal layout. |
+| `/portal/attend` | ✅ **v2 — REBUILT 2026-09-20** (phase 3, the Portal Rebuild, part 3; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, “Fit the first screen”, then the officer’s 2026-09-20 header removal: the page is one white `.sheet` on the grey ground (`PortalSheet`), the form at the `xs` rhythm with 16px gaps, every label visible above its field, a 48px full-width Check in. 🔓 **Its bar is a fold position and the tightest number in the phase** — at a true 360×640 under the 61px sticky header, IDLE, the Check in button’s bottom edge is **607.7px against a 640 fold**, where it was cut at 668. Measured independently twice (the lead at 611 with a classic scrollbar, the `design-reviewer` at 610.5 with it suppressed). All **twelve** states are designed and gated, not just the happy path, and **both** of its muted-on-Vellum occurrences are gone — lowest ratio anywhere in its `<main>`, measured on every state, is **8.51:1**. 🪟 `/portal/attend` stays **indexable**; robots is per page and must never move to a portal layout. |
 | `/portal/leaderboard`, `/portal/lookup` (were `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3’s parts 4 and 5 are next.** Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — nine occurrences on `/portal/lookup`, one on `/portal/leaderboard` — plus the `definition-list` axe fault on `/portal/lookup`’s result, which is the one check `npm run test:ui` still fails. 🧰 **Rebuilt through §Design toolkit**: both are registered in `docs/design/surfaces.json` with a brief, two concepts, evidence and an officer-adopted concept each; the builds and their gates are what remain. |
-| `/portal` (the member portal hub) | ✅ **v2 — REBUILT 2026-09-19** (phase 3, the Portal Rebuild; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, "the title block": a short `PortalBand`, then one shared-rule plate whose three cells are each a whole-row `<Link>` with a 48px navy key. Equal formatting is structural — one `.map` over one shape. No `data-reveal` anywhere, deliberately. The header's MEMBER PORTAL button is still the site's one way in. 🔓 Its bar, measured settled at 360×640 under the 61px sticky header: the check-in row's bottom edge at **325px** against "at or above 424". |
+| `/portal` (the member portal hub) | ✅ **v2 — REBUILT 2026-09-19** (phase 3, the Portal Rebuild; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, "the title block", then the officer’s 2026-09-20 header removal: one white `.sheet` on the grey ground (`PortalSheet`) whose body is a shared-rule plate whose three cells are each a whole-row `<Link>` with a 48px navy key. Equal formatting is structural — one `.map` over one shape. No `data-reveal` anywhere, deliberately. The header's MEMBER PORTAL button is still the site's one way in. 🔓 Its bar, measured settled at 360×640 under the 61px sticky header: the check-in row's bottom edge at **265.5px** against "at or above 424". 🔴 **No navy header** — zero `.chevron-notch` and zero `.ground-field` in any portal `<main>`; the only navy left in the portal body is the three key columns and the submit buttons, which are controls. |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
@@ -604,7 +604,7 @@ half is worth anything.**
 | Group | Modules |
 |---|---|
 | layout | `section.tsx` (public only), `panel.tsx`, `page-header.tsx` |
-| type | `heading.tsx` (Headline/Title/Eyebrow/Lead), `chevron-section.tsx` (PageHero), `portal-band.tsx` (PortalBand) |
+| type | `heading.tsx` (Headline/Title/Eyebrow/Lead), `chevron-section.tsx` (PageHero), `portal-sheet.tsx` (PortalSheet) |
 | controls | `button.tsx` (`buttonClass` + named constants), `field.tsx`, `chip.tsx` |
 | feedback | `banner.tsx` (Banner + ReadError), `pill.tsx`, `empty-state.tsx`, `status-region.tsx` (StatusRegion) |
 | data | `table.tsx` |
@@ -651,19 +651,35 @@ half is worth anything.**
   height. The gallery masonry is the one place that wants intrinsic heights.
 - 📌 **`empty-state.tsx` is never a `<Hatch>`.** A hatch means "a photograph
   belongs here"; an empty state means "there is no data."
-- 🔓 **`PortalBand` is the portal's short field band (v2 phase 3), and it is NOT
-  a `PageHero` variant.** `PageHero` serves the five phase-2 content pages, and
-  its page-hero ramp row (`34 → 44 → 52`), its `data-reveal="rise"` headline and
-  its subhead slot are *their* contract; a `short` prop there would put the
-  portal's decisions inside five pages that never asked for them. The two share
-  `<Section ground="field">` and the notch and nothing else. It exists for
-  **height**: 131px at 360 against `PageHero`'s 177px, and that 46px is most of
-  the margin `/portal/attend`'s first-screen bar needs. 🪤 It carries **no
-  `data-reveal`** — the hub's anti-goal is "slower to check in", and a band held
-  at `opacity: 0` until the observer fires is exactly that. 🪤 The notch cuts a
-  fixed **48px**, deepest at the left and right edges and zero at the centre,
-  which is why a *centred* h1 survives at this height and a left-aligned one
-  would not. **Three callers** — the hub, check-in and lookup.
+- 🔴 **`PortalSheet` is the portal's page surface, and THE PORTAL HAS NO NAVY
+  HEADER** (v2 phase 3, officer 2026-09-20: *"the navy header at the top of each
+  page should be removed for all pages in the portal"*). Every `/portal` page is
+  one white **`.sheet`** lying on the grey page ground, its title a masthead
+  above a rule that bleeds to the sheet's edges. 🔓 **The point is composition,
+  not colour:** the public pages are stacked full-bleed sections, and a navy
+  hero on a page whose whole job is a form applied a *brochure* device to a
+  *tool*. Making each portal page an **object** is what stops the portal
+  resembling the marketing site.
+  - It reuses `.sheet` (§Surfaces) rather than inventing a surface, and earns
+    its 4px radius on this file's own terms: *only a thing that reads as an
+    object lying on the page takes the plate radius*.
+  - 🪤 **A `.sheet` must sit on a ground that is not white**, so the component
+    owns its `<Section ground="page">` — the one mistake that would make it
+    vanish is the one a caller could make.
+  - 🪤 **ONE `max-width` declaration.** `width="narrow"` plus an
+    `innerClassName` measure emits two equal-specificity utilities and the
+    winner is Tailwind's emission order — the tie that made
+    `<Title className="text-[22px]">` render at 26px.
+  - 🪤 **No back link, measured rather than forgotten.** The adopted concept had
+    one; the site header's MEMBER PORTAL button already links `/portal` from
+    every page, so it duplicated an always-visible control for **40px** on the
+    surface gated on a fold position.
+  - **Four callers** — the hub, check-in, the leaderboard and lookup.
+  🗑️ **It replaced `PortalBand`, which is DELETED.** The band was built in part
+  1 and removed in the same phase; with both callers converted it would have had
+  zero call sites, and a primitive with no call sites has not ended the drift it
+  was written to end. Its reasoning survives in the hub's and check-in's
+  `receipts/officer.md`.
 - 🔴 **A focus ring must contrast with every ground the FOCUSED ELEMENT spans,
   not just the one its section sits on** (v2 phase 3, found at the portal-hub
   gate). `app/globals.css:318` draws `:focus-visible` as `2px solid

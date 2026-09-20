@@ -374,19 +374,27 @@ components/             site-header.tsx (4-item nav incl. Admin — was 5 until
                                     pages rendered this until v2 phase 3; the
                                     four /portal surfaces are leaving it, so
                                     re-count before quoting the number),
-                                    portal-band.tsx (PortalBand — v2 phase 3,
-                                    the portal's SHORT field band. 🪤 NOT a
-                                    PageHero variant: that component is the five
-                                    content pages' contract. It exists for
-                                    height — 131px at 360 against PageHero's
-                                    177, which is most of the margin
-                                    /portal/attend's first-screen bar needs — and
-                                    carries NO data-reveal, because a band held
-                                    at opacity 0 until the observer fires is the
-                                    hub's anti-goal in CSS. 🪤 The notch cuts a
-                                    fixed 48px, deepest at the edges and zero at
-                                    the centre, which is why a CENTRED h1
-                                    survives at this height)
+                                    portal-sheet.tsx (PortalSheet — v2 phase 3,
+                                    the portal PAGE SURFACE, and the portal has
+                                    NO NAVY HEADER since the officer removed it
+                                    on 2026-09-20. Every /portal page is one
+                                    white .sheet on the grey page ground, its
+                                    title a masthead above a rule that BLEEDS to
+                                    the sheet edges. 🔓 Composition, not colour:
+                                    a navy hero on a page whose job is a form
+                                    applied a brochure device to a tool. 🪤 It
+                                    owns its Section ground="page", because a
+                                    .sheet on white is an invisible rectangle
+                                    wearing a shadow. 🪤 ONE max-width
+                                    declaration — two equal-specificity ones are
+                                    decided by emission order. 🪤 No back link:
+                                    the site header already links /portal, and a
+                                    duplicate cost 40px on the surface gated on
+                                    a fold. Four callers.
+                                    🗑️ It REPLACED portal-band.tsx, which is
+                                    deleted — zero call sites, and a primitive
+                                    with none has not ended the drift it was
+                                    written to end)
                           controls  button.tsx (buttonClass + named constants —
                                     class strings, not components, because every
                                     call site is already an <a>, a <Link> or a
