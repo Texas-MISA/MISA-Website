@@ -42,6 +42,46 @@
      before, and now keeps looking that way whatever passes underneath it. */
   --misa-plate-edge: #bfbfc2;
 
+  /* 🔓 **The FORM CONTROL boundary, and it is a WCAG 1.4.11 fix rather than a
+     shade preference** (v2 phase 3, round 1a). 1.4.11 asks 3:1 of the visual
+     information required to IDENTIFY a user interface component, against the
+     colours adjacent to it. A text input has to clear that on BOTH sides at
+     once — the sheet outside it and its own Vellum interior inside it — and
+     `--misa-border` cleared neither, under EITHER reading of what an alpha
+     border composites against. A background paints under the border
+     (`background-clip: border-box`), so the pixel that actually paints is
+     Frame over the control's own fill, `#c7c7c8`: **1.69:1 against the white
+     sheet outside, 1.51:1 against the fill inside.** Read the other way, Frame
+     over white is `#d2d2d2`: **1.51:1 and 1.35:1.** All four fail, and the
+     fill itself is only 1.12:1 from a white sheet, so an EMPTY input was a
+     rectangle with no measurable edge — on the portal and on all 77 controls
+     measured across nine `/admin` screens.
+
+     📌 The receipts that raised this (portal-attend DR3 and T4) recorded 1.53
+     and 1.36 for the over-white reading; re-derived here they are **1.51 and
+     1.35**, and that ambiguity is why the border-box reading is written down
+     as well. ⚠️ **It is a property of an ALPHA border and it does not arise
+     again** — `--misa-control-edge` is opaque, so it has one reading.
+
+     🪤 **This is a control-specific token and NOT a move of `--misa-border`,
+     deliberately.** Frame is the site's card and image frame — moving it
+     repaints every plate, panel and photograph, and it would break its own
+     pairing with `--misa-plate-edge`, which is DEFINED as Frame resolved over
+     Vellum Shade, so the two would stop reading as one weight. 1.4.11 also
+     does not ask it of them: a card frame is decoration around content that is
+     already legible, whereas an empty input has no text of its own and its
+     boundary is the only thing saying a control is there. The requirement
+     lands on controls, so the token does too.
+
+     📌 Built the way `--misa-plate-edge` was built — the same Graphite ink
+     (`#1d1f20`) resolved opaque, here at 54% over white — so it stays in the
+     neutral family rather than introducing a fresh hue. **Measured, against a
+     formula validated on the WCAG reference pairs (`#767676` on white = 4.54,
+     black on white = 21.00): 3.65:1 on Paper, 3.26:1 on Vellum.** Vellum is
+     both the fill inside every control and `/admin`'s page ground, so one
+     value answers both. ⚠️ Re-measure it if either ground moves. */
+  --misa-control-edge: #858687;
+
   /* 🔓 **A second radius, and it is a documented exception to the Shape
      Consistency Lock rather than a drift.** The page is all-sharp at
      `--radius: 0` (officer, 2026-08-17) and structure stays that way: sections,
@@ -158,6 +198,7 @@
   --color-misa-hairline: var(--misa-hairline);
   --color-misa-border: var(--misa-border);
   --color-misa-plate-edge: var(--misa-plate-edge);
+  --color-misa-control-edge: var(--misa-control-edge);
   --color-misa-caution: var(--misa-caution);
   --color-misa-caution-wash: var(--misa-caution-wash);
   --color-misa-critical: var(--misa-critical);

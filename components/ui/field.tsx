@@ -15,9 +15,11 @@
 // its hint inside the `<label>`, which is the accessible-name bug the component
 // doc below describes. **A duplicate left standing does not stay still.**
 //
-// 📌 The skin follows DESIGN.md's Text Field: a Vellum interior, square, at the
-// FRAME border weight (1px `--misa-border`) rather than the heavier
-// `border-black/70` the admin had been shipping.
+// 📌 The skin follows DESIGN.md's Text Field: a Vellum interior, square, at a
+// 1px edge rather than the heavier `border-black/70` the admin had been
+// shipping. ⚠️ That edge was `--misa-border`, the card Frame, until v2 phase 3
+// round 1a measured it at 1.51:1 and moved it to `--misa-control-edge` — see
+// the note on `CONTROL` below, which is where the 3:1 argument lives.
 //
 // 🪤 **These components are deliberately thin, and that is a correctness
 // requirement rather than minimalism.** Three form invariants in this codebase
@@ -61,9 +63,38 @@ import type {
 // have**, which fails AA for placeholder text. Secondary (#4a4d50) is 7.60:1 on
 // the same ground. Measure a grey against the ground it actually sits on: this
 // one passed everywhere it was used until the day the field ground changed.
+// 🔓 **The border is `--misa-control-edge`, not `--misa-border`, and that is
+// WCAG 1.4.11 rather than taste** (v2 phase 3, round 1a). The skin note above
+// says the frame is "the FRAME border weight (1px `--misa-border`)"; it no
+// longer is, and the reason is that a control has a bar a card does not.
+// 1.4.11 wants 3:1 from the colours ADJACENT to the thing that identifies a
+// component, and an input has two of them at once: the sheet outside and its
+// own Vellum interior inside. Frame failed on both under either reading of
+// what an alpha border composites against: over the control's own fill (what
+// `background-clip: border-box` actually paints) it is `#c7c7c8`, **1.69:1 vs
+// the sheet and 1.51:1 vs the fill**; over white it is `#d2d2d2`, **1.51:1 and
+// 1.35:1**. The fill is 1.12:1 from a white sheet, so an EMPTY input was a
+// rectangle with no measurable edge. `--misa-control-edge` (`#858687`) is
+// opaque — one reading — and measures **3.65:1 on Paper, 3.26:1 on Vellum**.
+// The token comment in `globals.css` carries the derivation and the argument
+// for leaving the global Frame token where it is.
+//
+// 🪤 **The HOVER border had to move with it, or hovering made the boundary
+// worse than not hovering.** `misa-blue/50` composites to 2.92:1 on white and
+// 2.85:1 on the fill — it FAILED the same 3:1 the rest state now meets, so a
+// control that passed at rest dropped below the bar exactly when the pointer
+// was on it. `/55` is the smallest step that clears both (**3.36:1** and
+// **3.24:1**), solved rather than picked. Focus is solid navy at 13.03:1 and
+// `aria-invalid` is Critical at 8.63:1; both were already clear.
+//
+// 📌 Measured on the running site before and after, on `/portal/attend`'s white
+// sheet and across 77 controls on nine `/admin` screens — every one of which
+// sits on white, inside a Panel, not on the grey page ground. The token clears
+// 3:1 on both anyway, so a control placed directly on `/admin`'s Vellum `<main>`
+// is covered too.
 const CONTROL =
-  "border border-misa-border bg-misa-panel text-foreground transition-colors duration-150 " +
-  "placeholder:text-misa-secondary hover:border-misa-blue/50 focus:border-misa-blue " +
+  "border border-misa-control-edge bg-misa-panel text-foreground transition-colors duration-150 " +
+  "placeholder:text-misa-secondary hover:border-misa-blue/55 focus:border-misa-blue " +
   "aria-invalid:border-misa-critical " +
   "disabled:pointer-events-none disabled:opacity-50";
 
