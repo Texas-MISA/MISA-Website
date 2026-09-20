@@ -66,7 +66,7 @@ planned. Every value here was read off the running application on 2026-08-19.
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
 | `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3 is NEXT** (officer, 2026-09-18: the UI redesign of the member portal and every page in it). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — `npm run test:ui` catches it on `/portal/attend`'s first-timer confirmation, and a `definition-list` fault on `/portal/lookup`'s result. 🧰 **Rebuilt through §Design toolkit**: all four portal surfaces are registered in `docs/design/surfaces.json`, so their files are guarded until each has a brief (`/design-brief`). |
-| `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows, each with one navy button of one fixed width, all formatted the same (officer); no muted ink on the grey ground. The header's MEMBER PORTAL button is the site's one way in. Phase 3 owns the member area's real design and may re-compose it. |
+| `/portal` (the member portal hub) | ✅ **v2 — REBUILT 2026-09-19** (phase 3, the Portal Rebuild; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, "the title block": a short `PortalBand`, then one shared-rule plate whose three cells are each a whole-row `<Link>` with a 48px navy key. Equal formatting is structural — one `.map` over one shape. No `data-reveal` anywhere, deliberately. The header's MEMBER PORTAL button is still the site's one way in. 🔓 Its bar, measured settled at 360×640 under the 61px sticky header: the check-in row's bottom edge at **325px** against "at or above 424". |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
@@ -662,6 +662,35 @@ half is worth anything.**
   fixed **48px**, deepest at the left and right edges and zero at the centre,
   which is why a *centred* h1 survives at this height and a left-aligned one
   would not. **Three callers** — the hub, check-in and lookup.
+- 🔴 **A focus ring must contrast with every ground the FOCUSED ELEMENT spans,
+  not just the one its section sits on** (v2 phase 3, found at the portal-hub
+  gate). `app/globals.css:318` draws `:focus-visible` as `2px solid
+  var(--misa-blue)`, and `.on-navy :focus-visible` flips it to white — but that
+  selector answers "a focused element *inside* a navy section". The hub's row
+  link is the first thing in this system to span **two grounds inside one
+  focusable element**: a white cell, then a 48px `bg-misa-blue` key. Its single
+  navy ring measured 13:1 across the cell and **1.00:1 over the key**, so the
+  indicator appeared to stop dead at the seam. The fix is that the navy child
+  redraws the ring in white over its own box, at the same inset, so the two
+  segments meet and read as one indicator that changes colour with the ground.
+  🪤 **Any future portal surface that puts a navy element inside a link hits
+  this again.** And note what made it hard to see: the hub had already reasoned
+  carefully and correctly about *where* the ring is drawn (`-outline-offset-2`,
+  so it does not cross the 1px plate seam onto the neighbouring cell) — a
+  thorough argument about the right half of the problem.
+- 🔴 **`Title` takes `size`, because appending a smaller size class DOES NOT
+  WORK** (v2 phase 3). Both sizes are arbitrary-value utilities, so they tie on
+  specificity (0,1,0) and the winner is whichever Tailwind emits last — and
+  Tailwind v4 sorts arbitrary values **ascending**, so the **larger always
+  wins**. `<Title className="text-[22px] sm:text-[26px]">` has therefore always
+  rendered at the component's own `26 → 34`. 🐛 **This is a live defect on a
+  phase-1 surface:** `components/ui/activities.tsx:98` uses exactly that form,
+  and the home page's activity titles measure **34px at 1280** where the code
+  asks for 26. No test and no detector sees it — the class IS in the attribute,
+  so a grep confirms the intent and only `getComputedStyle` shows the result.
+  **This is the "measure rendered class attributes, not grep hits" rule with
+  teeth: here even the rendered attribute lies.** Fixing `activities.tsx` is
+  phase 3 part 6's, not any portal surface's.
 - 🔓 **`StatusRegion` is one always-mounted atomic announcer** (v2 phase 3), for
   `/portal/attend` and `/portal/lookup`. 🪤 It exists because **a live region
   must be in the DOM BEFORE its contents change**: a node that mounts already
