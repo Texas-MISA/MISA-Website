@@ -386,7 +386,7 @@ Each ends at a review gate. **Nothing proceeds past a gate without the officer.*
 | **0** | Amend `CLAUDE.md` precedence. Install the three packages. Re-skin shadcn out of default state. Define the elevation vocabulary and the radius scale. Read §0, §4, §5, §10, §12 in full. |
 | **1** | ✅ **COMPLETE, gate passed 2026-08-19.** Home page + header. Record below. |
 | **2** | ✅ **LIVE.** `/about`, `/projects`, `/gallery`, `/officers`, `/contact`, error and not-found boundaries. Record below. |
-| **3** | ⏭️ **NEXT (officer, 2026-09-18): the UI redesign of the member portal and EVERY page in it** — the `/portal` hub, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup`, and anything added under `/portal` later. It follows the merge of [member portal phase 1](member-portal-plan.md). *(Was: ⏸️ DEFERRED, not skipped.)* Originally `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched, and that constraint stands. Taken out of order on the officer's instruction (2026-08-27): phase 4 was asked for first. 🔓 **The `--misa-muted`-on-Vellum AA failure on those three pages was FOLDED INTO THIS PHASE by the officer on 2026-09-01**, rather than patched standalone first — so it is now a gate condition here, and **the failure stays live on member-facing pages until this phase ships**, which was the accepted cost. The 13 occurrences (re-counted 2026-09-19 against the rendered pages) and the measurement rule are in [`../tasks.md`](../tasks.md) §the `--misa-muted` AA contrast failures. 🪤 It is a ground question before it is a token swap — check what ground each page renders on first. 📌 **The three pages live under `/portal` since 2026-09-18** ([`member-portal-plan.md`](member-portal-plan.md) phase 1: `app/(public)/portal/attend`, `…/leaderboard`, `…/lookup`, with the old URLs as permanent redirects), and the phase now also covers the `/portal` hub, which was built from shared primitives only so as not to pre-empt this phase's design. 🧰 **It runs through `DESIGN.md` §Design toolkit** (built 2026-09-18 on `design-toolkit`, stacked on `portal-phase-1`), with `impeccable` (Operate) as lead: `/design-brief` per surface → build → `/design-gate`. **Its gate:** all four portal surfaces `rebuilt` in `docs/design/surfaces.json` with passing receipts, `npm run test:ui` green on their routes and states (it fails three of those states today), then the officer. ✅ **Both prerequisites are done (2026-09-19):** PRODUCT.md's member-identity line is corrected and the sidecar is refreshed from v2 (`f0cb15a`). ✅ **And all four briefs are written** — see *Phase 3 brief* below for the adopted concepts, the per-surface gate bars and the approved copy. |
+| **3** | 🏗️ **IN PROGRESS — 2 of 4 surfaces `rebuilt` as of 2026-09-20 (`portal-hub`, `portal-attend`); `/portal/lookup` and `/portal/leaderboard` remain.** The UI redesign of the member portal and EVERY page in it — the `/portal` hub, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup`, and anything added under `/portal` later. It follows the merge of [member portal phase 1](member-portal-plan.md). *(Was: ⏸️ DEFERRED, not skipped.)* Originally `/attend`, `/leaderboard`, `/lookup` — visual only, behaviour untouched, and that constraint stands. Taken out of order on the officer's instruction (2026-08-27): phase 4 was asked for first. 🔓 **The `--misa-muted`-on-Vellum AA failure on those three pages was FOLDED INTO THIS PHASE by the officer on 2026-09-01**, rather than patched standalone first — so it is now a gate condition here, and **the failure stays live on member-facing pages until this phase ships**, which was the accepted cost. The 13 occurrences (re-counted 2026-09-19 against the rendered pages) and the measurement rule are in [`../tasks.md`](../tasks.md) §the `--misa-muted` AA contrast failures. 🪤 It is a ground question before it is a token swap — check what ground each page renders on first. 📌 **The three pages live under `/portal` since 2026-09-18** ([`member-portal-plan.md`](member-portal-plan.md) phase 1: `app/(public)/portal/attend`, `…/leaderboard`, `…/lookup`, with the old URLs as permanent redirects), and the phase now also covers the `/portal` hub, which was built from shared primitives only so as not to pre-empt this phase's design. 🧰 **It runs through `DESIGN.md` §Design toolkit** (built 2026-09-18 on `design-toolkit`, stacked on `portal-phase-1`), with `impeccable` (Operate) as lead: `/design-brief` per surface → build → `/design-gate`. **Its gate:** all four portal surfaces `rebuilt` in `docs/design/surfaces.json` with passing receipts, `npm run test:ui` green on their routes and states (it fails three of those states today), then the officer. ✅ **Both prerequisites are done (2026-09-19):** PRODUCT.md's member-identity line is corrected and the sidecar is refreshed from v2 (`f0cb15a`). ✅ **And all four briefs are written** — see *Phase 3 brief* below for the adopted concepts, the per-surface gate bars and the approved copy. |
 | **4** | ✅ **MERGED AND LIVE 2026-08-31.** `/admin` under scanability rules, screen by screen, suite green between screens. Its five held-back accessibility findings were decided by the officer and built the same day, then walked in a browser. Brief below. 🔓 **Shipping it required pushing migration 29 to production first** — the branch was cut from the roster-terms commit, so its code depends on a schema the remote did not have. |
 | **5** | ~~Replace `DESIGN.md`~~ ✅ **done early, 2026-08-19.** What remains: reconcile `docs/invariants.md` for every invariant retired, each with its replacement argued; final record in `build-log.md` and `tasks.md` |
 
@@ -403,7 +403,7 @@ this standing until the section that owns them is rebuilt.
 
 ---
 
-## Phase 3 brief — the Portal Rebuild (BRIEFS DONE 2026-09-19, BUILD NEXT)
+## Phase 3 brief — the Portal Rebuild (2 OF 4 SURFACES `rebuilt`, 2026-09-20)
 
 **Start here for the build.** Each surface's own brief is the binding document,
 and `impeccable` loads it automatically on every command against that route:
@@ -422,39 +422,87 @@ approvals).
 
 ### 🧭 Where the build stands (2026-09-19)
 
-**Branch `design-toolkit`**, stacked on `portal-phase-1`. Parts 0, 1 and 2 are
-committed and **`portal-hub` is `rebuilt`** — the first surface through the
-toolkit end to end. The other three are still `in-progress`, so
-`tests/design-receipts.test.ts` now checks the hub's **receipts** and the other
-three's **briefs** only.
+**Branch `design-toolkit`**, stacked on `portal-phase-1`. Parts 0–3 are
+committed and **two of the four surfaces are `rebuilt`** — `portal-hub` and
+`portal-attend`. The other two are still `in-progress`, so
+`tests/design-receipts.test.ts` checks two surfaces' **receipts** and two
+surfaces' **briefs**.
 
 | Part | State | Commit |
 |---|---|---|
 | 0 — Baseline | ✅ done | `debeca2` |
 | 1 — Shared vocabulary | ✅ done | `fa7c2e5` |
 | 2 — `/portal` hub | ✅ **done — built, gated, `rebuilt`** | `d827ac7` build · `ab3f6c9` fixes · `e67acb8` receipts · `30bcec5` flip |
-| 3–7 | ⏭️ not started | — |
+| 3 — `/portal/attend` | ✅ **done — built, gated, `rebuilt`** | `a38a2b3` build · `bd71103` fixes · `40d3d24` receipts · `4c216f1` flip |
+| 4–7 | ⏭️ not started | — |
 
-🔒 **`portal-hub`'s files are now FROZEN.** `receipts.mjs` fails a `rebuilt`
-surface as **stale** on any commit touching `app/(public)/portal/page.tsx` that
-no receipt names as a `fix_commit`. Parts 3–5 must not edit it. (Shared
-primitives in `components/ui/` are exempt by DESIGN.md and may still change.)
+🔒 **`portal-hub`'s AND `portal-attend`'s files are now FROZEN.**
+`receipts.mjs` fails a `rebuilt` surface as **stale** on any commit touching
+`app/(public)/portal/page.tsx` or `app/(public)/portal/attend/` that no receipt
+names as a `fix_commit`. Parts 4–5 must not edit either. (Shared primitives in
+`components/ui/` are exempt by DESIGN.md and may still change — proved in
+practice at part 3, which changed `banner.tsx` and `heading.tsx` and left
+`portal-hub (rebuilt): ok`.)
 
-**Suite state, re-confirmed at part 0 and unchanged since:** `npm test` 41 files
-/ 1142 tests green; `npm run test:ui` **39 pass / 3 fail**, and the three are
-`/portal/lookup`'s member result (`definition-list (1): dl`) and both of
-`/portal/attend`'s first-timer confirmations (`color-contrast (3): … > dt`).
-Parts 3 and 4 own all three.
+**Suite state, after part 3:** `npm test` 41 files / 1142 tests green;
+`npm run test:ui` **41 pass / 1 fail** (was 39 / 3). ✅ Both of
+`/portal/attend`'s `color-contrast` failures are green. The one left is
+`/portal/lookup`'s member result (`definition-list (1): dl`), which **part 4
+owns**.
 
-⏭️ **The immediate next step is part 3, `/portal/attend`** — the surface with
-the most states (twelve, plus pre-hydration), the new box label and review
-copy, and **both** of its muted-on-Vellum occurrences. Its bar is IDLE-ONLY.
-🔴 It carries the one **open officer question** listed under *Needs the
-officer* below: changing the check-in checkbox label orphans the unmatched
-banner at `checkin-form.tsx:143-146`, which points at the box using the OLD
-label's words. Draft replacement copy and show it before shipping.
+⏭️ **The immediate next step is part 4, `/portal/lookup`** — the most complex
+result, and the surface carrying **nine of the eleven** remaining muted
+occurrences. Stacked event rows below `sm`, the `definition-list` fix, the
+announced result, the stale sentence removed, the contradictory dues comment
+corrected.
 
-✅ **Part 2 is closed.** What its gate produced, kept here because parts 3–5
+✅ **Part 3 is closed, and it answered the phase's one open copy question.** The
+officer approved the replacement unmatched-banner wording on 2026-09-19: *"We
+don't have that info on file. Check your EID and email for a typo and try again
+— or, if you haven't checked in with this form before, tick the box below."* It
+mirrors the new checkbox label clause for clause. **That was the only
+member-facing copy in the phase the officer had not already seen**, so no open
+copy questions remain.
+
+📌 **What part 3's gate produced, kept here because parts 4–5 inherit it:**
+- 🔴 **A clean detector is not a clean surface, and part 3 is the proof.** The
+  scan returned `[]`, exit 0, on a build that was simultaneously overflowing the
+  viewport by 588px on a long email, setting an `<h2>` in the paragraph ink,
+  painting the unmatched alert the same colour as the inputs below it, and
+  leaving focus on `<body>` when five of twelve states replace the screen. All
+  25 findings came from the other six steps.
+- 🔴 **A neutral `Banner` and a text input are THE SAME COLOUR.** Both fill
+  with `--misa-panel`, so on `ground="white"` an `info` banner above a stack of
+  empty inputs computes the identical `rgb(242,242,243)` and reads as one more
+  empty control. **`/portal/lookup` uses both on a white ground**, so it hits
+  this next. On a white ground, an alert that matters takes a status tone.
+- 🔴 **Neither `min-w-0` nor `break-words` fixes a long unbroken value
+  alone**, and the two failures look different: `break-words` alone does nothing
+  (the flex item is still sized to `min-content`, so there is nothing to wrap
+  into), and `min-w-0` alone stops the BOX overflowing while the text goes on
+  painting past the viewport. `/portal/lookup` echoes an EID and renders event
+  titles, so it wants both.
+- 🔴 **A width utility on a stretched flex child is not a width.**
+  `sm:w-auto` did nothing to the Check in button — it is a flex item in a
+  `flex-col` form, so `align-items: stretch` sets its width, and it rendered
+  576px at 1280 until `sm:self-start` landed.
+- 🚨 **ONLY ONE AGENT MAY DRIVE CHROME AT A TIME.** The first
+  `design-reviewer` run was killed after an hour having produced nothing,
+  because the lead was driving the same tab — two of the lead's own CDP calls
+  had already timed out (`Page.captureScreenshot` 30s, `Runtime.evaluate` 45s)
+  before the agent stalled. The second run, given the browser to itself, an
+  event left open so it needed no database work, a ban on `requestAnimationFrame`
+  loops (a background tab never advances rAF) and a 15-minute budget with
+  instructions to return partial findings, came back complete in ten minutes.
+- ⚠️ **The lead asserted a number it had not measured, in a comment, during
+  the pass that was measuring everything else.** It declined `min-h-12` on the
+  box row because "the block is already 87px" — an estimate from the build plan
+  assuming a three-line reassurance where it renders two. Wrong at every width
+  (64 at 360, **44** at 768 and 1280, under this surface's own committed floor).
+  The `design-reviewer` caught it. **Re-derive a number before writing it into a
+  comment, including one you produced yourself.**
+
+✅ **Part 2 is closed.**
 inherit both:
 - 🔴 **A focus ring must contrast with every ground the FOCUSED ELEMENT spans**,
   not just the one its section sits on. The hub's row link was the first thing
@@ -533,7 +581,7 @@ Each part ends somewhere demonstrable, which is the same rule the stages use.
 | **0 — Baseline** ✅ `debeca2` | Local stack up, dev server on the local env, re-measure each surface at 360×640 / 768 / 1280×720 / 1280×800, record the numbers, and run the receipts dry-run per surface. Confirm `npm test` and `npm run test:ui` are at their known state. | ✅ **Done.** `npm test` 41 files / 1142 tests green; `test:ui` 39 pass / 3 fail, exactly the documented three. Briefs re-confirmed or corrected; the muted counts fixed in three documents. |
 | **1 — Shared portal vocabulary** ✅ `fa7c2e5` | *(Widened — see above.)* Every shared-primitive addition the phase needs, all additive, all opt-in, no default moved. | ✅ **Done.** `portal-band.tsx` (PortalBand), `buttonClass({ touch })` for the 48px floor, `table.tsx`'s `scroll={false}` + `<THead sticky="page">`, `status-region.tsx` (StatusRegion). Suite unchanged at 39/3. |
 | **2 — `/portal` hub** ✅ `d827ac7` → `30bcec5` | The smallest surface, and it sets the row-link and key-column pattern the others borrow. | ✅ **DONE AND `rebuilt`.** Bar met with **99px** to spare (check-in row bottom **423 → 325** at 360×640, bar ≤424; all three destinations on the first screen), verified independently by the `design-reviewer` agent and by critique Assessment B. Seven receipts pass: 12 findings adopted, 8 rejected against a named rule, 3 deferred to the officer. |
-| **3 — `/portal/attend`** | The most states: twelve, plus pre-hydration. The new box label and review copy land here, **and both of its muted-on-Vellum occurrences** (`:336` and `:364`). | Its bar is met **in the idle state**, every state is designed and gated — not just the happy path — and the two red `color-contrast` checks are green. |
+| **3 — `/portal/attend`** ✅ `a38a2b3` → `4c216f1` | The most states: twelve, plus pre-hydration. The new box label and review copy land here, **and both of its muted-on-Vellum occurrences** (`:336` and `:364`). | ✅ **DONE AND `rebuilt`.** Bar met at **610.5px against a 640 fold** at a true 360×640 idle (was cut at 668), measured independently twice. All twelve states designed and gated; both `color-contrast` checks green and `test:ui` 39/3 → **41/1**. Seven receipts pass: 25 findings — 9 adopted, 14 rejected against a named rule, 2 deferred to part 6. |
 | **4 — `/portal/lookup`** | The most complex result, and the surface carrying 9 of the 13 muted occurrences. Stacked event rows below `sm`, the `definition-list` fix, the announced result, the stale sentence removed, the contradictory dues comment corrected. | Its bar is met; axe is green on the result and the miss; no sideways scroll to read whether you attended. |
 | **5 — `/portal/leaderboard`** | The odd one out: no hero, its own type scale, the column head made genuinely sticky (using part 1's white page-sticky variant), **and its two stale `active member` comments corrected**. | Its bar is met — **ten rows** on the first screen at 1280×720 — including the projector measurement. |
 | **6 — Outside the four surfaces, and the suite** | *(Narrowed — see above.)* `/officer-invite/[token]`'s one muted line; the shared primitives re-measured on the grounds the portal now puts them on; the full suite. **Touches no registered surface's files**, which is the point. | No muted ink on Vellum anywhere in `/portal` or `/officer-invite`; `npm test` green and `test:ui` green on all 42. |
@@ -623,13 +671,23 @@ front, so the order follows the **bars** rather than the dependencies:
 
 ### ⚠️ Open items that need the officer
 
-📌 **Three, none of which blocks a bar or a gate.** The first is part 3's and
-must be answered before that surface ships; the two from the hub's gate are
-*deferred* findings — recorded with reasons in
+📌 **Two remain, and neither blocks a bar or a gate.** Both are *deferred*
+findings from the hub's gate — recorded with reasons in
 `docs/design/surfaces/portal-hub/receipts/critique.md` (A3, A4/B3) — and the
 hub is `rebuilt` without them. 🔒 **Either one, if adopted, edits a frozen
 surface**, so each needs a receipt naming its fix commit or `receipts.mjs`
 fails `portal-hub` as stale. Ask them together at the officer's gate.
+
+✅ **The third is closed** — part 3's unmatched-banner copy, answered by the
+officer on 2026-09-19 and shipped verbatim. Kept below as item 1 so the record
+of what was asked, and what was chosen, survives.
+
+📌 **Part 3's gate also deferred two findings, and they are NOT officer
+questions** — both are shared-code work with a named owner, tracked in
+`tasks.md` under the muted-ink section: the text inputs' WCAG 1.4.11 boundary
+(1.53:1, from `controlClass`, shared site-wide) and the header's MEMBER PORTAL
+button at 29px tall with 3px of clearance at 360 (`site-header.tsx`). **Part 6
+owns both.**
 
 **2. The band's h1 restates the header button that was just tapped.**
 `PortalBand title="Member Portal"` renders 61→191 at 360, directly under the
@@ -655,14 +713,16 @@ row but left the ratio unchanged, so the finding stands.
 
 ---
 
-**1. Changing the check-in checkbox label orphans the unmatched banner.**
-`checkin-form.tsx:143-146` points at the box using the *old* label's words — "if
-this is your first MISA event or your first time checking in here, tick the box
-below" — and the approved copy replaces that label with *"I haven't checked in
-with this form before"*. The brief permits changing "the four banners" but the
-approved-copy list has **no replacement**. Part 3 drafts one and shows it to the
-officer before it ships, per the brief's own rule. **This is the only place in
-the phase that generates member-facing copy the officer has not already seen.**
+✅ **1. ANSWERED 2026-09-19 — the unmatched banner's replacement copy.**
+Changing the checkbox label orphaned the banner at `checkin-form.tsx:143-146`,
+which pointed at the box using the OLD label's words. The lead drafted three
+options and the officer chose the one that **mirrors the new label clause for
+clause**: *"We don't have that info on file. Check your EID and email for a typo
+and try again — or, if you haven't checked in with this form before, tick the
+box below."* Shipped verbatim in `a38a2b3`. **This was the only place in the
+phase that generated member-facing copy the officer had not already seen, so no
+copy question remains open.**
+
 
 ### What the officer settled in the interviews (2026-09-19)
 
