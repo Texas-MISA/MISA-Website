@@ -53,19 +53,21 @@ const EMPTY: SubmittedValues = {
  *
  * 🪤 **Empty for every state that already announces itself.** EV11's rule is
  * one atomic status message and never competing live regions: the three banners
- * carry `role="alert"` and the field errors carry their own, so adding a second
- * region saying the same thing would make a screen reader read each failure
- * twice. What this region exists for is the set of screens where the panel
- * MOUNTS already holding its text — the review step and the four terminal
- * outcomes — which is precisely the case CLAUDE.md records as missed, and which
- * is why those panels no longer carry `role="status"` themselves.
+ * carry `role="alert"`, the field errors carry their own, and the review step's
+ * heading takes focus — so adding a second region saying the same thing would
+ * make a screen reader read each of those twice. What this region exists for is
+ * the four TERMINAL outcomes, whose panels mount already holding their text,
+ * which is precisely the case CLAUDE.md records as missed and why those panels
+ * no longer carry `role="status"` themselves.
+ *
+ * 🔓 **One rule, six states, instead of a rule and an exception.** The region
+ * carries only what nothing else announces. `needs_confirmation` joined the
+ * banners here when the audit pass gave the review step's heading focus: a
+ * screen that CONTINUES the task moves focus (which announces it), a screen
+ * that ENDS it announces politely and leaves focus alone.
  */
 function announcement(state: CheckinState): string {
   switch (state.status) {
-    case "needs_confirmation":
-      return state.existing
-        ? "We found you. Confirm to check in."
-        : "Check your details before we add you.";
     case "present":
       return `You're checked in. Your attendance at ${state.eventTitle} is recorded.`;
     case "pending":
@@ -76,13 +78,15 @@ function announcement(state: CheckinState): string {
         : "Already recorded. Your check-in is awaiting officer review.";
     case "refused":
       return "No event around this time. Nothing was recorded.";
-    // Announced by their own role="alert" — the three banners and the field
-    // errors. Returning "" here is what keeps the two from competing.
+    // Announced by something else already — the three banners' and the field
+    // errors' `role="alert"`, and the review step's heading taking focus.
+    // Returning "" here is what keeps the two from competing.
     case "idle":
     case "invalid":
     case "error":
     case "rate_limited":
     case "unmatched":
+    case "needs_confirmation":
       return "";
     default: {
       const exhaustive: never = state;
@@ -297,9 +301,22 @@ function CheckinFields({
           quoting a label that no longer exists — the one place in the phase
           that generated member-facing copy the officer had not already seen.
           It now mirrors the label word for word, so a member scanning for the
-          banner's words finds the control it points at. */}
+          banner's words finds the control it points at.
+
+          🔴 `tone="caution"`, not the default `info`, and the reason is
+          measured rather than semantic — though it is both. The `info` wash is
+          `bg-misa-panel`: **the same Vellum the three empty inputs below it are
+          filled with**, since `controlClass` uses that exact token. On this
+          white sheet both compute `rgb(242,242,243)` at 1.12:1 against the
+          ground, so the alert carrying the officer's NAMED failure rendered as
+          a fourth, empty form control. Caution's warm wash separates it by hue
+          from the neutral controls, and it ties the banner to the outline on
+          the box it points at — the sentence and its target now share a colour.
+          It is also the more accurate token: `info` is DESIGN.md's "nothing to
+          do here", and this screen is the one place on the page that asks the
+          member to do something specific. */}
       {unmatched && (
-        <Banner role="alert" tabIndex={-1}>
+        <Banner tone="caution" role="alert" tabIndex={-1}>
           We don&apos;t have that info on file. Check your EID and email for a
           typo and try again — or, if you haven&apos;t checked in with this form
           before, tick the box below.
@@ -370,32 +387,48 @@ function CheckinFields({
           line says out loud so an unsure member can just tick it.
 
           🪤 **The reassurance is a DESCRIPTION, not part of the name.** It sits
-          inside the `<label>` so the whole block stays one tap target — 87px at
-          360, against EV4's 48px floor and against the 16×16 box this replaces
-          — but `aria-labelledby` points at the label span ALONE and
+          inside the `<label>` so the whole block stays one tap target, against
+          EV4's 48px floor and against the 16×16 box this replaces — but
+          `aria-labelledby` points at the label span ALONE and
           `aria-describedby` at the hint. Without that split the box announces
           as one run-on string with the question buried at its front, which is
           the exact accessible-name bug `components/ui/field.tsx` documents.
           `aria-labelledby` outranks the wrapping `<label>` in the accname
           computation, so the name is the sentence and nothing more.
 
-          🪤 **No `min-h-12` here**, deliberately: the block is already 87px, and
-          adding a floor it clears would only add dead space to the one page in
-          the codebase measured in single-digit pixels.
+          🔴 **`min-h-12` IS here, and an earlier version of this comment
+          declined it on a number nobody had measured.** It claimed "the block
+          is already 87px" — an arithmetic estimate from the build plan, which
+          assumed the reassurance wrapped to three lines. It wraps to two.
+          Measured on the running page: **64px at 360** (two lines), but **44px
+          at 768 and 1280**, where the label fits on one line — four pixels
+          UNDER the floor this surface's own evidence commits to, on the two
+          widths the estimate never considered. The floor costs the 360 bar
+          nothing, because 360 already clears it. Found by the design-reviewer
+          at the gate; the lesson is the project's own, and it was written into
+          a comment by the same pass that was otherwise measuring everything.
 
           Echoing the member's own tick back after the form reset — not a
           preselected suggestion. It starts unchecked on the first render and
           only ever reflects what they chose. */}
       <label
-        className={`flex items-start gap-3 text-sm ${
+        className={`flex min-h-12 items-start gap-3 text-sm ${
           // 🔓 On the unmatched screen the banner says "tick the box below", so
           // the box is marked in caution to end the sentence. An OUTLINE, never
           // a border: an outline is drawn outside the layout, so the idle state
           // — the one with the bar on it — pays nothing for a state it never
           // shows. Offset 4 keeps it clear of the 2px focus ring at offset 2,
           // and the two never coexist anyway.
+          //
+          // 🔴 2px at full strength, not 1px at 60%. At `outline-1` and /60 it
+          // rendered as a SINGLE DEVICE PIXEL at 60% alpha, held 4px off a 64px
+          // block — so the two faintest marks on that screen were the alert and
+          // the pointer to the control it names. 2px is already the system's
+          // focus-ring weight, so it is in the vocabulary; caution is a
+          // desaturated earth ink rather than a signal light, and at full
+          // strength it reads as deliberate rather than loud.
           unmatched
-            ? "outline-1 outline-offset-4 outline-misa-caution/60"
+            ? "outline-2 outline-offset-4 outline-misa-caution"
             : ""
         }`.trim()}
       >
@@ -493,8 +526,30 @@ function ReviewPanel({
   submitted: SubmittedValues;
   existing: boolean;
 }) {
+  // 🔴 **This screen replaces the one the member was focused on, so it has to
+  // place focus itself.** The submit button they just pressed is unmounted with
+  // the form, and focus falls back to `<body>` — so the next Tab restarts above
+  // the site header, and a keyboard user has to cross the skip link, the
+  // wordmark, four nav items and the MEMBER PORTAL button to reach *Confirm and
+  // check in*, which is the only thing this screen asks of them.
+  //
+  // 🪤 **Only this screen, and only because it CONTINUES the task.** The four
+  // terminal outcomes ask nothing, so they announce through `StatusRegion` and
+  // leave focus alone — moving it there would interrupt a sentence the member
+  // is being given rather than asked to act on. That split is also what keeps
+  // `announcement()` down to one rule: the region carries what nothing else
+  // announces, and a focused heading announces itself.
+  //
+  // 🪤 Queried out of the form rather than held on the heading, matching
+  // `CheckinFields` above: `Title` would need ref forwarding for no gain, and
+  // `h2[tabindex="-1"]` is exact — this is the only one on the page.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    formRef.current?.querySelector<HTMLElement>('h2[tabindex="-1"]')?.focus();
+  }, []);
+
   return (
-    <form action={action} className="flex flex-col gap-4">
+    <form ref={formRef} action={action} className="flex flex-col gap-4">
       {/* 🔴 `ground="white"`, and that is THE muted-on-Vellum fix for this
           surface's first occurrence. The three `<dt>` labels below were
           `--misa-muted` on a Vellum panel — 4.33:1, the AA failure that
@@ -515,13 +570,27 @@ function ReviewPanel({
             reads one line, not two. `size="card"` is the ramp's Card title row
             (22 → 26) — a level cue against the band's h1, which is `Title`'s
             own 26 → 34. NEVER `className="text-[22px] sm:text-[26px]"`: that
-            form ties on specificity and silently loses. */}
-        <Title as="h2" size="card">
+            form ties on specificity and silently loses.
+
+            `tabIndex={-1}` is the focus target, not a tab stop — see the effect
+            at the top of this component for why the screen has to place focus
+            itself. */}
+        <Title as="h2" size="card" tabIndex={-1}>
           {existing
             ? "We found you. Confirm to check in."
             : "Check your details before we add you"}
         </Title>
-        <dl className="mt-4 flex flex-col gap-2 text-sm">
+        {/* 🔴 Body size (16px), not `text-sm`. **This screen's whole job is
+            proofreading** — its heading says so, and the next action creates a
+            roster record. What it shows is a UT EID and an email address, on a
+            phone, in a room. The 14px arrived by inheritance from the form's
+            labels, and a label and a value are different jobs: one is
+            scaffolding you read once, the other is data you are being asked to
+            verify. DESIGN.md's other instrument for an identifier — monospace,
+            "because an EID is transcribed by hand off a phone screen" — is
+            scoped to /admin and unavailable here, which leaves size. Measured
+            cost: the list grows 76 → 88px, on a screen with no bar on it. */}
+        <dl className="mt-4 flex flex-col gap-2 text-base">
           <Row label="Full name" value={submitted.fullName} />
           <Row label="UT EID" value={submitted.eid} />
           <Row label="Email" value={submitted.email} />
@@ -601,7 +670,24 @@ function Row({ label, value }: { label: string; value: string }) {
           Vellum at 4.33:1: the AA failure phase 3 exists to remove, and the one
           the suite could actually see. */}
       <dt className="text-misa-secondary">{label}:</dt>
-      <dd className="font-medium">{value}</dd>
+      {/* 🔴 `min-w-0 break-words`, and NEITHER WORKS WITHOUT THE OTHER. A flex
+          item's automatic minimum size is its `min-content` width, and an email
+          address has no break opportunities — so the schema's 254-character
+          ceiling put a real value **904px wide inside a 305px column**, taking
+          the document to 588px of horizontal scroll at 360.
+
+          🪤 The two failures look different, which is what makes this worth a
+          comment. `break-words` alone does nothing: the item is still sized to
+          `min-content`, so there is nothing to wrap into. `min-w-0` alone is
+          worse than it looks — the `<dd>` BOX stops overflowing, so anything
+          reading box geometry calls it fixed, while the text goes on painting
+          588px past the viewport. Only the pair works, and the panel growing
+          233 → 293px is the proof the text finally wrapped.
+
+          🪤 It is specifically an UNBROKEN TOKEN. A 109-character *name* wraps
+          cleanly today, because it has spaces — so a long-content check that
+          used a realistic name would have passed and found nothing. */}
+      <dd className="min-w-0 break-words font-medium">{value}</dd>
     </div>
   );
 }
@@ -655,10 +741,29 @@ function ResultPanel({
           className="mt-0.5 size-6 shrink-0"
         />
         <div className="min-w-0">
-          <Title as="h2" size="card">
+          {/* 🔴 `text-foreground` (Graphite) because `Banner`'s tone classes end
+              in `text-misa-body`, and this heading was inheriting it — measured
+              `rgb(58, 61, 64)`. DESIGN.md §Colors assigns Graphite to "ink —
+              body headings" and Body Graphite to "long-form paragraphs", so the
+              outcome heading was wearing the paragraph's ink. What made it a
+              defect rather than a quibble: the review step's heading two
+              screens earlier sits in a `Panel`, inherits `body`'s
+              `--foreground`, and IS Graphite — so a first-timer saw the same
+              component, at the same size, in two different inks.
+
+              🪤 This does not touch `Banner`'s own rule. "The tone is in the
+              rule and the ground; the text stays body-coloured" was written
+              about the MESSAGE, and a heading inside a banner is a shape
+              `Banner` had no call site for until this surface made one. */}
+          <Title as="h2" size="card" className="text-foreground">
             {heading}
           </Title>
-          <p className="mt-2 leading-[1.65]">{children}</p>
+          {/* `leading-[1.6]`, the ramp's Body row. 1.65 is the `Lead` row's,
+              for 18px — inherited from the pre-redesign panel. Ten call sites
+              in the codebase still pair 1.65 with body size and three use 1.6;
+              what settles it here is that the hub, the only other surface
+              through this pipeline, took 1.6 against the ramp at its own gate. */}
+          <p className="mt-2 leading-[1.6]">{children}</p>
           {/* Stage 7 phase 2. On every terminal outcome, including `pending`
               and `duplicate` — those are the two where someone most wants to
               see for themselves that the system has them, rather than take a
@@ -674,10 +779,21 @@ function ResultPanel({
               🔓 "See your points and attendance" is the approved copy (was
               "Check your points and attendance" — "check" is the verb this
               whole page already owns). */}
-          <p className="mt-4">
+          {/* 🔴 `py-3` on the link and `mt-2` on the wrapper, together. This is
+              the ONLY action on four of the twelve screens — on `pending`,
+              `duplicate` and `refused` it is the only thing a member can do at
+              all — and it measured 217 × 32px while every other target on this
+              page was built to 48 on EV4's argument that the page is "used
+              standing up at a door, one-handed, in a hurry". 32 clears WCAG
+              2.2's 24px floor and matches what the hub shipped, but the hub's
+              equivalent is a footnote for the one person on that page who is
+              not a member. This is the member's next step. `py-3` takes it to
+              exactly 48px; `mt-4 → mt-2` gives back the 8px the padding adds,
+              so the visual gap to the sentence above stays at 20px. */}
+          <p className="mt-2">
             <Link
               href="/portal/lookup"
-              className="inline-block py-1 text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+              className="inline-block py-3 text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
             >
               See your points and attendance
             </Link>

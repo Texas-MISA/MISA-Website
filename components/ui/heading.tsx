@@ -24,6 +24,24 @@ export type HeadlineProps = {
   id?: string;
   "data-reveal"?: string;
   style?: React.CSSProperties;
+  /**
+   * 🔓 **`-1` makes a heading a focus TARGET without putting it in the tab
+   * order** (v2 phase 3, the Portal Rebuild). For the one case that needs it:
+   * a screen that replaces another in place, where the element the person was
+   * focused on has just been unmounted and focus would otherwise fall to
+   * `<body>` — so the next Tab restarts above the site header. Moving focus to
+   * the new screen's heading both announces it and puts the keyboard user
+   * above the control the screen is asking them to press.
+   *
+   * 🪤 Only `-1` is accepted. A `0` would put every heading on a page into the
+   * tab sequence, and a positive value jumps the document order.
+   *
+   * 🪤 It is for a screen that CONTINUES a task, not one that ends it. A
+   * terminal outcome asks nothing of the reader, so a polite live region is
+   * the correct, less disruptive answer there and moving focus is an
+   * interruption — see `StatusRegion`.
+   */
+  tabIndex?: -1;
 };
 
 /** The section heading. 30px on phones, 42px from `sm`. */

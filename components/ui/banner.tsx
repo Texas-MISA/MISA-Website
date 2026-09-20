@@ -49,8 +49,9 @@ export type BannerTone = keyof typeof TONES;
  * render at 26px for as long as it has existed (see `components/ui/heading.tsx`).
  * A prop that SWAPS the base classes cannot lose that race.
  *
- * 🪤 **`sm` is the default and nothing moves.** All ~38 existing call sites
- * render exactly what they rendered before. `md` exists for ONE shape: the
+ * 🪤 **`sm` is the default and nothing moves.** All 24 existing `<Banner>` call
+ * sites across 11 files — plus every `ReadError`, which renders one — emit the
+ * identical class string they did before. `md` exists for ONE shape: the
  * portal's outcome sheet, where the banner is not a notice beside the task but
  * the screen that ends it, and its sentence is body copy (16px) rather than the
  * 14px a notice is set in — 14px is on no row of DESIGN.md §The ramp.
