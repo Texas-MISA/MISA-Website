@@ -723,12 +723,19 @@ Real photographs are live on the home page **locally only**.
   ⚠️ `/attend`, `/lookup`, `/leaderboard` and `/officer-invite/[token]` also put
   muted on grey in places. They are phase 3 and were left standing rather than
   touched from outside their phase; the smallest margin on the five phase-2 pages
-  is now **4.84:1**. 📌 **RE-COUNTED 2026-09-19: 14 occurrences across FIVE files** — lookup 9
-  (page 1, form 8), attend 2 (the 2026-09-14 disclosure hotfix removed two of
-  the four), leaderboard 1, the `/portal` hub 1 (it did not exist when this
-  note was written), officer-invite 1 — **not all of them fail**,
+  is now **4.84:1**. 📌 **RE-COUNTED 2026-09-19, AGAINST THE RENDERED PAGES: 13
+  occurrences across FOUR files** — lookup 9 (page 1, form 8), attend 2 (the
+  2026-09-14 disclosure hotfix removed two of the four), leaderboard 1,
+  officer-invite 1 — **not all of them fail**,
   only the ones on grey, so each is measured on the ground it actually sits on
-  rather than swapped wholesale. 🪤 **All four live under `app/(public)/`,
+  rather than swapped wholesale.
+  🐛 **The `/portal` hub renders NONE, and the earlier count of 1 was a grep
+  hit on a COMMENT** — `app/(public)/portal/page.tsx:42`, the note explaining
+  why the hub's officer line uses `--misa-secondary` in the first place.
+  `tasks.md` had this right ("The new `/portal` hub adds none") and this file
+  did not. **Count rendered class attributes, not grep hits**, and the same
+  pass found attend at 2 where `tasks.md` still said 4. Neither document was
+  wholly right; both are corrected. 🪤 **All four live under `app/(public)/`,
   `officer-invite` included** — it is outside `/admin` (see `proxy.ts`), which
   makes `app/officer-invite` a plausible-looking path that does not exist.
   Tracked in `tasks.md`.

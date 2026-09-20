@@ -46,12 +46,38 @@ Officer interview, 2026-09-19.
   | Events table | **512px wide inside a 320px frame — the "You" column needs a sideways scroll** | fits (768px) |
   | Result page height | 2107 | 1817 |
 
+- ✅ **RE-MEASURED 2026-09-19 at the start of the build (part 0).** The form
+  figures reproduce within 1px: hero ends **309**, EID field **540–590**, Look
+  up button **614–653**, the member's name at **516**. Two corrections:
+  - 🐛 **The frame around the events table is 305px, not 320** — 360 less the
+    20px phone gutters less the section's own inset. The table is still 512px
+    inside it (`scrollWidth` 512 against `clientWidth` 305), so the "You"
+    column is still the one off-screen; the gap is 207px, not 192.
+    🪤 **The page itself does NOT overflow** — `scrollWidth - clientWidth` is
+    **0**, because the scroll lives inside `Table`'s `overflow-x-auto` wrapper.
+    That is exactly why `test:ui`'s 360px overflow check passes while the
+    attendance state stays unreachable, and why EV2 needs a human.
+  - 🐛 **The result's length figures belong to a DIFFERENT member than the one
+    the suite gates on.** "Membership dues 1718 / page height 2107" is a member
+    with a pending check-in — **`hs8260` (Hana Sato)**, re-measured at **1726 /
+    2149**. But `tests/ui/design-gate.spec.ts` drives **`bk2856` (Bela
+    Kovacs)**, who has **0 pending and 0 adjustments**, so the gated result is
+    the *shortest* one: dues at **1494**, height **1917**, with neither
+    "Waiting on an officer" nor "Points granted separately" rendered at all.
+    🪤 **No seed member has both a pending check-in and an adjustment** —
+    pending is `hs8260`/`lm2647`, adjustments belong to six other members, and
+    the sets are disjoint. So the "many states at once" case under *States* is
+    **not reachable from any single seed member today**; the build has to
+    construct it locally in order to design it. A member with one adjustment
+    (`pn8571`) measures dues **1725**, height **2148**, two tables.
 - **Proof the lead proposes for the gate:** at 360×640 the EID field and the
   Look up button are both on the first screen (today the button is cut); on the
   result, **no horizontal scroll is needed to read whether you attended an
   event**; the member's own numbers are reachable without reading past
   explanation; and `npm run test:ui` passes, including the `definition-list`
-  fault it catches on the result today.
+  fault it catches on the result today. 📌 **That fault is ONE node, not four** —
+  axe reports `definition-list (1): dl`, and only the Attendance-rate `<div>` is
+  `DT,DD,P`; the other three stats are clean `DT,DD`. Measured in the browser.
 
 ## States
 - **Idle** — one field (UT EID) and the button.

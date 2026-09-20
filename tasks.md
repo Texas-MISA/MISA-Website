@@ -14,7 +14,7 @@ Officer instruction: before the portal's UI redesign, a site-wide system around 
 - **Pipeline per surface:** `/design-brief` (impeccable `shape` → the brief impeccable itself loads; `frontend-design`'s two concepts; `ui-ux-pro-max` evidence) → build → `/design-gate` review → officer. Surfaces are registered in `docs/design/surfaces.json`; the four portal pages are `in-progress` since 2026-09-19 — each has its brief, so **their files are unguarded and their builds may start**.
 - **Enforcement:** the brief guard hook refuses edits to a registered surface without its brief; `tests/design-receipts.test.ts` fails a `rebuilt` surface whose receipts are missing, undisposed, changed nothing, or stale; `tests/design-tokens.test.ts` and `tests/design-detector.test.ts` (empty baseline) in `npm test`; `npm run test:ui` runs axe, 360px overflow and no-JS reveals.
 - 🔓 **The skills are committed** (officer) — `.claude/skills/`, `.claude/settings.json`, `.claude/agents/`, `.mcp.json`, `skills-lock.json`.
-- 📌 **`npm run test:ui` is RED on three checks, all correct and all phase 3's:** `/portal/lookup`'s member result fails axe `definition-list` (a `<p>` inside a `<dl>` group, `lookup-form.tsx:435`), and **both of `/portal/attend`'s first-timer confirmations fail `color-contrast` — the known `--misa-muted`-on-Vellum failure, now caught by a check.** 39 pass, WCAG 2.2 AA included, on every public page, `/admin/login`, the 404 and every portal first render.
+- 📌 **`npm run test:ui` is RED on three checks, all correct and all phase 3's:** `/portal/lookup`'s member result fails axe `definition-list` (a `<p>` inside a `<dl>` group, `lookup-form.tsx:435`), and **both of `/portal/attend`'s first-timer confirmations fail `color-contrast` — the known `--misa-muted`-on-Vellum failure, now caught by a check.** 39 pass, WCAG 2.2 AA included, on every public page, `/admin/login`, the 404 and every portal first render. ✅ **Re-confirmed 2026-09-19 at the Portal Rebuild's part 0: `npm test` 41 files / 1142 tests / 0 failures; `npm run test:ui` 39 pass, 3 fail, and the three are exactly these.** Axe names them `definition-list (1): dl` and `color-contrast (3): … > dt` — **one** malformed list node, and the review step's **three** `<dt>` labels, so neither fault is as wide as the prose around them had implied.
 - 🔍 **Reviewed the same day** (officer): five bugs and four design weaknesses in the toolkit itself found and fixed — the record is in `docs/build-log.md` and the v1.82 note.
 - ⚠️ **Flag for phase 3, before the briefs:** `PRODUCT.md` still says member identity is "an EID plus a matching email", but `/portal/lookup` has been EID-alone since 2026-08-25 — and impeccable feeds PRODUCT.md to the lead on every command. Correct it with the officer first.
 - ⚠️ **Also stale, and older than this work: `.impeccable/design.json` is the v1-era sidecar** (generated 2026-08-17, before DESIGN.md v2). It still states the retired Two Grounds Rule and "no radius, anywhere", and has no elevation. impeccable's context loader does not read it, so it is not steering the lead — but its detector's token checks and its live panel do. Refresh it with `/impeccable document`'s **sidecar-only** path (it writes only `design.json` and preserves DESIGN.md), and review the diff: it is a design artifact, not a cache.
@@ -423,16 +423,31 @@ ink on Paper (white) is **4.84:1** and passes. Only the background differs.
 grey. `DESIGN.md`'s rule is deliberately narrow: **muted may sit on Paper, never
 on Vellum.**
 
-⚠️ **DO NOT swap all 15 occurrences.** Muted on white is correct and must stay —
+⚠️ **DO NOT swap all 13 occurrences.** Muted on white is correct and must stay —
 that is where the header, footer, `KpiPlate` and `OfficerCard` use it. Each has
 to be **measured on the ground it actually sits on, compositing any alpha**:
 
-| Surface | `misa-muted` occurrences |
-|---|---|
-| `/portal/lookup` (`page.tsx`, `_components/lookup-form.tsx`) | 9 |
-| `/portal/attend` (`_components/checkin-form.tsx`) | 4 |
-| `/portal/leaderboard` (`page.tsx`) | 1 |
-| `/officer-invite/[token]` (`page.tsx`) | 1 |
+| Surface | `misa-muted` occurrences | On Vellum? |
+|---|---|---|
+| `/portal/lookup` (`page.tsx` 1, `_components/lookup-form.tsx` 8) | 9 | all on white today |
+| `/portal/attend` (`_components/checkin-form.tsx` `:336`, `:364`) | 2 | **both** — `Panel ground="panel"` |
+| `/portal/leaderboard` (`page.tsx` `:238`) | 1 | on white today |
+| `/officer-invite/[token]` (`page.tsx` `:135`) | 1 | **yes** — a raw `<section>` on the page ground |
+| `/portal` hub | **0** | — |
+
+🐛 **RE-COUNTED 2026-09-19 against the rendered pages, and this table was wrong
+twice.** It said `/portal/attend` 4; the 2026-09-14 disclosure hotfix took it to
+**2**. And `DESIGN.md` counted the hub at 1 where this file always said 0 — the
+hub's single grep hit is `portal/page.tsx:42`, the **comment** explaining why its
+officer line uses `--misa-secondary`. **Count rendered class attributes, not grep
+hits.** New total: **13 across four files.**
+
+📌 **Two of the four Vellum failures are caught by `npm run test:ui`, and two are
+not.** Axe names `color-contrast (3): … > dt` — the three review-step labels at
+`checkin-form.tsx:336`. It never reaches a terminal check-in screen, so
+`:364`'s muted link line — which renders on **all four** of present, pending,
+duplicate and refused — has never been seen by an automated check. Neither has
+`/officer-invite`, which is not a route the suite visits.
 
 📌 The three member pages moved under `/portal` on 2026-09-18 with no copy change, so
 the counts stand (files are under `app/(public)/portal/`). The new `/portal` hub adds

@@ -50,12 +50,33 @@ related_targets: ["app/(public)/portal/attend/page.tsx","app/(public)/portal/att
   | 390×844 | 238 | 310–548 | 572 | 632–671 |
   | 1280×800 | 283 | 371–609 | 633 | 673–712 |
 
+  ✅ **RE-MEASURED 2026-09-19 at the start of the build (part 0), and the table
+  holds within 3px:** hero ends **237**, inputs **309–358 / 402–451 / 495–545**
+  (**49px** each, not 50), box row **565–605** with the box itself at 569, Check
+  in **629–668**. The form carries no `data-reveal`, which is why these reproduce
+  where the hub's did not. The net budget recomputed from the spacing scale is
+  **−47px**, landing at **≈624 against a 640 fold — 16px, not 12**. Still the
+  tightest number in the phase, and still unmeasurable by any automated check.
+
   **Proof the lead proposes for the gate (the officer did not name an anti-goal;
   this is the documented 20-second target made measurable):** at 360×640, with
-  the keyboard closed, the Check in button sits fully in the first screen
-  (bottom edge ≤ 640px, today 671); the page never grows a step on the fast
-  path; and every state below passes `npm run test:ui` — today the first-timer
-  confirmation does not.
+  the keyboard closed **and in the IDLE state**, the Check in button sits fully
+  in the first screen (bottom edge ≤ 640px, today 671); the page never grows a
+  step on the fast path; and every state below passes `npm run test:ui` — today
+  the first-timer confirmation does not.
+  🔓 **The bar is IDLE-ONLY (settled 2026-09-19).** The unmatched state — which
+  is what the officer's named first-timer failure actually produces — puts a
+  banner above the fields and pushes the button roughly 90px further down. It is
+  **measured and recorded at the gate, but does not block**: gating on it would
+  force either the approved reassurance line into a disclosure or the band below
+  what the 48px chevron notch allows, and both reopen decisions the officer has
+  already made.
+  🐛 **`test:ui` names three `color-contrast` nodes, all at `checkin-form.tsx:336`**
+  — the review step's three `<dt>` labels. It does **not** see `:364`, the muted
+  link line inside `ResultPanel`, which sits on the same Vellum `Panel` and
+  renders on **all four** terminal screens (present, pending, duplicate,
+  refused). The suite reaches neither, so that occurrence has never been caught
+  by anything. Both are this surface's to fix.
 
 ## States
 Every state is designed, not just the form. Realistic ranges: full name up to

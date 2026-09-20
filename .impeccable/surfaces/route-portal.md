@@ -45,6 +45,20 @@ related_targets: ["app/(public)/portal/page.tsx"]
   | 768×1024 | 373–412 | 516–555 | 671–710 |
   | 1280×800 | 381–420 | 524–563 | 667–706 |
 
+  ✅ **RE-MEASURED 2026-09-19 at the start of the build (part 0), and the table
+  holds:** at 360×640 the three buttons settle at **384–423**, **602–641** and
+  **820–859**. Within 1–3px of the rows above, so the bar stands as written.
+  🪤 **Measure the SETTLED state or you will read every number 18px low.**
+  `html.js [data-reveal="up"]` is `translateY(18px)`, and the hub's three rows
+  each carry one — so an un-revealed read gives 441 where the truth is 423.
+  Forcing `data-revealed` is the right method (it is what
+  `tests/ui/design-gate.spec.ts` does), but it starts a 0.7s transition, and a
+  **background browser tab never advances it** — even an `!important` override
+  appears not to apply. Removing the `js` class off `<html>` is the reliable
+  read: it drops the transition with the rule, so the geometry snaps.
+  📌 This is one more argument for concept A's no-reveal destinations: the 18px
+  is not only a delay, it is a number nobody can measure casually.
+
   **Proof for the gate:** at 360×640 the check-in control's bottom edge sits at
   or above 424px (fully in the first screen, no scroll), and the path stays
   header button → hub → check-in, two taps. Any concept that pushes check-in

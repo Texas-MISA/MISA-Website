@@ -49,6 +49,23 @@ several phone screens.
 
   The table is 768px wide at desktop; the page is ~1900px tall with 29 rows,
   and would be ~6,500px with 150.
+
+  ✅ **RE-MEASURED 2026-09-19 at the start of the build (part 0): every figure
+  in this table holds.** Hero ends 309 / 330, first row 391 / 428, rows in the
+  first screen **5 at 360×640, 6 at 1280×720, 15 at 1920×1080**, names 14px,
+  rows 42px, table 768px at desktop and 305px at 360, page 1891px with 29 rows.
+  Two numbers the build needs that were not recorded:
+  - 📌 **The tenth row's bottom edge is at 851 at 1280×720.** So the gate bar is
+    a **131px** claw-back, against concept A's estimated 174px of saving (677).
+    That is the budget, stated as a number rather than a row count.
+  - 📌 **The seed's rank ≤ 10 is exactly ten rows.** Verified against the view:
+    totals 23, 19, 19, 18, 17, 17, 17, 17, 15, 15 then 14 — ranks 1, 2, 2, 4,
+    5, 5, 5, 5, 9, 9, **11**. So the seed measures the bar honestly, and the
+    boundary-tie case has to be constructed rather than observed.
+  🔓 **The bar is TEN ROWS (settled 2026-09-19).** A boundary tie pushing an
+  eleventh recognised row past the fold is a named, accepted overflow, recorded
+  in this surface's receipt — not a bar failure. The board shows ranks as they
+  are; what it may not do is renumber a tie to fit.
 - **Proof the lead proposes for the gate:** at **1280×720 the whole top 10 is
   on the first screen** (today 6 rows), and the recognised places read from
   across a room — names well above today's 14px at desktop widths; at 360×640
