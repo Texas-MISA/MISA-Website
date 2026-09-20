@@ -73,16 +73,17 @@ export function Headline({
  * sm:text-[26px]">` renders at 26 → 34, the default, every time.
  *
  * 🐛 Measured on the running site at the portal-hub gate (2026-09-19):
- * `components/ui/activities.tsx:98` passes `text-[22px] sm:text-[26px]` and the
- * home page's activity titles render at **34px** at 1280. That is a live
- * defect on a phase-1 surface, it has been there since the bento grid was
- * built, and no test or detector sees it — the class IS in the attribute, so a
+ * `components/ui/activities.tsx` passed `text-[22px] sm:text-[26px]` and the
+ * home page's activity titles rendered at **34px** at 1280. That was a live
+ * defect on a phase-1 surface, it had been there since the bento grid was
+ * built, and no test or detector saw it — the class IS in the attribute, so a
  * grep confirms the intent and only a computed-style read shows the result.
  * **This is the "measure rendered class attributes, not grep hits" rule with
  * teeth: here even the rendered attribute lies, and only `getComputedStyle`
- * tells the truth.** Fixing `activities.tsx` is NOT this surface's to do — it
- * is recorded for v2 phase 3 part 6, which is the part that owns work outside
- * the four portal surfaces.
+ * tells the truth.** ✅ **FIXED in v2 phase 3 round 1a** — `activities.tsx` now
+ * passes `size="card"` and measures **22px below `sm`, 26px at and above it**.
+ * ⚠️ Nothing stops the next call site from reaching for the className again;
+ * the prop is the fix, and this paragraph is the reason to use it.
  *
  * So the size is a prop that SWAPS the base classes rather than an override
  * that races them. `card` is DESIGN.md §The ramp's "Card title" row.

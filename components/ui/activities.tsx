@@ -95,7 +95,15 @@ export function Activities({ className = "" }: { className?: string }) {
             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 60vw"
           />
           <div className="flex flex-1 flex-col px-6 pt-5 pb-6">
-            <Title className="mb-2.5 text-[22px] sm:text-[26px]">
+            {/* 🐛 `size="card"`, NOT `className="text-[22px] sm:text-[26px]"`.
+                This carried exactly that className until v2 phase 3 round 1a
+                and rendered 26 → 34 — the default — because both are plain
+                arbitrary-value utilities that tie on specificity (0,1,0) and
+                Tailwind v4 emits them ascending, so the LARGER always wins. The
+                class was in the attribute, so a grep confirmed the intent and
+                only `getComputedStyle` showed the result. `size` swaps the base
+                classes rather than racing them; see `Title` in heading.tsx. */}
+            <Title size="card" className="mb-2.5">
               {activity.title}
             </Title>
             <p className="leading-[1.6] text-misa-secondary">{activity.body}</p>
