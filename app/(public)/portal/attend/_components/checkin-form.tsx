@@ -1,7 +1,9 @@
 "use client";
 
+import { Check, CircleCheck, CircleSlash, Clock } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useEffect, useId, useRef } from "react";
 
 import {
   submitCheckin,
@@ -12,10 +14,12 @@ import {
 // constant the server decides with — a hardcoded "48 hours" would start
 // lying the moment ORPHAN_WINDOW_HOURS changed. lib/checkin.ts is free of
 // next/* and server-only imports, so a Client Component can import it.
-import { Banner } from "@/components/ui/banner";
-import { BUTTON_OUTLINE_NAVY, BUTTON_SOLID_NAVY } from "@/components/ui/button";
+import { Banner, type BannerTone } from "@/components/ui/banner";
+import { buttonClass } from "@/components/ui/button";
 import { CHECKBOX, Field, Input } from "@/components/ui/field";
+import { Title } from "@/components/ui/heading";
 import { Panel } from "@/components/ui/panel";
+import { StatusRegion } from "@/components/ui/status-region";
 import { ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 
 // Client Component for useActionState only — the form posts to the Server
@@ -23,6 +27,12 @@ import { ORPHAN_WINDOW_HOURS } from "@/lib/checkin";
 // queue until JS loads; Next prioritizes hydrating them). The two-step
 // first-timer flow is action state rather than client-side routing for the
 // same reason: it has to survive a phone that hasn't finished loading JS.
+//
+// REBUILT in v2 phase 3 (the Portal Rebuild), concept A "Fit the first screen".
+// Brief: .impeccable/surfaces/route-portal-attend.md. Twelve states, plus the
+// pre-hydration one, and every one of them is designed — the officer's named
+// failure (a first-timer stuck on the checkbox's wording) happens on a screen
+// no happy-path review ever opens.
 
 const INITIAL: CheckinState = { status: "idle" };
 
@@ -38,6 +48,50 @@ const EMPTY: SubmittedValues = {
   declaredNew: false,
 };
 
+/**
+ * The sentence the always-mounted status region announces, per outcome.
+ *
+ * 🪤 **Empty for every state that already announces itself.** EV11's rule is
+ * one atomic status message and never competing live regions: the three banners
+ * carry `role="alert"` and the field errors carry their own, so adding a second
+ * region saying the same thing would make a screen reader read each failure
+ * twice. What this region exists for is the set of screens where the panel
+ * MOUNTS already holding its text — the review step and the four terminal
+ * outcomes — which is precisely the case CLAUDE.md records as missed, and which
+ * is why those panels no longer carry `role="status"` themselves.
+ */
+function announcement(state: CheckinState): string {
+  switch (state.status) {
+    case "needs_confirmation":
+      return state.existing
+        ? "We found you. Confirm to check in."
+        : "Check your details before we add you.";
+    case "present":
+      return `You're checked in. Your attendance at ${state.eventTitle} is recorded.`;
+    case "pending":
+      return "Check-in received. No event window is open, so an officer will match it to the right event.";
+    case "duplicate":
+      return state.prior === "present"
+        ? "Already recorded. You're already checked in to this event."
+        : "Already recorded. Your check-in is awaiting officer review.";
+    case "refused":
+      return "No event around this time. Nothing was recorded.";
+    // Announced by their own role="alert" — the three banners and the field
+    // errors. Returning "" here is what keeps the two from competing.
+    case "idle":
+    case "invalid":
+    case "error":
+    case "rate_limited":
+    case "unmatched":
+      return "";
+    default: {
+      const exhaustive: never = state;
+      void exhaustive;
+      return "";
+    }
+  }
+}
+
 export function CheckinForm() {
   const [state, formAction, pending] = useActionState(submitCheckin, INITIAL);
 
@@ -47,25 +101,65 @@ export function CheckinForm() {
   // makes React drop the value attribute, and the reset then clears the field.
   const submitted = state.submitted ?? EMPTY;
 
+  return (
+    <>
+      {/* 🪤 **Outside the switch, and rendered unconditionally.** This is the
+          whole point of the component: a live region has to be in the DOM
+          BEFORE its contents change, and every screen below replaces the one
+          before it. Sitting here it is mounted from first paint and only its
+          text ever changes. `{message && <StatusRegion/>}` would re-create the
+          exact defect it was written to fix, and so would moving it inside any
+          branch. `sr-only` is absolutely positioned, so it adds no height to a
+          page measured in single-digit pixels. */}
+      <StatusRegion message={announcement(state)} />
+      <CheckinScreen
+        action={formAction}
+        pending={pending}
+        state={state}
+        submitted={submitted}
+      />
+    </>
+  );
+}
+
+function CheckinScreen({
+  action,
+  pending,
+  state,
+  submitted,
+}: {
+  action: (formData: FormData) => void;
+  pending: boolean;
+  state: CheckinState;
+  submitted: SubmittedValues;
+}) {
   switch (state.status) {
     // Terminal outcomes replace the form entirely — the member is done.
     case "present":
       return (
-        <ResultPanel heading="You're checked in!">
+        <ResultPanel tone="affirm" icon={Check} heading="You're checked in!">
           Your attendance at <strong>{state.eventTitle}</strong> is recorded.
         </ResultPanel>
       );
     case "pending":
       return (
-        <ResultPanel heading="Check-in received">
+        <ResultPanel tone="caution" icon={Clock} heading="Check-in received">
           No event window is open right now, so an officer will review your
           check-in and match it to the right event. You don&apos;t need to do
           anything else.
         </ResultPanel>
       );
+    // 🔓 Duplicate is the one outcome whose TONE is decided by what it found.
+    // "You're already checked in" is a success — the member can stop — and
+    // "it's awaiting review" is the same caution as `pending`. Giving both the
+    // same colour would make the affirm ground mean two different things.
     case "duplicate":
       return (
-        <ResultPanel heading="Already recorded">
+        <ResultPanel
+          tone={state.prior === "present" ? "affirm" : "caution"}
+          icon={CircleCheck}
+          heading="Already recorded"
+        >
           {state.prior === "present"
             ? "You're already checked in to this event — you're all set."
             : "We already have your check-in — it's awaiting officer review. You don't need to submit again."}
@@ -78,7 +172,11 @@ export function CheckinForm() {
     // unbroken run of text.
     case "refused":
       return (
-        <ResultPanel heading="No event around this time">
+        <ResultPanel
+          tone="critical"
+          icon={CircleSlash}
+          heading="No event around this time"
+        >
           Check-in opens around event times, and there&apos;s no MISA event
           within {ORPHAN_WINDOW_HOURS}&nbsp;hours of right now — nothing
           running, and nothing that just ended or is about to start. Check the
@@ -90,7 +188,7 @@ export function CheckinForm() {
     case "needs_confirmation":
       return (
         <ReviewPanel
-          action={formAction}
+          action={action}
           pending={pending}
           submitted={submitted}
           existing={state.existing}
@@ -104,7 +202,7 @@ export function CheckinForm() {
     case "unmatched":
       return (
         <CheckinFields
-          action={formAction}
+          action={action}
           pending={pending}
           state={state}
           submitted={submitted}
@@ -135,24 +233,86 @@ function CheckinFields({
 }) {
   const fieldErrors =
     state.status === "invalid" ? state.fieldErrors : undefined;
+  const unmatched = state.status === "unmatched";
+
+  // Two ids, because the box's NAME and its DESCRIPTION are different strings
+  // and the difference is the whole accessible-name fix below.
+  const boxId = useId();
+  const labelId = `${boxId}-label`;
+  const hintId = `${boxId}-hint`;
+
+  // EV1 — after a failed submit, focus moves to the explanation. Without this
+  // the submit button disables while pending and focus is left wherever the
+  // browser put it, so the member is told nothing and shown nothing.
+  //
+  // 🪤 Queried out of the form rather than held in a ref per control. `Field`
+  // clones its first element child to thread the label id, and putting a ref
+  // through that clone is a second thing to get right for no gain — the
+  // selectors below are exact: `aria-invalid` is only ever on a failed field,
+  // and `[role="alert"][tabindex="-1"]` is only ever the banner. (The honeypot
+  // is also `tabindex="-1"`, which is why the role is in the selector and not
+  // just the tabindex.)
+  //
+  // 🪤 Keyed on `state`, not on `state.status`. Two consecutive failed submits
+  // of the same kind produce the same status and a NEW state object, and only
+  // the object identity changes — on `status` alone the second failure would
+  // move focus nowhere.
+  const formRef = useRef<HTMLFormElement>(null);
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    if (state.status === "invalid") {
+      form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+      return;
+    }
+    if (
+      state.status === "unmatched" ||
+      state.status === "rate_limited" ||
+      state.status === "error"
+    ) {
+      form
+        .querySelector<HTMLElement>('[role="alert"][tabindex="-1"]')
+        ?.focus();
+    }
+    // Nothing moves before hydration, and nothing needs to: without JS the
+    // action is a full page POST and the browser starts the member at the top
+    // of the new document, which is where the explanation is.
+  }, [state]);
 
   return (
-    <form action={action} className="flex flex-col gap-5" noValidate>
-      {state.status === "unmatched" && (
-        <Banner role="alert">
+    // 🪤 `gap-4` (16px), not `gap-5`. The idle form has four gaps — between the
+    // three fields, the box and the button — so the 4px step is a measured 16px
+    // off the first-screen bar, which came in at 611 against a 640 fold. EV5
+    // sets the floor at 8px between touch targets and nothing here goes near
+    // it; the reassurance line is what gives next if this copy ever grows.
+    <form ref={formRef} action={action} className="flex flex-col gap-4" noValidate>
+      {/* 🔓 The three banners sit INSIDE the sheet and above the fields, so a
+          correction starts where the eye already is. Each is the focus target
+          for its state (EV1) and keeps its own `role="alert"` — which is why
+          `announcement()` returns "" for all three rather than saying it twice.
+
+          🔓 The unmatched copy was REWRITTEN for the new checkbox label
+          (officer, 2026-09-19). It used to say "if this is your first MISA
+          event or your first time checking in here, tick the box below",
+          quoting a label that no longer exists — the one place in the phase
+          that generated member-facing copy the officer had not already seen.
+          It now mirrors the label word for word, so a member scanning for the
+          banner's words finds the control it points at. */}
+      {unmatched && (
+        <Banner role="alert" tabIndex={-1}>
           We don&apos;t have that info on file. Check your EID and email for a
-          typo and try again — or, if this is your first MISA event or your
-          first time checking in here, tick the box below.
+          typo and try again — or, if you haven&apos;t checked in with this form
+          before, tick the box below.
         </Banner>
       )}
       {state.status === "rate_limited" && (
-        <Banner tone="caution" role="alert">
+        <Banner tone="caution" role="alert" tabIndex={-1}>
           Too many check-ins from this connection — wait a few minutes and try
           again.
         </Banner>
       )}
       {state.status === "error" && (
-        <Banner tone="critical" role="alert">
+        <Banner tone="critical" role="alert" tabIndex={-1}>
           Something went wrong on our end — please try again. If it keeps
           failing, tell an officer at the event so your attendance isn&apos;t
           lost.
@@ -197,18 +357,68 @@ function CheckinFields({
         />
       </Field>
 
-      {/* Echoing the member's own tick back after the form reset — not a
+      {/* ── The box the officer named ──────────────────────────────────────
+          🔓 **The label states a fact the MEMBER knows.** "This is my first
+          MISA event, or my first time checking in here" asked about a fact the
+          ROSTER knows better than they do, and the officer's 2026-09-19
+          interview named that wording — not mistyped details, not signal — as
+          what goes wrong at the door. Approved copy, built verbatim.
+
+          🪤 **It is a hint, not an instruction** (docs/attend-confirmation-
+          flow.md). Ticking it when we already have you links you to your own
+          record and never creates a second one, which is what the reassurance
+          line says out loud so an unsure member can just tick it.
+
+          🪤 **The reassurance is a DESCRIPTION, not part of the name.** It sits
+          inside the `<label>` so the whole block stays one tap target — 87px at
+          360, against EV4's 48px floor and against the 16×16 box this replaces
+          — but `aria-labelledby` points at the label span ALONE and
+          `aria-describedby` at the hint. Without that split the box announces
+          as one run-on string with the question buried at its front, which is
+          the exact accessible-name bug `components/ui/field.tsx` documents.
+          `aria-labelledby` outranks the wrapping `<label>` in the accname
+          computation, so the name is the sentence and nothing more.
+
+          🪤 **No `min-h-12` here**, deliberately: the block is already 87px, and
+          adding a floor it clears would only add dead space to the one page in
+          the codebase measured in single-digit pixels.
+
+          Echoing the member's own tick back after the form reset — not a
           preselected suggestion. It starts unchecked on the first render and
           only ever reflects what they chose. */}
-      <label className="flex items-start gap-3 text-sm">
+      <label
+        className={`flex items-start gap-3 text-sm ${
+          // 🔓 On the unmatched screen the banner says "tick the box below", so
+          // the box is marked in caution to end the sentence. An OUTLINE, never
+          // a border: an outline is drawn outside the layout, so the idle state
+          // — the one with the bar on it — pays nothing for a state it never
+          // shows. Offset 4 keeps it clear of the 2px focus ring at offset 2,
+          // and the two never coexist anyway.
+          unmatched
+            ? "outline-1 outline-offset-4 outline-misa-caution/60"
+            : ""
+        }`.trim()}
+      >
         <input
           type="checkbox"
           name="firstTime"
           defaultChecked={submitted.declaredNew}
+          aria-labelledby={labelId}
+          aria-describedby={hintId}
           className={`mt-1 ${CHECKBOX}`}
         />
         <span>
-          This is my first MISA event, or my first time checking in here
+          <span id={labelId}>
+            I haven&apos;t checked in with this form before
+          </span>
+          {/* 📌 Secondary Graphite, not Annotation Grey. This sits on the
+              section's white ground where `--misa-muted` would pass at 4.84:1,
+              but the portal has one de-emphasis ink and this is it (7.60:1),
+              which is also what survives if this block ever moves grounds. */}
+          <span id={hintId} className="mt-1 block text-misa-secondary">
+            Not sure? Tick it. If we already have you, we&apos;ll use your
+            existing record, never a second one.
+          </span>
         </span>
       </label>
 
@@ -224,18 +434,41 @@ function CheckinFields({
       {/* No name on this button, so `step` is absent on the first pass. Do not
           add a hidden <input name="step"> here: React inserts a submitter's
           name/value immediately before the submitter, so an earlier hidden
-          field of the same name would win formData.get("step"). */}
+          field of the same name would win formData.get("step").
+
+          🔓 `touch` is the 48px native minimum (EV4) — `md` alone is 39px, which
+          is the figure all three portal briefs measured. It is the last thing
+          on the first screen and the reason the bar is where it is.
+
+          🪤 EV7: the pending label must not resize the control. Below `sm` it is
+          full width, so it cannot. Above `sm` `min-w` holds the box at the width
+          "Checking in…" needs, so swapping the label moves nothing.
+
+          🐛 `sm:self-start` is REQUIRED and `sm:w-auto` alone did nothing —
+          measured, not assumed. This button is a flex item in a `flex-col`
+          form, whose cross axis is horizontal, so the container's default
+          `align-items: stretch` sets the item's width and a `width: auto` has
+          no say in it. The button rendered 576px at 1280 with `sm:w-auto`
+          already on it. **A width utility on a stretched flex child is not a
+          width.** */}
       <button
         type="submit"
         disabled={pending}
         aria-busy={pending}
-        className={`mt-1 w-fit ${BUTTON_SOLID_NAVY}`}
+        className={buttonClass({
+          touch: true,
+          block: true,
+          className: "sm:w-auto sm:min-w-[13rem] sm:self-start",
+        })}
       >
         {pending ? "Checking in…" : "Check in"}
       </button>
 
       {/* The check-in location-verification disclosure was removed here at the
-          officer's instruction. Capture itself is unchanged. */}
+          officer's instruction (hotfix c3890a1, re-confirmed 2026-09-19 in this
+          surface's brief). Capture itself is unchanged, and this redesign adds
+          none. If one ever returns it is ONE sentence in the unconditional
+          present tense — never a conditional, because capture is not. */}
     </form>
   );
 }
@@ -261,22 +494,33 @@ function ReviewPanel({
   existing: boolean;
 }) {
   return (
-    <form action={action} className="flex flex-col gap-5">
-      <Panel
-        as="div"
-        ground="panel"
-        pad="none"
-        className="px-6 py-6"
-        role="status"
-      >
-        <h2 className="font-display text-[26px] leading-[1.08] font-semibold">
-          Check your details
-        </h2>
-        <p className="mt-2 leading-[1.65] text-misa-body">
+    <form action={action} className="flex flex-col gap-4">
+      {/* 🔴 `ground="white"`, and that is THE muted-on-Vellum fix for this
+          surface's first occurrence. The three `<dt>` labels below were
+          `--misa-muted` on a Vellum panel — 4.33:1, the AA failure that
+          `npm run test:ui` has been reporting as three `color-contrast` nodes
+          on both first-timer confirmations. The concept's answer is the one
+          DESIGN.md prescribes: move the GROUND, do not recolour the token in
+          place. On white the panel reads against the section by its hairline,
+          which is what `Panel` is for.
+
+          🪤 No `role="status"`. It mounted already holding its text, which is
+          the live-region case CLAUDE.md records as missed — the always-mounted
+          `StatusRegion` in `CheckinForm` announces this step now. */}
+      <Panel ground="white" pad="none" className="px-6 py-6">
+        {/* 🔓 Approved copy, and the heading now says what CONFIRMING DOES
+            rather than only what to look at. The sentence that used to sit
+            under it said the same thing at greater length, so it is gone: the
+            values are directly below, and a member holding a phone at a door
+            reads one line, not two. `size="card"` is the ramp's Card title row
+            (22 → 26) — a level cue against the band's h1, which is `Title`'s
+            own 26 → 34. NEVER `className="text-[22px] sm:text-[26px]"`: that
+            form ties on specificity and silently loses. */}
+        <Title as="h2" size="card">
           {existing
-            ? "We already have you on file, so confirming will use your existing record rather than adding you twice."
-            : "You'll be added to the roster with exactly these details, so give them a quick look."}
-        </p>
+            ? "We found you. Confirm to check in."
+            : "Check your details before we add you"}
+        </Title>
         <dl className="mt-4 flex flex-col gap-2 text-sm">
           <Row label="Full name" value={submitted.fullName} />
           <Row label="UT EID" value={submitted.eid} />
@@ -304,7 +548,16 @@ function ReviewPanel({
       {/* Confirm first in DOM order, so Enter takes the intended action.
           Plain submit buttons carrying name/value — never formAction, which
           makes React drop the submitter's name from the FormData and would
-          break `step` only after hydration. */}
+          break `step` only after hydration.
+
+          🔓 "Edit details" replaces "Go back", which did not say the values are
+          kept — the one thing a member hesitating over a typo needs to know.
+          Approved copy. Both controls are 48px (EV4); this step is reached on a
+          phone at a door exactly as often as the form is.
+
+          🪤 `flex-wrap` with `flex-1 basis-full sm:basis-auto`: below `sm` the
+          two buttons stack full width rather than sharing a cramped row, and
+          "Confirm and check in" is the longer label of the two. */}
       <div className="flex flex-wrap gap-3">
         <button
           type="submit"
@@ -312,18 +565,25 @@ function ReviewPanel({
           value="confirm"
           disabled={pending}
           aria-busy={pending}
-          className={BUTTON_SOLID_NAVY}
+          className={buttonClass({
+            touch: true,
+            className: "basis-full sm:basis-auto",
+          })}
         >
-          {pending ? "Checking in…" : "Confirm & check in"}
+          {pending ? "Checking in…" : "Confirm and check in"}
         </button>
         <button
           type="submit"
           name="step"
           value="edit"
           disabled={pending}
-          className={BUTTON_OUTLINE_NAVY}
+          className={buttonClass({
+            variant: "outline",
+            touch: true,
+            className: "basis-full sm:basis-auto",
+          })}
         >
-          Go back
+          Edit details
         </button>
       </div>
     </form>
@@ -332,17 +592,44 @@ function ReviewPanel({
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
+    // 🪤 A `<div>` wrapping one `<dt>` and one `<dd>` is the shape axe's
+    // `definition-list` rule allows; a stray `<p>` inside it becomes a second
+    // `<dd>` and fails, which is the fault /portal/lookup's stat block carries.
+    // Nothing else goes in here.
     <div className="flex flex-wrap gap-x-2">
-      <dt className="text-misa-muted">{label}:</dt>
+      {/* 🔴 Secondary Graphite on white — 7.60:1. This was `--misa-muted` on
+          Vellum at 4.33:1: the AA failure phase 3 exists to remove, and the one
+          the suite could actually see. */}
+      <dt className="text-misa-secondary">{label}:</dt>
       <dd className="font-medium">{value}</dd>
     </div>
   );
 }
 
+/**
+ * A terminal outcome: the screen that ends the task.
+ *
+ * 🔓 **The tone is the outcome, and it is never the tone alone** (EV9). Each of
+ * the four carries a status ground, a heading that names what happened, and a
+ * drawn Lucide mark — so the colour is read first and confirmed twice. This is
+ * the one place colour appears on the page, which is what makes it legible as
+ * meaning rather than decoration (DESIGN.md: status tokens for feedback only).
+ *
+ * 🪤 **`Banner size="md"`, not a hand-rolled wash.** The tone → wash + hairline
+ * pairing lives in `components/ui/banner.tsx` and must stay there; writing
+ * `bg-misa-affirm-wash` here would be a second definition of what "affirm"
+ * looks like. `size` is a prop rather than an appended `px-6 py-6` because
+ * equal-specificity utilities are decided by emission order — the tie that has
+ * made `<Title className="text-[22px]">` render at 26px since it was written.
+ */
 function ResultPanel({
+  tone,
+  icon: Icon,
   heading,
   children,
 }: {
+  tone: BannerTone;
+  icon: LucideIcon;
   heading: string;
   children: React.ReactNode;
 }) {
@@ -352,23 +639,51 @@ function ResultPanel({
     // mounted by a state change is never observed, so its unconditional
     // `opacity: 0` start state would become permanent. The one screen that
     // tells a member their attendance was recorded would render blank.
-    <Panel ground="panel" pad="none" className="px-6 py-6" role="status">
-      <h2 className="font-display text-[26px] leading-[1.08] font-semibold">
-        {heading}
-      </h2>
-      <p className="mt-2 leading-[1.65] text-misa-body">{children}</p>
-      {/* Stage 7 phase 2. On every terminal outcome, including `pending` and
-          `duplicate` — those are the two where someone most wants to see for
-          themselves that the system has them, rather than take a sentence's
-          word for it. */}
-      <p className="mt-4 text-sm text-misa-muted">
-        <Link
-          href="/portal/lookup"
-          className="text-misa-blue underline hover:text-misa-blue-dark"
-        >
-          Check your points and attendance
-        </Link>
-      </p>
-    </Panel>
+    //
+    // 🪤 And no `role="status"` either, for the mirror-image reason: it mounts
+    // already carrying its heading, so assistive technology sees a new element
+    // rather than a region that changed. `StatusRegion` does the announcing.
+    <Banner as="div" tone={tone} size="md">
+      <div className="flex items-start gap-3">
+        {/* The mark is decorative: every word of the outcome is in the heading
+            and the sentence, so a screen reader that skips this loses nothing.
+            `shrink-0` because a long event title must wrap beside it, never
+            squeeze it. */}
+        <Icon
+          aria-hidden="true"
+          strokeWidth={2}
+          className="mt-0.5 size-6 shrink-0"
+        />
+        <div className="min-w-0">
+          <Title as="h2" size="card">
+            {heading}
+          </Title>
+          <p className="mt-2 leading-[1.65]">{children}</p>
+          {/* Stage 7 phase 2. On every terminal outcome, including `pending`
+              and `duplicate` — those are the two where someone most wants to
+              see for themselves that the system has them, rather than take a
+              sentence's word for it.
+
+              🔴 The wrapper used to be `text-sm text-misa-muted`, which is this
+              surface's SECOND muted-on-Vellum occurrence and the one nothing
+              has ever caught: it painted no text (the link sets its own ink),
+              so axe had nothing to measure and a grep found a class that did
+              nothing. Both are gone — the line is body size on the ramp, and
+              the link carries the only colour it needs.
+
+              🔓 "See your points and attendance" is the approved copy (was
+              "Check your points and attendance" — "check" is the verb this
+              whole page already owns). */}
+          <p className="mt-4">
+            <Link
+              href="/portal/lookup"
+              className="inline-block py-1 text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+            >
+              See your points and attendance
+            </Link>
+          </p>
+        </div>
+      </div>
+    </Banner>
   );
 }

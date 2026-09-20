@@ -35,7 +35,7 @@ function returning(identity: Identity) {
   return { ...identity, declaredNew: false, confirmed: false };
 }
 
-/** Ticked "this is my first MISA event, or my first time checking in here", first pass. */
+/** Ticked "I haven't checked in with this form before", first pass. */
 function asNew(identity: Identity) {
   return { ...identity, declaredNew: true, confirmed: false };
 }

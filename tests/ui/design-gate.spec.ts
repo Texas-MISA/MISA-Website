@@ -158,8 +158,12 @@ test.describe("/portal/attend states", () => {
   });
 
   for (const [label, eid, reached] of [
-    ["a new first-timer's confirmation", "zz9998", /added to the roster/],
-    ["a known member's first-timer confirmation", "bk2856", /already have you on file/],
+    // 🔓 The review step's headings are the officer-approved copy (v2 phase 3):
+    // one heading per case, and the sentence that used to sit under them is
+    // gone. These matchers are what proves the state was REACHED, so they move
+    // with the copy or the axe run below checks the idle form instead.
+    ["a new first-timer's confirmation", "zz9998", /Check your details before we add you/],
+    ["a known member's first-timer confirmation", "bk2856", /We found you\. Confirm to check in\./],
   ] as const) {
     test(`${label} has no WCAG A/AA axe violations`, async ({ page }) => {
       await submit(page, {
