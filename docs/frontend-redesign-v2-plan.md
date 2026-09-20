@@ -422,17 +422,23 @@ approvals).
 
 ### 🧭 Where the build stands (2026-09-19)
 
-**Branch `design-toolkit`**, stacked on `portal-phase-1`. Parts 0, 1 and part
-2's build are committed; **no surface is `rebuilt` yet** — all four are still
-`in-progress`, so `tests/design-receipts.test.ts` checks their briefs but does
-not yet fail on their receipts.
+**Branch `design-toolkit`**, stacked on `portal-phase-1`. Parts 0, 1 and 2 are
+committed and **`portal-hub` is `rebuilt`** — the first surface through the
+toolkit end to end. The other three are still `in-progress`, so
+`tests/design-receipts.test.ts` now checks the hub's **receipts** and the other
+three's **briefs** only.
 
 | Part | State | Commit |
 |---|---|---|
 | 0 — Baseline | ✅ done | `debeca2` |
 | 1 — Shared vocabulary | ✅ done | `fa7c2e5` |
-| 2 — `/portal` hub | 🏗️ **build done, gate pending** | `d827ac7` |
+| 2 — `/portal` hub | ✅ **done — built, gated, `rebuilt`** | `d827ac7` build · `ab3f6c9` fixes · `e67acb8` receipts · `30bcec5` flip |
 | 3–7 | ⏭️ not started | — |
+
+🔒 **`portal-hub`'s files are now FROZEN.** `receipts.mjs` fails a `rebuilt`
+surface as **stale** on any commit touching `app/(public)/portal/page.tsx` that
+no receipt names as a `fix_commit`. Parts 3–5 must not edit it. (Shared
+primitives in `components/ui/` are exempt by DESIGN.md and may still change.)
 
 **Suite state, re-confirmed at part 0 and unchanged since:** `npm test` 41 files
 / 1142 tests green; `npm run test:ui` **39 pass / 3 fail**, and the three are
@@ -440,11 +446,29 @@ not yet fail on their receipts.
 `/portal/attend`'s first-timer confirmations (`color-contrast (3): … > dt`).
 Parts 3 and 4 own all three.
 
-⏭️ **The immediate next step is the rest of part 2:** `/design-gate portal-hub`,
-its six receipts (`lead`, `critique`, `audit`, `guidelines`, `design-review`,
-`detector`, plus `motion` — required for this surface), at least one review
-finding adopted in a commit that touches the surface, then `rebuilt` in
-`surfaces.json` **and** DESIGN.md's table in one commit.
+⏭️ **The immediate next step is part 3, `/portal/attend`** — the surface with
+the most states (twelve, plus pre-hydration), the new box label and review
+copy, and **both** of its muted-on-Vellum occurrences. Its bar is IDLE-ONLY.
+🔴 It carries the one **open officer question** listed under *Needs the
+officer* below: changing the check-in checkbox label orphans the unmatched
+banner at `checkin-form.tsx:143-146`, which points at the box using the OLD
+label's words. Draft replacement copy and show it before shipping.
+
+✅ **Part 2 is closed.** What its gate produced, kept here because parts 3–5
+inherit both:
+- 🔴 **A focus ring must contrast with every ground the FOCUSED ELEMENT spans**,
+  not just the one its section sits on. The hub's row link was the first thing
+  in this system to span two grounds inside one focusable element, and its navy
+  ring measured **1.00:1** over the navy key. `DESIGN.md` §Components carries
+  the rule. **Check-in and lookup both adopt the band and the row idiom, so the
+  next navy-element-inside-a-link hits this again.**
+- 🔴 **`<Title className="text-[22px] …">` silently does nothing** — arbitrary
+  values tie on specificity and Tailwind v4 sorts them ascending, so the larger
+  always wins. Use the new `size="card"` prop. 🐛 The same bug is live on the
+  **home page** via `activities.tsx:98` (renders 34px where the code asks 26);
+  **part 6 owns that fix**, not a portal surface.
+- 📌 **Three officer questions are open and none blocks a bar** — see *Deferred
+  to the officer* at the end of this section.
 
 🪤 **Two gate rules make the per-surface order mandatory rather than stylistic.**
 The checker fails a surface with *"no review finding was adopted in a commit
@@ -508,7 +532,7 @@ Each part ends somewhere demonstrable, which is the same rule the stages use.
 |---|---|---|
 | **0 — Baseline** ✅ `debeca2` | Local stack up, dev server on the local env, re-measure each surface at 360×640 / 768 / 1280×720 / 1280×800, record the numbers, and run the receipts dry-run per surface. Confirm `npm test` and `npm run test:ui` are at their known state. | ✅ **Done.** `npm test` 41 files / 1142 tests green; `test:ui` 39 pass / 3 fail, exactly the documented three. Briefs re-confirmed or corrected; the muted counts fixed in three documents. |
 | **1 — Shared portal vocabulary** ✅ `fa7c2e5` | *(Widened — see above.)* Every shared-primitive addition the phase needs, all additive, all opt-in, no default moved. | ✅ **Done.** `portal-band.tsx` (PortalBand), `buttonClass({ touch })` for the 48px floor, `table.tsx`'s `scroll={false}` + `<THead sticky="page">`, `status-region.tsx` (StatusRegion). Suite unchanged at 39/3. |
-| **2 — `/portal` hub** 🏗️ `d827ac7` | The smallest surface, and it sets the row-link and key-column pattern the others borrow. | 🏗️ **BUILD DONE, GATE PENDING.** Bar met with 96px to spare (check-in row bottom **423 → 328** at 360×640, bar ≤424; all three destinations now on the first screen). ⏭️ Remaining: `/design-gate portal-hub`, its receipts, and `rebuilt` in the registry **and** DESIGN.md's table in one commit. |
+| **2 — `/portal` hub** ✅ `d827ac7` → `30bcec5` | The smallest surface, and it sets the row-link and key-column pattern the others borrow. | ✅ **DONE AND `rebuilt`.** Bar met with **99px** to spare (check-in row bottom **423 → 325** at 360×640, bar ≤424; all three destinations on the first screen), verified independently by the `design-reviewer` agent and by critique Assessment B. Seven receipts pass: 12 findings adopted, 8 rejected against a named rule, 3 deferred to the officer. |
 | **3 — `/portal/attend`** | The most states: twelve, plus pre-hydration. The new box label and review copy land here, **and both of its muted-on-Vellum occurrences** (`:336` and `:364`). | Its bar is met **in the idle state**, every state is designed and gated — not just the happy path — and the two red `color-contrast` checks are green. |
 | **4 — `/portal/lookup`** | The most complex result, and the surface carrying 9 of the 13 muted occurrences. Stacked event rows below `sm`, the `definition-list` fix, the announced result, the stale sentence removed, the contradictory dues comment corrected. | Its bar is met; axe is green on the result and the miss; no sideways scroll to read whether you attended. |
 | **5 — `/portal/leaderboard`** | The odd one out: no hero, its own type scale, the column head made genuinely sticky (using part 1's white page-sticky variant), **and its two stale `active member` comments corrected**. | Its bar is met — **ten rows** on the first screen at 1280×720 — including the projector measurement. |
@@ -597,9 +621,41 @@ front, so the order follows the **bars** rather than the dependencies:
   assuming. Today it requires `motion.md` for hub, attend and leaderboard, and
   **not** for lookup.
 
-### ⚠️ The one open item left, and it needs the officer
+### ⚠️ Open items that need the officer
 
-🔴 **Changing the check-in checkbox label orphans the unmatched banner.**
+📌 **Three, none of which blocks a bar or a gate.** The first is part 3's and
+must be answered before that surface ships; the two from the hub's gate are
+*deferred* findings — recorded with reasons in
+`docs/design/surfaces/portal-hub/receipts/critique.md` (A3, A4/B3) — and the
+hub is `rebuilt` without them. 🔒 **Either one, if adopted, edits a frozen
+surface**, so each needs a receipt naming its fix commit or `receipts.mjs`
+fails `portal-hub` as stale. Ask them together at the officer's gate.
+
+**2. The band's h1 restates the header button that was just tapped.**
+`PortalBand title="Member Portal"` renders 61→191 at 360, directly under the
+header's current-marked **MEMBER PORTAL** button — two identical phrases within
+90px, costing 130.5px on the page whose named anti-goal is height. The brief
+permits change here ("the hub may drop or shrink its use of the shared hero"),
+but **the officer approved concept A *as proposed*, and what was proposed was
+"a short hub-only field band carrying only the centred h1"** — so dropping or
+re-titling it reopens the thing they said yes to. 🪤 It is also the page's
+specificity: the notch is what makes the hub unmistakably this site's, so
+shrinking it trades identity for pixels the bar does not currently need (99px
+of margin). *Not a change to `PortalBand` — it is the hub's `title` prop.*
+
+**3. At 360 the destination rows rake 93 / 118 / 144px.** The bodies wrap to
+one, two and three lines, so the least-urgent destination is the largest object
+on the phone screen and the navy key reads as one slab on the bottom row.
+Equal *formatting* is untouched — what is unequal is the copy, which is the
+officer's (each body is its destination page's own `metadata.description`).
+The fix is subtraction, which "nothing else is added" permits: the word "MISA"
+appears in all three bodies on a MISA-only page. 🪤 The alternative — a
+one-line clamp — truncates and is worse. Part 2's type-ramp fix shortened every
+row but left the ratio unchanged, so the finding stands.
+
+---
+
+**1. Changing the check-in checkbox label orphans the unmatched banner.**
 `checkin-form.tsx:143-146` points at the box using the *old* label's words — "if
 this is your first MISA event or your first time checking in here, tick the box
 below" — and the approved copy replaces that label with *"I haven't checked in
