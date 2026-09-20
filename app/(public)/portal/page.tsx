@@ -3,8 +3,7 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 
 import { Title } from "@/components/ui/heading";
-import { PortalBand } from "@/components/ui/portal-band";
-import { Section } from "@/components/ui/section";
+import { PortalSheet } from "@/components/ui/portal-sheet";
 
 // The member portal hub — REBUILT in v2 phase 3 (the Portal Rebuild), concept A
 // "The title block", adopted by the officer 2026-09-19. Brief:
@@ -107,17 +106,22 @@ const DESTINATIONS = [
 
 export default function PortalPage() {
   return (
-    <>
-      {/* 1. LAYOUT FAMILY: Short portal field band. Title only — the rows below
-          say what the portal holds, and every line added here is height taken
-          off the member's first screen. */}
-      <PortalBand title="Member Portal" />
+    // ONE object. The band and the plate used to be two stacked sections; the
+    // hub is now a single sheet whose masthead is its title and whose body is
+    // the three rows.
+    <PortalSheet title="Member Portal">
+      {/* Shared-rule plate. One background showing through 1px gaps between
+          opaque cells, so the seams read as ONE rule rather than as two
+          adjacent borders — the same trick `KpiPlate` uses.
 
-      {/* 2. LAYOUT FAMILY: Shared-rule plate. One background showing through
-          1px gaps between opaque cells, so the seams read as ONE rule rather
-          than as two adjacent borders — the same trick `KpiPlate` uses. */}
-      <Section padTop="sm" padBottom="md" width="narrow">
-        <ul className="grid gap-px border border-misa-hairline bg-misa-hairline">
+          🔓 It BLEEDS to the sheet's edges (`-mx-*` tracking the sheet's
+          padding, `border-y` rather than a full frame) so the rows read as the
+          document's body rather than as a card inside a card. A framed plate
+          inside a framed sheet is the doubled rule `Panel`'s `frameless` prop
+          exists to avoid. The negative margins must track `PortalSheet`'s
+          padding; they are the same values its masthead rule uses. */}
+      <div>
+        <ul className="-mx-4 grid gap-px border-y border-misa-hairline bg-misa-hairline sm:-mx-8">
           {DESTINATIONS.map((destination) => (
             <li key={destination.href} className="bg-white">
               {/* 🪤 The WHOLE ROW is the link — exactly one `<Link>` per
@@ -246,7 +250,14 @@ export default function PortalPage() {
             target is the words themselves.
 
             `mt-6`, not `mt-8`: at 360×640 the line was landing at y 632 on a
-            640px screen — visible enough to notice, never enough to read. */}
+            640px screen — visible enough to notice, never enough to read.
+
+            🔓 It now sits INSIDE the sheet, below the plate, because the sheet
+            is the page: a line stranded on the grey below the document would
+            be the one piece of the hub that is not part of the object. The ink
+            stays `--misa-secondary` — it is on white now rather than grey, so
+            `--misa-muted` would also pass, but the portal has one de-emphasis
+            ink and this is it. */}
         <p className="mt-6 text-misa-secondary">
           Officers:{" "}
           <Link
@@ -256,7 +267,7 @@ export default function PortalPage() {
             sign in
           </Link>
         </p>
-      </Section>
-    </>
+      </div>
+    </PortalSheet>
   );
 }

@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { PageHero } from "@/components/ui/chevron-section";
-import { Section } from "@/components/ui/section";
+import { PortalSheet } from "@/components/ui/portal-sheet";
 
 import { LookupForm } from "./_components/lookup-form";
 
@@ -35,14 +34,19 @@ export const metadata: Metadata = {
 
 export default function LookupPage() {
   return (
-    <>
-      <PageHero
-        title="My Attendance"
-        subhead="Enter your UT EID and you'll see where you stand this term."
-      />
-      {/* 🪤 White for the same reason /attend is: the lookup form's controls
-          fill with `bg-misa-panel`, which is now the page ground's own colour. */}
-      <Section ground="white" pad="md" width="narrow">
+    // 🔴 The navy PageHero is GONE (officer, 2026-09-20: "the navy header at
+    // the top of each page should be removed for all pages in the portal").
+    // This page is not rebuilt yet — part 4 owns its design — so this is the
+    // header removal and nothing else.
+    //
+    // 🪤 The sheet is white for the same reason /attend's was: the lookup
+    // form's controls fill with `bg-misa-panel`, which is the page ground's own
+    // colour, so on the page ground they would be invisible.
+    <PortalSheet title="My Attendance">
+      <p className="leading-[1.6] text-misa-body">
+        Enter your UT EID and you&apos;ll see where you stand this term.
+      </p>
+      <div className="mt-6">
         <p className="leading-[1.65] text-misa-body">
           You&apos;ll see which events you attended, which you missed, anything
           still waiting on an officer, and whether your dues are paid.
@@ -60,7 +64,7 @@ export default function LookupPage() {
         <div className="mt-8">
           <LookupForm />
         </div>
-      </Section>
-    </>
+      </div>
+    </PortalSheet>
   );
 }

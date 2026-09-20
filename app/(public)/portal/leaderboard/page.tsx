@@ -2,9 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { Banner, ReadError } from "@/components/ui/banner";
-import { PageHero } from "@/components/ui/chevron-section";
+import { PortalSheet } from "@/components/ui/portal-sheet";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Section } from "@/components/ui/section";
 import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { createClient } from "@/lib/supabase/server";
 
@@ -157,24 +156,26 @@ export default async function LeaderboardPage() {
   const term = result.kind === "ok" ? (result.rows[0]?.term ?? null) : null;
 
   return (
-    <>
+    // 🔴 The navy PageHero is GONE (officer, 2026-09-20: "the navy header at
+    // the top of each page should be removed for all pages in the portal").
+    // This page is not rebuilt yet — part 5 owns its design — so this is the
+    // header removal and nothing else.
+    <PortalSheet title="Leaderboard">
       {/* The active term, prominently (§7 Stage 7). An officer can pin the
           board on a finished term over a break, so a stale term has to be
-          readable on the page rather than assumed to be today's. */}
-      <PageHero
-        title="Leaderboard"
-        subhead={
-          term
-            ? `Standings for ${term}. Attendance and bonus points, added together.`
-            : "Current-term standings for MISA members."
-        }
-      />
+          readable on the page rather than assumed to be today's. It was the
+          hero's subhead; with the hero gone it opens the sheet. */}
+      <p className="leading-[1.6] text-misa-body">
+        {term
+          ? `Standings for ${term}. Attendance and bonus points, added together.`
+          : "Current-term standings for MISA members."}
+      </p>
       {/* 🪤 White because `<Table>`'s sticky `<THead>` fills with
           `bg-misa-panel` — on the grey page ground the header would dissolve
           into it exactly when it matters, which is while the body scrolls under
           it. The standings table IS this page's content, so the whole section
           is the card. */}
-      <Section ground="white" pad="md" width="narrow">
+      <div className="mt-6">
         {/* 🔓 The three outcomes below are rendered as three DIFFERENT things,
             and that is the empty-vs-error invariant showing up in the layout
             rather than only in the types. Both used to be a muted `<p>`: a
@@ -246,7 +247,7 @@ export default async function LeaderboardPage() {
           </Link>
           .
         </p>
-      </Section>
-    </>
+      </div>
+    </PortalSheet>
   );
 }
