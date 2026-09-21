@@ -65,8 +65,40 @@ const EMPTY: SubmittedValues = {
  * banners here when the audit pass gave the review step's heading focus: a
  * screen that CONTINUES the task moves focus (which announces it), a screen
  * that ENDS it announces politely and leaves focus alone.
+ *
+ * 🔴 **And the BUSY state, added at the 2026-09-20 re-gate, under the same one
+ * rule.** EV7 asks a loading state to preserve *layout, focus and busy status*.
+ * Layout was built (the button cannot resize) and busy status was put on the
+ * button as `aria-busy` — but `disabled` removes that button from the tab order
+ * the instant the request starts, so the attribute reaches nobody, and measured
+ * on the running page `document.activeElement` becomes `<body>` for the whole
+ * request while this region sits empty. The original gate's T3 rejected the
+ * `aria-busy`-on-disabled shape because "the visible label swapping to
+ * 'Checking in…' " carries it, which is true of exactly the people who do not
+ * need it. So the region carries the busy sentence too: nothing else announces
+ * it, which is the rule this function already had.
+ *
+ * 🪤 **It reuses the button's own visible label rather than inventing copy** —
+ * the officer's rule for the portal is that the interface does not explain
+ * itself, and a progress message that is not the words already on screen is a
+ * second thing to keep in step.
+ *
+ * 🪤 **NOT on the review step, and the reason is that we cannot tell which
+ * button was pressed.** `pending` is true for *Confirm and check in* and for
+ * *Edit details* alike — one is a check-in and one is going back to the form —
+ * so announcing "Checking in…" there would be wrong half the time. Telling them
+ * apart needs client state on a component whose constraint is working before
+ * hydration, which is a behaviour change and not this phase's. The review step
+ * keeps what it has: its heading takes focus, which announces it.
+ *
+ * ⚠️ **The focus half of EV7 is still not met and this does not fix it.** A
+ * member who presses the button still loses their place until the outcome
+ * arrives. Keeping the control focusable means `aria-disabled` plus a submit
+ * guard, which is behaviour; recorded in `critique.md` A1 rather than smuggled
+ * into a presentation pass.
  */
-function announcement(state: CheckinState): string {
+function announcement(state: CheckinState, pending: boolean): string {
+  if (pending && state.status !== "needs_confirmation") return "Checking in…";
   switch (state.status) {
     case "present":
       return `You're checked in. Your attendance at ${state.eventTitle} is recorded.`;
@@ -115,7 +147,7 @@ export function CheckinForm() {
           exact defect it was written to fix, and so would moving it inside any
           branch. `sr-only` is absolutely positioned, so it adds no height to a
           page measured in single-digit pixels. */}
-      <StatusRegion message={announcement(state)} />
+      <StatusRegion message={announcement(state, pending)} />
       <CheckinScreen
         action={formAction}
         pending={pending}
@@ -286,7 +318,10 @@ function CheckinFields({
   return (
     // 🪤 `gap-4` (16px), not `gap-5`. The idle form has four gaps — between the
     // three fields, the box and the button — so the 4px step is a measured 16px
-    // off the first-screen bar, which came in at 611 against a 640 fold. EV5
+    // off the first-screen bar, which came in at 611 against a 640 fold — that
+    // is the CLASSIC-SCROLLBAR reading, at 346px of layout; on a phone at a true
+    // 360 the same build measures 591.5. `page.tsx` carries both numbers, the
+    // 348px cliff between them, and why the surface had recorded only one. EV5
     // sets the floor at 8px between touch targets and nothing here goes near
     // it; the reassurance line is what gives next if this copy ever grows.
     <form ref={formRef} action={action} className="flex flex-col gap-4" noValidate>
@@ -396,17 +431,38 @@ function CheckinFields({
           `aria-labelledby` outranks the wrapping `<label>` in the accname
           computation, so the name is the sentence and nothing more.
 
-          🔴 **`min-h-12` IS here, and an earlier version of this comment
-          declined it on a number nobody had measured.** It claimed "the block
-          is already 87px" — an arithmetic estimate from the build plan, which
-          assumed the reassurance wrapped to three lines. It wraps to two.
-          Measured on the running page: **64px at 360** (two lines), but **44px
-          at 768 and 1280**, where the label fits on one line — four pixels
-          UNDER the floor this surface's own evidence commits to, on the two
-          widths the estimate never considered. The floor costs the 360 bar
-          nothing, because 360 already clears it. Found by the design-reviewer
-          at the gate; the lesson is the project's own, and it was written into
-          a comment by the same pass that was otherwise measuring everything.
+          🔴 **`min-h-12` IS here, and it has now been argued from three
+          different sets of numbers, two of which were wrong.** It was first
+          declined on "the block is already 87px", an arithmetic estimate from
+          the build plan; the design-reviewer then measured 44px at 768 and 1280
+          — four pixels under EV4's floor, on the two widths the estimate never
+          considered — and the class landed.
+
+          ✅ **Re-measured at the 2026-09-20 re-gate, and the row is taller at
+          every width than the comment that replaced the estimate said** — by
+          LAYOUT width, which is the viewport minus a classic scrollbar if there
+          is one:
+
+              ≤ 347px      104.0px   (label 2 lines + reassurance 3)
+              348 → 639     84.0px   (label 1 line  + reassurance 3)
+              ≥ 640px       64.0px   (label 1 line  + reassurance 2)
+
+          So **104 in a 360px-wide desktop window** (346 of layout), **84 on a
+          phone at 360**, **64 at 768 and 1280**. The old figures — 64 at 360 and
+          44 at ≥`sm` — were true before `ca5cd06`, which narrowed the content
+          column from 305 to 286 (272 at a 346 layout) and this line's own text
+          column to 258 (244). 🪤 **The text column is not the content column:**
+          the reassurance sits inside this flex row, after a 16px box and a 12px
+          gap, so it gets column minus 28.
+
+          🪤 **The 348px step is a cliff, not a slope** — one pixel of layout
+          width moves this row 20px and the Check in button with it. That is the
+          whole of the difference between the two bar figures the receipts have
+          carried; `page.tsx` has the table and the diagnosis.
+
+          The floor is cleared everywhere by 16px at the tightest, so `min-h-12`
+          never binds — but it stays, because it is the only thing holding the
+          guarantee if this copy ever shortens.
 
           Echoing the member's own tick back after the form reset — not a
           preselected suggestion. It starts unchecked on the first render and
@@ -445,12 +501,34 @@ function CheckinFields({
             I haven&apos;t checked in with this form before
           </span>
           {/* 📌 Secondary Graphite, not Annotation Grey. This sits on the
-              section's white ground where `--misa-muted` would pass at 4.84:1,
-              but the portal has one de-emphasis ink and this is it (7.60:1),
-              which is also what survives if this block ever moves grounds. */}
+              sheet's white ground where `--misa-muted` would pass at 4.84:1,
+              but the portal has one de-emphasis ink and this is it — **8.51:1
+              here**, and what survives if this block ever moves grounds.
+              🪤 8.51 is Secondary on PAPER; DESIGN.md's 7.60:1 for the same ink
+              is on the grey page ground, and this comment quoted that figure for
+              a white one until the 2026-09-20 re-gate measured it. Measure a
+              grey against the ground it actually sits on — including when the
+              number you are copying came from this codebase. */}
+          {/* 🔴 **The first clause is lifted out of the grey, and the copy is
+              unchanged.** The officer's named failure is a first-timer stuck at
+              this box; the redesign's answer is the label plus this line; and
+              measured, this line was the **quietest text on the page** — 14px
+              Secondary at 8.51:1, the lowest ratio anywhere in the surface's
+              `<main>`, wrapping to three lines. *"Not sure? Tick it."* is the
+              answer and the rest is the justification, so the answer takes the
+              body ink at medium weight and the justification stays secondary.
+              A weight-and-ink change only: not one word moved, which matters
+              because the officer approved this sentence verbatim.
+
+              🪤 It is all still inside the one `#hint` span, so the accessible
+              DESCRIPTION is unchanged — the split is visual, and `aria-describedby`
+              still reads the whole thing. */}
           <span id={hintId} className="mt-1 block text-misa-secondary">
-            Not sure? Tick it. If we already have you, we&apos;ll use your
-            existing record, never a second one.
+            <span className="font-medium text-foreground">
+              Not sure? Tick it.
+            </span>{" "}
+            If we already have you, we&apos;ll use your existing record, never a
+            second one.
           </span>
         </span>
       </label>
@@ -666,9 +744,10 @@ function Row({ label, value }: { label: string; value: string }) {
     // `<dd>` and fails, which is the fault /portal/lookup's stat block carries.
     // Nothing else goes in here.
     <div className="flex flex-wrap gap-x-2">
-      {/* 🔴 Secondary Graphite on white — 7.60:1. This was `--misa-muted` on
-          Vellum at 4.33:1: the AA failure phase 3 exists to remove, and the one
-          the suite could actually see. */}
+      {/* 🔴 Secondary Graphite on white — **8.51:1** (7.60:1 is the same ink on
+          the grey page ground, which is the figure this line used to quote).
+          This was `--misa-muted` on Vellum at 4.33:1: the AA failure phase 3
+          exists to remove, and the one the suite could actually see. */}
       <dt className="text-misa-secondary">{label}:</dt>
       {/* 🔴 `min-w-0 break-words`, and NEITHER WORKS WITHOUT THE OTHER. A flex
           item's automatic minimum size is its `min-content` width, and an email
@@ -708,6 +787,18 @@ function Row({ label, value }: { label: string; value: string }) {
  * equal-specificity utilities are decided by emission order — the tie that has
  * made `<Title className="text-[22px]">` render at 26px since it was written.
  */
+/**
+ * The outcome mark's ink, per tone. See the comment at the `<Icon>` below for
+ * the argument and the measurements; `info` is here only to satisfy
+ * `BannerTone` — no outcome on this surface uses it.
+ */
+const MARK_INK: Record<BannerTone, string> = {
+  info: "text-misa-blue",
+  affirm: "text-misa-affirm",
+  caution: "text-misa-caution",
+  critical: "text-misa-critical",
+};
+
 function ResultPanel({
   tone,
   icon: Icon,
@@ -734,13 +825,61 @@ function ResultPanel({
         {/* The mark is decorative: every word of the outcome is in the heading
             and the sentence, so a screen reader that skips this loses nothing.
             `shrink-0` because a long event title must wrap beside it, never
-            squeeze it. */}
+            squeeze it.
+
+            🔴 **It is drawn in its own STATUS INK, and until the 2026-09-20
+            re-gate it was Body Graphite on all four outcomes.** That mark exists
+            because of EV9 — "every outcome is colour plus a naming heading plus
+            an icon" — and it was the one of the three that carried no tone at
+            all. Measured, the rest of the tone encoding is very quiet on a white
+            sheet: the `affirm` wash is **1.11:1** against the sheet it lies on,
+            `caution` 1.10 and `critical` 1.12, and the hairline over each is
+            2.14–2.38. So the only strong signal that these four screens mean
+            four different things was the words — which is the accessibility
+            guarantee, not the glance. Held at arm's length for half a second
+            before the phone goes back in a pocket, every outcome looked the
+            same.
+
+            🪤 **The ink is the tone's own token, so this adds nothing to the
+            palette.** Measured against `DESIGN.md` §Status on each wash:
+            affirm **7.20:1**, caution **5.40:1**, critical **7.73:1** — all far
+            past 1.4.11's 3:1 for a meaningful graphic, which this is not
+            required to meet anyway since it stays `aria-hidden` and redundant.
+
+            🪤 **This does NOT touch `Banner`'s own rule.** *"The tone is in the
+            rule and the ground; the text stays body-coloured"* was written about
+            the MESSAGE, and the message is still Body Graphite — 9.79–9.98:1 on
+            these washes. The map is local rather than exported from
+            `banner.tsx` because `ResultPanel` is the only heading-and-mark shape
+            in the codebase; if a second one appears, it promotes, the way
+            `size` did. */}
         <Icon
           aria-hidden="true"
           strokeWidth={2}
-          className="mt-0.5 size-6 shrink-0"
+          className={`mt-0.5 size-6 shrink-0 ${MARK_INK[tone]}`}
         />
-        <div className="min-w-0">
+        {/* 🔴 `min-w-0 break-words`, THE PAIR — and this panel carried only the
+            first half until the 2026-09-20 re-gate. `present` interpolates an
+            officer-entered event title (`{state.eventTitle}`), which is the one
+            piece of variable content on any terminal screen, and `events.title`
+            has no length limit. Measured at 360 with a 76-character unbroken
+            title: the `<strong>` painted **622.1px wide, right edge 720.1** —
+            380px past the sheet's 340 and 360px past the viewport — and
+            `document.scrollWidth` went to **720 against a 360 client width**.
+
+            🪤 **`min-w-0` alone is exactly the half-fix `Row` documents 80 lines
+            below**, which is what makes this worth its own comment rather than a
+            silent class: the wrapper's BOX held at 200px, so anything reading box
+            geometry called it fixed, while the text went on painting 380px past
+            the surface. The review step's `<dd>` got the pair at the 2026-09-19
+            gate after a long email overflowed by 588px; the success screen — the
+            one screen this whole surface exists to render — did not.
+
+            🪤 **And it needed an unbroken token to find.** The first probe used
+            a hyphenated 86-character title and passed cleanly, because a hyphen
+            is a break opportunity. Same trap the `<dd>` comment names: a
+            realistic-looking long value proves nothing. */}
+        <div className="min-w-0 break-words">
           {/* 🔴 `text-foreground` (Graphite) because `Banner`'s tone classes end
               in `text-misa-body`, and this heading was inheriting it — measured
               `rgb(58, 61, 64)`. DESIGN.md §Colors assigns Graphite to "ink —
