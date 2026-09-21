@@ -1,160 +1,238 @@
-# design-reviewer — `/portal/attend`
+# `design-reviewer` agent — `/portal/attend`, 2026-09-20
 
-Run 2026-09-20 against `a38a2b3d3fb740cc9565fdfb2036dfee72449efb`, in Chrome
-against the local dev server, at 360 / 768 / 1280.
+Branch `design-toolkit`, HEAD `77d2c568`. Browsers: **Playwright Chromium** for
+scripted measurement and pixel diffs, **real Chrome (MCP)** for the cross-check
+of the gate bar and the painted-pixel sample. Local dev server and local
+Supabase only. The reviewer deleted the attendance rows its walk created and
+left the fixture event open; no repo writes.
 
-🪤 **This is the SECOND run. The first was killed after an hour with no
-output**, and the cause is worth recording because it will recur: the lead was
-driving the same Chrome tab at the same time, and two CDP clients on one browser
-wedged the renderer — two of the lead's own calls had already timed out
-(`Page.captureScreenshot` at 30s, `Runtime.evaluate` at 45s) before the agent
-stalled. The second run was given the browser to itself, an event left open so
-it needed no database work, an explicit ban on `requestAnimationFrame` loops (a
-background tab never advances rAF), and a ~15-minute budget. It returned in ten.
-**Only one agent may drive the browser at a time.**
+## ⚠️ The surface moved under the review
+
+Git was clean at 21:49. At 22:00–22:01, while the state walk was running,
+`app/(public)/portal/attend/page.tsx`, `_components/checkin-form.tsx` and
+`components/ui/portal-sheet.tsx` were modified in the working tree (HEAD
+unchanged) by the lead, writing this gate's fix. The reviewer diffed it rather
+than guessing:
+
+- **Exactly five code-like lines changed**, one functional change:
+  `announcement(state)` → `announcement(state, pending)`, the busy early return,
+  and the call site.
+- **Everything else was comments**, largely rewritten — and rewritten to numbers
+  *identical to ones the reviewer had independently measured minutes earlier*:
+  286px content column, 258px text column, button bottom 591.5, 48.5px slack,
+  checkbox row 104 / 84 / 64 / 64, 8.51:1 for Secondary Graphite on white.
+
+Every layout, contrast, focus and state measurement below is therefore valid for
+both trees, **except** the sr-only status text during `submitting`, which the
+reviewer re-measured after the edit.
 
 ---
 
-## The bar, verified independently
+## THE BAR — measured from scratch, two ways, and both are real
 
-At a true 360×640 viewport (iframe with the scrollbar suppressed, so
-`documentElement.clientWidth === scrollWidth === 360`), idle, scroll 0, under
-the 60.6px sticky header:
+Header shell **61.0px** (Playwright) / **60.57px** (real Chrome). Nothing on the
+page carries `data-reveal` (`main [data-reveal]` count = 0), so it settles on
+first paint; nothing was forced.
 
-> Check in button — top **562.5**, **bottom 610.5**, height 48.0. **29.5px of
-> slack under the fold.**
+| | layout width | content col | text col | box row | **Check in bottom** | slack |
+|---|---|---|---|---|---|---|
+| a phone — overlay scrollbars | **360** | 286 | 258 (3 lines) | 84px | **591.5** | 48.5 |
+| a 360px desktop window — classic 15px scrollbar | **345** | 272 | 244 (3 lines) | **104px** (the label wraps) | **607.66** | 32.3 |
 
-Fields at 239.1–288.2, 328.2–377.4, 417.4–466.5 (49.1px each); box row
-482.5–546.5; 16px between the box row and the button. The lead's independent
-measurement was 611 with a classic scrollbar present. **The bar is met.**
+**Bar met either way.** The receipts' 607.7 is the conservative of the two, and
+it is what you get the most likely way anyone would have taken it.
 
-One number recorded rather than raised as a finding: **unmatched pushes the
-button to bottom 731.7** — the banner is 105.1px and with its 16px gap that is
-+121.2px on idle's 610.5, where the brief anticipated "roughly 90px". Measured
-at 360 with a classic scrollbar (content 345px), so on a true 360 the banner may
-lose a line and land nearer +100. The bar is IDLE-ONLY by decision, so this
-reports rather than gates.
+🔴 **This overturns the diagnosis the lead had written an hour earlier.** That
+paragraph said 607.7 "reproduces at no viewport" and attributed the 16.16px gap
+to `Title`'s `sm:text-[34px]` plus an 8px `sm:` step — "a reading taken where
+the media query did not apply". **At 345 the `h1` computes 26px: no `sm:` is
+applied.** The delta is the checkbox label's wrap (+20px) net of real Chrome's
+sub-pixel row heights (inputs 49.14 rather than 50, header 60.57 rather than
+61). The decomposition added up and described nothing.
 
-## Findings
+---
 
-### DR1 · Medium · the box row is 44px at ≥ `sm`
+## FOCUS INDICATORS — pixel evidence, Tab-driven
 
-`label:has(input[name=firstTime])` measures **44.0px at 1280×800 and 44.0px at
-768×900** — four pixels under the 48px floor the brief commits to (EV4: *"the
-whole box row is the checkbox's target and is at least 48px tall"*). At 360 the
-label wraps to two lines and the row is 64.0px, so only ≥`sm` is short.
+Screenshot focused, screenshot unfocused, diff per pixel (threshold 8/channel).
+Every ring **paints**, and every changed-pixel count matches the ring geometry
+arithmetically:
 
-The label at `checkin-form.tsx:389-401` carried no min-height, and **the comment
-at `:383` declined `min-h-12` on a figure that could not be reproduced at any
-width** — it claimed "the block is already 87px" against measurements of 64.0 at
-360 and 44.0 at 768 and 1280. Adding the floor costs the 360 bar nothing,
-because 360 already clears it.
+| element | width | changed px | bbox | accounting |
+|---|---|---|---|---|
+| text inputs | 1280 | **3404** | 518 × 58 | 2288 ring band + 1116 for the 1px control edge flipping to navy (`focus:border-misa-blue`, perimeter 2 × (510 + 50) = 1120). Both effects paint. |
+| text inputs | 360 | **2060** | 294 × 58 | 1392 ring + 672 border |
+| checkbox | 360 and 1280 | **176** | 24 × 24 | exactly 24² − 20². Exact ring, no extras. |
+| Check in | 1280 | **1072** | 216 × 56 | exactly 216·56 − 212·52 |
+| Check in | 360 | **1324** | 294 × 56 | ring 1384 less corner anti-aliasing |
+| Confirm and check in / Edit details | 360 | **1384** each | 294 × 56 | |
+| See your points and attendance | 360, present | **1136** | 208 × 80 | exactly 208·80 − 204·76 |
 
-### DR2 · Medium · the unmatched alert is painted the same colour as the empty inputs below it
+🪤 **The instrument that would have missed it, recorded.** Programmatic
+`.focus()` on the checkbox and the buttons returns
+`matches(':focus-visible') === false` and paints **0 changed pixels**. That is
+why the Tab-driven numbers above are the evidence and `getComputedStyle` was
+never used as proof.
 
-The neutral `<Banner>` at `checkin-form.tsx:302` computes
-`backgroundColor: rgb(242, 242, 243)` — and `input[name=fullName]` directly
-below computes `rgb(242, 242, 243)`. **Identical**, because `Banner`'s `info`
-tone and `controlClass` both fill with `--misa-panel`.
+---
 
-Against the sheet's `rgb(255,255,255)` that wash is 1.12:1, and its
-`border-misa-blue/35` hairline composites to ≈`rgb(173,183,198)` = 2.03:1 on
-white. Confirmed in a 360 screenshot: **the banner reads as a fourth, empty form
-control rather than as an alert.**
+## CONTRAST — formula validated on the WCAG reference pairs every run
 
-Text contrast inside it is fine (body ink on Vellum, no failure in the scan), it
-keeps `role="alert"` and it takes focus — so this is salience, not
-comprehension. But it is the one screen the rebuild exists to rescue.
+`#767676` on white = **4.54**; black on white = **21.00**. Backgrounds
+composited up the ancestor chain from white; alpha foregrounds composited too.
 
-### DR3 · Medium · the text inputs have no boundary meeting 1.4.11's 3:1
+**Lowest ratio anywhere in `<main>`, across every state and width reached:
+8.51:1** — Secondary Graphite `#4a4d50` on the white sheet, being the 14px
+reassurance line and the review step's three 16px `<dt>` labels. AA needs 4.5.
+**Zero failures at any width in any state reached.**
 
-On the white sheet the Vellum fill is 1.12:1 (`rgb(242,242,243)` vs
-`rgb(255,255,255)`) and the hairline `rgba(29,31,32,0.2)` composites to
-≈`rgb(210,210,210)` = **1.53:1 against white** and ≈1.36:1 against the fill it
-encloses. Measured with `getComputedStyle` on `input[name=fullName]` and its
-`section`.
+Others: banner body on the caution wash **9.98:1**; body on the affirm wash
+**9.88:1**; the lookup link's navy on the affirm wash **11.78:1**; field errors
+critical on white **8.63:1**; button ink on navy **13.03:1**; `h1` **16.55:1**;
+the unmatched state's caution outline **5.91:1** on white.
 
-Scope caveat from the reviewer, quoted because it is the interesting part: *"the
-fill comes from `controlClass` in `components/ui/field.tsx`, which you excluded
-as a ui/ internal — I raise it because the composite is created by this
-surface's `ground="white"` (`page.tsx:77-82`), and because the comment at
-`page.tsx:63-70` offers that pairing as the fix for the inputs being 'the colour
-of what is behind them'. On white they are 1.12:1 from what is behind them.
-Site-wide, so probably not this gate's blocker."*
+**The two muted-on-Vellum occurrences the brief owns are gone** — no
+`--misa-muted` (`rgb(111,114,117)`) paints anywhere in `<main>` in any state.
 
-### DR4 · Medium · the header's MEMBER PORTAL button is 29px tall at 360
+Painted pixels sampled from the PNG to confirm the computed values: labels
+**[29,31,32]**, banner body **[58,61,~66]**, page ground **[242,242,243]**,
+sheet **[255,255,255]**.
 
-Rect top 15.5, bottom 44.5 — under the 44px phone tap-target floor — and its
-left edge sits **3.0px** from the wordmark's right edge (wordmark 131.6–213.6,
-button 216.6–325.1). No collision, but 3px of it. Measured on the rendered
-header inside a 360px iframe.
+---
 
-`components/site-header.tsx`, site-wide and outside this surface's registered
-files. CLAUDE.md records the nav clearance as re-measured 2026-09-18 **at 1280
-only**, and this is the 360 case that measurement did not cover — the same case
-CLAUDE.md's own note anticipates: *"on a phone the tight spot is that button
-beside the centred wordmark."*
+## `--misa-control-edge` — the reason that fix exists, checked here
 
-### DR5 · Nit · the caution outline renders as a single device pixel
+| | measured | vs the white sheet | vs the `#f2f2f3` fill |
+|---|---|---|---|
+| rest | `rgb(133,134,135)` = `#858687`, 1px | **3.65:1** | **3.26:1** |
+| hover | `oklab(0.314884 -0.0144003 -0.08381 / 0.55)` | **3.36:1** | **3.24:1** |
+| `aria-invalid` | `rgb(143,35,35)` | 8.63:1 | 7.72:1 |
+| focus | solid navy | 13.03:1 | |
 
-Computed outline on the box label:
-`oklab(0.50854 0.033691 0.0968719 / 0.6) 0.571429px solid`, offset 4px —
-**0.571px CSS is one device pixel at this dpr 1.75**, at 60% alpha, held 4px off
-a 64px block. Paired with DR2, the two faintest marks on that screen were the
-alert and the pointer to the control it names (`checkin-form.tsx:397-399`).
+**All four of the first two rows match `field.tsx`'s claim exactly.**
 
-## What passed
+---
 
-**No Blockers and no Highs.** A full composited-contrast scan of every text node
-across all six states at all three widths found **zero** failures and **zero**
-`--misa-muted`-on-Vellum occurrences:
+## LAYOUT
 
-- review-step `<dt>` labels **8.51:1 on white** (was 4.33 on Vellum)
-- lookup link **11.78:1** on the affirm wash
-- field errors **8.63:1**
-- band h1 **16.8:1** on navy
-- the only sub-5 text anywhere on the route is the footer's `txmisa@gmail.com`
-  at 4.84:1 on white, which passes and is shared chrome this surface does not own
+No horizontal scroll at any width in any state (`scrollWidth − innerWidth = 0`
+everywhere). **The 254-character-email regression is fixed**: with a
+143-character unbroken email, a 32-character EID and a 120-character name,
+`hScroll = 0` at 360 and the review panel wraps.
 
-Also verified: **EV7 holds exactly** — button width 208.0px for both "Check in"
-and "Checking in…" at 768 and 1280, full-width at 360, so it cannot resize.
-**No focusable element sits inside the navy band (0), and none straddles the
-band/white boundary at y = 191.1** — so the hub's two-grounds ring rule was
-checked here and does not bite. No horizontal scroll in any state at any width.
-No `data-reveal` nodes and no animations, only the 150ms colour transitions.
-The console across a full load and six submissions held 28 messages, all
-`[HMR] connected` or the React DevTools notice — **no errors, no hydration
-warnings**. Outcomes are never colour alone: each pairs a wash with a naming
-heading and a 24px `aria-hidden` mark, and present and duplicate use different
-icons.
+The sheet: `px-4 py-5` at 360 (content 286), `sm:px-8 sm:py-7` at ≥640 (content
+510, sheet 576 = `max-w-xl`), `border-radius: 4px`, `shadow-lift`. **The masthead
+rule bleeds to the sheet's inner edges at every width** — at 360 the rule spans
+21→339 inside a 20→340 sheet; at 1280, 353→927 inside 352→928.
 
-🔓 **One refinement of the lead's own long-content finding.** A 109-character
-*name* wraps to three lines in the review `<dd>` with no overflow, because it
-has spaces — so the defect is specifically an **unbroken token**, and a
-long-content check written with a realistic name would have passed and found
-nothing.
+Tap targets: the whole checkbox *row* is the label and measures 84–104px at 360
+and 64px at ≥768; Check in 48px; both review buttons 48px; the lookup link 48px
+at ≥768 and 72px at 360. **The bare 16 × 16 checkbox is the only sub-44 box and
+it is not the target.**
 
-## Coverage — what this run did not reach
+---
 
-States walked at 360: idle, `needs_confirmation` (new, `zz9998`, and again with
-a 109-character name), `present` (`ab8049`), `duplicate` (repeat of `ab8049`,
-prior `present`, affirm), `unmatched` (`zz9999`), `invalid` (empty submit). Idle
-also at 768 and 1280.
+## STATES
 
-Not reached by this agent:
+Reached and walked at 360, 768 and 1280: **idle, invalid, unmatched,
+needs_confirmation (new), needs_confirmation (already on file), present,
+duplicate, submitting, long-values**, plus **pre-hydration**.
 
-- `refused`, `pending`, `rate_limited`, `error` — **excluded from its scope on
-  purpose**, because each needs the database pushed off its happy path. The lead
-  drove all four (`error` by revoking the check-in RPC's execute grant,
-  `rate_limited` by filling the throttle bucket; both restored) and reports them
-  in `lead.output.md`.
-- `needs_confirmation, already on file` — the lead verified this variant
-  separately; heading and announcement both correct.
-- The pre-hydration / no-JS submit path — the lead verified it from the server
-  HTML (`method="POST"`, `$ACTION_REF_1`, `$ACTION_KEY`, and `StatusRegion`
-  present from first paint).
-- Real `:focus-visible` pixel rendering: **Chrome would not match
-  `:focus-visible` inside a background iframe**, so the ring was verified
-  structurally — the global `2px solid var(--misa-blue)` at offset 2, one
-  `.on-navy` element on the page, nothing focusable inside it — rather than by
-  screenshot.
+Focus placement after each replacement screen: invalid → the first
+`aria-invalid` field ✅; unmatched → `p[role=alert][tabindex=-1]` ✅; both
+confirmations → `h2[tabindex=-1]`, and Tab from there goes straight to *Confirm
+and check in* ✅; the four terminal screens → `<body>`, which is the brief's
+settled choice — they announce through `StatusRegion` instead, verified
+non-empty and correct in both `present` and `duplicate`.
+
+Tab order is sane at both widths: 360 → skip link, hamburger, wordmark, MEMBER
+PORTAL, then the form; 1280 → skip link, four nav items, wordmark, MEMBER PORTAL,
+three inputs, checkbox, Check in, footer. (One extra stop, `nextjs-portal`, is
+the dev overlay and is not in production.)
+
+**Console: zero errors and zero warnings**, every state, every width, including
+the no-JS load and the throttled pending window. No hydration warnings.
+
+### States NOT reached, and not guessed at
+
+`pending`, `refused`, `rate_limited`, `error`. The first two need the shared
+local fixture event closed or removed, which would have broken the fixture the
+caller set up; `rate_limited` needs 200 submissions in ten minutes
+(`RATE_LIMIT_MAX = 200`), which would have written 200 rows. **So the reviewer
+measured no contrast, layout or focus number for the `critical` banner wash or
+the `caution` terminal panel.** Nearest evidence it did have: the `caution` wash
+at 9.98:1 on the `unmatched` banner (same component, same size, same ink as
+`rate_limited`), and the `affirm` wash at 9.88:1 on `present` / `duplicate`.
+
+---
+
+## ACCESSIBILITY WIRING, verified on the running page
+
+One `<main>`, one `<h1>`, correct heading order. The checkbox's accessible
+**name** is *"I haven't checked in with this form before"* alone and its
+**description** is the reassurance, while the `<label>` still wraps both so the
+row stays one tap target — the accname split works. The honeypot is
+`aria-hidden="true"`, `tabindex="-1"`, `left: -9999px`. `StatusRegion` is
+`role="status" aria-atomic="true"`, `sr-only`, present and empty from first
+paint. **No `robots` meta, so the page stays indexable as the brief requires.**
+The caution outline on the box row in `unmatched` renders `2px solid
+rgb(138,90,18)` at `offset 4px`, **5.91:1** on white. The pre-hydration submit
+works end to end: JS disabled → POST → the success screen.
+
+## MOTION
+
+Nothing animates except `transition-colors duration-150` on the control edge —
+a colour swap, which is what DESIGN.md allows. No `data-reveal` in `<main>`.
+
+---
+
+## THE FINDINGS, in the reviewer's own framing
+
+**DR1 — Medium — focus is lost for the whole pending window.** Measured at
+360×640 with the POST throttled to 3.5s: `"Checking in…"`, `aria-busy="true"`,
+`disabled` true, box **286 × 48, bottom 591.5 — byte-identical to idle**, and
+`document.activeElement` = **BODY**. Mitigation the 22:01 edit supplied: the
+status region now says "Checking in…", so something is spoken — and because
+focus is on body, the button's own label change is *not* also announced, so
+there is exactly one announcement (measured). A full fix means
+`aria-disabled={pending}` plus an early return in the submit path instead of
+`disabled`, so the control keeps focus.
+
+**DR2 — Medium — the bar's recorded figure reproduces, and the new diagnostic
+comment was wrong twice.** Above.
+
+**DR3 — Nit — the outcome sentence is read twice on the no-JS path.** Measured
+with `javaScriptEnabled: false` at 360: after submit, `main`'s innerText begins
+*"Event Check-In You're checked in. Your attendance at … is recorded. You're
+checked in! Your attendance at … is recorded."* Both the sr-only `StatusRegion`
+and the visible `ResultPanel` carry it in the initial DOM. With JavaScript the
+region is a live update and the panel is silent, which is correct; only the
+full-page-POST path duplicates.
+
+**DR4 — Nit —** `min-h-12` never binds: 104px at a 345 layout, 84px at 360, 64px
+at 768 and 1280, against a 48px floor. Inert but harmless.
+
+**DR5 — Nit —** the brief's "roughly 90px" for the unmatched push is **+82px** at
+768 and 1280 (595.7 → 677.7) and **+122px** at 360 (591.5 → 713.5). Non-gating by
+officer decision; the recorded figure understates the phone case by 32px.
+
+**DR6 — Nit —** the three marks the sheet composition rests on are the faintest
+on the page: sheet fill vs page ground **1.12:1**, sheet border `rgb(191,191,194)`
+vs ground **1.64:1**, masthead rule `rgb(219,219,219)` vs sheet **1.38:1**. No
+WCAG rule applies — all decorative. Recorded because nothing had reviewed this
+composition before.
+
+**DR7 — Nit —** `py-3` "takes it to exactly 48px" holds at 768/1280 (217.3 × 48)
+but the link is 200 × 72 at 360, where it wraps. Exceeds the floor everywhere;
+the comment is width-silent.
+
+**DR8 — Nit —** box clearance between the centred wordmark and the MEMBER PORTAL
+button is **10.4px at a true 360 layout and 3.0px at a 345 layout**. No collision
+at either. `components/site-header.tsx`, not this surface's file.
+
+## Withdrawn
+
+A finding that *"Secondary Graphite … (7.60:1)"* was quoted against white in two
+comments where the measured value on white is 8.51:1 (7.60:1 is that ink on
+Vellum). The 22:01 edit had already corrected both sites. Withdrawn rather than
+filed.

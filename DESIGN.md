@@ -1,7 +1,7 @@
 ---
 name: Texas MISA
 description: A navy-and-white institutional drawing set, now with depth — a drawn navy field, a flat grey page, and white surfaces lifted off it. Square structure, softened plates, hairline rules.
-version: 2.3
+version: 2.4
 status: Written from what phase 1 of the v2 redesign actually shipped (2026-08-19). Sections marked NOT YET REBUILT describe surfaces still running the v1 system.
 colors:
   drafting-navy: "#16305c"
@@ -66,7 +66,7 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/portal/attend` | ✅ **v2 — REBUILT 2026-09-20** (phase 3, the Portal Rebuild, part 3; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, “Fit the first screen”, then the officer’s 2026-09-20 header removal: the page is one white `.sheet` on the grey ground (`PortalSheet`), the form at the `xs` rhythm with 16px gaps, every label visible above its field, a 48px full-width Check in. 🔓 **Its bar is a fold position and the tightest number in the phase** — at a true 360×640 under the 61px sticky header, IDLE, the Check in button’s bottom edge is **607.7px against a 640 fold**, where it was cut at 668. At its gate it measured 610.5 — independently twice, the lead at 611 with a classic scrollbar and the `design-reviewer` at 610.5 with it suppressed — and the officer’s 2026-09-20 header removal improved it to 607.7. All **twelve** states are designed and gated, not just the happy path, and **both** of its muted-on-Vellum occurrences are gone — lowest ratio anywhere in its `<main>`, measured on every state, is **8.51:1**. 🪟 `/portal/attend` stays **indexable**; robots is per page and must never move to a portal layout. |
+| `/portal/attend` | ✅ **v2 — REBUILT 2026-09-20** (phase 3, the Portal Rebuild, part 3; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, “Fit the first screen”, then the officer’s 2026-09-20 header removal: the page is one white `.sheet` on the grey ground (`PortalSheet`), the form at the `xs` rhythm with 16px gaps, every label visible above its field, a 48px full-width Check in. 🔓 **Its bar is a fold position and was the tightest number in the phase, and it is TWO NUMBERS** — established at the 2026-09-20 re-gate, which found that no record had ever said which convention it used. At a **true 360×640** (a phone, overlay scrollbars, 360 CSS px of layout) under the 61px sticky header, IDLE, the Check in button’s bottom edge is **591.5px, 48.5px of slack**. In a **360px-wide desktop window**, where a classic 14–15px scrollbar leaves 345–346px of layout, the checkbox’s own **label** wraps to a second line and the same build measures **611.5 headless / 607.66 in real Chrome** — the figure the receipts recorded. 🪤 **The step is a cliff at 348px of layout width, not a slope:** one pixel moves that row 20px (104 → 84) and the button with it. **Met under both**; it was cut at 668 and measured 610.5 at its 2026-09-19 gate. Removing the navy band was worth **+19px at a true 360 and about zero at 346** — not the “most of another 131” a comment claimed; it bought composition, not height. All **twelve** states are designed and gated, not just the happy path, and **both** of its muted-on-Vellum occurrences are gone — lowest ratio anywhere in its `<main>`, measured on every state, is **8.51:1**. 🪟 `/portal/attend` stays **indexable**; robots is per page and must never move to a portal layout. |
 | `/portal/leaderboard`, `/portal/lookup` (were `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3’s parts 4 and 5 are next.** Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — nine occurrences on `/portal/lookup`, one on `/portal/leaderboard` — plus the `definition-list` axe fault on `/portal/lookup`’s result, which is the one check `npm run test:ui` still fails. 🧰 **Rebuilt through §Design toolkit**: both are registered in `docs/design/surfaces.json` with a brief, two concepts, evidence and an officer-adopted concept each; the builds and their gates are what remain. |
 | `/portal` (the member portal hub) | ✅ **v2 — REBUILT 2026-09-19** (phase 3, the Portal Rebuild; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, "the title block", then the officer’s 2026-09-20 header removal: one white `.sheet` on the grey ground (`PortalSheet`) whose body is a shared-rule plate whose three cells are each a whole-row `<Link>` with a 48px navy key. Equal formatting is structural — one `.map` over one shape. No `data-reveal` anywhere, deliberately. The header's MEMBER PORTAL button is still the site's one way in. 🔓 Its bar, measured settled at 360×640 under the 61px sticky header: the check-in row's bottom edge at **267.2px** against "at or above 424" (re-derived at the 2026-09-20 re-gate three ways — the lead, the `design-reviewer` agent and the critique's assessment B, the last from the box model rather than a browser; the 265.5 recorded on 2026-09-20 does not reproduce). 🔴 **No navy header** — zero `.chevron-notch` and zero `.ground-field` in any portal `<main>`; the only navy left in the portal body is the three key columns and the submit buttons, which are controls. |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
@@ -760,6 +760,25 @@ half is worth anything.**
     fix verified by the same instrument that would have missed the defect is not
     verified.** Computed style cannot see paint order. A focus ring on a
     two-ground element is checked by diffing a screenshot, or it is not checked.
+  - 🔴 **A FOCUS RING ON A FILLED BUTTON FADES IN FROM INVISIBLE, AND NOBODY
+    CHOSE IT** (v2 phase 3, found at the portal-attend re-gate, 2026-09-20).
+    **Tailwind v4 puts `outline-color` inside `transition-colors`** — resolved
+    on a real button, `transition-property` reads `color, background-color,
+    border-color, outline-color, …`. `components/ui/button.tsx`'s `BASE`
+    carries `transition-colors duration-150`, and an unfocused element's
+    `outline-color` computes to `currentColor`. So on any control whose own text
+    is white — `variant: "primary"`, `"onNavy"`, and `danger` once filled — the
+    ring animates **white → navy over 150ms, on a white ground**. Sampled on
+    `/portal/attend`'s Check in button: `rgb(255,255,255)` at t≈1ms (**1.00:1**
+    against the sheet), `rgb(214,219,226)` at ≈31ms, `rgb(148,160,180)` at
+    ≈62ms, navy at ≈151ms (13.03:1) — **the indicator does not clear 3:1 until
+    roughly 70–90ms after the key**. A control whose text is dark (every text
+    input, whose `currentColor` is Graphite) fades dark-to-dark and is fine.
+    🪤 **It cannot be fixed at a call site**: every `transition-*` utility sets
+    `transition-property` at equal specificity, so an appended override ties and
+    loses on emission order — the same tie as `Title`'s below. The fix belongs in
+    `BASE`. 📌 The header's MEMBER PORTAL button is the same defect, raised at
+    the portal-hub re-gate from the other end; the two are one officer question.
 - 🔴 **`Title` takes `size`, because appending a smaller size class DOES NOT
   WORK** (v2 phase 3). Both sizes are arbitrary-value utilities, so they tie on
   specificity (0,1,0) and the winner is whichever Tailwind emits last — and
@@ -891,6 +910,18 @@ Real photographs are live on the home page **locally only**.
 - **Contrast is measured per pairing, on the ground the text actually sits on,
   compositing any alpha.** Annotation Grey passed everywhere until a field's
   ground changed under it.
+- 🔴 **A FOLD MEASUREMENT IS NOT A NUMBER, IT IS A NUMBER AND A LAYOUT WIDTH**
+  (v2 phase 3, the portal-attend re-gate, 2026-09-20). A 360px-wide desktop
+  window on Windows is a **345–346px layout**, because a classic scrollbar takes
+  14–15px; a phone at 360 is a **360px layout**, because its scrollbars are
+  overlays. `/portal/attend` crosses a wrap cliff between the two — its checkbox
+  label wraps at ≤347px and the row grows 20px — so its bar reads **591.5** one
+  way and **607.7** the other. Both were recorded, in six documents, with no
+  convention attached to any of them. 🪤 **And headless Chromium uses overlay
+  scrollbars in EVERY context**, `isMobile` or not, so a headless "desktop" run
+  is not the desktop case and three headless derivations are one derivation.
+  Write the layout width beside the number, and cross-check a fold figure in a
+  real browser.
 - 🐛 **`--misa-muted` (`#6f7275`) on the grey page ground measures 4.33:1 and
   FAILS AA. This file previously recorded it as 4.63:1 and called it "the
   smallest margin in the system"; both halves were wrong.** Recomputed in phase 2
@@ -898,6 +929,11 @@ Real photographs are live on the home page **locally only**.
   4.54, black on white = 21.00). The three public places it had landed on grey —
   `/gallery`'s count, `/about`'s FAQ marker and the public error boundary — now
   use `--misa-secondary` (`#4a4d50`, **7.60:1**).
+  🪤 **7.60:1 is Secondary on the GREY ground. On Paper the same ink is
+  8.51:1** — write the ground down beside the ratio, always. `/portal/attend`
+  quoted 7.60 for a white ground in two comments until the 2026-09-20 re-gate
+  measured them, which is the same mistake as Annotation Grey's, made with the
+  ink that was brought in to fix it.
   ⚠️ **Muted is still fine on white** (4.84:1) and that is where the header, the
   footer, `KpiPlate` and `OfficerCard` use it. The rule is narrow and worth
   stating exactly: **`--misa-muted` may sit on Paper, never on Vellum.**

@@ -1,64 +1,97 @@
 ---
 skill: design-reviewer
-command: design-reviewer agent — /portal/attend at 360 / 768 / 1280 on the local dev server, six states
+command: design-reviewer agent — /portal/attend at 360 / 768 / 1280 on the local dev server; ten states plus pre-hydration; Playwright Chromium for scripted measurement and pixel diffs, real Chrome for the bar cross-check
 date: 2026-09-20
-commit: "a38a2b3d3fb740cc9565fdfb2036dfee72449efb"
+commit: "77d2c568ed093f78a6b437e053bbef0533eff9e4"
 output: design-review.output.md
 findings:
   - id: DR1
-    summary: "[Medium] The first-time checkbox row — the checkbox's whole tap target — measures 44.0px at 1280x800 and 44.0px at 768x900, four pixels under the 48px floor the brief commits to (EV4). At 360 the label wraps to two lines and the row is 64.0px, so only >=sm is short. The comment declining `min-h-12` cited \"the block is already 87px\", a figure reproducible at no width."
+    summary: "[Medium] The submit's `disabled={pending}` drops focus to `<body>` for the whole pending window. Measured at 360x640 with the POST throttled to 3.5s: the button reads \"Checking in…\", `aria-busy=\"true\"`, `disabled` true, box 286 x 48 with its bottom edge at 591.5 — byte-identical to idle, so EV7's \"must not resize the control\" is satisfied exactly — and `document.activeElement` is BODY. The member pressed a control that then removed itself from the tab order, so the next Tab restarts at the skip link, four to seven stops back. It is the same defect `ReviewPanel`'s own comment identifies one step later, one step earlier."
     disposition: adopted
-    fix_commit: "bd71103f223e26f6be75f2296c9c84d4ee401f13"
+    fix_commit: "b2900e15681b949b3e551a86a836f13f153d04c9"
   - id: DR2
-    summary: "[Medium] The unmatched alert is painted the same colour as the three empty inputs beneath it. The neutral `<Banner>` computes backgroundColor rgb(242,242,243) and `input[name=fullName]` computes rgb(242,242,243) — identical, because `Banner`'s `info` tone and `controlClass` both fill with `--misa-panel`. Against the sheet's white that wash is 1.12:1 and its hairline composites to ~2.03:1, so the banner reads as a fourth, empty form control rather than as an alert. Salience, not comprehension — text contrast inside it passes and it keeps role=alert and takes focus — but it is the one screen the rebuild exists to rescue."
+    summary: "[Medium] 🔴 THE BAR'S RECORDED FIGURE DOES REPRODUCE, AND THE RE-GATE'S FIRST DIAGNOSIS OF IT WAS WRONG. In real Chrome a genuine 360x640 frame on Windows gets a classic 15px scrollbar, so the layout width is 345, not 360 — and there the `h1` computes 26px (no `sm:` applied), the content column is 272, the text column 244, the checkbox LABEL wraps to two lines taking that row to 104px, and the Check in button's bottom edge is 607.66. The 16.16px delta is the label's wrap (+20px) net of sub-pixel row heights (inputs 49.14 not 50, header 60.57 not 61). So 607.7 is the classic-scrollbar reading, taken the most likely way anyone would have taken it, and the `sm:`-value decomposition the lead had written up as \"the signature to look for in a suspect measurement\" was derived from a wrong diagnosis. Found by diffing the working tree mid-review, against the fix being written for `lead.md` L1."
     disposition: adopted
-    fix_commit: "bd71103f223e26f6be75f2296c9c84d4ee401f13"
+    fix_commit: "b2900e15681b949b3e551a86a836f13f153d04c9"
   - id: DR3
-    summary: "[Medium] The text inputs have no boundary meeting WCAG 1.4.11's 3:1. On the white sheet the Vellum fill is 1.12:1 and the hairline `rgba(29,31,32,0.2)` composites to ~1.53:1 against white, ~1.36:1 against the fill it encloses. The composite is created by this surface's `ground=\"white\"`, and `page.tsx`'s own comment offers that pairing as the fix for inputs being \"the colour of what is behind them\"."
+    summary: "[Nit] On the pre-hydration path the outcome sentence is in the initial HTML twice. Measured with `javaScriptEnabled: false` at 360: after a full-page POST, `main`'s innerText reads \"Event Check-In / You're checked in. Your attendance at … is recorded. / You're checked in! / Your attendance at … is recorded.\" — the sr-only `StatusRegion` and the visible `ResultPanel` both carry it in the initial DOM, so a linear read hears it twice. With JavaScript the region is a live update and the panel is silent, which is correct; only the full-document path duplicates."
     disposition: deferred
-    reason: "The fill comes from `controlClass` in `components/ui/field.tsx`, shared with /admin and every form on the site — the reviewer's own note says \"site-wide, so probably not this gate's blocker\". The fix is a border weight or colour change that must be re-measured against 25 admin forms and eleven tables, which is not a per-surface edit and not one to make between a review and a flip. Tracked in tasks.md under v2 phase 3 part 6, which owns the shared primitives re-measured on the portal's grounds. Raised independently by the audit as T4."
+    reason: "The fix belongs in `components/ui/status-region.tsx`, which `/portal/lookup` also uses, and it is not free: suppressing the message until after hydration means client state in a component whose entire value is that it is a `<p>` that is always mounted. It would also be the right answer — on a full document load nothing announces anyway, so the region has no job there — which is exactly why it should be decided once for both callers rather than here. Tracked for part 6 alongside the announcement question. Practical cost today is one duplicated sentence for a screen-reader user with JavaScript disabled."
   - id: DR4
-    summary: "[Medium] At 360 the header's MEMBER PORTAL button is 29.0px tall (rect top 15.5, bottom 44.5), under the 44px phone tap-target floor, and its left edge sits 3.0px from the wordmark's right edge (wordmark 131.6-213.6, button 216.6-325.1). No collision, but 3px of it."
-    disposition: deferred
-    reason: "`components/site-header.tsx` — site-wide chrome, outside this surface's registered files, and editing it here would put a shared-header change inside a portal surface's gate. It is the nav-clearance invariant's territory: CLAUDE.md records that clearance as re-measured 2026-09-18 AT 1280 ONLY, and this is the 360 case that measurement did not cover — the case CLAUDE.md's own note anticipates (\"on a phone the tight spot is that button beside the centred wordmark\"). Tracked in tasks.md with both numbers so the next nav change starts from a measurement rather than an estimate."
+    summary: "[Nit] `min-h-12` on the checkbox row never binds: measured 104px at a 345px layout, 84px at 360, 64px at 768 and 1280 — the floor is 48."
+    disposition: rejected
+    reason: "Inert by design rather than dead code. The class was added at the 2026-09-19 gate because the row then measured 44px at >=`sm`, four pixels under EV4's floor; `ca5cd06` narrowed the column and the reassurance grew a line, which is what lifted the row clear. Removing it now would leave the floor guaranteed by a copy length nobody controls — the reassurance is the line EV5 names as the first thing to give if this copy ever grows or shrinks. The measurements are adopted: they are what `lead.md` L3 corrects, and the row's three values by layout width are now in the file."
   - id: DR5
-    summary: "[Nit] The caution outline marking the checkbox the banner points at renders as a single device pixel: computed `0.571429px solid` at 60% alpha, offset 4px, which at dpr 1.75 is one device pixel held off a 64px block. Paired with DR2, the two faintest marks on that screen were the alert and the pointer to the control it names."
-    disposition: adopted
-    fix_commit: "bd71103f223e26f6be75f2296c9c84d4ee401f13"
+    summary: "[Nit] The brief says the unmatched state \"pushes the button roughly 90px further down\". Measured: +82px at 768 and 1280 (595.7 -> 677.7) and +122px at 360 (591.5 -> 713.5). The recorded figure understates the phone case — the one the officer's named failure actually happens on — by 32px."
+    disposition: deferred
+    reason: "The brief's own instruction is that this state \"is measured and recorded AT THE GATE, but does not block\", and this receipt is that record — so the instruction is satisfied by the numbers above rather than by editing the brief. The brief is also the officer-facing document that carries the non-gating decision; changing a figure inside it mid-gate would edit the basis of a decision the officer has already taken. Recorded here and in `officer.md`'s neighbourhood for parts 4-5, which read the same brief shape."
+  - id: DR6
+    summary: "[Nit] The three marks the new \"sheet is the page\" idea rests on are the faintest on the page: the sheet's fill against the page ground 1.12:1, the sheet's border rgb(191,191,194) against the ground 1.64:1, and the masthead rule rgb(219,219,219) against the sheet 1.38:1. No WCAG rule applies — all three are decorative — and what separates the sheet from the ground in practice is `shadow-lift` rather than any of them."
+    disposition: deferred
+    reason: "It is the composition the officer adopted, and it is `.sheet` in `app/globals.css` plus `PortalSheet` — shared by all four portal surfaces, two of them frozen and two of them being built next. Nothing is wrong by a measurable standard; what the finding establishes is that the sheet is carried by elevation, so any future change to `shadow-lift` is a legibility change to the whole portal and not a taste change. Recorded because NOTHING had reviewed this composition before this gate — that is the reason the re-gate happened — and part 6 owns the shared surfaces. No action proposed."
+  - id: DR7
+    summary: "[Nit] `py-3` \"takes it to exactly 48px\" for the lookup link holds at 768 and 1280 (measured 217.3 x 48.0) but the link is 200 x 72 at 360, where it wraps to two lines. It exceeds the floor everywhere; the comment is width-silent."
+    disposition: rejected
+    reason: "Same as `lead.md` L6, reached independently. EV4's figure is a floor and it is met at every width; nothing misleads a decision and there is nothing to change. Both are recorded rather than dropped because the comment states an exact number and the next reader to measure it at this surface's own gate width will get 72."
+  - id: DR8
+    summary: "[Nit] Box clearance between the centred wordmark and the header's MEMBER PORTAL button, seen on this route: 10.4px at a true 360 layout and 3.0px at a 345px layout. No collision at either."
+    disposition: deferred
+    reason: "`components/site-header.tsx` — site-wide chrome, outside this surface's registered files. It also corrects the 2026-09-19 gate's DR4, which recorded \"3.0px at 360\" with no convention named — the same defect as `lead.md` L1, in the same folder. CLAUDE.md's nav-clearance invariant records its measurements as taken at 1280 only, so both phone figures are new. Carried into `officer.md` O5 with the rest of the header question, for part 6."
 ---
 
-**No Blockers and no Highs.** The reviewer confirmed the bar independently — at
-a true 360×640 viewport with the scrollbar suppressed, the Check in button
-measures top 562.5 / **bottom 610.5** / height 48.0, **29.5px of slack** — and
-found zero contrast failures and zero `--misa-muted`-on-Vellum occurrences
-across every text node in six states at three widths. Full report, including
-what passed and the exact coverage, in `design-review.output.md`.
+**No Blockers and no Highs.** Two Mediums, six Nits, and one finding withdrawn
+by the reviewer itself. Full measurements, the focus-ring pixel diffs, the
+contrast table and the list of states it could not reach are in
+`design-review.output.md`.
 
-🪤 **This is the SECOND run; the first was killed after an hour having produced
-nothing, and the cause is worth recording because it will recur.** The lead was
-driving the same Chrome tab at the same time, and two CDP clients on one browser
-wedged the renderer — two of the lead's own calls had already timed out
-(`Page.captureScreenshot` at 30s, `Runtime.evaluate` at 45s) before the agent
-stalled. **Only one agent may drive the browser at a time.** The second run was
-given the browser to itself, an event left open so it needed no database work,
-an explicit ban on `requestAnimationFrame` loops (a background tab never
-advances rAF), and a ~15-minute budget with instructions to return partial
-findings and name its gaps. It returned complete in ten minutes.
+## 🔴 DR2 is the finding of the round, and it is a finding against this gate
 
-🔴 **DR1 is the finding of the gate, because of what it caught rather than what
-it cost.** Four pixels is nothing; the comment beside it was the defect. It
-declined the 48px floor on the grounds that "the block is already 87px" — an
-arithmetic estimate carried over from the build plan, which assumed a three-line
-reassurance where it renders two. It is wrong at every width (64 at 360, 44 at
-768 and 1280), and it was written by the same pass that was otherwise measuring
-everything with `getComputedStyle`. **The project's own rule — measure, do not
-assume — landed on the project.**
+The reviewer was asked to re-measure the bar from scratch and to treat the
+recorded 607.7 as unverified. It did — and then reproduced it. **A 360×640
+window in real Chrome on Windows is a 345px layout**, because a classic scrollbar
+takes 15px, and at 345 the checkbox's own label wraps to a second line. The lead
+had by then written the opposite conclusion into `page.tsx`, with three
+derivations and a `sm:`-value decomposition that added up exactly.
 
-🔓 **DR2 is the one that changes what a member sees.** The alert carrying the
-officer's named failure was the same colour as the empty inputs below it,
-because two different primitives reach for `--misa-panel` for two different
-reasons and nobody had put them on the same screen before.
+**All three of the lead's derivations were headless, and headless Chromium uses
+overlay scrollbars in every context.** They held fixed the one variable that
+mattered. The reviewer was the only step in this gate using a real browser, and
+it is the only reason the surface did not ship a confident wrong diagnosis with
+a memorable name attached to it.
 
-📌 **The two deferred findings are both real and both correctly out of scope**,
-and each is tracked with its measurement rather than its description — a number
-the next person can re-derive, not a claim they have to take on trust.
+## What it verified, with its own numbers
+
+The bar both ways (591.5 at a true 360, 607.66 in real Chrome at 345 — **met
+under both**); **every focus ring painted**, Tab-driven so `:focus-visible`
+genuinely applied, with changed-pixel counts matching the ring geometry
+arithmetically at 360 and 1280; the lowest contrast anywhere in `<main>` at
+**8.51:1** with zero failures; `--misa-control-edge` at **3.65 / 3.26** rest and
+**3.36 / 3.24** hover, all four matching `field.tsx`'s claim exactly; no
+horizontal scroll at any width in any state, including a 143-character unbroken
+email; correct focus placement after every screen replacement; **zero console
+errors and zero warnings** including the no-JS load; and the pre-hydration submit
+working end to end.
+
+🪤 **It also recorded the instrument that would have missed it**: programmatic
+`.focus()` on the checkbox and the buttons returns `matches(':focus-visible')
+=== false` and paints **0 changed pixels**, which is why the Tab-driven numbers
+are the evidence.
+
+## States it could not reach, and did not guess at
+
+`pending`, `refused`, `rate_limited` and `error` — the first two need the shared
+local fixture event closed or removed, and `rate_limited` needs 200 submissions
+in ten minutes. It said so rather than inferring, and named the nearest evidence
+it did have. **The lead reached `pending`, `refused` and both `duplicate`
+readings separately** by driving the fixture, and their measurements are in
+`audit.output.md`; `rate_limited` and `error` were reached by neither and are
+verified by code inspection only — both render the same `Banner` shape as
+`unmatched` with a different tone, whose washes were measured on the terminal
+panels.
+
+## Withdrawn by the reviewer
+
+A finding that `--misa-secondary` was quoted at 7.60:1 against white in two
+comments where the measured value is 8.51:1. It was correct, and it had already
+been adopted as `lead.md` L4 and fixed in the working tree while the review ran.
+Withdrawn rather than filed twice.

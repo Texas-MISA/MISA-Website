@@ -1,39 +1,60 @@
 ---
 skill: impeccable
 command: node .claude/skills/impeccable/scripts/detect.mjs --json --no-advisory "app/(public)/portal/attend/page.tsx" "app/(public)/portal/attend/_components/checkin-form.tsx"
-date: 2026-09-19
-commit: "a38a2b3d3fb740cc9565fdfb2036dfee72449efb"
+date: 2026-09-20
+commit: "77d2c568ed093f78a6b437e053bbef0533eff9e4"
 output: detector.output.json
 findings: []
 ---
 
 The detector returned an empty array — **zero hits**, exit 0 — so there is
 exactly one finding per hit and the list is empty. Run against the surface's own
-two files; `components/ui/banner.tsx`, `button.tsx`, `field.tsx` and
-`portal-band.tsx` are shared primitives in `components/ui/` and belong to no
-surface (DESIGN.md: *"a change to a shared primitive in `components/ui/` does
-not make any surface stale"*).
+two files; `components/ui/banner.tsx`, `button.tsx`, `field.tsx`, `heading.tsx`
+and `portal-sheet.tsx` are shared primitives in `components/ui/` and belong to no
+surface (DESIGN.md: *"a change to a shared primitive in `components/ui/` does not
+make any surface stale"*).
 
-📌 **A clean detector is not a clean surface, and this run is the proof twice
-over.** The scan was green on a build that was simultaneously:
+## 🔴 A clean detector is not a clean surface — and this run is worth less than that
 
-- overflowing the viewport by **588px** on a long email in the review step, a
-  flex item that cannot shrink (`guidelines.md` G1 / `audit.md` T2);
-- setting an `<h2>` in the paragraph ink while the same component two screens
-  earlier used the heading ink (`lead.md` L1);
-- setting 16px body copy at the ramp's 18px leading (`lead.md` L2);
-- leaving focus on `<body>` after five of the twelve states replace the screen
-  (`audit.md` T1);
-- carrying the sole action on four screens at a 32px target on a page whose
-  every other target is 48 (`critique.md` A2).
+The 2026-09-19 receipt recorded the scan as green on a build that was
+simultaneously overflowing the viewport by 588px, setting an `<h2>` in the
+paragraph ink, painting the unmatched alert the colour of the inputs below it,
+and leaving focus on `<body>` in five of twelve states. All 25 findings that
+gate came from the other six steps.
 
-The detector reads arbitrary `text-[Npx]` values against the ramp. It cannot see
-`text-sm`, a `leading-` value, an ink token used for the wrong role, a flex
-item's automatic minimum size, or where focus goes. **Every finding on this
-surface came from one of the other six steps**, which is the argument for the
-pipeline not stopping at step 6.
+**Round 2 then proved the type-ramp rule is switched off rather than blind, and
+this run re-derived that independently rather than repeating the claim** —
+CLAUDE.md's own rule that a review is a set of claims, not an inventory.
 
-🪤 Not pre-suppressed: `.impeccable/config.json` gains no ignore entries here.
-v1 added ten `design-system-font-size` ignores as it went and the set died with
-the branch; the plan's rule is to suppress at phase 5 against the ramp that
-actually ships, or not at all.
+**By mechanism.** `scripts/detector/design-system.mjs` builds the allowlist in
+`normalizeDesignSystem()`:
+
+```js
+addTypographySizes(out, frontmatter.typography);   // the ONLY source
+…
+out.hasFontSizes = out.allowedFontSizes.some(entry => !entry.fluid);
+```
+
+`frontmatter` is DESIGN.md's YAML head. **DESIGN.md has no `typography:` key**
+(it has `name`, `description`, `version`, `status`, `colors`, `elevation`), so
+`allowedFontSizes` stays empty, `hasFontSizes` is `false`, and the rule abstains
+for everything. The same is true of `rounded:`, which is also absent.
+
+**By probe.** A copy of `page.tsx` carrying three planted values was scanned with
+the same flags:
+
+| planted | reported? |
+|---|---|
+| `className="text-[17px]"` — not on any ramp row | **no** |
+| `className="rounded-[9px]"` — not on the radius scale | **no** |
+| `style={{ color: "#ff00aa" }}` | **yes** — `design-system-color`, "Undocumented color #ff00aa is outside DESIGN.md colors" |
+
+So the colour rule works — `colors:` *is* in the frontmatter — and the two rules
+that would police this surface's type ramp and radii are not running at all.
+📌 **Treat this `[]` as no evidence.** It rules out an undocumented literal
+colour on these two files and nothing else.
+
+📌 **`--no-advisory` does not suppress an advisory-severity finding**, which the
+probe also showed: the colour hit came back at `"severity": "advisory"` with the
+flag set. Worth knowing before anyone reads a future empty array as "no advisory
+findings either".

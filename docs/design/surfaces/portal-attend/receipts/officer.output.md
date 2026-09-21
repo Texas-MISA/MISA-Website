@@ -104,10 +104,28 @@ says so. Refinement to the rule: **measure the column the text is actually in.**
 | `.chevron-notch` / `.ground-field` in any portal `<main>` | **0** at 1280, all four routes |
 | `<h1>` on each route | present — Member Portal, Event Check-In, Leaderboard, My Attendance |
 | Navy remaining in the portal body | the hub's 3 key columns, 2 submit buttons — controls only |
-| Check in button bottom, 360×640 idle | **607.7** (bar ≤640) |
-| Hub check-in row bottom, 360×640 | **265.5** (bar ≤424; was 325) |
+| Check in button bottom, 360×640 idle | **607.7** (bar ≤640) — 🔴 corrected below |
+| Hub check-in row bottom, 360×640 | **265.5** (bar ≤424; was 325) — 🔴 corrected below |
 | `npm test` | 41 files / 1142 tests green |
 | `npm run test:ui` | 41 pass / 1 fail — unchanged, and the one is `/portal/lookup`'s |
+
+🔴 **BOTH BAR FIGURES IN THAT TABLE WERE RE-MEASURED ON 2026-09-20 AND NEITHER
+REPRODUCES.** The rows are left as written, because this is a raw output and not
+a place to rewrite history — but neither number should be built on:
+
+| | recorded | re-measured | derivations |
+|---|---|---|---|
+| Check in button bottom, 360×640 idle | 607.7 | **591.5** (48.5px of slack) | three, at the portal-attend re-gate |
+| Hub check-in row bottom, 360×640 | 265.5 | **267.2** | three, at the portal-hub re-gate |
+
+591.5 was read in a mobile-emulated context, in a desktop context and with the
+`js` class stripped — identical each time — and falls out of the CSS chain to the
+pixel. A sweep of nineteen widths from 320 to 1280 produces 607.7 at none of
+them. The 16.16px gap decomposes exactly into `Title`'s `sm:text-[34px]` (+8.16)
+plus one 8px `sm:` vertical step, inside an otherwise-360 layout — a combination
+that exists at no viewport, so the figure cannot be a reading at a true 360.
+Nothing has moved the layout since `ca5cd06`. Full working in
+`lead.output.md` and in `officer.md`'s correction block.
 
 ## What is NOT claimed
 

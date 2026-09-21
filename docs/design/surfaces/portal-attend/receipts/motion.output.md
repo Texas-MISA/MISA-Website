@@ -1,76 +1,136 @@
-# emil-design-eng — motion review, `/portal/attend`
+# `emil-design-eng` — motion review of `/portal/attend`
 
-Run 2026-09-19 against `a38a2b3d3fb740cc9565fdfb2036dfee72449efb`.
+Run at `77d2c568ed093f78a6b437e053bbef0533eff9e4`, against the running page.
 
-The question this step exists to answer was left open by the concept:
-`diverge.output.md` says *"emil-design-eng decides whether the swap from form to
-result gets a 200ms crossfade."* **It does not.** The reasoning is below, run
-through the Animation Decision Framework in order.
+## The surface still moves nothing of its own
 
-| Before | After | Why |
-| --- | --- | --- |
-| Form → outcome swaps instantly | *unchanged* | A crossfade would put a half-faded screen between "submitted" and "recorded" on the one page whose brief says a member *"must always know which outcome they got"*. It also cannot exist before hydration, where the swap is a full page load — so it would be present exactly when the phone is fast and absent exactly when it is slow. |
-| `transition-colors duration-150` on controls | *unchanged* | Already the right call: 150ms is this skill's own figure for a colour swap, and colour is the only thing that moves here. |
-| No `:active` transform on buttons | *unchanged* | `transform: scale(0.97)` on press is this skill's recommendation and it is **overruled by DESIGN.md**, which bans a scale on a control outright (Square Corner / flat-at-rest). `components/ui/button.tsx` records the overrule and keeps the 150ms timing. Not relitigated per surface. |
-| No spinner in the pending button | *unchanged* | EV7 asks for preserved layout and busy status, not a spinner; the label swap plus `aria-busy` carries it, and the button's geometry is identical between labels (measured, 360 and 1280). |
-| Caution outline appears instantly on `unmatched` | *unchanged* | It arrives with the banner on a new render — there is no prior state to transition from. |
-| `transition-colors` is not behind `@media (hover: hover) and (pointer: fine)` | **deferred to part 6** | A real point on a touch-first page: `:hover` sticks after a tap on touch. But it lives in `components/ui/button.tsx` and `field.tsx`, shared with `/admin` and every public page, so it is not this surface's to change — and the practical effect here is nil, since `:hover` and `:active` resolve to the same navy and the button unmounts on the success path. |
+Unchanged from 2026-09-19 and re-verified: no `data-reveal`, no `@keyframes`, no
+`transform`, no Motion/Framer import, no `useReducedMotion`. `main [data-reveal]`
+returns nothing on every state. The terminal panels replace the form in place,
+with no crossfade — the decision M1 settled at the original gate and which the
+officer's header removal did not reopen.
+
+**What is new since that pass is not a new animation. It is that one of the
+inherited transitions turns out to animate the focus ring**, which the 2026-09-19
+motion pass did not know and would have had to measure to find.
 
 ---
 
-## 1. Should this animate at all?
+## Run through the Animation Decision Framework
 
-A member checks in **once per event** — a handful of times a semester. On the
-frequency table that is *Rare/first-time*, the band where delight is permitted.
-So frequency does not rule it out; everything below does.
+### 1. Should this animate at all?
 
-## 2. What is the purpose?
+| What animates | Frequency for this user | Framework's verdict |
+|---|---|---|
+| Control colour on hover / press | tens of times a day, across the site | "remove or drastically reduce" — but it is the system's only interaction cue, so it stays |
+| **The focus ring's colour** | every keyboard tab stop | **"Never animate keyboard-initiated actions."** |
 
-The only valid purpose available is *"preventing jarring changes: elements
-appearing or disappearing without transition feel broken"*. Three things
-outweigh it, and each is specific to this surface rather than a general
-preference for less motion:
+The framework's rule is stated without qualification: *"Never animate
+keyboard-initiated actions. These actions are repeated hundreds of times daily.
+Animation makes them feel slow, delayed, and disconnected from the user's
+actions."* A focus ring is the keyboard-initiated action.
 
-1. **The officer's anti-goal is literally the duration.** The portal's one named
-   anti-goal is *"slower to check in"*. The outcome screen is the answer to the
-   only question the member has; 200ms of it being half-legible is the anti-goal
-   expressed in milliseconds.
-2. **The brief's one non-negotiable is outcome legibility.** *"A member must
-   always know which outcome they got — and a recorded check-in must never look
-   like a failure, or a failure like a recorded one."* During a crossfade the
-   affirm and critical grounds are both partly on screen. A member glancing at a
-   phone at a door is exactly the reader that fails on.
-3. **It cannot exist before hydration.** The form must post before JS loads
-   (verified: `method="POST"` and `$ACTION_KEY` in the server HTML), and that
-   path is a full document load with no transition available. A crossfade would
-   therefore appear only on fast devices — inverted from where a smoothing
-   effect would help.
+### 2. What is the purpose?
 
-🪤 And the mechanical objection, which is the one that would have bitten in
-code: the panel replaces the form via a `switch` on action state, so React
-unmounts one subtree and mounts another. A crossfade needs both present at once
-— a wrapper holding the outgoing screen, or a library. That is machinery on a
-component whose entire design constraint is working without JavaScript.
+The colour swap's purpose is **feedback** — a valid one. The ring's fade has no
+purpose at all: it is a side effect of `outline-color` being inside Tailwind v4's
+`transition-colors` shorthand. Nobody chose it.
 
-## 3 & 4. Easing and duration
+### 3–4. Easing and duration
 
-Moot. Nothing new animates. The two durations that exist are both 150ms colour
-swaps, which is this skill's figure for that case.
+150ms, the figure this skill specifies for a colour swap, on the browser default
+ease. Correct for the hover. For the ring it is 150ms of a feedback signal
+arriving late.
 
-## What the surface actually moves
+---
 
-Nothing. No `data-reveal` (correct — the band must be readable at first paint,
-and a panel mounted by a state change is never seen by the observer, so a reveal
-on it would be permanent `opacity: 0`). No keyframes, no `animate-*`, no
-`useReducedMotion`, no transform anywhere. The only transitions are inherited
-from `components/ui/`: `transition-colors duration-150` on buttons and inputs.
+## Measured: the ring on the Check in button fades in from white
 
-🪤 **This surface is required to carry a motion receipt for a reason that is
-itself worth recording.** `scripts/design/receipts.mjs` computes whether a
-surface moves by grepping its files for `data-reveal|animate-|transition-|…`.
-Both hits here are **inside comments** — `page.tsx:42` and
-`checkin-form.tsx:637`, each explaining why a reveal must never be added. The
-grep cannot tell a comment from code. The receipt is written in full anyway:
-the conclusion "nothing should animate" is worth having on the record for a
-surface whose concept explicitly left the question open, and deleting a comment
-to drop a review step would be the wrong way to resolve it.
+`components/ui/button.tsx`'s `BASE` carries `transition-colors duration-150`.
+Resolved on the running button:
+
+```
+transition-property: color, background-color, border-color, outline-color,
+                     text-decoration-color, fill, stroke, --tw-gradient-from,
+                     --tw-gradient-via, --tw-gradient-to
+transition-duration: 0.15s
+```
+
+`outline-color` is in the list. The button's unfocused `outline-color` computes
+to `currentColor`, and on `bg-misa-blue` that is **white**. So the ring animates
+white → navy across the 150ms, on a **white sheet**.
+
+Sampled on the real page, keyboard focus, `outline: 2px solid` at `offset 2px`:
+
+| t | `outline-color` | contrast vs the white sheet |
+|---|---|---|
+| ≈1 ms | `rgb(255,255,255)` | **1.00:1** — invisible |
+| ≈16 ms | `rgb(247,248,250)` | 1.04:1 |
+| ≈31 ms | `rgb(214,219,226)` | ≈1.41:1 |
+| ≈62 ms | `rgb(148,160,180)` | ≈2.67:1 |
+| ≈92 ms | `rgb(60,82,119)` | ≈8.6:1 |
+| ≈151 ms | `rgb(22,48,92)` | **13.03:1** |
+
+So the focus indicator on the primary action **does not exist for the first
+~30ms and does not clear 3:1 until somewhere around 70–90ms.**
+
+🔓 **The three text inputs do not have this problem, and the difference is
+instructive.** Their `currentColor` is `text-foreground` (Graphite), so their
+ring fades `rgb(29,31,32)` → `rgb(22,48,92)`: dark to dark, clearing 3:1 for the
+whole 150ms. The defect is specific to a control whose own text is white — which
+on this surface is the navy submit, and site-wide is every `variant: "primary"`,
+`"onNavy"` and `"danger"`-filled button.
+
+⚠️ **The ring does paint.** This is a timing finding, not the hub's
+paint-order one: pixel diffs show the full 2px ring at its exact geometric area
+on every focusable element here (`audit.output.md`). What is wrong is *when* it
+becomes visible, not *whether*.
+
+📌 **Round 2 reached the same mechanism from the other end** — the header's
+MEMBER PORTAL button, recorded as an open officer question: *"its focus ring
+fades in from invisible."* Two steps, two surfaces, one cause in
+`components/ui/button.tsx`.
+
+---
+
+## Why this surface cannot fix it, specifically
+
+The obvious per-surface fix is to append a narrower `transition-property` to the
+submit's `className`. It does not work reliably: every Tailwind `transition-*`
+utility sets `transition-property` at the same specificity, so
+`transition-[color,background-color]` appended after `transition-colors` ties,
+and the winner is whichever Tailwind emits last. That is the same
+emission-order tie that made `<Title className="text-[22px]">` render at 26px
+for as long as it existed, and that `Banner`'s `size` prop and `Title`'s `size`
+prop were both introduced to avoid.
+
+So the fix belongs in `BASE` itself — one shared string, ~40 public call sites
+plus every `/admin` button — which is `components/ui/` and part 6's.
+
+---
+
+## The two standing overrules, re-checked rather than restated
+
+**`transform: scale(0.97)` on `:active`.** This skill asks for it on every
+pressable element. DESIGN.md bans a transform on a control outright ("Press
+feedback is an ink change, never a transform"), and `button.tsx` already records
+the overrule at its own call site while keeping this skill's 150ms figure for the
+swap. Verified on the page: press changes `background-color` only,
+`rgb(22,48,92)` → `rgb(13,29,56)`, no transform. Settled system decision; not
+relitigated per surface.
+
+**Hover gating.** `transition-colors` is not behind
+`@media (hover: hover) and (pointer: fine)`, so `:hover` sticks after a tap on
+the touch devices this page is built for. Correct in general, still not this
+surface's to fix (`button.tsx`, `field.tsx`), and still nearly free here: hover
+and active resolve to the same navy on the button, and the button unmounts on
+the success path.
+
+## `prefers-reduced-motion` — checked, and correct as built
+
+Nothing here is gated behind it, and that is right rather than an omission. This
+skill's own accessibility rule: *"Reduced motion means fewer and gentler
+animations, not zero. **Keep opacity and color transitions that aid
+comprehension.** Remove movement and position animations."* There is no movement
+on this surface to remove, and the colour transitions are the comprehension aid
+the rule protects.
