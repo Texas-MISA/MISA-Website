@@ -1,7 +1,7 @@
 ---
 name: Texas MISA
 description: A navy-and-white institutional drawing set, now with depth — a drawn navy field, a flat grey page, and white surfaces lifted off it. Square structure, softened plates, hairline rules.
-version: 2.2
+version: 2.3
 status: Written from what phase 1 of the v2 redesign actually shipped (2026-08-19). Sections marked NOT YET REBUILT describe surfaces still running the v1 system.
 colors:
   drafting-navy: "#16305c"
@@ -68,7 +68,7 @@ planned. Every value here was read off the running application on 2026-08-19.
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
 | `/portal/attend` | ✅ **v2 — REBUILT 2026-09-20** (phase 3, the Portal Rebuild, part 3; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, “Fit the first screen”, then the officer’s 2026-09-20 header removal: the page is one white `.sheet` on the grey ground (`PortalSheet`), the form at the `xs` rhythm with 16px gaps, every label visible above its field, a 48px full-width Check in. 🔓 **Its bar is a fold position and the tightest number in the phase** — at a true 360×640 under the 61px sticky header, IDLE, the Check in button’s bottom edge is **607.7px against a 640 fold**, where it was cut at 668. At its gate it measured 610.5 — independently twice, the lead at 611 with a classic scrollbar and the `design-reviewer` at 610.5 with it suppressed — and the officer’s 2026-09-20 header removal improved it to 607.7. All **twelve** states are designed and gated, not just the happy path, and **both** of its muted-on-Vellum occurrences are gone — lowest ratio anywhere in its `<main>`, measured on every state, is **8.51:1**. 🪟 `/portal/attend` stays **indexable**; robots is per page and must never move to a portal layout. |
 | `/portal/leaderboard`, `/portal/lookup` (were `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3’s parts 4 and 5 are next.** Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — nine occurrences on `/portal/lookup`, one on `/portal/leaderboard` — plus the `definition-list` axe fault on `/portal/lookup`’s result, which is the one check `npm run test:ui` still fails. 🧰 **Rebuilt through §Design toolkit**: both are registered in `docs/design/surfaces.json` with a brief, two concepts, evidence and an officer-adopted concept each; the builds and their gates are what remain. |
-| `/portal` (the member portal hub) | ✅ **v2 — REBUILT 2026-09-19** (phase 3, the Portal Rebuild; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, "the title block", then the officer’s 2026-09-20 header removal: one white `.sheet` on the grey ground (`PortalSheet`) whose body is a shared-rule plate whose three cells are each a whole-row `<Link>` with a 48px navy key. Equal formatting is structural — one `.map` over one shape. No `data-reveal` anywhere, deliberately. The header's MEMBER PORTAL button is still the site's one way in. 🔓 Its bar, measured settled at 360×640 under the 61px sticky header: the check-in row's bottom edge at **265.5px** against "at or above 424". 🔴 **No navy header** — zero `.chevron-notch` and zero `.ground-field` in any portal `<main>`; the only navy left in the portal body is the three key columns and the submit buttons, which are controls. |
+| `/portal` (the member portal hub) | ✅ **v2 — REBUILT 2026-09-19** (phase 3, the Portal Rebuild; `rebuilt` in `docs/design/surfaces.json`, all seven receipts passing). Concept A, "the title block", then the officer’s 2026-09-20 header removal: one white `.sheet` on the grey ground (`PortalSheet`) whose body is a shared-rule plate whose three cells are each a whole-row `<Link>` with a 48px navy key. Equal formatting is structural — one `.map` over one shape. No `data-reveal` anywhere, deliberately. The header's MEMBER PORTAL button is still the site's one way in. 🔓 Its bar, measured settled at 360×640 under the 61px sticky header: the check-in row's bottom edge at **267.2px** against "at or above 424" (re-derived at the 2026-09-20 re-gate three ways — the lead, the `design-reviewer` agent and the critique's assessment B, the last from the box model rather than a browser; the 265.5 recorded on 2026-09-20 does not reproduce). 🔴 **No navy header** — zero `.chevron-notch` and zero `.ground-field` in any portal `<main>`; the only navy left in the portal body is the three key columns and the submit buttons, which are controls. |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
@@ -740,6 +740,26 @@ half is worth anything.**
   carefully and correctly about *where* the ring is drawn (`-outline-offset-2`,
   so it does not cross the 1px plate seam onto the neighbouring cell) — a
   thorough argument about the right half of the problem.
+  - 🔴 **THE CHILD MUST BE POSITIONED, or its ring does not paint at all**
+    (portal-hub re-gate, 2026-09-20). The fix above shipped on 2026-09-19 and
+    was verified with `getComputedStyle`, which reports the child's white
+    outline as present, correct and inset by the matching 2px. **It never
+    painted.** Screenshotting a focused row and diffing it against the same row
+    unfocused isolates the indicator exactly: the parent's navy runs stopped
+    dead at the child's left edge, the parent's right-hand run painted nothing
+    at all, and the child's white ring contributed only a 2px bar at the seam.
+    The ring did not change colour at the seam — it **ended** there, with the
+    48px key outside the indicator that named it. An outline paints in its own
+    element's paint step, and a non-positioned in-flow child does not get one
+    that survives over its parent's. `position: relative` on the child fixes it;
+    `relative` + `z-index` and `isolation: isolate` also work; an inset
+    `box-shadow` does **not**, because it paints with the child's background and
+    is still under the parent's outline. All four were measured rather than
+    reasoned about.
+  - ⚠️ **The rule this leaves behind is about instruments, not about rings: a
+    fix verified by the same instrument that would have missed the defect is not
+    verified.** Computed style cannot see paint order. A focus ring on a
+    two-ground element is checked by diffing a screenshot, or it is not checked.
 - 🔴 **`Title` takes `size`, because appending a smaller size class DOES NOT
   WORK** (v2 phase 3). Both sizes are arbitrary-value utilities, so they tie on
   specificity (0,1,0) and the winner is whichever Tailwind emits last — and
