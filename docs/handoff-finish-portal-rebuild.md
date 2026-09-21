@@ -1,5 +1,25 @@
 # Hand-off: finish the Portal Rebuild (v2 phase 3, parts 4–7)
 
+> 🗑️ **SUPERSEDED 2026-09-20 by
+> [`handoff-portal-rebuild-rounds-4-7.md`](handoff-portal-rebuild-rounds-4-7.md).
+> Do not run this file.** A session ran it and completed its rounds 1–3: the
+> three shared primitives, the officer copy rule on the frozen pair (which
+> correctly found nothing to delete), and the re-gates of `portal-hub` and
+> `portal-attend`. Parts 4–7 remain, and the new file carries them with the
+> corrected numbers, the defect classes those rounds uncovered, and the context
+> discipline an orchestrator needs to finish without running out of room.
+>
+> **Kept for its reasoning**, which the new file does not repeat in full: the
+> officer's DELETE/KEEP copy lists and what they supersede, and the original
+> per-round scopes. Where this file and the new one disagree, **the new one
+> wins** — several of this file's numbers were re-derived and moved.
+>
+> ⚠️ **Specifically stale here:** the bar figures (`607.7` is the desktop-window
+> reading, not a true phone 360; the hub's `265.5` does not reproduce and is
+> `267.2`), the state line below, and rounds 1–3, which are done.
+
+---
+
 > **This file is a PROMPT.** Copy everything below the rule into a new Claude
 > Code session. It is written to be read cold — it names its own reading list,
 > its scope, its traps and its stopping condition.

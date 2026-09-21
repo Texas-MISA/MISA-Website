@@ -454,6 +454,11 @@ The band was ~60px of chrome; the narrower sheet column and the back link spent
 ~70. Removing the back link (−40px — **the site header already links `/portal`
 from every page**) and tightening the sheet's phone padding brought it to
 **607.7, 32.3px of slack**. The hub went **325 → 265.5** against its ≤424 bar.
+🔓 **Both figures were re-derived at the re-gates and BOTH MOVED.** The hub's
+265.5 does not reproduce: it is **267.2**, confirmed three independent ways
+including a browserless box-model sum. And 607.7 is the *desktop-window*
+reading — at a true phone 360×640 the button's bottom edge is **591.5**. See
+*What rounds 1–3 found* above; every record must now name its layout width.
 
 ⚠️ **And a comment asserted an unmeasured number AGAIN**, one commit after part
 3's gate recorded that exact lesson — it claimed a padding change fixed a text
@@ -473,13 +478,18 @@ rule: **measure the column the text is actually in.**
    surfaces should be re-gated rather than amended, that is a decision to take
    before part 4 rather than after.
 
-### 🧭 Where the build stands (2026-09-19)
+### 🧭 Where the build stands (2026-09-20, after the re-gate rounds)
 
-**Branch `design-toolkit`**, stacked on `portal-phase-1`. Parts 0–3 are
-committed and **two of the four surfaces are `rebuilt`** — `portal-hub` and
-`portal-attend`. The other two are still `in-progress`, so
-`tests/design-receipts.test.ts` checks two surfaces' **receipts** and two
-surfaces' **briefs**.
+**Branch `design-toolkit`**, stacked on `portal-phase-1`, **HEAD `5d8731d`, 10
+commits ahead of `main`, unpushed.** Parts 0–3 are committed, **both frozen
+surfaces have been RE-GATED against the sheet build**, and the same two of four
+are `rebuilt` — `portal-hub` and `portal-attend`. The other two are still
+`in-progress`, so `tests/design-receipts.test.ts` checks two surfaces'
+**receipts** and two surfaces' **briefs**.
+
+📌 **Suite state:** `npm test` **41 files / 1142 tests green**; `npm run test:ui`
+**41 pass / 1 fail**, the one being `/portal/lookup`'s `definition-list`, which
+part 4 owns.
 
 | Part | State | Commit |
 |---|---|---|
@@ -487,7 +497,69 @@ surfaces' **briefs**.
 | 1 — Shared vocabulary | ✅ done | `fa7c2e5` |
 | 2 — `/portal` hub | ✅ **done — built, gated, `rebuilt`** | `d827ac7` build · `ab3f6c9` fixes · `e67acb8` receipts · `30bcec5` flip |
 | 3 — `/portal/attend` | ✅ **done — built, gated, `rebuilt`** | `a38a2b3` build · `bd71103` fixes · `40d3d24` receipts · `4c216f1` flip |
-| 4–7 | ⏭️ not started | — |
+| — the header removal | ✅ all four surfaces | `ca5cd06` build · `cffb833` records |
+| **R1a — shared primitives** | ✅ **done** | `f2e41d6` input boundary · `b01dc6a` header button · `539a5f0` activities Title · `a660ada` records |
+| **R1b — the officer copy rule on the frozen pair** | ✅ **done — EMPTY DIFF, correctly** | — |
+| **R1c — the CRLF gatekeeper fix** | ✅ **done** | `77d2c56` |
+| **R2 — re-gate `portal-hub`** | ✅ **done — receipts `ok`** | `92076ac` fixes · `8419617` receipts · `91e5c13` DESIGN.md |
+| **R3 — re-gate `portal-attend`** | ✅ **done — receipts `ok`** | `b2900e1` fixes · `b197663` PortalSheet comment · `5d8731d` receipts + DESIGN.md |
+| 4–7 | ⏭️ **not started** — `/portal/lookup`, `/portal/leaderboard`, `/officer-invite` + suite, records + merge | — |
+
+🔴 **Why rounds 2 and 3 existed at all, and the rule they establish.** The seven
+review steps on both frozen surfaces had run against `a38a2b3` — **a build with
+a navy band that no longer exists.** The officer receipts recorded the
+instruction, the concepts and the lead's re-run measurements and *explicitly
+claimed nothing more*; this plan listed that as an open process failure. Both
+surfaces are now genuinely re-reviewed against the sheet. **The rule: an officer
+receipt cures staleness, it does not constitute a review.** A surface whose
+composition changed after its gate needs the gate again, not a note.
+
+### 📌 What rounds 1–3 found, kept here because parts 4–7 inherit it
+
+- 🔴 **`getComputedStyle` IS NOT EVIDENCE THAT SOMETHING PAINTED.** The hub's
+  2026-09-19 gate "fixed" a focus ring spanning two grounds and verified it by
+  reading the computed style, which reported the white outline present and
+  correct. **It never painted.** An outline is painted in its own element's
+  paint step and was overpainted by the parent's. `position: relative`,
+  `z-index` and `isolation: isolate` all fix it; an inset `box-shadow` does
+  **not**. Caught only by diffing focused-vs-unfocused pixels. **For any claim
+  about what is visible, diff pixels.**
+- 🔴 **THE DETECTOR'S TYPE-RAMP RULE IS SWITCHED OFF, not merely blind.**
+  `allowedFontSizes` is populated only from a `typography` frontmatter key
+  `DESIGN.md` does not have, so it abstains even for the `text-[Npx]` values it
+  exists to catch — proved with six planted probes, five of which returned
+  nothing. Against a `.tsx` file the scan has essentially one thing it can say.
+  **Treat a clean detector as no evidence at all**, and do not let a `[]` stand
+  in for a review step's work.
+- 🔴 **THE CHECK-IN BAR IS TWO NUMBERS, and every record must name its
+  convention.** At a true phone 360×640 (overlay scrollbars) the Check in
+  button's bottom edge is **591.5px** (48.5px slack); in a 360px *desktop*
+  window a classic 14–15px scrollbar drops layout width to 345–346, the
+  checkbox's own label wraps, the row grows 20px, and it reads **611.5**
+  headless / **607.66** in real Chrome. **Both clear the 640 fold.** There is a
+  cliff at **348px of layout width**. The bare `607.7` in older records is the
+  desktop-window reading.
+- ⚠️ **Three agreeing measurements that share one hidden assumption are ONE
+  measurement.** Round 3 first concluded 607.7 "reproduces at no viewport" and
+  built tidy arithmetic to explain it — all three of its "independent"
+  derivations were headless, and **headless Chromium uses overlay scrollbars in
+  every context**. The `design-reviewer`, on real Chrome, was the only step that
+  could catch it. **Cross-check any fold position in a real browser.**
+- 🪤 **Programmatic `.focus()` returns `:focus-visible === false` and paints
+  ZERO pixels.** Tab-driven focus is the only valid way to measure a ring.
+- 🪤 **`npm test` can report green while its gatekeeper is not running.**
+  `core.autocrlf=true` with no `.gitattributes` re-materialised
+  `scripts/design/receipts.mjs` as CRLF on checkout, and vitest 4 cannot parse
+  `#!...\r\n` — `tests/design-receipts.test.ts` failed to **load**, contributing
+  **zero** tests, and the suite printed 40 files / 1118 instead of 41 / 1142.
+  Fixed by `.gitattributes` (`77d2c56`); **do not remove it.** Check the file
+  count, not just the word "passed".
+- 🪤 **There is NO open seeded event locally.** The nearest are 2026-08-06 and
+  2026-12-02. Any round that needs a check-in written must create its own event
+  and delete it afterwards. 🔴 Round 3 damaged the seed driving terminal states
+  and had to `npx supabase db reset` to restore it — which also wipes
+  `auth.users` to the seed officer, so a hand-made local officer must be
+  recreated with `scripts/create-officer.mjs --local`.
 
 🔒 **`portal-hub`'s AND `portal-attend`'s files are now FROZEN.**
 `receipts.mjs` fails a `rebuilt` surface as **stale** on any commit touching
@@ -633,8 +705,8 @@ Each part ends somewhere demonstrable, which is the same rule the stages use.
 |---|---|---|
 | **0 — Baseline** ✅ `debeca2` | Local stack up, dev server on the local env, re-measure each surface at 360×640 / 768 / 1280×720 / 1280×800, record the numbers, and run the receipts dry-run per surface. Confirm `npm test` and `npm run test:ui` are at their known state. | ✅ **Done.** `npm test` 41 files / 1142 tests green; `test:ui` 39 pass / 3 fail, exactly the documented three. Briefs re-confirmed or corrected; the muted counts fixed in three documents. |
 | **1 — Shared portal vocabulary** ✅ `fa7c2e5` | *(Widened — see above.)* Every shared-primitive addition the phase needs, all additive, all opt-in, no default moved. | ✅ **Done.** `portal-band.tsx` (PortalBand — 🗑️ **deleted 2026-09-20** when the officer removed the navy header; replaced by `portal-sheet.tsx`), `buttonClass({ touch })` for the 48px floor, `table.tsx`'s `scroll={false}` + `<THead sticky="page">`, `status-region.tsx` (StatusRegion). Suite unchanged at 39/3. |
-| **2 — `/portal` hub** ✅ `d827ac7` → `30bcec5` | The smallest surface, and it sets the row-link and key-column pattern the others borrow. | ✅ **DONE AND `rebuilt`.** Bar met with **99px** to spare (check-in row bottom **423 → 325** at 360×640, bar ≤424; all three destinations on the first screen), verified independently by the `design-reviewer` agent and by critique Assessment B. Seven receipts pass: 12 findings adopted, 8 rejected against a named rule, 3 deferred to the officer. |
-| **3 — `/portal/attend`** ✅ `a38a2b3` → `4c216f1` | The most states: twelve, plus pre-hydration. The new box label and review copy land here, **and both of its muted-on-Vellum occurrences** (`:336` and `:364`). | ✅ **DONE AND `rebuilt`.** Bar met at **607.7px against a 640 fold** (610.5 at the gate; the officer’s 2026-09-20 header removal improved it) at a true 360×640 idle (was cut at 668), measured independently twice. All twelve states designed and gated; both `color-contrast` checks green and `test:ui` 39/3 → **41/1**. Seven receipts pass: 25 findings — 9 adopted, 14 rejected against a named rule, 2 deferred to part 6. |
+| **2 — `/portal` hub** ✅ `d827ac7` → `30bcec5`, **re-gated `92076ac` → `91e5c13`** | The smallest surface, and it sets the row-link and key-column pattern the others borrow. | ✅ **DONE AND `rebuilt`, then RE-GATED against the sheet.** Bar met with **156.8px** to spare — check-in row bottom **267.2px** at 360×640 against ≤424, the whole sheet ending at 625.4 inside the 640 fold. 🔓 **The recorded 265.5 does not reproduce**; 267.2 was confirmed three independent ways, one of them a browserless box-model sum. The re-gate's headline finding: 🔴 **the focus ring this surface's own gate had "fixed" was never painting** — see *What rounds 1–3 found*. 13 adopted, 8 rejected against a named rule, 6 deferred (5 to the officer, 1 to the phase). |
+| **3 — `/portal/attend`** ✅ `a38a2b3` → `4c216f1`, **re-gated `b2900e1` → `5d8731d`** | The most states: twelve, plus pre-hydration. The new box label and review copy land here, **and both of its muted-on-Vellum occurrences** (`:336` and `:364`). | ✅ **DONE AND `rebuilt`, then RE-GATED against the sheet.** Bar met under **both** conventions: **591.5px at a true 360×640** (48.5px slack) and **611.5 / 607.66 in a 360px desktop window** (was cut at 668). All twelve states designed and gated; both `color-contrast` checks green and `test:ui` 39/3 → **41/1**. The original gate: 25 findings — 9 adopted, 14 rejected against a named rule, 2 deferred to part 6, **and both deferrals are now DONE** (round 1a). The re-gate: **44 findings — 16 adopted, 14 rejected, 14 deferred**, and it **overturned the lead twice**, both left unedited in the receipts because a receipt rewritten to agree with the outcome stops being evidence the steps disagreed. |
 | **4 — `/portal/lookup`** | The most complex result, and the surface carrying 9 of the 13 muted occurrences. Stacked event rows below `sm`, the `definition-list` fix, the announced result, the stale sentence removed, the contradictory dues comment corrected. | Its bar is met; axe is green on the result and the miss; no sideways scroll to read whether you attended. |
 | **5 — `/portal/leaderboard`** | The odd one out: no hero, its own type scale, the column head made genuinely sticky (using part 1's white page-sticky variant), **and its two stale `active member` comments corrected**. | Its bar is met — **ten rows** on the first screen at 1280×720 — including the projector measurement. |
 | **6 — Outside the four surfaces, and the suite** | *(Narrowed — see above.)* `/officer-invite/[token]`'s one muted line; the shared primitives re-measured on the grounds the portal now puts them on; the full suite. **Touches no registered surface's files**, which is the point. | No muted ink on Vellum anywhere in `/portal` or `/officer-invite`; `npm test` green and `test:ui` green on all 42. |
