@@ -2,7 +2,7 @@
 skill: officer
 command: officer instruction, 2026-09-20 — "the navy header at the top of each page should be removed for all pages in the portal. the design skills can come up with a replacement."
 date: 2026-09-20
-commit: "30bcec5"
+commit: "30bcec549c8bc78983afc093d9964f2b9727a9c9"
 output: officer.output.md
 findings:
   - id: O1
@@ -34,8 +34,19 @@ same receipt and the two un-rebuilt surfaces took the header removal alone.
 
 Its bar is the check-in row's bottom edge at 360×640, "at or above 424". It was
 **423** before the rebuild and **325** after it. With the band gone and the plate
-bleeding inside the sheet, it is **265.5** — and all three destinations plus the
+bleeding inside the sheet, it is **267.2** — and all three destinations plus the
 officer line still sit on the first screen.
+
+⚠️ **This line read 265.5 until the 2026-09-20 re-gate, and 265.5 does not
+reproduce.** 267.2 was measured three times independently that day — by the lead,
+by the `design-reviewer` agent and by the critique's assessment B, the last
+deriving it from the box model rather than from a browser — and it falls out of
+the CSS chain to the pixel (61 header + 24 `padTop="xs"` + 1 sheet border + 20
+padding + 26.52 h1 + 16 + 1 rule + 24 + 1 plate border + 92.70 row). 1.7px
+changes nothing about the gate, which is met either way by more than 150px; it is
+corrected because a frozen surface should not carry a figure that no longer
+reproduces. `officer.output.md` keeps the original table verbatim, because it is
+a raw output and not a place to rewrite history.
 
 The layout-family budget dropped from two to one: the band and the plate were
 two stacked sections, and the hub is now a single object.
@@ -63,3 +74,38 @@ The `design-reviewer`, the critique and the audit have not seen the sheet. If th
 officer wants the surface re-gated rather than amended, it goes back through
 `/design-gate`; this receipt records the instruction, the concepts, the adoption
 and the numbers that moved, and claims nothing further.
+
+## ✅ SUPERSEDED — the surface WAS re-gated, 2026-09-20
+
+The section above is kept as written, because it correctly stated its own limits
+at the time. Those limits are now closed: **all seven review steps have been
+re-run against `a660ada`, the sheet build, and their receipts replaced.** The
+`design-reviewer`, the critique's two assessments, the audit, the lead, the
+guidelines and the motion step have all now seen the sheet.
+
+They found four things the sheet build introduced or exposed and nobody had
+reviewed, fixed in `92076ac`:
+
+- the row focus indicator **did not enclose the 48px navy key at all** — the
+  white ring this receipt's own build shipped never painted, and the file argued
+  at length that it did;
+- the row text column **aligned with the masthead at no width**, and the sign of
+  the miss inverted across `sm` — the cell's padding was a flat `px-6` against a
+  sheet at `px-4 sm:px-8`;
+- two 16px paragraphs at two different leadings, 20px apart;
+- the officers sign-in target at 44.9 × 32px, the one target on the page under
+  the floor the comment beside it cites.
+
+It also found three claims in the page's comments that this change had made
+false, including one paragraph that contradicted itself within seven lines.
+
+🪤 **The third deferred question is STILL not settled, and the re-gate did not
+quietly settle it.** At 320 and 360 the rows still rake 92.7 / 118.3 / 143.9
+because the officer's copy wraps to one, two and three lines. The alignment fix
+widened the phone text column 222 → 238px and one assessment predicted that might
+collapse the rake; **it was measured after the fix and it does not.** It goes to
+the officer unchanged, now with three other questions the re-gate raised: the
+header's MEMBER PORTAL button announces the current page to a screen reader and
+shows nothing to an eye, the masthead rule and the plate's top border state one
+boundary twice, and "Points Leaderboard" on the hub arrives at a sheet titled
+"Leaderboard".
