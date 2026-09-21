@@ -138,8 +138,9 @@ Durable constraints future work must preserve:
 
 Real:
 
-- Four partner logos — KPMG, PwC, ConocoPhillips, Credera — in
-  `public/partners/`. These are the only images the site serves.
+- Four partner logos — KPMG, PwC, EY, PepsiCo — in `public/partners/`,
+  generated onto one shared canvas by `scripts/build-partner-logos.mjs`. These
+  are the only images the site serves.
 - Three real Spring 2024 student consulting projects: **PepsiCo** (facility and
   corporate communication tool), **Casa de Luz** (customer engagement and
   marketing analysis), **CapMetro** (transit data analysis).
