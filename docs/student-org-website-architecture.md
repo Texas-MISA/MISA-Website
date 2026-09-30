@@ -1,12 +1,12 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
 **Version:** 1.81
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** 🧭 **Member portal phase 1 (`/portal`) is BUILT on `portal-phase-1`, awaiting the officer's go-ahead to merge.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000029` as of 2026-08-31.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
 **Last updated:** September 2026
 
 > **v1.81: the member pages move under `/portal`, and the old URLs are permanent redirects.**
 >
-> Officer instruction, 2026-09-18 ([`member-portal-plan.md`](member-portal-plan.md), phase 1). Built on `portal-phase-1`, not yet merged. Rollback point: the tag `pre-portal-2026-09-18` (`ce5bda7`).
+> Officer instruction, 2026-09-18 ([`member-portal-plan.md`](member-portal-plan.md), phase 1). Built on `portal-phase-1` and live on `main` since 2026-09-30 (`b273977`). Rollback point: `699fd3d`, production until then. It is not the tag `pre-portal-2026-09-18` (`ce5bda7`), which this line named first and which predates the 9/20 partner logos.
 >
 > - **`/attend`, `/leaderboard` and `/lookup` became `/portal/attend`, `/portal/leaderboard` and `/portal/lookup`**, moved with `git mv` so history follows, and a static hub at `/portal` lists the three (§5, §10). No page's copy, behaviour or data access changed, and there is no migration and no new environment variable — undoing it is a code revert.
 > - 🔓 **The old paths are PERMANENT redirects in `next.config.ts` — 308, method kept, query string carried through — and are never deleted.** Printed QR codes, group-chat links and bookmarks point at them. `tests/portal.test.ts` asserts all three, because nothing else would notice one going missing: `tests/docs.test.ts` walks `page.tsx` and `route.ts`, and a redirect is neither. Vercel serves Next's 308s with `cache-control: public, max-age=0, must-revalidate`, so a browser revalidates rather than pinning the redirect — which is what keeps an Instant Rollback clean.
