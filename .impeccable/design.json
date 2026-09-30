@@ -1,7 +1,7 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-08-17T00:00:00.000Z",
-  "title": "Design System: Texas MISA",
+  "generatedAt": "2026-09-19T18:46:11.000Z",
+  "title": "Design System: Texas MISA — v2",
   "extensions": {
     "colorMeta": {
       "drafting-navy": {
@@ -92,7 +92,8 @@
           "oklch(72% 0.004 240)",
           "oklch(84% 0.003 240)",
           "oklch(95% 0.002 240)"
-        ]
+        ],
+        "purpose": "Meta labels. May sit on Paper (4.84:1), NEVER on Vellum (4.33:1, fails AA)."
       },
       "vellum": {
         "role": "neutral",
@@ -107,7 +108,8 @@
           "oklch(74% 0.002 270)",
           "oklch(87% 0.002 270)",
           "oklch(96% 0.002 270)"
-        ]
+        ],
+        "purpose": "THE page ground (public and /admin <main>). Also chip and input fills. --misa-muted on Vellum FAILS AA (4.33:1)."
       },
       "vellum-shade": {
         "role": "neutral",
@@ -137,7 +139,8 @@
           "oklch(74% 0 0)",
           "oklch(87% 0 0)",
           "oklch(100% 0 0)"
-        ]
+        ],
+        "purpose": "Cards, sheets, control-bearing sections. No longer the page."
       },
       "hairline": {
         "role": "neutral",
@@ -167,6 +170,22 @@
           "rgba(29,31,32,0.3)",
           "rgba(29,31,32,0.5)",
           "rgba(29,31,32,0.8)"
+        ]
+      },
+      "plate-edge": {
+        "role": "neutral",
+        "displayName": "Plate Edge",
+        "canonical": "#bfbfc2",
+        "purpose": "Opaque twin of Frame: rgba(29,31,32,0.2) resolved over Vellum Shade. Frames on an UNKNOWN ground (floating plates, .sheet).",
+        "tonalRamp": [
+          "oklch(15% 0.004 286)",
+          "oklch(25% 0.004 286)",
+          "oklch(36% 0.004 286)",
+          "oklch(48% 0.004 286)",
+          "oklch(60% 0.004 286)",
+          "oklch(72% 0.004 286)",
+          "oklch(80.6% 0.004 286)",
+          "oklch(95% 0.002 286)"
         ]
       },
       "poche-light": {
@@ -237,56 +256,131 @@
       }
     },
     "typographyMeta": {
-      "display": {
-        "displayName": "Display",
-        "purpose": "The hero h1 on all five designed pages. One per page, never elsewhere. Steps 72 → 56 → 44px down the breakpoints."
+      "hero-headline": {
+        "displayName": "Hero headline",
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "34 / 44 / 38 / 48 / 56px at base/sm/lg/xl/2xl",
+        "weight": 600,
+        "lineHeight": "0.94",
+        "letterSpacing": "-0.02em",
+        "purpose": "Home hero only. Dips at lg because the split's type column is narrowest there. No text-balance (explicit <br/>)."
+      },
+      "page-hero-headline": {
+        "displayName": "Page-hero headline",
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "34 → 44 → 52px at base/sm/lg",
+        "weight": 600,
+        "lineHeight": "0.96",
+        "letterSpacing": "-0.02em",
+        "purpose": "PageHero on interior pages. Centred, text-balance, max 18ch."
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Section headings — \"Our Mission\", \"Activities\", \"Our Amazing Partners\". Navy on white, white on navy. Steps to 30px on phones."
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "30 → 42px at sm",
+        "weight": 600,
+        "lineHeight": "1",
+        "letterSpacing": "-0.02em",
+        "purpose": "Section headings. Ground-aware via [.on-navy_&]:text-white."
       },
       "title": {
         "displayName": "Title",
-        "purpose": "Activity and case-study row titles in the alternating two-column layouts."
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "26 → 34px at sm",
+        "weight": 600,
+        "lineHeight": "1.02",
+        "letterSpacing": "-0.015em"
       },
       "card-title": {
-        "displayName": "Card Title",
-        "purpose": "Project cards and FAQ questions. A 22px/1.05 step carries officer names and event rows."
+        "displayName": "Card title",
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "22 → 26px",
+        "weight": 600,
+        "lineHeight": "1.05"
       },
-      "body-large": {
-        "displayName": "Body Large",
-        "purpose": "Page intros and hero subheads. Capped at 74ch."
+      "lead": {
+        "displayName": "Lead",
+        "fontFamily": "Barlow, system-ui, sans-serif",
+        "size": "18px",
+        "lineHeight": "1.65",
+        "purpose": "Intro paragraph, max 74ch."
       },
       "body": {
         "displayName": "Body",
-        "purpose": "Every paragraph. 1.65 line-height, or 1.7 inside a card. Capped at 46ch in activity rows, 48ch in case studies."
+        "fontFamily": "Barlow, system-ui, sans-serif",
+        "size": "16px",
+        "lineHeight": "1.6"
       },
-      "label": {
-        "displayName": "Label",
-        "purpose": "Uppercase eyebrows, meta rows and KPI labels. An 11px/.12em step carries officer roles and semester tags."
+      "eyebrow": {
+        "displayName": "Eyebrow",
+        "fontFamily": "Barlow, system-ui, sans-serif",
+        "size": "12px",
+        "weight": 500,
+        "letterSpacing": "0.14em",
+        "transform": "uppercase",
+        "purpose": "Budgeted per page; the five phase-2 pages use zero."
       },
       "button": {
-        "displayName": "Button",
-        "purpose": "All button and eyebrow-link labels. Always uppercase; 13px in the compact header variant."
+        "displayName": "Button label",
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "13px (sm) / 15px (md, lg)",
+        "weight": 600,
+        "letterSpacing": "0.06em / 0.1em",
+        "transform": "uppercase (applied by button.tsx; labels are sentence case in the DOM)"
       },
-      "nav": {
-        "displayName": "Nav",
-        "purpose": "Header and mobile-sheet nav items. Always uppercase."
+      "officer-page-title": {
+        "displayName": "PageHeader title",
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "30 → 34px at sm",
+        "purpose": "/admin only. Every admin screen opens with one."
       },
-      "caption": {
-        "displayName": "Caption",
-        "purpose": "The mono text inside a hatched placeholder box naming the shot that belongs there. Used nowhere else in the system."
+      "officer-section": {
+        "displayName": "SectionHeading",
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "22px",
+        "purpose": "/admin region heading."
       },
-      "headline-sm": {
-        "displayName": "Headline (phone)",
-        "purpose": "The 30px step a section heading takes on phones. Documented in prose before 2026-08-17 but absent from the machine-readable ramp, so the detector flagged every correct use of it."
+      "officer-sub": {
+        "displayName": "SectionHeading sub",
+        "fontFamily": "'Barlow Condensed', system-ui, sans-serif",
+        "size": "18px",
+        "purpose": "/admin only; renders an <h3>. The one step the public ramp lacks."
       },
-      "card-title-sm": {
-        "displayName": "Card Title (small)",
-        "purpose": "The 22px/1.05 step carrying officer names, event rows and admin section headings."
+      "pill": {
+        "displayName": "Pill",
+        "fontFamily": "Barlow, system-ui, sans-serif",
+        "size": "11px/.12em (sm) · 12px/.14em (md)",
+        "transform": "uppercase",
+        "purpose": "The only badge."
+      },
+      "identifier": {
+        "displayName": "Identifier (mono)",
+        "fontFamily": "ui-monospace, monospace",
+        "purpose": "An EID, /admin only — separates l from 1."
       }
     },
-    "shadows": [],
+    "shadows": [
+      {
+        "name": "lift",
+        "value": "0 1px 2px rgb(22 48 92 / 0.06), 0 4px 12px rgb(22 48 92 / 0.08)",
+        "purpose": "A resting element above the page: a card, a floating image plate, .sheet."
+      },
+      {
+        "name": "raised",
+        "value": "0 2px 4px rgb(22 48 92 / 0.07), 0 10px 26px rgb(22 48 92 / 0.13)",
+        "purpose": "The same element under the pointer. The ONLY hover elevation. Currently unused."
+      },
+      {
+        "name": "overlay",
+        "value": "0 8px 20px rgb(22 48 92 / 0.12), 0 24px 56px rgb(22 48 92 / 0.18)",
+        "purpose": "Menus, popovers, dialogs."
+      },
+      {
+        "name": "sticky",
+        "value": "0 1px 0 rgb(22 48 92 / 0.08), 0 6px 16px rgb(22 48 92 / 0.07)",
+        "purpose": "A bar pinned over scrolling content (header-lift)."
+      }
+    ],
     "motion": [
       {
         "name": "ease-reveal",
@@ -378,204 +472,298 @@
         "value": "1280px"
       }
     ],
-    "maintenance": "Hand-updated 2026-08-17 alongside the site-wide rework, NOT regenerated: /impeccable document rebuilds DESIGN.md from code and would discard the reasoning added there by hand. Token data, motion and the narrative rules below are in sync with DESIGN.md; the `components` array still carries the pre-rework demos and is the one part known to be behind."
+    "grounds": [
+      {
+        "name": "page",
+        "renders": "inherits bg-misa-panel (#f2f2f3) from <main>",
+        "focusRing": "navy",
+        "use": "The default. Almost every section."
+      },
+      {
+        "name": "white",
+        "renders": "bg-white",
+        "focusRing": "navy",
+        "use": "Sections carrying controls or tabular data (a correctness control: five primitives fill with Vellum)."
+      },
+      {
+        "name": "panel",
+        "renders": "bg-misa-panel",
+        "focusRing": "navy",
+        "use": "The same grey, declared on the section itself."
+      },
+      {
+        "name": "navy",
+        "renders": "bg-misa-blue + .on-navy",
+        "focusRing": "white",
+        "use": "Solid brand band."
+      },
+      {
+        "name": "field",
+        "renders": ".ground-field + .on-navy (Pressed Navy base + two radial lobes)",
+        "focusRing": "white",
+        "use": "Heroes, feature bands. Measure contrast at both ends."
+      }
+    ],
+    "radii": [
+      {
+        "name": "structure",
+        "value": "0",
+        "purpose": "Sections, tables, inputs, buttons, panels, chips, any 1px-seam cell."
+      },
+      {
+        "name": "plate",
+        "value": "4px",
+        "purpose": "Only a thing that floats: image plates and raised sheets. Needs overflow:hidden."
+      }
+    ],
+    "maintenance": "Sidecar-only refresh, 2026-09-19, from DESIGN.md v2.1 (frontmatter + sections). DESIGN.md was NOT regenerated and must not be: it is hand-written and is the source of truth (DESIGN.md §Design toolkit forbids /impeccable document writing it). Regenerate this file only in sidecar-only mode. Components mirror components/ui/ and app/globals.css as of this date."
   },
   "components": [
     {
       "name": "Primary Button",
       "kind": "button",
       "refersTo": "button-primary",
-      "description": "The primary action on a white ground. Stamped, not raised — hover darkens the ink, nothing moves.",
-      "html": "<button class=\"ds-btn-primary\">Propose a project</button>",
-      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #16305c; color: #fff; padding: 14px 24px; border: none; border-radius: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-btn-primary:hover { background: #0d1d38; } .ds-btn-primary:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+      "description": "buttonClass({variant:'primary'}). The primary action on a light ground. Hover is an ink change, never a transform.",
+      "html": "<button class=\"ds-btn-primary\">Check in</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Barlow Condensed', system-ui, sans-serif;font-weight:600;line-height:1;text-transform:uppercase;border-radius:0;cursor:pointer;transition:background-color 150ms,color 150ms,border-color 150ms;padding:12px 24px;font-size:15px;letter-spacing:0.1em;background:#16305c;color:#fff;border:none;} .ds-btn-primary:hover{background:#0d1d38;} .ds-btn-primary:focus-visible{outline:2px solid #16305c;outline-offset:2px;}"
     },
     {
       "name": "Outline Button",
       "kind": "button",
-      "refersTo": "button-outline-navy",
-      "description": "Secondary action on a white ground. The outline is not tinted on hover — it is completed, filling navy.",
-      "html": "<button class=\"ds-btn-outline\">Load more photos</button>",
-      "css": ".ds-btn-outline { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: transparent; color: #16305c; padding: 14px 30px; border: 1px solid #16305c; border-radius: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms, color 150ms; } .ds-btn-outline:hover { background: #16305c; color: #fff; } .ds-btn-outline:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+      "refersTo": "button-outline",
+      "description": "Secondary on a light ground — fills navy on hover.",
+      "html": "<button class=\"ds-btn-outline\">View leaderboard</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Barlow Condensed', system-ui, sans-serif;font-weight:600;line-height:1;text-transform:uppercase;border-radius:0;cursor:pointer;transition:background-color 150ms,color 150ms,border-color 150ms;padding:12px 24px;font-size:15px;letter-spacing:0.1em;background:transparent;color:#16305c;border:1px solid #16305c;} .ds-btn-outline:hover{background:#16305c;color:#fff;} .ds-btn-outline:focus-visible{outline:2px solid #16305c;outline-offset:2px;}"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Tertiary, hairline weight, for dense /admin toolbars.",
+      "html": "<button class=\"ds-btn-quiet\">Export</button>",
+      "css": ".ds-btn-quiet{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Barlow Condensed', system-ui, sans-serif;font-weight:600;line-height:1;text-transform:uppercase;border-radius:0;cursor:pointer;transition:background-color 150ms,color 150ms,border-color 150ms;padding:8px 16px;font-size:13px;letter-spacing:0.06em;background:transparent;color:#4a4d50;border:1px solid rgba(29,31,32,0.2);} .ds-btn-quiet:hover{border-color:#16305c;color:#16305c;} .ds-btn-quiet:focus-visible{outline:2px solid #16305c;outline-offset:2px;}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Void, revoke, remove access. A destructive control names its blast radius.",
+      "html": "<button class=\"ds-btn-danger\">Revoke</button>",
+      "css": ".ds-btn-danger{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Barlow Condensed', system-ui, sans-serif;font-weight:600;line-height:1;text-transform:uppercase;border-radius:0;cursor:pointer;transition:background-color 150ms,color 150ms,border-color 150ms;padding:8px 16px;font-size:13px;letter-spacing:0.06em;background:transparent;color:#8f2323;border:1px solid #8f2323;} .ds-btn-danger:hover{background:#8f2323;color:#fff;} .ds-btn-danger:focus-visible{outline:2px solid #16305c;outline-offset:2px;}"
     },
     {
       "name": "Button on Navy",
       "kind": "button",
       "refersTo": "button-on-navy",
-      "description": "Primary action inside a navy band. White fill, navy label; the focus ring flips to white with the ground.",
-      "html": "<div class=\"ds-navy-band\"><button class=\"ds-btn-on-navy\">Email an officer</button></div>",
-      "css": ".ds-navy-band { background: #16305c; padding: 32px; } .ds-btn-on-navy { display: inline-flex; align-items: center; justify-content: center; gap: 8px; background: #fff; color: #16305c; padding: 14px 30px; border: none; border-radius: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 15px; font-weight: 600; line-height: 1; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms; } .ds-btn-on-navy:hover { background: rgba(255,255,255,0.85); } .ds-btn-on-navy:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }"
-    },
-    {
-      "name": "Filter Chip",
-      "kind": "chip",
-      "refersTo": "chip-filter",
-      "description": "The gallery's filter chips. Selected is a solid navy stamp; unselected turns border and text navy on hover.",
-      "html": "<div class=\"ds-chip-row\"><button class=\"ds-chip ds-chip--active\">All</button><button class=\"ds-chip\">Socials</button><button class=\"ds-chip\">Workshops</button></div>",
-      "css": ".ds-chip-row { display: flex; gap: 10px; } .ds-chip { background: transparent; color: #4a4d50; padding: 9px 18px; border: 1px solid rgba(29,31,32,0.2); border-radius: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 13px; font-weight: 600; line-height: 1; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; transition: border-color 150ms, color 150ms; } .ds-chip:hover { border-color: #16305c; color: #16305c; } .ds-chip--active { background: #16305c; color: #fff; border-color: #16305c; } .ds-chip--active:hover { color: #fff; } .ds-chip:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
-    },
-    {
-      "name": "Card",
-      "kind": "card",
-      "refersTo": "card",
-      "description": "The framed white rectangle used for FAQ entries, history notes and project cards. One hairline border, no shadow, square corners.",
-      "html": "<div class=\"ds-card\"><p class=\"ds-card__eyebrow\">Growth</p><h3 class=\"ds-card__title\">Who can become a MISA member?</h3><p class=\"ds-card__body\">Anyone! We accept all majors &amp; years. The only requirement is being a UT student and paying dues.</p></div>",
-      "css": ".ds-card { background: #fff; border: 1px solid rgba(29,31,32,0.2); border-radius: 0; padding: 26px 28px; max-width: 420px; } .ds-card__eyebrow { margin: 0 0 10px; font-family: Barlow, system-ui, sans-serif; font-size: 12px; font-weight: 500; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: #16305c; } .ds-card__title { margin: 0 0 12px; padding-bottom: 12px; border-bottom: 1px solid rgba(29,31,32,0.16); font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 26px; font-weight: 600; line-height: 1.08; letter-spacing: -0.01em; color: #16305c; } .ds-card__body { margin: 0; font-family: Barlow, system-ui, sans-serif; font-size: 15px; font-weight: 400; line-height: 1.65; color: #4a4d50; }"
+      "description": "The primary action inside a navy band or the drawn field. The focus ring flips to white.",
+      "html": "<div class=\"ds-field-band\"><button class=\"ds-btn-on-navy\">Member portal</button></div>",
+      "css": ".ds-field-band{background-color:#0d1d38;background-image:radial-gradient(120% 86% at 18% 0%,rgba(44,75,124,.62),transparent 64%),radial-gradient(96% 74% at 82% 4%,rgba(22,48,92,.88),transparent 70%);padding:32px;} .ds-btn-on-navy{display:inline-flex;align-items:center;justify-content:center;gap:8px;font-family:'Barlow Condensed', system-ui, sans-serif;font-weight:600;line-height:1;text-transform:uppercase;border-radius:0;cursor:pointer;transition:background-color 150ms,color 150ms,border-color 150ms;padding:14px 32px;font-size:15px;letter-spacing:0.1em;background:#fff;color:#16305c;border:none;} .ds-btn-on-navy:hover{background:rgba(255,255,255,0.85);} .ds-btn-on-navy:focus-visible{outline:2px solid #fff;outline-offset:2px;}"
     },
     {
       "name": "Text Field",
       "kind": "input",
       "refersTo": "input",
-      "description": "Form field, currently admin-only. Vellum interior, square, with the global navy focus ring. Shown at the Frame border weight this system specifies rather than the heavier weight currently shipped.",
-      "html": "<label class=\"ds-field\">Email<input class=\"ds-input\" type=\"email\" placeholder=\"you@utexas.edu\" /></label>",
-      "css": ".ds-field { display: flex; flex-direction: column; gap: 4px; font-family: Barlow, system-ui, sans-serif; font-size: 14px; color: #1d1f20; max-width: 320px; } .ds-input { width: 100%; background: #f2f2f3; color: #1d1f20; border: 1px solid rgba(29,31,32,0.2); border-radius: 0; padding: 12px; font-family: Barlow, system-ui, sans-serif; font-size: 16px; } .ds-input::placeholder { color: #6f7275; } .ds-input:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+      "description": "Field + controlClass. Vellum fill, so it must sit on a WHITE surface; hint above the control, error below with role=alert.",
+      "html": "<div class=\"ds-surface\"><div class=\"ds-field\"><label for=\"ds-eid\">UT EID</label><span class=\"ds-hint\">The one on your student ID.</span><input id=\"ds-eid\" class=\"ds-input\" placeholder=\"abc123\" /></div></div>",
+      "css": ".ds-surface{background:#fff;padding:24px;max-width:360px;} .ds-field{display:flex;flex-direction:column;gap:4px;font-family:Barlow, system-ui, sans-serif;font-size:14px;} .ds-field label{font-weight:500;color:#1d1f20;} .ds-hint{font-size:12px;color:#6f7275;} .ds-input{background:#f2f2f3;color:#1d1f20;border:1px solid rgba(29,31,32,0.2);border-radius:0;padding:12px;font-family:Barlow, system-ui, sans-serif;font-size:16px;transition:border-color 150ms;} .ds-input::placeholder{color:#4a4d50;} .ds-input:hover{border-color:rgba(22,48,92,0.5);} .ds-input:focus{border-color:#16305c;} .ds-input:focus-visible{outline:2px solid #16305c;outline-offset:2px;} .ds-input[aria-invalid=true]{border-color:#8f2323;}"
     },
     {
-      "name": "Header Nav",
-      "kind": "nav",
-      "refersTo": "nav-item",
-      "description": "The 60px sticky header row. Inactive items are Annotation Grey and darken on hover; the active item is Graphite with a navy underline.",
-      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav__item ds-nav__item--active\" href=\"#\" aria-current=\"page\">About</a><a class=\"ds-nav__item\" href=\"#\">Projects</a><a class=\"ds-nav__item\" href=\"#\">Gallery</a><a class=\"ds-nav__item\" href=\"#\">Officers</a><a class=\"ds-nav__item\" href=\"#\">Admin</a></nav>",
-      "css": ".ds-nav { display: flex; align-items: center; gap: 22px; height: 60px; padding: 0 32px; background: #fff; border-bottom: 1px solid rgba(29,31,32,0.16); } .ds-nav__item { font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 13px; font-weight: 500; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; color: #6f7275; text-decoration: none; transition: color 150ms; } .ds-nav__item:hover { color: #1d1f20; } .ds-nav__item--active { color: #1d1f20; border-bottom: 1px solid #16305c; padding-bottom: 2px; } .ds-nav__item:focus-visible { outline: 2px solid #16305c; outline-offset: 2px; }"
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-filter",
+      "description": "FilterChip: `active` drives both the skin and aria-pressed.",
+      "html": "<div class=\"ds-chip-row\"><button class=\"ds-chip ds-chip--active\" aria-pressed=\"true\">All</button><button class=\"ds-chip\" aria-pressed=\"false\">Socials</button><button class=\"ds-chip\" aria-pressed=\"false\">Workshops</button></div>",
+      "css": ".ds-chip-row{display:flex;gap:10px;} .ds-chip{display:inline-flex;align-items:center;background:transparent;color:#4a4d50;padding:9px 18px;border:1px solid rgba(29,31,32,0.2);border-radius:0;font-family:'Barlow Condensed', system-ui, sans-serif;font-size:13px;font-weight:600;line-height:1;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer;transition:border-color 150ms,color 150ms,background-color 150ms;} .ds-chip:hover{border-color:#16305c;color:#16305c;} .ds-chip--active,.ds-chip--active:hover{background:#16305c;color:#fff;border-color:#16305c;} .ds-chip:focus-visible{outline:2px solid #16305c;outline-offset:2px;}"
     },
     {
-      "name": "Hatch Placeholder",
+      "name": "Pill",
+      "kind": "chip",
+      "refersTo": "pill",
+      "description": "The only badge. Status tones are feedback, never category colour.",
+      "html": "<div class=\"ds-pill-row\"><span class=\"ds-pill\">Member</span><span class=\"ds-pill ds-pill--affirm\">Present</span><span class=\"ds-pill ds-pill--caution\">Pending</span><span class=\"ds-pill ds-pill--critical\">Voided</span></div>",
+      "css": ".ds-pill-row{display:flex;gap:8px;background:#fff;padding:16px;} .ds-pill{display:inline-flex;align-items:center;border:1px solid rgba(29,31,32,0.2);color:#4a4d50;padding:2px 8px;font-family:Barlow, system-ui, sans-serif;font-size:12px;letter-spacing:0.14em;line-height:1;text-transform:uppercase;white-space:nowrap;} .ds-pill--affirm{border-color:rgba(31,92,52,.45);color:#1f5c34;} .ds-pill--caution{border-color:rgba(138,90,18,.45);color:#8a5a12;} .ds-pill--critical{border-color:rgba(143,35,35,.45);color:#8f2323;}"
+    },
+    {
+      "name": "Sheet",
+      "kind": "card",
+      "refersTo": "sheet",
+      "description": ".sheet — a raised white surface on the grey page. Plate radius, Plate Edge, shadow-lift. Must sit on a non-white ground.",
+      "html": "<div class=\"ds-page\"><div class=\"ds-sheet\"><h3 class=\"ds-sheet__title\">Who can become a MISA member?</h3><p class=\"ds-sheet__body\">Anyone! We accept all majors &amp; years. The only requirement is being a UT student and paying dues.</p></div></div>",
+      "css": ".ds-page{background:#f2f2f3;padding:32px;} .ds-sheet{background:#fff;border:1px solid #bfbfc2;border-radius:4px;box-shadow:0 1px 2px rgb(22 48 92 / 0.06),0 4px 12px rgb(22 48 92 / 0.08);padding:28px;max-width:440px;} .ds-sheet__title{margin:0 0 12px;font-family:'Barlow Condensed', system-ui, sans-serif;font-size:26px;font-weight:600;line-height:1.05;color:#1d1f20;} .ds-sheet__body{margin:0;font-family:Barlow, system-ui, sans-serif;font-size:16px;line-height:1.6;color:#4a4d50;}"
+    },
+    {
+      "name": "Floating Plate",
       "kind": "custom",
-      "refersTo": null,
-      "description": "The system's signature component. A 45° 7px poché fill in a framed rectangle, captioned in mono with the shot that belongs there. Light tone on white grounds, navy tone on navy — never mixed.",
-      "html": "<div class=\"ds-hatch-row\"><div class=\"ds-hatch ds-hatch--light\"><span class=\"ds-hatch__caption\">social event photo</span></div><div class=\"ds-hatch-navy-ground\"><div class=\"ds-hatch ds-hatch--navy\"><span class=\"ds-hatch__caption ds-hatch__caption--navy\">banquet photo</span></div></div></div>",
-      "css": ".ds-hatch-row { display: flex; gap: 16px; align-items: flex-start; } .ds-hatch { display: flex; align-items: center; justify-content: center; width: 260px; height: 162px; border-radius: 0; } .ds-hatch--light { background: repeating-linear-gradient(45deg, #f2f2f3, #f2f2f3 7px, #e7e7ea 7px, #e7e7ea 14px); border: 1px solid rgba(29,31,32,0.2); } .ds-hatch-navy-ground { background: #16305c; padding: 16px; } .ds-hatch--navy { background: repeating-linear-gradient(45deg, #2c4b7c, #2c4b7c 7px, #26436f 7px, #26436f 14px); border: 1px solid rgba(255,255,255,0.28); } .ds-hatch__caption { font-family: ui-monospace, Menlo, monospace; font-size: 11px; line-height: 1; color: #6f7275; } .ds-hatch__caption--navy { color: rgba(255,255,255,0.65); }"
+      "refersTo": "plate",
+      "description": ".plate — image plate: 4px radius + overflow hidden, framed in Plate Edge, lifted. The tilt is lg-only and never on the data-reveal node. No hover: it is not interactive.",
+      "html": "<div class=\"ds-page\"><div class=\"ds-plate\"><span class=\"ds-plate__caption\">social event photo</span></div></div>",
+      "css": ".ds-page{background:#f2f2f3;padding:40px;} .ds-plate{display:flex;align-items:center;justify-content:center;width:260px;aspect-ratio:4/3;transform:rotate(-3deg);border-radius:4px;overflow:hidden;border:1px solid #bfbfc2;box-shadow:0 1px 2px rgb(22 48 92 / 0.06),0 4px 12px rgb(22 48 92 / 0.08);background:repeating-linear-gradient(45deg,#f2f2f3,#f2f2f3 7px,#e7e7ea 7px,#e7e7ea 14px);} .ds-plate__caption{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a4d50;background:#fff;padding:3px 6px;}"
     },
     {
-      "name": "KPI Plate",
-      "kind": "custom",
-      "refersTo": null,
-      "description": "The numeral/label plate on About and Projects. A 1px-gap grid over a hairline background with white cells, so one shared rule reads between them instead of two adjacent borders.",
-      "html": "<dl class=\"ds-plate\"><div class=\"ds-plate__cell\"><dd class=\"ds-plate__value\">1982</dd><dt class=\"ds-plate__label\">Founded</dt></div><div class=\"ds-plate__cell\"><dd class=\"ds-plate__value\">2009</dd><dt class=\"ds-plate__label\">Re-established</dt></div><div class=\"ds-plate__cell\"><dd class=\"ds-plate__value\">250%</dd><dt class=\"ds-plate__label\">Membership growth</dt></div></dl>",
-      "css": ".ds-plate { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin: 0; background: rgba(29,31,32,0.16); border: 1px solid rgba(29,31,32,0.16); } .ds-plate__cell { display: flex; flex-direction: column; background: #fff; padding: 20px 24px; } .ds-plate__value { margin: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 34px; font-weight: 600; line-height: 1; color: #16305c; } .ds-plate__label { margin: 4px 0 0; font-family: Barlow, system-ui, sans-serif; font-size: 12px; font-weight: 500; line-height: 1.2; letter-spacing: 0.14em; text-transform: uppercase; color: #6f7275; }"
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Panel — the officer surface (also the /portal hub's rows): square, white, no shadow; the shell owns the ground. Header rule is a hairline.",
+      "html": "<div class=\"ds-page\"><section class=\"ds-panel\"><h3 class=\"ds-panel__head\">Check in</h3><p class=\"ds-panel__body\">At an event? Check in with your EID.</p></section></div>",
+      "css": ".ds-page{background:#f2f2f3;padding:32px;} .ds-panel{background:#fff;border:1px solid rgba(29,31,32,0.2);border-radius:0;padding:20px 24px;max-width:480px;} .ds-panel__head{margin:0 0 12px;padding-bottom:12px;border-bottom:1px solid rgba(29,31,32,0.16);font-family:'Barlow Condensed', system-ui, sans-serif;font-size:22px;font-weight:600;line-height:1.05;color:#1d1f20;} .ds-panel__body{margin:0;font-family:Barlow, system-ui, sans-serif;font-size:16px;line-height:1.6;color:#3a3d40;}"
     },
     {
       "name": "Page Hero",
       "kind": "custom",
-      "refersTo": null,
-      "description": "The hero every page opens with: a navy field under a 60×60 graph-paper grid, with the chevron notch clipped from its bottom edge. Both decorations are CSS, so they scale with the viewport.",
-      "html": "<section class=\"ds-hero\"><div class=\"ds-hero__grid\" aria-hidden=\"true\"></div><div class=\"ds-hero__inner\"><h1 class=\"ds-hero__title\">Client &amp; Data Projects</h1><p class=\"ds-hero__sub\">Turning classroom knowledge into real-world impact.</p></div></section>",
-      "css": ".ds-hero { position: relative; background: #16305c; color: #fff; padding: 72px 56px 108px; text-align: center; clip-path: polygon(0 0, 100% 0, 100% calc(100% - 48px), 50% 100%, 0 calc(100% - 48px)); } .ds-hero__grid { position: absolute; inset: 0; pointer-events: none; background-image: linear-gradient(rgba(255,255,255,0.06) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.06) 1px, transparent 1px); background-size: 60px 60px; } .ds-hero__inner { position: relative; max-width: 900px; margin: 0 auto; } .ds-hero__title { margin: 0; font-family: 'Barlow Condensed', system-ui, sans-serif; font-size: 72px; font-weight: 600; line-height: 0.96; letter-spacing: -0.02em; } .ds-hero__sub { margin: 18px 0 0; font-family: Barlow, system-ui, sans-serif; font-size: 20px; font-weight: 400; line-height: 1.5; color: rgba(255,255,255,0.8); }"
+      "refersTo": "page-hero",
+      "description": "PageHero — the ONE navy hero treatment: drawn field, 60px hero grid, 48px chevron notch, centred title and subhead (officer, 2026-08-23).",
+      "html": "<section class=\"ds-hero\"><div class=\"ds-hero__grid\" aria-hidden=\"true\"></div><div class=\"ds-hero__inner\"><h1 class=\"ds-hero__title\">Member Portal</h1><p class=\"ds-hero__sub\">Check in, see the leaderboard, and look up your own record.</p></div></section>",
+      "css": ".ds-hero{position:relative;background-color:#0d1d38;background-image:radial-gradient(120% 86% at 18% 0%,rgba(44,75,124,.62),transparent 64%),radial-gradient(96% 74% at 82% 4%,rgba(22,48,92,.88),transparent 70%);color:#fff;padding:48px 56px 108px;text-align:center;clip-path:polygon(0 0,100% 0,100% calc(100% - 48px),50% 100%,0 calc(100% - 48px));} .ds-hero__grid{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);background-size:60px 60px;} .ds-hero__inner{position:relative;} .ds-hero__title{margin:0 auto;max-width:18ch;font-family:'Barlow Condensed', system-ui, sans-serif;font-size:52px;font-weight:600;line-height:.96;letter-spacing:-0.02em;text-wrap:balance;} .ds-hero__sub{margin:18px auto 0;max-width:56ch;font-family:Barlow, system-ui, sans-serif;font-size:20px;line-height:1.5;color:rgba(255,255,255,.8);}"
     },
     {
-      "name": "Wordmark",
+      "name": "Hatch Placeholder",
       "kind": "custom",
-      "refersTo": null,
-      "description": "Drawn in CSS rather than shipped as an asset, in currentColor so the one component works navy on white and white on navy. The exclamation glyph overlays the second stem of \"misa\".",
-      "html": "<a class=\"ds-wordmark\" href=\"#\"><span class=\"ds-wordmark__misa\">misa<span class=\"ds-wordmark__bang\" aria-hidden=\"true\"><span class=\"ds-wordmark__dot\"></span><span class=\"ds-wordmark__bar\"></span></span></span><span class=\"ds-wordmark__texas\">TEXAS</span></a>",
-      "css": ".ds-wordmark { display: inline-flex; flex-direction: column; align-items: center; color: #16305c; text-decoration: none; } .ds-wordmark__misa { position: relative; font-family: Barlow, system-ui, sans-serif; font-size: 24px; font-weight: 600; line-height: 1; letter-spacing: -0.02em; } .ds-wordmark__bang { position: absolute; left: 1.72em; top: -0.3em; display: flex; flex-direction: column; align-items: center; } .ds-wordmark__dot { width: 0.16em; height: 0.16em; border-radius: 50%; background: currentColor; } .ds-wordmark__bar { margin-top: 0.03em; width: 0.05em; height: 0.14em; background: currentColor; } .ds-wordmark__texas { margin-top: 2px; font-family: Barlow, system-ui, sans-serif; font-size: 8px; font-weight: 500; letter-spacing: 0.42em; text-indent: 0.42em; }"
+      "refersTo": "hatch",
+      "description": "45°, 7px stripes. Light on light grounds, navy on navy — never mixed (one recorded exception: the hero's plates are a light hatch on the field). Means 'a photograph belongs here', never 'no data'.",
+      "html": "<div class=\"ds-hatch-row\"><div class=\"ds-hatch ds-hatch--light\"><span class=\"ds-hatch__cap\">banquet photo</span></div><div class=\"ds-navy\"><div class=\"ds-hatch ds-hatch--navy\"><span class=\"ds-hatch__cap ds-hatch__cap--navy\">project photo</span></div></div></div>",
+      "css": ".ds-hatch-row{display:flex;gap:16px;align-items:flex-start;background:#f2f2f3;padding:16px;} .ds-hatch{display:flex;align-items:center;justify-content:center;width:240px;height:150px;} .ds-hatch--light{background:repeating-linear-gradient(45deg,#f2f2f3,#f2f2f3 7px,#e7e7ea 7px,#e7e7ea 14px);border:1px solid rgba(29,31,32,0.2);} .ds-navy{background:#16305c;padding:16px;} .ds-hatch--navy{background:repeating-linear-gradient(45deg,#2c4b7c,#2c4b7c 7px,#26436f 7px,#26436f 14px);border:1px solid rgba(255,255,255,.28);} .ds-hatch__cap{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#4a4d50;} .ds-hatch__cap--navy{color:rgba(255,255,255,.8);}"
     }
   ],
   "narrative": {
-    "northStar": "The Drawing Set",
-    "overview": "This is a set of construction documents, not a brochure. Every decorative element in the system is borrowed from architectural drafting and does a drafting job: the 60×60px grid laid over each navy hero is graph paper showing through; the 45° 7px stripe fill is poché, the convention for marking a volume that exists in the plan but has not been built; the mono captions under and inside those volumes are drawing annotations; the 1px hairlines are rule weights, not decoration. Corners are square because a drawing has none.\n\nThat metaphor is not applied to the system after the fact — it is the honest description of what the system already had to become. The organization publishes no photography, so eighteen gallery slots, four activity rows, three project cards, thirteen officer headshots and the About cluster all render as hatched boxes captioned with the shot that belongs there. A system that treated those as missing assets would read as broken. A drawing set treats them as specified-but-unbuilt, which is exactly true, and the caption is the specification. The hatch is not a missing photograph; it is the drawing of one.\n\nThe register that follows is institutional and unhurried: navy on white, condensed uppercase for anything structural, Barlow at 1.65 line-height for anything that has to be read at length, and hairlines instead of shadows to separate one thing from the next. Density is generous rather than tight — a 56px page gutter and 64–80px section padding — because the pages are read once, by a student deciding whether to show up, and comprehension outranks information density everywhere except /admin.",
+    "northStar": "A navy-and-white institutional drawing set, now with depth",
+    "overview": "A navy-and-white institutional drawing set, now with depth — a drawn navy field, a flat grey page, and white surfaces lifted off it. Square structure, softened plates, hairline rules.\n\nv1 was flat by inheritance — white behind everything, 1px borders, no shadows. v2 has a drawn navy field, a flat grey page, and white surfaces lifted off it. Depth comes from real stacked planes, never from a drawn texture pretending to be space.",
     "keyCharacteristics": [
-      "Square corners everywhere — no radius token exists above 0.",
-      "Two grounds only: white and navy #16305c. Never a third, never a gradient.",
-      "Hairline rules carry every separation; the system is flat at rest.",
-      "Barlow Condensed for structure, Barlow for reading. Nothing else.",
-      "Hatched, captioned placeholders wherever a photograph would go.",
-      "Motion is entrance-only: reveal on scroll, two marquee tracks, no hover lift."
+      "The page is a ground, and things sit on it.",
+      "Structure is square; objects are softened.",
+      "One varying property reads as a set; four read as scatter."
     ],
     "rules": [
       {
-        "name": "The Two Grounds Rule",
-        "body": "A surface is either white or Drafting Navy, and everything on it moves together: on navy, the hatch is Poché, borders are rgba(255,255,255,.28–.45), paragraphs are rgba(255,255,255,.8), eyebrows are rgba(255,255,255,.6–.7), and the section carries .on-navy so the focus ring flips to white. Change the ground and you change all five — including the section's own padding, since a navy band's inset was sized to a field that is no longer there. Mixing a light hatch onto a navy ground, or a navy hatch onto white, is always a bug.",
+        "name": "The Two Grounds Rule is RETIRED",
+        "body": "v2 has five grounds, a closed set: page, white, panel, navy, field. Adding a sixth is a change to DESIGN.md, not a prop.",
         "section": "colors"
       },
       {
         "name": "The Rare Navy Rule",
-        "body": "Navy is a ground or an accent, never a texture. On a white page it appears in headings, eyebrows, links, KPI numerals and buttons — and nowhere else. Its scarcity on the page is what makes a full-bleed navy band land when one arrives.",
+        "body": "Navy is the colour of everything that is merely true. A second accent, or a tint of navy outside the Pressed↔Drafting ramp, is still refused.",
         "section": "colors"
       },
       {
-        "name": "The Poché Rule",
-        "body": "The hatch means specified, not yet built. It is reserved for image slots awaiting real photography and must never be used as decoration, as a texture behind live content, or as an empty state for data.",
+        "name": "No raw framework colour scales",
+        "body": "red-700, amber-600, green-800 are banned; reach for a named status token.",
         "section": "colors"
       },
       {
-        "name": "The Two-Width Rule",
-        "body": "Barlow Condensed is for structure — headings, buttons, nav, chips, KPI numerals, officer names. Barlow is for reading — every paragraph, every label, every meta line. A condensed paragraph or a non-condensed button is always wrong, and no third family is ever introduced.",
-        "section": "typography"
+        "name": "Muted on Paper, never on Vellum",
+        "body": "--misa-muted (#6f7275) is 4.84:1 on white and 4.33:1 on the grey page ground, which FAILS AA. Any commit that changes a ground re-measures every grey sitting on it.",
+        "section": "colors"
       },
       {
-        "name": "The Mono-Means-Placeholder Rule",
-        "body": "On the PUBLIC pages, monospace appears in exactly one context: the caption naming a shot that does not exist. The scoping matters, and it was wrong when this rule was first written — /admin has set EIDs and error digests in monospace since Stage 4. It is kept there on a functional argument rather than an aesthetic one: an EID is transcribed by hand off a phone screen, and a monospace face is what separates l from 1 and 0 from O. The two uses never meet, because /admin renders no Hatch and the public pages render no identifiers. Monospace for prose, or for a heading, remains wrong everywhere.",
-        "section": "typography"
-      },
-      {
-        "name": "The Tight-Top Rule",
-        "body": "Negative tracking (-.01em to -.02em) belongs to large condensed type only; positive tracking (.06em to .14em) belongs to small uppercase type only. Nothing in between is tracked at all.",
-        "section": "typography"
-      },
-      {
-        "name": "The Hairline Grid Rule",
-        "body": "A plate is a grid with gap: 1px over a Hairline background, with white cells. The background shows through the gaps, so one shared rule reads between cells instead of two adjacent borders. Never build a plate by giving each cell its own border.",
+        "name": "ground=\"white\" is a correctness control",
+        "body": "Five primitives fill with Vellum (controlClass, the sticky THead, FilterChip, Banner neutral, Tr hover). On the page ground they vanish; give the section a white ground, never recolour the primitive. Wrap in white first, flip the ground last.",
         "section": "layout"
       },
       {
-        "name": "The Section Owns Its Padding Rule",
-        "body": "Space between sections comes from the sections themselves, never from a margin between them — which is why removing a band's navy ground also means resizing its padding. A ground change without a padding change leaves the inset that belonged to a field that is gone.",
-        "section": "layout"
+        "name": "Shadows are tinted, never black",
+        "body": "All four elevation steps are navy at low alpha; rgba(0,0,0,…) is a bug. A shadow tinted to the ground composites to nothing on that ground.",
+        "section": "elevation"
       },
       {
-        "name": "The Wordmark Clearance Rule",
-        "body": "The header wordmark is absolutely centered and wins the z-order, so an overflowing nav item disappears behind it silently instead of breaking the layout. Measured at 1280: 285px clearance left of the wordmark, 312px right. Adding a nav item requires re-measuring both, at 1280 and at a wide viewport.",
-        "section": "layout"
+        "name": "Four elevation steps, each with a job",
+        "body": "lift, raised, overlay, sticky. A fifth step is a change to DESIGN.md.",
+        "section": "elevation"
       },
       {
-        "name": "The Square Corner Rule",
-        "body": "No radius, anywhere, on any element — buttons, cards, inputs, chips, images, avatars. The drift this rule used to record is CORRECTED as of 2026-08-17: /admin's 37 rounded-full pills, its border-black/70 fields and the Stage-6 border-2 border-black dialect all resolve to components/ui now. One deliberate exemption, and it is not a corner: wordmark.tsx draws the dot of its exclamation glyph with rounded-full, which is a full stop rather than a rounded corner. It is the only rounded-* left in the codebase and should stay the only one.",
+        "name": "The Shape Consistency Lock",
+        "body": "Only a thing that floats is rounded (4px plate). Structure is square. 1px is the only border weight.",
         "section": "shapes"
       },
       {
-        "name": "The Status Ink Rule",
-        "body": "Feedback uses Caution, Critical or Affirm and their washes — never a raw Tailwind colour scale, and never navy. The tone lives in the 1px rule and the tinted ground; the text stays Body Graphite, because setting a whole message in the status colour reads acceptably for one line and badly for four, and several of these panels carry a paragraph, an amount and a link. These are not a second accent: the Rare Navy Rule is about expression, and these are feedback.",
-        "section": "colors"
+        "name": "A radius needs a clip",
+        "body": ".plate carries overflow:hidden because the hatch squares the corners back off without it.",
+        "section": "shapes"
       },
       {
-        "name": "The One Shelf Rule",
-        "body": "Every shared primitive lives in components/ui/ and both halves of the application use it. Before 2026-08-17 /admin imported two things from there, and what grew in the gap was three button dialects, nine verbatim copies of one Field component, eleven declarations of an input class carrying four distinct values, four status-pill implementations, and 26 raw copies of a notice literal whose component already existed. A class string has no home; a component does.",
+        "name": "Headings are ground-aware via a variant, not a prop",
+        "body": "Headline carries [.on-navy_&]:text-white; a dark prop would be a second source of truth.",
+        "section": "typography"
+      },
+      {
+        "name": "Monospace means an identifier",
+        "body": "Only in /admin, for EIDs transcribed by hand.",
+        "section": "typography"
+      },
+      {
+        "name": "Space between sections belongs to the sections",
+        "body": "<Section> owns ground + gutter + rhythm together; never a margin between sections.",
         "section": "layout"
       },
       {
-        "name": "The Reveal-Is-Server-Markup Rule",
-        "body": "data-reveal belongs only on markup present in the server response. The observer scans once per pathname, so a node mounted by a state change is never observed — and the hidden start state is unconditional, so its opacity:0 becomes permanent. The gallery's Load-more tiles and /attend's terminal result panel are the two places this would have shipped a blank screen.",
+        "name": "A seam is built from two paddings",
+        "body": "One from each neighbour; 32 + 32 = 64px at desktop. Where a neighbour cannot contribute, the one side brings the whole 64px.",
         "section": "layout"
       },
       {
-        "name": "The Light-Only Rule",
-        "body": "There is no dark mode, and adding one requires arguing it into DESIGN.md first. The Two Grounds Rule is load-bearing: every hatch tone, border opacity, text opacity and focus-ring flip is defined against white or navy, and navy stops reading as an accent the moment the page around it is dark. The north star is ink on paper, and a drawing set is not lit from behind. design-taste-frontend calls dark mode mandatory and will raise it again; it is refused, not overlooked.",
-        "section": "colors"
+        "name": "A shared-rule plate is one background through gap:1px",
+        "body": "Never a border per cell; cells stay opaque.",
+        "section": "layout"
+      },
+      {
+        "name": "The layout-family budget",
+        "body": "A family appears at most once per page; eight sections need at least four families; no more than two consecutive image+text splits. Declare the family in a comment per section.",
+        "section": "layout"
+      },
+      {
+        "name": "The nav cannot grow without measuring",
+        "body": "Re-measured 2026-09-18 at 1280: 342px left, 450px right. The left is the tighter side; on a phone, the MEMBER PORTAL button beside the centred wordmark.",
+        "section": "layout"
+      },
+      {
+        "name": "One varying property reads as a set",
+        "body": "The hero's three plates share one aspect ratio, frame and radius, and vary only in position and a mirrored angle.",
+        "section": "layout"
+      },
+      {
+        "name": "Colour swaps are the only hover",
+        "body": "No hover on any plate or card, because none is interactive. No pause-on-hover on the marquee.",
+        "section": "motion"
+      },
+      {
+        "name": "No ease-in curve",
+        "body": "An ease-in start reads as lag on anything a person is waiting for. UI response stays under 300ms.",
+        "section": "motion"
+      },
+      {
+        "name": "Revealed state is clip-path:none",
+        "body": "inset(0 0 0 0) clips descendants and sliced the tilted plates; wipe keeps its own inset() rule.",
+        "section": "motion"
+      },
+      {
+        "name": "A primitive with no call sites has not ended the drift",
+        "body": "Extracting the component is half the job; the adoption is the other half.",
+        "section": "components"
+      },
+      {
+        "name": "Button labels are sentence case in the DOM",
+        "body": "button.tsx applies uppercase; the caps live in one place.",
+        "section": "components"
       }
     ],
     "dos": [
-      "Do keep every corner square (0 radius) on every element, including in /admin, where the pill buttons are recorded drift rather than a second skin.",
-      "Do move the whole set together when a section changes ground: hatch tone, border color, text opacities, the .on-navy focus flip, and the padding.",
-      "Do build plates as gap: 1px grids over a Hairline background with white cells, so one shared rule reads between them.",
-      "Do put every global CSS rule inside a Tailwind cascade layer — base for element defaults, components for decorative classes. An unlayered rule beats every layered utility regardless of specificity, which is how a bare a { color } once rendered navy text on a navy button.",
-      "Do give every interactive element a visible :focus-visible ring (2px navy, 2px offset; white inside .on-navy). The prototypes define none — this system adds them.",
-      "Do cap prose by role: 46ch in activity rows, 48ch in case studies, 74ch in page intros.",
-      "Do re-measure wordmark clearance at 1280 and at a wide viewport before adding a nav item.",
-      "Do state a translate distance in pixels when a track's copy count can change; a percentage silently couples the distance to the number of copies.",
-      "Do reach for components/ui/ before writing a class string. Button, field, table, panel, banner, pill, chip, section and heading all exist; the reason /admin drifted for four stages is that they did not.",
-      "Do measure horizontal overflow at 390px after changing any reveal offset or page gutter: documentElement.scrollWidth minus clientWidth must be 0."
+      "Reach for `<Section>` for every band. Ground, gutter and rhythm move together.",
+      "Give a new ground its focus-ring answer in the same commit.",
+      "Declare the layout family in a comment at the top of each section.",
+      "Put the rotation on `.plate` and the reveal on the wrapper.",
+      "Use `ground=\"white\"` for any section carrying inputs, chips or a table.",
+      "Write the arithmetic down when a composition depends on it.",
+      "Vary **one** property across a set."
     ],
     "donts": [
-      "Don't add photography, stock imagery, or generated imagery to any image slot. The site publishes none — every slot is a captioned <Hatch>, and public/photos/ was deleted rather than unlinked. Restoring a photo is a deliberate three-part change (add the file, give the slot a src, swap the <Hatch> for an <Image> sized with fill), never a design proposal.",
-      "Don't use the hatch as texture, decoration, or a data empty state. It means specified, not yet built, and nothing else.",
-      "Don't mix hatch tones against their ground — light hatch on navy, or navy hatch on white, is always wrong.",
-      "Don't introduce a third font family, set a paragraph in Barlow Condensed, or set a button in Barlow.",
-      "Don't introduce a second accent color, a gradient, or a tint of navy other than Pressed Navy for hover. Poché belongs to the hatch alone.",
-      "Don't animate on hover with a lift, a scale on a control, or a shadow. Hover is an ink change; motion is entrance-only.",
-      "Don't use monospace for anything but a placeholder caption.",
-      "Don't reach for raw Tailwind colour scales (red-700, amber-700, green-800). If it is feedback it is Caution / Critical / Affirm; otherwise it is on the navy-and-graphite ramp.",
-      "Don't add a one-off box-shadow. If a surface genuinely needs depth, define the vocabulary in DESIGN.md first.",
-      "Don't add a dark mode without arguing it into the Light only section of DESIGN.md first."
+      "Don't use `paper` / `.ground-paper` / `.paper-grid`. All three are deleted.",
+      "Don't put a `border` and `overflow: hidden` and a `transform` on one element and then blame the border when the frame disappears.",
+      "Don't recolour a shared primitive to fix one page's ground. Give the **section** a ground instead — the primitives are shared with `/admin`.",
+      "Don't reach for a raw framework colour scale.",
+      "Don't add a hover affordance to something that is not interactive.",
+      "Don't add a fifth elevation step, a sixth ground, or a third radius without changing this file.",
+      "Don't put an aspect-ratio-sized tile in the marquee; its geometry is derived from pixel widths.",
+      "Don't animate `box-shadow`. Animate the opacity of a pseudo-element.",
+      "Don't add a `loading.tsx` **and** granular `<Suspense>` to one route.",
+      "Don't ship photography to git without the officer."
     ]
   }
 }
