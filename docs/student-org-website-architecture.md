@@ -2281,7 +2281,7 @@ Every account the project depends on. "The shared login" is not an actionable ha
 | Supabase | MISA email | Project `misa-website` / `gbxypeofjnhrhotlhyzs`, us-east-2 | Bitwarden (§2.5) |
 | Supabase database password | — | `db push`, direct Postgres connections | Bitwarden (§2.5); the original plaintext file is deleted |
 | Vercel | MISA email, personal Hobby account `txmisa-jds-projects` | Hosting, env vars, domain binding | Bitwarden (§2.5) |
-| Domain registrar | not yet purchased (Stage 9) | DNS | Bitwarden (§2.5), once purchased |
+| Domain registrar | `txmisa.org`, the old Squarespace site's domain, **not a new purchase**: registered 2019-04-10, registrar of record Tucows, nameservers Squarespace's, so DNS is edited in Squarespace. 🔴 **Expires 2027-04-10** (public RDAP record, read 2026-09-30) | DNS. `www` is a CNAME to Vercel; 🔴 the apex has **no A record** (2026-09-30, see `tasks.md`) | The Squarespace account that holds it. ⚠️ Not yet confirmed in Bitwarden (§2.5) |
 
 **The MISA email is the single point of failure.** It is the password-reset address for everything else, so losing it is materially worse than losing any individual service. Two mitigations, both cheap:
 
@@ -3727,6 +3727,7 @@ Three phases, each merged to `main` on completion.
 **Goal:** In real use by real members.
 
 - Custom domain purchase + DNS to Vercel; update Supabase redirect URLs
+  - ⚠️ **Half done (2026-09-30).** Nothing needed purchasing, since `txmisa.org` was the old site's domain (§2.4's account inventory). `www.txmisa.org` serves from Vercel, but **the apex `txmisa.org` has no A record**, so the bare domain fails at DNS. That includes any QR code or link without `www`. The fix is two officer-owned settings, recorded in `tasks.md`. The Supabase redirect URLs were not re-checked.
 - Officer walkthrough and a one-page written handoff guide — the account side is just the shared login plus §2.3; the guide's real content is operations (review queue, semester wake-up check, event duplication)
 - Soft launch at one event with a paper backup sign-in sheet on hand
 
@@ -3735,7 +3736,7 @@ Three phases, each merged to `main` on completion.
 - **What it costs, stated plainly:** last year's standings do not carry over, so the leaderboard opens empty and nobody's accumulated points survive the switch. That is a real loss for anyone near the top of the old sheet, and it is worth telling members rather than letting them discover it.
 - **What it buys:** the migration was the one part of Stage 9 whose effort could not be estimated — the old estimate literally hedged on "how clean the existing data is" — and the one that would have imported the exact ambiguity §1.2 says this system exists to end: unmatched names, guessed events, arithmetic nobody can re-derive. Every migrated row would have to be trusted at precisely the level the spreadsheet was.
 - **Nothing needs building.** `/admin/members/import` (Stage 6 phase 7b) already takes a CSV of current members, create-only and matched by header name. There is deliberately **no** importer for historical attendance or point adjustments, and this decision is why one was never written.
-- ✅ **Production was CLEARED on 2026-08-19 and this item is DONE.** `bash scripts/wipe-remote.sh` emptied it: 0 members, 0 events, 0 attendance, 0 adjustments, 0 dues, 0 field definitions, both views empty. The three real officer logins, the four `officer_invites` and the eight `admin_audit` rows about invites and officer access survived by design; the fabricated `seed.officer@example.edu` account was deleted. The real roster import and the real schedule follow.
+- ✅ **Production was CLEARED on 2026-08-19 and this item is DONE.** `bash scripts/wipe-remote.sh` emptied it: 0 members, 0 events, 0 attendance, 0 adjustments, 0 dues, 0 field definitions, both views empty. The three real officer logins, the four `officer_invites` and the eight `admin_audit` rows about invites and officer access survived by design; the fabricated `seed.officer@example.edu` account was deleted. The real roster import and the real schedule follow. 📌 **They did:** counted 2026-09-30, production holds 65 members, 16 events, 139 attendance rows and 10 officers, so it is no longer disposable.
 - 🔴 **The command written here until 2026-08-19 was wrong, and would have re-seeded rather than cleared.** It said `bash scripts/seed-remote.sh --force`, but `--force` skips only the *guard* chunk — the seed then re-inserts all 32 fabricated members, 15 events and 208 attendance rows. Following it to "clear production for launch" would have left production holding the seed, and the counts would have looked plausible enough to pass a glance. `scripts/wipe-remote.sh` was written for this and inserts nothing.
 - ⚠️ **Production had drifted from the seed before the wipe.** It held 33 members, 16 events, 209 attendance and **9 dues payments** against a documented 0 — walkthroughs wrote to it. Any figure a doc states about the *remote* is a claim to re-check, not a fact; `seed.sql`'s counts describe **local** after a `db reset`.
 

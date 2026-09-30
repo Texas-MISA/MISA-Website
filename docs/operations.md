@@ -1,4 +1,4 @@
-# Local environment, CLI and test notes — the long form
+# Local environment, CLI, test and deploy notes — the long form
 
 The full text of the traps summarised under **Commands** in `CLAUDE.md`, moved there on 2026-08-14. Each one cost real debugging time and none of them fails loudly, which is why they are written down at length rather than trimmed to a warning.
 
@@ -39,6 +39,17 @@ Stage 4 added `tests/events.test.ts` (pure — DST, half-open windows, edit-impa
 `tests/helpers.ts`'s `getTestOfficer()` creates one officer and **never deletes it**: `admin_audit` rows can't be deleted (P0001 from the append-only trigger), `admin_audit.actor_id` has no cascade, so an officer who has written any audit row is undeletable. Audit rows are likewise left behind by `cleanup()`. That is safe only because the local stack is disposable and `global-setup.ts` refuses any non-local URL.
 
 Test identities are obviously fake (`T3-…` IDs, `example.edu`); fixture events live in 2030, each test in its own 7-day slot so no 48-hour orphan window reaches a neighbour's events.
+
+## Deploying to production
+
+A push to `main` is a production deploy of https://www.txmisa.org, and `tasks.md` carries the procedure. These are the traps the member-portal deploy hit on 2026-09-30. Each one looked like success.
+
+- 🪤 **Read the clock from the database, not from Git Bash.** The rule is "after an event, never during one", and applying it needs the time in Central. `TZ=America/Chicago date` has no zoneinfo on this machine, so it silently printed UTC: 19:00 when Central was 14:00. The database runs the check-in window on its own clock, so ask it directly. `npx supabase db query --linked "select now() at time zone 'America/Chicago' as now_ct, (select title from public.open_event_at(now())) as open_now;"` gives both answers in one line, and an empty `open_now` means no window is open.
+- 🪤 **A push can 408 and still print "Everything up-to-date".** Confirm with `git ls-remote origin refs/heads/main`, which asks GitHub instead of trusting the push's own output.
+- 🪤 **`npx vercel ls` prints only URLs when its output is piped.** The status column (Ready, Building, Error) goes to the terminal, so a script that greps it for `Ready` waits until it times out. Poll `npx vercel inspect <deployment-url> 2>&1 | grep status` instead. `npx vercel inspect www.txmisa.org` names the deployment that is actually live.
+- 🪤 **Verify by rendered response, not by status code.** An error boundary also answers 200, so check each page's own `<h1>`, and check for "Something went wrong" and "Couldn't load" in the HTML.
+- 🪤 **A browser that has visited the site cannot test the bare domain.** Chrome autocompletes `txmisa.org` to `www.txmisa.org` from history, then hides `www.` in the address bar, so a dead apex looks fine. On 2026-09-30 the apex had no A record, yet it "worked" in the officer's browser. Pointing that same Chrome at exactly `https://txmisa.org/` showed Chrome's error page. Test with `curl -sI https://txmisa.org/attend`, or click into the address bar to see the full URL.
+- 📌 **A docs-only commit to `main` is still a production build.** It needs the same event check, and the live deployment can be a docs commit ahead of the commit the docs name.
 
 ## Check-in location verification (migration 28)
 

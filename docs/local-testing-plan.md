@@ -3,8 +3,10 @@
 **Status:** 📋 Plan, written 2026-08-19, the day `bash scripts/wipe-remote.sh`
 emptied production ahead of the real Fall 2026 schedule being entered.
 
-Production is now **0 members / 0 events / 0 attendance / 0 dues** and is about
-to hold real people. Everything below is what "keep testing" means from here:
+Production was emptied to **0 members / 0 events / 0 attendance / 0 dues** that
+day, and it **now holds real people**: counted 2026-09-30, 65 members, 16
+events, 139 attendance rows and 10 officers. That makes the rule below stronger,
+not weaker. Everything below is what "keep testing" means from here:
 **the local stack is the test environment, and the remote is not.** It is short
 on purpose — the traps live in [`operations.md`](operations.md), the history in
 [`build-log.md`](build-log.md), and the checklist in [`../tasks.md`](../tasks.md).
@@ -19,8 +21,9 @@ Asked 2026-08-19, and the answer is the reason this file exists.
 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` /
 `SUPABASE_SERVICE_ROLE_KEY` from the Preview environment, and today those name
 the same project production uses (`gbxypeofjnhrhotlhyzs`). So pushing a branch
-and running `seed-remote.sh` does not seed a branch — **it re-inserts the 32
-fabricated members into the database that was just cleared for launch.**
+and running `seed-remote.sh` does not seed a branch. Without `--force` its guard
+refuses, because real officers have signed in. **With `--force` it wipes the
+real club data and re-inserts the 32 fabricated members in its place.**
 
 Two consequences worth holding on to:
 

@@ -15,8 +15,8 @@ This file provides guidance to Claude Code when working with code in this reposi
 | [`docs/design-v1-superseded.md`](docs/design-v1-superseded.md) | The v1 design system, kept verbatim for its reasoning. **Historical.** Where it and `DESIGN.md` disagree, `DESIGN.md` wins. |
 | [`docs/invariants.md`](docs/invariants.md) | **The long form of all invariants below,** with measurements and failures. The short form here is the rule; that file is the evidence. |
 | [`docs/layout.md`](docs/layout.md) | **Full annotated layout** — every file, module and component with one-line annotations. Extracted from this file to save context. |
-| [`docs/operations.md`](docs/operations.md) | Dev-server, Supabase CLI and test-suite traps in full. |
-| [`docs/local-testing-plan.md`](docs/local-testing-plan.md) | 📋 **Where testing happens now that production is empty: the LOCAL stack.** |
+| [`docs/operations.md`](docs/operations.md) | Dev-server, Supabase CLI, test-suite and **production-deploy** traps in full. |
+| [`docs/local-testing-plan.md`](docs/local-testing-plan.md) | 📋 **Where testing happens: the LOCAL stack.** Production holds real club data, and previews write to it. |
 | [`docs/dues-and-membership.md`](docs/dues-and-membership.md) | Stage 6.5 spec, including the real Venmo CSV format — and the plan for **manual dues entry**, which is written down but NOT BUILT. |
 | [`docs/attend-confirmation-flow.md`](docs/attend-confirmation-flow.md) | `/attend`'s first-time confirmation and the accepted membership-oracle tradeoff. |
 | [`docs/checkin-location-verification.md`](docs/checkin-location-verification.md) | ✅ **BUILT — migration 28, 2026-08-22.** Spec and threat model. *What this cannot catch* is the main thing to read before trusting a flag. |
@@ -30,9 +30,9 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 **Stages 0–8 are COMPLETE. Stage 9 (launch) is in progress.** 30 migration files, through `…000029`. ✅ **Local and the remote are IN SYNC as of 2026-08-31** — migration 29 (`member_directory_terms`) was pushed with the code that reads it, which is the rule this line used to be warning about; 28 (`checkin_origin`) had gone out earlier. The next unclaimed number is **30**. 📌 **Confirm rather than assume** — `npx supabase migration list --linked` prints `local` against `remote` per migration, and a row with an empty `remote` is code waiting to 500 in production. 🪤 **26 and 27 were written by two sessions at once and both claimed 26 for a few minutes** — the collision surfaced as a 23505 on `schema_migrations_pkey` during `db reset`.
 
-⚠️ **PRODUCTION IS THE CLUB'S REAL PUBLIC DOMAIN, https://www.txmisa.org.** A merge to `main` replaces the live club website. The production deployment's aliases are `www.txmisa.org`, `misa-website-txmisa-jds-projects.vercel.app` and `misa-website-git-main-txmisa-jds-projects.vercel.app`; confirm with `npx vercel inspect <deployment-url>`. `git push origin <branch>` without merging gives a preview URL instead. 🔴 **The apex `txmisa.org` has NO DNS A record (found 2026-09-30)** — only `www` resolves, so any link or QR code without `www` fails before reaching Vercel. The fix is in the officer's Squarespace DNS, not in this repo: see the top of `tasks.md`.
+⚠️ **PRODUCTION IS THE CLUB'S REAL PUBLIC DOMAIN, https://www.txmisa.org.** A merge to `main` replaces the live club website. The production deployment's aliases are `www.txmisa.org`, `misa-website-txmisa-jds-projects.vercel.app` and `misa-website-git-main-txmisa-jds-projects.vercel.app`; confirm with `npx vercel inspect <deployment-url>`. `git push origin <branch>` without merging gives a preview URL instead. 🔴 **The apex `txmisa.org` has NO DNS A record (found 2026-09-30)** — only `www` resolves, so any link or QR code without `www` fails before reaching Vercel. 🪤 **It LOOKS fine in a browser that has visited the site**: Chrome autocompletes to `www` and hides it in the address bar. Test with `curl`. The fix is in the officer's Squarespace DNS, not in this repo: see the top of `tasks.md`. 📌 **The domain expires 2027-04-10.**
 
-Next.js 16 deploys from `main` to https://www.txmisa.org; the Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked, migrated and seeded.
+Next.js 16 deploys from `main` to https://www.txmisa.org; the Supabase project (`gbxypeofjnhrhotlhyzs`, us-east-2) is linked and migrated, and holds real club data (below), not the seed.
 
 What exists, in one pass:
 
@@ -98,6 +98,7 @@ The traps, each of which fails silently. Full text in [`docs/operations.md`](doc
 - **`db query` reads only the first line of its SQL argument**, and it targets the **remote** unless you pass `--local` — `--linked=false` parses as `--linked`.
 - **`db reset` needs Docker Desktop running** and does **not** re-read `config.toml` — an `[auth]` change needs a full `stop` + `start`.
 - 🪤 **`fileParallelism: false` in `vitest.config.ts` is load-bearing** — the local Kong gateway 502s under parallel workers.
+- 🪤 **A production deploy has its own four:** the clock (Git Bash's `TZ=` prints UTC), a push that 408s while printing success, `vercel ls` hiding status when piped, and a browser hiding a dead apex. See `docs/operations.md` §Deploying to production.
 
 ## Architecture
 
