@@ -1,6 +1,6 @@
 # Member portal plan
 
-> ✅ **PHASE 1 BUILT on `portal-phase-1` (2026-09-18), verified locally, awaiting the officer's go-ahead to merge.** See [Phase 1 record](#phase-1-record-2026-09-18) at the end of the phase. Written 2026-09-18. **Rollback point:** the tag `pre-portal-2026-09-18` (commit `ce5bda7`), which is production as of that date.
+> ✅ **PHASE 1 BUILT on `portal-phase-1` (2026-09-18), verified locally.** 🚀 **It ships ALONE, ahead of the redesign, from `portal-launch` (2026-09-29):** `main` plus a `--no-ff` merge of `portal-phase-1` (`ef07b47`), with lint, build and 1,097 tests green. It goes to `main` after an event, never during one. See [Phase 1 record](#phase-1-record-2026-09-18) at the end of the phase. Written 2026-09-18. **Rollback point:** `699fd3d`, production as of 2026-09-29. 🔴 **Not the tag `pre-portal-2026-09-18` (`ce5bda7`)**: `main` gained the partner-logo swap on 2026-09-20, and rolling back to the tag would take that down too.
 > **Current goal: phase 1 only.** Phases 2–4 (houses and bingo) are **on hold** until the officer has more information about how the house system works.
 > ⏭️ **NEXT TASK after phase 1 merges (officer, 2026-09-18): a UI redesign of the portal and every page in it** — the hub, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup`. That is v2 phase 3 in [`frontend-redesign-v2-plan.md`](frontend-redesign-v2-plan.md), widened to the hub. It is presentation only, and it owns the `--misa-muted` AA fix. Phase 1 deliberately built the hub from shared primitives so as not to pre-empt it.
 
