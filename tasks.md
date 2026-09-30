@@ -6,6 +6,34 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## 🧰 Design toolkit — TOOLS ONLY, split onto `design-tools` from `main`, AWAITING REVIEW (2026-09-30)
+
+Officer: "a new branch to main which only includes the design toolkit itself, not any iterations on UI design. just the tools." The rule is `DESIGN.md` §Design toolkit, and the record is doc v1.82.
+
+- **What it is:** the toolkit exactly as it stood on `design-toolkit` at `f0cb15a`, the end of its own work on 2026-09-19 and before any brief, plus `77d2c56`, which pins its scripts to LF. After `f0cb15a` the redesign touched only two toolkit files, the registry and the rendered spec, so every other toolkit file here is **byte-identical** to `design-toolkit`'s.
+  - **Skills:** eight in `.claude/skills/`, six vendored and two our own (`design-brief`, `design-gate`), with their licences.
+  - **Agent and MCP:** the `design-reviewer` agent, and the shadcn MCP in `.mcp.json`.
+  - **Hooks:** in `.claude/settings.json`.
+  - **Checks:** the brief guard and receipt checker in `scripts/design/`, the templates, three vitest files, and Playwright + axe (`npm run test:ui`).
+  - **impeccable's context:** its config and baseline under `.impeccable/`, plus `f0cb15a`'s correction to `PRODUCT.md`, which was still describing the EID+email gate and the pre-portal routes.
+- 🔓 **The one judgement call: the surface registry is EMPTY.** At `f0cb15a` the four portal pages were already registered as `legacy`, and registering is how a redesign starts. From then on, the brief guard refuses every Claude edit to a surface's files until it has a brief, and the briefs are redesign work. Shipped as it stood, the toolkit would have locked `main`'s portal behind briefs that are not here.
+- **Deliberately left out:** registration, briefs, concepts, receipts, the handoffs, every page and component change, and the three shared-UI fixes (`b01dc6a`, `f2e41d6`, `539a5f0`).
+- ✅ **Verified in a scratch worktree, 2026-09-30:**
+  - `tsc` and lint are clean.
+  - **`npm test`: 1,134 across 41 files** (the site's 1,097 plus 37 design tests). The detector finds nothing new in `main`'s code, the partner logos included.
+  - **`npm run test:ui`: 27 pass, and 3 fail, the three the toolkit's own record predicted, all phase 3's.** `/portal/lookup`'s member result fails `definition-list`, and both first-timer confirmations on `/portal/attend` fail `color-contrast` (the known `--misa-muted`).
+  - With nothing registered, `test:ui` checks the eight public routes and the portal's hard-coded states. The portal's first renders join when phase 3 registers them, which is why it runs 30 checks here where `design-toolkit` ran 42.
+- ⚠️ **What merging changes for everyone:**
+  - **The hooks run in EVERY Claude Code session in this repo.** Measured at about 0.2s each. The brief guard allows every edit while nothing is registered, and a sanity run with a registered page and no brief confirmed it still blocks. impeccable adds one advisory line after a UI-file edit and is silent at Stop.
+  - The shadcn MCP asks for approval on first launch.
+  - `npm ci` adds four dev dependencies, and `npx playwright install chromium` is needed once per machine for `test:ui`.
+- 🪤 **Line endings.** Files written before `.gitattributes` exists come out CRLF on this machine (`core.autocrlf=true`), and vitest then fails to load the receipt checker with *SyntaxError: Invalid or unexpected token*. Delete `scripts/design/*.mjs` and `git checkout -- scripts/design`. 🪤 Git Bash's `grep -c $'\r'` counted EVERY line as CRLF here, so measure CRs with node.
+- ⏭️ **Next:**
+  - Officer review, then merge `design-tools` into `main`, after an event and never during one: it changes no page, but a push to `main` is still a production build.
+  - Then merge `main` into `design-toolkit`. The toolkit files are identical and merge silently. **`docs/design/surfaces.json` conflicts, so take `design-toolkit`'s registry.** The docs conflict too.
+
+---
+
 ## ✅ Member portal phase 1 — LIVE on `main` since 2026-09-30 (`b273977`, shipped alone from `portal-launch`)
 
 Plan and full record in [`docs/member-portal-plan.md`](docs/member-portal-plan.md); doc v1.81.
