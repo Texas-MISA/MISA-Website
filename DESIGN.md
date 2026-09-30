@@ -1,7 +1,7 @@
 ---
 name: Texas MISA
 description: A navy-and-white institutional drawing set, now with depth — a drawn navy field, a flat grey page, and white surfaces lifted off it. Square structure, softened plates, hairline rules.
-version: 2.0
+version: 2.1
 status: Written from what phase 1 of the v2 redesign actually shipped (2026-08-19). Sections marked NOT YET REBUILT describe surfaces still running the v1 system.
 colors:
   drafting-navy: "#16305c"
@@ -65,13 +65,22 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3 is NEXT** (officer, 2026-09-18: the UI redesign of the member portal and every page in it). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure. |
+| `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3 is NEXT** (officer, 2026-09-18: the UI redesign of the member portal and every page in it). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — `npm run test:ui` catches it on `/portal/attend`'s first-timer confirmation, and a `definition-list` fault on `/portal/lookup`'s result. 🧰 **Rebuilt through §Design toolkit**: all four portal surfaces are registered in `docs/design/surfaces.json`, so their files are guarded until each has a brief (`/design-brief`). |
 | `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows, each with one navy button of one fixed width, all formatted the same (officer); no muted ink on the grey ground. The header's MEMBER PORTAL button is the site's one way in. Phase 3 owns the member area's real design and may re-compose it. |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
 page sits on the v2 page ground today, so a page can be un-rebuilt and still not
 look like v1. Do not read "it has the grey background" as "it has been done."
+
+📌 **From 2026-09-18 a rebuild's status also lives in `docs/design/surfaces.json`**
+(§Design toolkit), which the tests read. This table is for people; that file is
+for the checks. **They must agree** — a surface is ✅ here only once it is
+`rebuilt` there and its receipts pass. **No surface is registered yet** (2026-09-30):
+the toolkit ships on its own, ahead of the redesign, from the `design-tools` branch.
+Registering the four portal surfaces is the first step of v2 phase 3, so it ships
+with that work: from then on their files are guarded until each has a brief. The
+phase 1, 2 and 4 surfaces predate the toolkit and are not registered.
 
 ---
 
@@ -818,14 +827,54 @@ scope) stayed in `CLAUDE.md`; invariants with evidence are in `docs/invariants.m
 
 - 🪤 **The site header's nav cannot grow without measuring at 1280.** The wordmark is absolutely centred and wins the z-order; an overflowing item disappears silently. 🔓 **RE-MEASURED 2026-09-18: 342px clearance left, 450px right** (342 / 295 on 2026-08-23). Left group 225px; the right side is now ONE navy MEMBER PORTAL button, 117px (was 272 — Leaderboard, My Attendance and Check In); wordmark 82px, 32px gutter. **The left is the tighter side again.** Relisting `/projects` spends part of the left; any sixth item needs a fresh measurement. 🪤 **On a phone the button sits beside the centred wordmark alone, and it is the tight spot**: `px-3` below `sm` (10px clear at 360), stacked onto two lines below 360px.
 
-### Design skill precedence
+### Design toolkit (2026-09-18) — the roster, the pipeline, and what enforces them
 
-- **The Invariants in `CLAUDE.md` outrank all four skills, without exception.**
-- 📌 **`DESIGN.md` is the design source of truth for the WHOLE site.** The handoff is historical reference — desktop-only, no breakpoints, no interaction states.
-- 🔓 **`design-taste-frontend` IS PRIMARY for the public visual UI during the v2 redesign** (officer's call, 2026-08-17). It owns composition, layout family, image strategy, and its §14 Final Pre-Flight gate. `DESIGN.md` constrains the skill: it does not re-pick grounds, elevation, radii, or palette.
-- **No aesthetic skill is primary anywhere** outside the active redesign. `impeccable`'s "redesign replaces" path is out of scope for the whole site.
-- ⚠️ **Skill conflicts are settled in `DESIGN.md`; don't relitigate them.** Refused: dark mode, real imagery, eyebrow ban, mono-as-costume, 65–75ch measure, one-marquee-per-page, em-dash ban, "no oversized H1". Adopted: no coloured border-left above 1px, entrance variety, themed browser surfaces, emil's easing and durations.
-- **Animation and motion: `emil-design-eng` always wins** on easing, duration, and whether to animate at all. The scroll reveal is the house pattern.
-- **Pre-ship review: run `web-design-guidelines`.** Its accessibility findings override aesthetic preference.
-- **`impeccable`'s hook** runs after every Edit/Write (`.claude/settings.local.json`, machine-local, gitignored). It injects context only.
-- If two skills conflict and nothing above settles it, ask. Don't average them.
+Replaces "Design skill precedence". v1 failed because it "treated the installed skills as advisory and hand-rolled everything" (`docs/frontend-redesign-v2-plan.md`); this section makes skill use **checkable**. The skills, agent, hooks and the `/design-brief` + `/design-gate` skills are **committed** (`.claude/`), so every clone carries the same toolkit. Licences: `.claude/third-party-licenses/`.
+
+**Precedence:**
+- **The Invariants in `CLAUDE.md` outrank every skill, without exception.** Then this file. Then the skill that owns the concern below.
+- 📌 **`DESIGN.md` is the design source of truth for the WHOLE site, and it is hand-written.** No skill re-picks grounds, elevation, radii, palette or the type ramp. Outside a surface's pipeline, no aesthetic skill is primary.
+- 🔴 **Forbidden, because each one writes a rival source of truth:** impeccable's "redesign replaces DESIGN.md" path (every redesign here is new work *inside* this world), `/impeccable init`, and `/impeccable document` writing DESIGN.md — overwrite or merge (PRODUCT.md exists; DESIGN.md is not regenerated from code). Its **sidecar-only refresh**, which by its own reference "preserve[s] DESIGN.md and write[s] only `.impeccable/design.json`", is allowed; `ui-ux-pro-max --design-system` and `--persist` (it writes `design-system/…/MASTER.md`, "the Global Source of Truth"), and `shadcn init`. `tests/design-receipts.test.ts` fails if a `design-system/` directory appears or DESIGN.md loses its hand-written sections.
+- ⚠️ **Skill conflicts settled here are not relitigated.** Refused: dark mode, real imagery, eyebrow ban, mono-as-costume, 65–75ch measure, one-marquee-per-page, em-dash ban, "no oversized H1". Adopted: no coloured border-left above 1px, entrance variety, themed browser surfaces, emil's easing and durations.
+- If two skills conflict and nothing here settles it, ask the officer. Don't average them.
+
+**The roster — one owner per concern:**
+
+| Concern | Owner | Limits |
+|---|---|---|
+| Lead, **Persuade** surfaces (home, the five content pages) | `design-taste-frontend` | Owns composition, layout family, image strategy, its `## 14. FINAL PRE-FLIGHT CHECK`. |
+| Lead, **Operate** surfaces (`/portal/*`, `/admin`) | `impeccable` (Operate mode, craft-floor) | Officer, 2026-09-18, for the portal; `/admin` already ran this way in phase 4. Its `shape` interview writes every surface's brief. |
+| Divergence | `frontend-design` — the Apache-2.0 skill from `anthropics/skills`, not the commercially licensed plugin | Exactly two concepts per surface, for the lead to adopt or reject. **Never writes shipped code.** |
+| Reference data | `ui-ux-pro-max` | **Lookups only** (`search.py "<q>" --domain ux`), each cited in the brief by id. Never overrides a token, the ramp or the palette. |
+| Motion | `emil-design-eng` | Always wins on easing, duration, and whether to animate at all. Reviews in its required format. |
+| Components | shadcn MCP (`.mcp.json`) | Search and view through the MCP; `shadcn add … --dry-run` before any add, never `--overwrite`; it lands in `components/shadcn/` (the `ui` alias) and is wrapped in `components/ui/`; then run the MCP's `get_audit_checklist`. 🔴 `shadcn init` stays forbidden — it overwrote `button.tsx` once. |
+| Code review | `web-design-guidelines` | Its accessibility findings override aesthetic preference. |
+| Rendered review | `design-reviewer` agent (`.claude/agents/`) | Claude in Chrome, or Playwright when the extension is absent. Local stack only — previews write to production. |
+| Fixed checks | impeccable detector, Playwright + axe, token contrast | See enforcement. |
+
+**The pipeline, per surface** (a page or hub registered in `docs/design/surfaces.json` — registering one is how its redesign starts):
+1. **Brief** — `/design-brief <surface>`: impeccable's `shape` interview with the officer, written from `docs/design/templates/brief.md` and persisted with impeccable's `surface-brief.mjs` at `.impeccable/surfaces/<slug>.md` — **impeccable's own brief, so the lead loads it on every command** rather than a document nothing reads.
+2. **Diverge** — `frontend-design`, two concepts; the lead adopts or rejects each, with reasons.
+3. **Evidence** — `ui-ux-pro-max` lookups (EV1, EV2…); every adopted one cited in the brief.
+4. **Build** — the lead drives; the shadcn MCP sources components; emil on any motion.
+5. **Review** — `/design-gate <surface>`: the lead's self-review, `impeccable critique` + `audit`, `web-design-guidelines`, the `design-reviewer` agent at 360/768/1280, the detector, emil if it moves.
+6. **Gate** — the checkers green, then the officer. Changes the officer asks for are recorded in `receipts/officer.md` with their commits.
+
+**What enforces it:**
+- 🔓 **A brief before any edit.** `.claude/settings.json` runs `scripts/design/brief-guard.mjs` as a PreToolUse hook: an Edit/Write to a registered surface's files is **refused** until its brief exists. The human-only bypass, for an urgent non-design fix, is `MISA_DESIGN_GUARD=off` in the environment Claude Code is launched with.
+- 🔓 **Receipts that prove use, not presence.** Each step writes `docs/design/surfaces/<surface>/receipts/<step>.md` (template `docs/design/templates/receipt.md`) plus the skill's raw output. `scripts/design/receipts.mjs`, run by `tests/design-receipts.test.ts`, fails a surface once it is `rebuilt` (and its brief once it is `in-progress`) when:
+  - the brief is missing, unfilled, or declares a different mode than the registry;
+  - a receipt is missing or names the wrong skill, a finding has no disposition, or anything not adopted has no reason;
+  - diverge has fewer than two concepts; an adopted evidence lookup is never cited in the brief; the detector's JSON has a hit the receipt does not dispose of;
+  - **no REVIEW finding was adopted in a commit that touches the surface** — the skills ran but changed nothing. Adopting a concept does not count; that is how every build starts;
+  - **a surface commit lands after a review step and no receipt names it** (stale). The pre-build steps are exempt, since the build is their purpose;
+  - a SHA is unquoted — 🪤 YAML reads `1836e72` as the float 1.836e+75 — or is not in the branch's history. **Merge a branch that carries receipts; never squash it.**
+- **Token contrast** — `tests/design-tokens.test.ts` measures the sanctioned pairings from `app/globals.css`, and asserts muted-on-Vellum still fails so the rule is re-read if the palette moves.
+- **Detector regression** — `tests/design-detector.test.ts` fails on any finding in `app/` or `components/` outside `.impeccable/baseline.json` (empty, 2026-09-18). impeccable's PostToolUse/Stop hooks still advise during edits.
+- **Rendered** — `npm run test:ui` (`tests/ui/`, Playwright + axe, local stack, not part of `npm test`): WCAG 2.0–2.2 A/AA, no overflow at 360px, no reveal hidden without JS, on every public route (plus `/admin/login` and the 404) and every registered surface — **and the states a first render never shows**: `/portal/lookup`'s result and miss, and `/portal/attend`'s field errors, miss and both first-timer confirmations, reached against a short-lived local event. Each state test asserts it reached its state before axe runs. It reuses a running `npm run dev` (found through Next's `.next/dev/lock`) and never anything else on a port. Red on a `legacy` surface is expected; a `rebuilt` one must be green.
+
+**What it cannot catch, stated so nobody assumes it does:**
+- 🪤 The hook sees Edit/Write only; a shell edit is not intercepted. The receipts test is the backstop that cannot be walked around.
+- A change to a shared primitive in `components/ui/` does not make any surface stale. It is reviewed by the gate of whatever surface it was made for, and seen by `test:ui` everywhere.
+- Axe cannot judge hierarchy, clarity or taste. That is the design-reviewer's and the officer's job, and a green `test:ui` is not a design review.
+- A receipt records a decision; it cannot prove the decision was good. The officer's gate still exists.

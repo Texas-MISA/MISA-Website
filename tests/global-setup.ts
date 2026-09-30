@@ -15,7 +15,12 @@ import type { Database } from "@/lib/types/database";
 // puts it back afterwards. See clearTermPin() below for why that is necessary
 // rather than tidy.
 
-export default async function setup() {
+/**
+ * The local stack's URL and keys, read from `supabase status`, refusing a
+ * non-local URL. Shared with tests/ui/global-setup.ts (npm run test:ui), so
+ * both suites carry the same refusal rather than two copies of it.
+ */
+export function readLocalStack() {
   let raw: string;
   try {
     raw = execSync("npx supabase status -o env", {
@@ -51,6 +56,11 @@ export default async function setup() {
     );
   }
 
+  return { url, serviceKey, anonKey };
+}
+
+export default async function setup() {
+  const { url, serviceKey, anonKey } = readLocalStack();
   process.env.SUPABASE_TEST_URL = url;
   process.env.SUPABASE_TEST_SERVICE_KEY = serviceKey;
   process.env.SUPABASE_TEST_ANON_KEY = anonKey;
