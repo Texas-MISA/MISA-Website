@@ -606,7 +606,7 @@ app/admin/(shell)/events/_components/event-form.tsx
                               the checkbox. 🪤 A bare <label>, NOT wrapped in
                               this file's local Field, which renders a <label>
                               of its own — nested labels are invalid HTML
-app/(public)/attend/_components/checkin-form.tsx
+app/(public)/portal/attend/_components/checkin-form.tsx
                               the disclosure sentence
 ```
 

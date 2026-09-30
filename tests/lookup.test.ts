@@ -457,7 +457,7 @@ describe("source assertions", () => {
     // value attribute, and the reset then clears the field the member is
     // trying to correct.
     const source = readFileSync(
-      new URL("../app/(public)/lookup/_components/lookup-form.tsx", import.meta.url),
+      new URL("../app/(public)/portal/lookup/_components/lookup-form.tsx", import.meta.url),
       "utf8"
     );
     expect(source).toContain("state.submitted ?? EMPTY");
@@ -473,7 +473,10 @@ describe("source assertions", () => {
   it("carries robots noindex on both member-facing pages", () => {
     // 🔓 Not recoverable after the fact — a search cache outlives the deploy
     // that filled it (§9 #1).
-    for (const page of ["../app/(public)/leaderboard/page.tsx", "../app/(public)/lookup/page.tsx"]) {
+    for (const page of [
+      "../app/(public)/portal/leaderboard/page.tsx",
+      "../app/(public)/portal/lookup/page.tsx",
+    ]) {
       const source = readFileSync(new URL(page, import.meta.url), "utf8");
       expect(source).toContain("robots: { index: false, follow: false }");
     }

@@ -22,16 +22,20 @@ import { buttonClass } from "@/components/ui/button";
 //
 // 📌 These six are the places somebody who is lost actually wants: the front
 // door, what the club is, the thing they may have been mid-way through, and the
-// two member-facing pages. `/attend` is on the list deliberately — a member who
-// mistypes a URL on the way to checking in is the one visitor here with a clock
-// running.
+// member portal.
+//
+// 🔓 **There is deliberately NO Check In here (officer, 2026-09-18): check-in
+// lives only inside the portal.** It used to be a direct link, argued for as
+// the one visitor with a clock running; a member who mistypes a URL on the way
+// to checking in now goes through Member Portal, one click more. The printed QR
+// codes do not pass through here at all — /attend redirects to /portal/attend.
 
 const DESTINATIONS = [
   ["/", "Home"],
   ["/about", "About Us"],
-  ["/attend", "Check In"],
-  ["/leaderboard", "Leaderboard"],
-  ["/lookup", "My Attendance"],
+  ["/portal", "Member Portal"],
+  ["/portal/leaderboard", "Leaderboard"],
+  ["/portal/lookup", "My Attendance"],
   ["/contact", "Contact Us"],
 ] as const;
 

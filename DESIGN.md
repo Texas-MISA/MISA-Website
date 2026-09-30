@@ -65,7 +65,8 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/attend`, `/leaderboard`, `/lookup` | ⏳ **NOT YET REBUILT** (phase 3, deferred). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure. |
+| `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3 is NEXT** (officer, 2026-09-18: the UI redesign of the member portal and every page in it). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure. |
+| `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows, each with one navy button of one fixed width, all formatted the same (officer); no muted ink on the grey ground. The header's MEMBER PORTAL button is the site's one way in. Phase 3 owns the member area's real design and may re-compose it. |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
@@ -177,10 +178,11 @@ side the surface is `Panel` (or a `bg-white` frame where a `<form>` needs its ow
 `action`, which `Panel` does not forward), and the shell owns the ground.
 
 🔓 **`PageHero` moved from a flat `bg-misa-blue` to `ground="field"` in phase 2**,
-so the site has ONE navy hero treatment rather than two. ⚠️ **Eight pages render
+so the site has ONE navy hero treatment rather than two. ⚠️ **Nine pages render
 it** — the five phase-2 pages plus `/attend`, `/lookup` and `/leaderboard`, which
-are phase 3. Those three inherit any change to it and were measured at the phase-2
-gate rather than assumed. Its dead `size="home"` and `tagline` props were deleted.
+are phase 3, and the `/portal` hub that has linked those three since 2026-09-18
+(they live under `/portal` now). The phase-3 three inherit any change to it and
+were measured at the phase-2 gate rather than assumed. Its dead `size="home"` and `tagline` props were deleted.
 🔓 **It is CENTRED as of 2026-08-23 (officer), reversing phase 2's
 left-alignment.** Phase 2 left-aligned it because §4.3's anti-centre bias binds
 at `DESIGN_VARIANCE 8` and a centred hero repeated across eight pages was the
@@ -436,11 +438,14 @@ Roles, not sizes. `components/ui/section.tsx` owns the vertical rhythm.
   **opaque**, or the container shows through the whole card instead of the seam.
 - 📌 **The nav cannot grow without measuring.** The wordmark is absolutely centred
   and wins the z-order, so an overflowing item silently disappears. 🔓
-  **Re-measured 2026-08-23 at 1280: 342px left, 295px right** (was 285 / 312).
-  Two changes moved it in opposite directions — `/projects` left the nav, and the
-  wordmark became the real logo and grew 48px → 82px wide. ⚠️ **The right is now
-  the tighter side**; it was the looser one before, and it lost exactly half the
-  wordmark's growth because the mark is centred.
+  **Re-measured 2026-09-18 at 1280: 342px left, 450px right.** Everything right
+  of the wordmark — Leaderboard, My Attendance and the Check In button — became
+  one navy MEMBER PORTAL button, so the right side fell from 272px to 117px and
+  gained 155px. ⚠️ **The left is the tighter side again** on desktop; on a phone
+  the tight spot is that button beside the centred wordmark. History: 342 / 295 on 2026-08-23, when `/projects`
+  left the nav and the wordmark became the real logo (48px → 82px wide — the
+  right lost exactly half that, because the mark is centred), and 285 / 312
+  before that.
 
 ---
 
@@ -811,7 +816,7 @@ scope) stayed in `CLAUDE.md`; invariants with evidence are in `docs/invariants.m
 
 ### Nav clearance
 
-- 🪤 **The site header's nav cannot grow without measuring at 1280.** The wordmark is absolutely centred and wins the z-order; an overflowing item disappears silently. 🔓 **RE-MEASURED 2026-08-23: 342px clearance left, 295px right.** Left group 225px, right cluster 272px, wordmark 82px, 32px gutter. Right is now the tighter side. Relisting `/projects` spends part of the left; any sixth item needs a fresh measurement.
+- 🪤 **The site header's nav cannot grow without measuring at 1280.** The wordmark is absolutely centred and wins the z-order; an overflowing item disappears silently. 🔓 **RE-MEASURED 2026-09-18: 342px clearance left, 450px right** (342 / 295 on 2026-08-23). Left group 225px; the right side is now ONE navy MEMBER PORTAL button, 117px (was 272 — Leaderboard, My Attendance and Check In); wordmark 82px, 32px gutter. **The left is the tighter side again.** Relisting `/projects` spends part of the left; any sixth item needs a fresh measurement. 🪤 **On a phone the button sits beside the centred wordmark alone, and it is the tight spot**: `px-3` below `sm` (10px clear at 360), stacked onto two lines below 360px.
 
 ### Design skill precedence
 

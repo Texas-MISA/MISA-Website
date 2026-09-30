@@ -103,7 +103,7 @@ export function buttonClass({
 /** Primary action on a white ground. */
 export const BUTTON_SOLID_NAVY = buttonClass({ variant: "primary", size: "md" });
 
-/** The compact version, for the header's Check In. */
+/** The compact version, for the header's Member portal button. */
 export const BUTTON_SOLID_NAVY_SM = buttonClass({
   variant: "primary",
   size: "sm",

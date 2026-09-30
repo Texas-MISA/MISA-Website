@@ -7,6 +7,37 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🧭 **Member portal phase 1 BUILT on `portal-phase-1` (2026-09-18) — awaiting the officer's go-ahead to merge.** `/attend`, `/leaderboard` and `/lookup` moved to `/portal/*` with `git mv`, a static hub went in at `/portal`, and the old paths became permanent 308 redirects in `next.config.ts`. The plan and full record are in [`member-portal-plan.md`](member-portal-plan.md), doc v1.81.
+
+  - 🔴 **The first thing the phase found was that the LOCAL SEED HAD STOPPED WORKING, and nothing had said so.** `seed.sql` carries two "still to come" events, and the published one was dated 1 September. Once that date passed, the bulk insert (`starts_at < now()`) gave it attendance, the seed's own assert read 218 present rows against 202, and the whole seed rolled back. `db reset` then printed an error and left migrations with no data. The local database was found empty apart from test-created officers, and **23 tests failed against it** — all data-dependent, so any full run on this machine after a reset since 1 September would have been red. Fixed in its own commit by moving both events to December. 🪤 **They expire again on 1 December 2026.** A seed with `now()`-relative inserts and fixed-date events has a shelf life, and the assert is what tells you — read its exception before reading the screen.
+
+  - 🪤 **A server left running from 2026-09-14 blocked the move itself.** `git mv` of a route folder failed with *Permission denied*: the old `next dev` held handles inside `app/`. Stopping it (found by port) was enough. Its `.next/dev/types/validator.ts` then broke the first `next build`, because it still imported `app/(public)/attend/page.js` and `tsconfig.json` includes that folder. Both traps are now in `operations.md`.
+
+  - 📌 **`tests/docs.test.ts` forced the §5 rows into the same commit as the move**, which is the check doing its job. But its route match is a plain substring, so `/portal/attend` alone satisfies "§5 lists /portal". Nothing would have failed without the hub's own row. `tests/portal.test.ts` is new for the gap that test cannot see: a redirect is not a route directory, so deleting one would have passed the whole suite.
+
+  - 🪤 **Two things only a browser showed.** A `find`-then-click on "Check in" hit the header's **Check In link** — same label, same page — so the "submission" was a navigation and the form came back empty. The dev log gave it away: there was no POST. And screenshots of a tab the OS reports as hidden catch the scroll reveal mid-transition, so a heading reads faded; its computed opacity was 1. **Read the dev log and the computed style before believing a screenshot**, the same rule as the phase-4 EPIPE entry.
+
+  - ✅ **Verified locally, by rendered content rather than status.**
+    - Each page's own `<h1>`, and no error boundary.
+    - Three 308s, with the query string kept, a POST keeping its method, and two hops for a trailing slash.
+    - A seed member checking in with a lower-case EID, and a first-timer confirmed into the roster.
+    - A lookup showing the new row and writing its throttle row, and the leaderboard listing the new member.
+    - `aria-current` correct on eight paths.
+    - Nav clearance re-measured at 1280: **342 left / 450 right** (after the officer review below). The left is the tighter side again.
+
+  - 🔁 **The officer reviewed the first build the same day and changed two things, both built.**
+    - **The header became ONE navy MEMBER PORTAL button, and check-in now lives only inside the portal.** Nothing outside `/portal` links `/portal/attend` — the "Portal" text item and the Check In button are gone, and the 404 list and `/admin/login` point members at `/portal`.
+    - **The hub's three buttons are formatted the same.** Check In had been the lone primary.
+    - **Then the hub's copy became the officer's:** *Event Check-In* / CHECK IN, *Points Leaderboard* / LEADERBOARD, *My Attendance* / LOOKUP. The shared button width was re-sized from 256px, which fit "Look up your attendance", to 160px for "Leaderboard". It was measured rather than guessed, because a fixed width sized for a label that no longer exists reads as an empty bar.
+    - 🪤 **The longer label moved the header's tight spot from the desktop to the phone.** Beside the centred wordmark, which wins the z-order, MEMBER PORTAL at the shared padding cleared the mark by 2.4px at 360 and ran 25px under it at 320. CHECK IN never came close. It now takes `px-3` below `sm` and stacks below 360px.
+    - 🪤 **A hidden browser tab could not measure any of that**: Chrome defers iframe loads and pauses `requestAnimationFrame` there, so every probe timed out. Measuring a clone of the button with the mobile styles set inline was synchronous and gave the numbers, and the generated `@media` rules were then read back from the stylesheet to confirm the classes exist.
+
+  - ⚠️ **What the preview cannot be used for:** it reads and writes the production database, so this phase's preview check is render and redirects only, by the officer's decision.
+
+  - ⚠️ **Open: the officer could not see the MISA logo — the link home — in the preview**, and it does not reproduce. The branch renders it at true 320, 360 and 390px viewports and on desktop: the mask PNG returns 200, and the logo is the topmost element at its centre. Production renders it with byte-identical `.wordmark` CSS. The preview's login wall covers every path equally, the site's own CSS and JS included, so the protection alone does not explain a missing mask image. 🪤 **`--window-size` cannot render a phone in headless Chrome**: it enforces a ~500px minimum and crops, which put the logo at x≈258 in both "390" and "320" shots and looked exactly like a layout bug. True phone renders need device-metrics emulation over the DevTools protocol.
+
+  - ⏭️ **Next task (officer, 2026-09-18): a UI redesign of the member portal and every page in it** — v2 phase 3, un-deferred and widened to the `/portal` hub. It follows this phase's merge.
+
 ✅ **Phase 4 and the term-scoped roster went LIVE (2026-08-31).** `main` fast-forwarded 18 commits to `e3266e6`; production on schema `…000029`.
 
   - 🔴 **The migration had to go out BEFORE the code, and this is the entry to remember.** `v2-phase-4-admin` was cut from the roster-terms commit, so its code reads `member_directory` as one row per (member, term) and expects `dues_paid_term`. Production was still at `…000028`. Merging on its own would have put the error boundary on `/admin/members`, `/leaderboard` and the dues screens **of the live club website**. Migration 29 was pushed first (0 members on production, so dropping `members.active` was lossless), then the code. **A branch cut from a migration commit carries that migration's dependency whether or not anyone remembers it.**

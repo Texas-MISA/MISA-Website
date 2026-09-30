@@ -42,10 +42,12 @@ import { Section } from "@/components/ui/section";
 // to `HomeHero` in phase 1, and grep confirmed no call site passed either. The
 // `size="home"` branch had been unreachable since that commit.
 //
-// 🪤 **EIGHT pages render this, not the five phase 2 rebuilt.** `/attend`,
+// 🪤 **NINE pages render this, not the five phase 2 rebuilt.** `/attend`,
 // `/lookup` and `/leaderboard` are phase 3 and were not redesigned — they
-// inherit this hero and nothing else. Any change here is a change to them, so
-// they get measured at the gate even though they are out of scope.
+// inherit this hero and nothing else — and the `/portal` hub that links them
+// (member portal phase 1) is the ninth. The three moved under `/portal` then
+// too. Any change here is a change to all four, so they get measured at the
+// gate even though they are out of scope.
 //
 // 🪤 **`.chevron-notch` is a `clip-path`, and a clip-path clips DESCENDANTS.**
 // Nothing may overhang the hero's bottom edge; a plate positioned to overlap

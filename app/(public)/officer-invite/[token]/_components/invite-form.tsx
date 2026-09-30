@@ -12,7 +12,7 @@ import { BUTTON_SOLID_NAVY } from "@/components/ui/button";
 import { controlClass } from "@/components/ui/field";
 
 // Client Component for useActionState only, the same shape as
-// app/(public)/lookup/_components/lookup-form.tsx. The form posts via
+// app/(public)/portal/lookup/_components/lookup-form.tsx. The form posts via
 // <form action>, so it works before hydration.
 //
 // ⚠️ This file must not import lib/officer-invites.ts. That module pulls in
