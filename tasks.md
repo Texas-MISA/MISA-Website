@@ -1,5 +1,7 @@
 # Tasks
 
+> 🗑️ **STALE — THIS BRANCH WILL BE SCRAPPED (officer, 2026-10-01).** Do not build on it, merge it, merge `main` into it, or run any handoff prompt from it. The design toolkit it carried lives on as `design-tools` (tools only, cut from `main`). The Portal Rebuild here, with its briefs, concepts, receipts and pages, will not be merged. **The project's current state is on `main`**: read that branch's `CLAUDE.md` and `tasks.md`, not this one's.
+
 Short-horizon working list. The full plan lives in [`docs/student-org-website-architecture.md`](docs/student-org-website-architecture.md); section refs (§) point there. Refill **Later** as stages are reached.
 
 **Stages 0–8 are ALL COMPLETE. ⬅️ Stage 9 (launch) is the next task** — see the state table below, which is authoritative. *(This line said "Stage 7 is next" until 2026-08-29; stages 7 and 8 closed long before that and the header simply never moved.)* The stage was re-planned on 2026-08-01 after four design decisions landed on top of phase 1. Carry-over chores from Stage 0 are collected under Loose ends.

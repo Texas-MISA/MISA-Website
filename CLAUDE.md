@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> 🗑️ **STALE — THIS BRANCH WILL BE SCRAPPED (officer, 2026-10-01).** Do not build on it, merge it, merge `main` into it, or run any handoff prompt from it. The design toolkit it carried lives on as `design-tools` (tools only, cut from `main`). The Portal Rebuild here, with its briefs, concepts, receipts and pages, will not be merged. **The project's current state is on `main`**: read that branch's `CLAUDE.md` and `tasks.md`, not this one's.
+
 @AGENTS.md
 
 This file provides guidance to Claude Code when working with code in this repository. It is the **working brief**: current state, the rules that must not be reversed, and where everything else is written down.

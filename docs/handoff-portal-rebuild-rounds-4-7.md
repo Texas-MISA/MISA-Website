@@ -1,5 +1,7 @@
 # Hand-off: finish the Portal Rebuild (v2 phase 3, parts 4–7)
 
+> 🗑️ **STALE — THIS BRANCH WILL BE SCRAPPED (officer, 2026-10-01).** Do not build on it, merge it, merge `main` into it, or run any handoff prompt from it. The design toolkit it carried lives on as `design-tools` (tools only, cut from `main`). The Portal Rebuild here, with its briefs, concepts, receipts and pages, will not be merged. **The project's current state is on `main`**: read that branch's `CLAUDE.md` and `tasks.md`, not this one's.
+
 > **This file is a PROMPT.** Copy everything below the horizontal rule into a
 > fresh Claude Code session. It is written to be read cold.
 >
@@ -15,6 +17,8 @@
 > this one cites rather than repeats.
 
 ---
+
+> 🛑 **STOP. This prompt is VOID (officer, 2026-10-01).** Branch `design-toolkit` is stale and will be scrapped, and the Portal Rebuild this prompt describes will not be merged. Do not run any part of it. Tell the user it is void, then read `CLAUDE.md` and `tasks.md` on `main` for the current state.
 
 Finish the Portal Rebuild (v2 phase 3) in `C:\MISA-Website`, on branch
 `design-toolkit`. You are running **parts 4–7**. Parts 0–3 are done, and both
