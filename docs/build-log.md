@@ -7,6 +7,12 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🗑️ **`design-toolkit` marked STALE, to be scrapped (officer, 2026-10-01).** The branch that holds the Portal Rebuild (54 commits, tip `4b1ba13`) will not be merged. Its design toolkit had been split onto `design-tools` the day before, and that is what made dropping the rest cheap.
+
+  - **Marked, not deleted.** Its own `CLAUDE.md`, its `tasks.md` and both of its handoff prompts now open with the notice. A session that checks it out, on either machine, then stops before building on it. A handoff prompt is the dangerous one: it is written to be pasted into a fresh session that reads nothing else first.
+  - **Five things on it exist nowhere else**, three code fixes and two docs fixes. They are listed in `tasks.md` to decide before the branch is deleted.
+  - Earlier entries below still describe `design-toolkit` as the redesign's home. They are left as written, because they record what was true when they were written.
+
 🧰 **The design toolkit, tools only: split onto `design-tools` from `main` (2026-09-30).** The officer asked for "just the tools", without the redesign they were built for. On `design-toolkit` they sit under 54 commits that mostly rebuild the portal.
 
   - **The cut point was found, not assumed.** A log of every toolkit file after `f0cb15a` (2026-09-19, the toolkit's last own commit) showed the redesign touching only two of them: `docs/design/surfaces.json`, which the briefs and gates advanced, and `tests/ui/design-gate.spec.ts`, which the check-in rebuild edited. So everything was taken whole from `f0cb15a`, plus `77d2c56`'s LF pin. `main` had changed none of those files since the fork, so a later merge of `design-toolkit` meets identical content there.
