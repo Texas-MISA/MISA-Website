@@ -50,7 +50,7 @@ Officer: "a new branch to main which only includes the design toolkit itself, no
 - 🪤 **Line endings.** Files written before `.gitattributes` exists come out CRLF on this machine (`core.autocrlf=true`), and vitest then fails to load the receipt checker with *SyntaxError: Invalid or unexpected token*. Delete `scripts/design/*.mjs` and `git checkout -- scripts/design`. 🪤 Git Bash's `grep -c $'\r'` counted EVERY line as CRLF here, so measure CRs with node.
 - ⏭️ **Next:**
   - Officer review, then merge `design-tools` into `main`, after an event and never during one: it changes no page, but a push to `main` is still a production build.
-  - Then merge `main` into `design-toolkit`. The toolkit files are identical and merge silently. **`docs/design/surfaces.json` conflicts, so take `design-toolkit`'s registry.** The docs conflict too.
+  - ✖️ **Cancelled 2026-10-01: merging `main` into `design-toolkit` afterwards.** That branch is stale and will be scrapped (see the top of this file), so the registry here stays empty. The portal's registrations will come with whatever restarts phase 3.
 
 ---
 
