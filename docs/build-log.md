@@ -7,6 +7,12 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🗑️ **`design-toolkit` marked STALE, to be scrapped (officer, 2026-10-01).** The branch that holds the Portal Rebuild (54 commits, tip `4b1ba13`) will not be merged. Its design toolkit had been split onto `design-tools` the day before, and that is what made dropping the rest cheap.
+
+  - **Marked, not deleted.** Its own `CLAUDE.md`, its `tasks.md` and both of its handoff prompts now open with the notice. A session that checks it out, on either machine, then stops before building on it. A handoff prompt is the dangerous one: it is written to be pasted into a fresh session that reads nothing else first.
+  - **Five things on it exist nowhere else**, three code fixes and two docs fixes. They are listed in `tasks.md` to decide before the branch is deleted.
+  - Earlier entries below still describe `design-toolkit` as the redesign's home. They are left as written, because they record what was true when they were written.
+
 ✅ **Member portal phase 1 is LIVE: `portal-launch` fast-forwarded to `main` (2026-09-30, 14:04 Central).** `699fd3d..b273977`, with no migration and no new environment variable. The only changes after the tested merge were `.gitignore` and docs. Vercel built `dpl_9ziuvnfeRsmFTCMGfuGY5RWVjHB8` in about 45 seconds. The previous production deployment, `dpl_CNadYLpanZVtUEZAkBpi4mLyVs83` (`699fd3d`), is the Instant Rollback target.
 
   - **The event rule was checked against the database, not the calendar.** `open_event_at(now())` was empty, there had been no check-in for 18 hours, and the next window (Excel Workshop, Thursday 10/1) opened at 17:45, about 27 hours out. `migration list --linked` showed 29 of 29 matched before the push.
