@@ -25,9 +25,10 @@ import { SelectAllHeader } from "./selection";
 // them from the officer's Fields choice — remembered in a cookie — plus Name,
 // which is locked, plus the column the table is sorted by, and hands this file
 // the result in catalogue order. The default is Member, Email, EID, Total
-// points and Dues, then every custom field marked as a default column; any
-// other export field can be added, and the export carries exactly what is
-// drawn here. lib/directory-columns.ts owns all of it.
+// points, Dues, Member type and Project eligibility, then every custom field
+// marked as a default column; any other export field can be added, and the
+// export carries exactly what is drawn here. lib/directory-columns.ts owns all
+// of it.
 //
 // ⚠️ A header SORTS only where `sortColumn` already accepts the key, which
 // `column.sort` encodes; every other header is plain text (officer decision,
@@ -42,6 +43,17 @@ const DIRECTORY = "/admin/members";
 
 export type MemberRow = {
   id: string;
+  /**
+   * The term this row's figures belong to — half of the row's identity.
+   *
+   * 🪤 member_directory is one row per (member, term), so under "Roster: All
+   * terms" one member has a row per term and `id` repeats — measured: 26 of
+   * the 32 seeded members have more than one row. Keyed by `id` alone the keys
+   * collide, and React's handling of duplicate keys is undefined: it may hand
+   * one term's row component to another. Each row holds its own compare-and-
+   * set token and every inline cell's state, so the rows are keyed by both.
+   */
+  term: string;
   eid: string;
   fullName: string;
   email: string;
@@ -59,6 +71,14 @@ export type MemberRow = {
    * correct or void a payment.
    */
   duesPaid: boolean;
+  /** `member_type` (migration 30): the member's standing type, the same on
+   * every term row. Editable inline through MemberTypeCell. */
+  memberType: string;
+  /**
+   * `project_eligibility` (migration 30) — calculated for THIS row's term, so
+   * two term rows of one member can differ. Null renders as "—".
+   */
+  projectEligibility: string | null;
   /** The member's answers, keyed by definition key. Raw jsonb from the view —
    * read it with fieldValue(), which collapses a missing key and an empty
    * string to the one "no answer" state. */
@@ -145,7 +165,9 @@ export function MemberTable({
       <tbody>
         {rows.map((row) => (
           <DirectoryRow
-            key={row.id}
+            // Member AND term — see `MemberRow.term`. A member is unique per
+            // term on this view, so the pair is a real key where `id` is not.
+            key={`${row.id}:${row.term}`}
             row={row}
             columns={columns}
             detailHref={detailHref(row.id)}

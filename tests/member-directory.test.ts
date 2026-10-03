@@ -7,15 +7,19 @@ import {
   type SortableField,
 } from "@/lib/filters";
 import { termAtIndex, termIndex } from "@/lib/dues";
+import { centralWallTimeToInstant } from "@/lib/events";
 import { classifyTermEvents, customFieldKey } from "@/lib/members";
 
 import {
   cleanup,
   createCurrentTermEvent,
   createTestAttendance,
+  createTestEvent,
   createTestMember,
   getTestOfficer,
   newTracker,
+  pickEmptyFall,
+  termOfEvent,
   testClient,
   testIdentity,
   type Tracker,
@@ -1282,5 +1286,169 @@ describe("relational filters against the view", () => {
 
     expect(rows).toHaveLength(total);
     expect(rows.map((r) => r.id ?? "").sort()).toEqual([...missed].sort());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Migration 30 — the member-type and project-eligibility filters against the
+// real view.
+//
+// 📌 On a FAR-PAST Fall of its own, never the current term (review,
+// 2026-10-03). A current-term verdict depends on the date: one unattended,
+// published, non-Projects Thursday in a month that has already ended turns a
+// project member's Yes into No. A walkthrough fixture or a seed edit can put
+// one there, and so can this file's own createCurrentTermEvent fixtures (3, 6
+// and 9 hours back) in a run starting just after midnight Central on the 1st,
+// when the month before ended on a Thursday. In a Fall that ended decades ago,
+// holding one Projects meeting and nothing else, every verdict is final and
+// the meeting alone decides it. Chosen as tests/project-eligibility.test.ts
+// chooses its own; the filters are scoped to it through `term`, as the Roster
+// control would scope them.
+//
+// `t3qtyp` is a strict narrowing of `t3q`, like every other block's marker.
+// ---------------------------------------------------------------------------
+const TYPE_MARKER = "t3qtyp";
+
+describe("member type and eligibility filters against the view", () => {
+  const ids = {
+    dataAttended: "",
+    dataMissed: "",
+    clientMissed: "",
+    juniorDirector: "",
+    general: "",
+  };
+  let term = "";
+  let year = 0;
+
+  beforeAll(async () => {
+    year = await pickEmptyFall(
+      db,
+      Array.from({ length: 45 }, (_, i) => 1971 + i)
+    );
+
+    // A Projects meeting that ended long ago. Attending it is the difference
+    // between Yes and No for the two project types, and the term holds no
+    // general meeting, so no month can be judged short of one.
+    const starts = centralWallTimeToInstant(`${year}-10-14`, "18:00");
+    const meeting = await createTestEvent(db, track, {
+      starts,
+      ends: new Date(starts.getTime() + 60 * 60 * 1000),
+      title: "TEST projects meeting (type filters)",
+      category: "projects",
+    });
+    term = await termOfEvent(db, meeting.id);
+
+    // Joined inside that Fall, which is what puts each on its roster.
+    const joinedAt = centralWallTimeToInstant(`${year}-08-15`, "12:00");
+    const make = async (memberType: string) => {
+      const base = testIdentity();
+      const identity = { ...base, eid: base.eid.replace("t3q", TYPE_MARKER) };
+      const id = await createTestMember(db, track, identity, {
+        memberType,
+        joinedAt,
+      });
+      return { id, identity };
+    };
+
+    const attending = await make("data_project");
+    ids.dataAttended = attending.id;
+    await createTestAttendance(db, track, {
+      eventId: meeting.id,
+      memberId: attending.id,
+      submittedName: attending.identity.fullName,
+      submittedEid: attending.identity.eid,
+      submittedEmail: attending.identity.email,
+      submittedAt: starts,
+      status: "present",
+    });
+
+    ids.dataMissed = (await make("data_project")).id;
+    ids.clientMissed = (await make("client_project")).id;
+    ids.juniorDirector = (await make("junior_director")).id;
+    ids.general = (await make("general")).id;
+  }, 60_000);
+
+  const COLUMNS = "id, member_type, project_eligibility" as const;
+
+  async function run(params: Record<string, string>) {
+    const { data, error, count } = await applyMemberFilter(
+      db.from("member_directory").select(COLUMNS, { count: "exact" }),
+      // The fixtures' own term. The current term is still passed, because the
+      // argument is required, but a term in the filter outranks it.
+      parseMemberFilter({ q: TYPE_MARKER, term, ...params }),
+      [],
+      await currentTerm()
+    );
+    if (error) throw new Error(`type filter query failed: ${error.message}`);
+    const rows = data ?? [];
+    return {
+      rows,
+      ids: rows.map((r) => r.id ?? "").sort(),
+      count: count ?? 0,
+    };
+  }
+
+  it("is scoped to a far-past Fall, read back rather than typed", async () => {
+    expect(term.endsWith(String(year))).toBe(true);
+    expect(term).not.toBe(await currentTerm());
+    // A term the filter dropped would silently fall back to the current one.
+    expect(parseMemberFilter({ term }).term).toBe(term);
+  });
+
+  it("carries both columns, every fixture on that term's roster", async () => {
+    const { rows, count } = await run({});
+    expect(count).toBe(5);
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    expect(byId.get(ids.dataAttended)).toMatchObject({
+      member_type: "data_project",
+      project_eligibility: "yes",
+    });
+    expect(byId.get(ids.dataMissed)).toMatchObject({
+      member_type: "data_project",
+      project_eligibility: "no",
+    });
+    expect(byId.get(ids.clientMissed)).toMatchObject({
+      member_type: "client_project",
+      project_eligibility: "no",
+    });
+    expect(byId.get(ids.juniorDirector)?.project_eligibility).toBe(
+      "not_applicable"
+    );
+    expect(byId.get(ids.general)?.project_eligibility).toBe("not_applicable");
+  });
+
+  it("narrows on member type", async () => {
+    const data = await run({ memberType: "data_project" });
+    expect(data.ids).toEqual([ids.dataAttended, ids.dataMissed].sort());
+    expect(data.count).toBe(2);
+
+    const junior = await run({ memberType: "junior_director" });
+    expect(junior.ids).toEqual([ids.juniorDirector]);
+  });
+
+  it("narrows on the calculated verdict", async () => {
+    const no = await run({ eligibility: "no" });
+    expect(no.ids).toEqual([ids.dataMissed, ids.clientMissed].sort());
+    expect(no.count).toBe(2);
+
+    const yes = await run({ eligibility: "yes" });
+    expect(yes.ids).toEqual([ids.dataAttended]);
+
+    const na = await run({ eligibility: "not_applicable" });
+    expect(na.ids).toEqual([ids.juniorDirector, ids.general].sort());
+  });
+
+  it("composes the two as a conjunction, and the verdicts partition the roster", async () => {
+    const both = await run({ memberType: "data_project", eligibility: "no" });
+    expect(both.ids).toEqual([ids.dataMissed]);
+
+    // Every member has exactly one verdict for the term: no overlap, no gap.
+    const everyone = await run({});
+    const counts = await Promise.all(
+      ["yes", "no", "not_applicable"].map(
+        async (eligibility) => (await run({ eligibility })).count
+      )
+    );
+    expect(counts.reduce((sum, n) => sum + n, 0)).toBe(everyone.count);
   });
 });

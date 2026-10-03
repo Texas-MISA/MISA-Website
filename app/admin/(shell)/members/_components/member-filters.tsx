@@ -7,6 +7,7 @@ import { BUTTON_QUIET_SM } from "@/components/ui/button";
 import { controlClass } from "@/components/ui/field";
 
 import {
+  ELIGIBILITY_FILTERS,
   EVENT_MODES,
   hasRelationalFilter,
   MAX_SEARCH_LENGTH,
@@ -14,6 +15,7 @@ import {
   MEMBER_PENDING,
   MEMBER_SOURCES,
   MEMBER_TERM_ALL,
+  MEMBER_TYPE_FILTERS,
   memberFilterFields,
   memberFilterUrl,
   relationalFilterCount,
@@ -26,6 +28,10 @@ import {
   fieldOptions,
   type FieldDefinition,
 } from "@/lib/members";
+import {
+  formatMemberType,
+  formatProjectEligibility,
+} from "@/lib/member-types";
 import { Pill } from "@/components/ui/pill";
 import { Panel } from "@/components/ui/panel";
 
@@ -194,6 +200,8 @@ export function MemberFilters({
     filter.maxPoints !== null ||
     filter.dues !== "all" ||
     filter.source !== "all" ||
+    filter.memberType !== "all" ||
+    filter.eligibility !== "all" ||
     Object.keys(filter.custom).length > 0 ||
     relationalCount > 0;
 
@@ -273,6 +281,40 @@ export function MemberFilters({
                 : dues === "paid"
                   ? "Paid only"
                   : "Not paid only"}
+            </option>
+          ))}
+        </select>
+      </Labelled>
+
+      {/* Migration 30 — both ship with their columns, which are default
+          columns, so each narrows on something the table shows. The options
+          come from the same lists the parser accepts, and both default to the
+          one that narrows nothing. */}
+      <Labelled label="Member type">
+        <select
+          className={control}
+          value={filter.memberType}
+          onChange={(e) => update({ memberType: e.target.value })}
+        >
+          {MEMBER_TYPE_FILTERS.map((type) => (
+            <option key={type} value={type}>
+              {type === "all" ? "Any type" : formatMemberType(type)}
+            </option>
+          ))}
+        </select>
+      </Labelled>
+
+      <Labelled label="Project eligibility">
+        <select
+          className={control}
+          value={filter.eligibility}
+          onChange={(e) => update({ eligibility: e.target.value })}
+        >
+          {ELIGIBILITY_FILTERS.map((eligibility) => (
+            <option key={eligibility} value={eligibility}>
+              {eligibility === "all"
+                ? "Any"
+                : formatProjectEligibility(eligibility)}
             </option>
           ))}
         </select>

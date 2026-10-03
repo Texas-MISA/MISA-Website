@@ -64,14 +64,14 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
   - **Prices live in `app_settings` in cents and are read at import time only.** `terms_covered` is stored on the row, so raising dues never rewrites what last year's payments bought.
   - 🪤 **Terms do not sort lexicographically.** `'Fall 2026' < 'Spring 2026'` is true as a string compare and false as a calendar fact. Every "which term is later" question goes through the **term index** — `term_index()` in SQL, `termIndex` / `isLaterTerm` in `lib/dues.ts` — and never through `max(term)` or `order by term`. Same class of error as `new Date("2026-09-01T18:00")`: plausible output, wrong answer, no error anywhere. This is why there is no "paid through" column on the view.
     - The index is two terms a year with Spring first (`Spring 2026 → 4052`, `Fall 2026 → 4053`), so ordering is integer comparison and stepping is addition. Chosen over iterating `next_term` because `covered_terms` is a **generated column**, which requires an immutable expression — and because a total order is what the trap actually needs, not just a successor function.
-  - ⚠️ **`dues`, `dues_paid`, `dues_paid_current_term`, `dues_paid_term` and `term` are reserved custom-field keys** — the two retired names stay reserved because older exports, audit rows and saved presets still refer to them, and `term` because it is now a real directory column a custom field could shadow in the sort and filter namespace — in migration 19's CHECK and in `RESERVED_FIELD_KEYS`, which move in the same commit. Without them an officer recreates the hand-ticked dropdown beside the calculated column and the roster carries two answers to one question. Reserving `dues` alone is not enough — `dues_paid` is the name people reach for, and it is the key phase 4's own walkthrough created (✅ that fixture was deleted from the local database 2026-08-05). 📌 The generalisable part: **archiving a definition does not free its key.** Migration 18's unique key index spans archived rows on purpose, so any migration that forbids a key must reckon with archived definitions holding it, not just live ones.
+  - ⚠️ **`dues`, `dues_paid`, `dues_paid_current_term`, `dues_paid_term` and `term` are reserved custom-field keys** — the two retired names stay reserved because older exports, audit rows and saved presets still refer to them, and `term` because it is now a real directory column a custom field could shadow in the sort and filter namespace — in migration 19's CHECK and in `RESERVED_FIELD_KEYS`, which move in the same commit. Without them an officer recreates the hand-ticked dropdown beside the calculated column and the roster carries two answers to one question. Reserving `dues` alone is not enough — `dues_paid` is the name people reach for, and it is the key phase 4's own walkthrough created (✅ that fixture was deleted from the local database 2026-08-05). 📌 The generalisable part: **archiving a definition does not free its key.** Migration 18's unique key index spans archived rows on purpose, so any migration that forbids a key must reckon with archived definitions holding it, not just live ones. Migration 30 reserved `member_type` and `project_eligibility` on the same reasoning, and its first section refuses to run, with a readable error, if any definition (archived included) already holds either; see the section on member type at the end of this file.
   - **The import is a Server Action, not a Route Handler**, and it re-parses server-side rather than trusting the preview. A Server Action takes a `File` in `FormData`; the Route Handler rule here is about *downloads* needing `Content-Disposition`. The CSV text is held in the browser between the preview and commit steps — 🔓 **never persist the uploaded file**, which is every dues transaction for a month in one blob.
 - **A roster export is audited as its own receipt.** `admin_audit.entity_id` is `uuid not null` and an export spans N members, so each export generates a uuid nothing else references, under entity type `'roster'`, with the filter and row count in `after`/`note`. Don't make `entity_id` nullable to avoid this, and don't borrow a member's id — the row would read as an action taken against that one person. (§6 requires every export logged; it is the largest PII egress point in the system.)
   - **Since doc v1.30 the receipt also carries the chosen field list and the format**, because the export's columns are a choice, over CSV and `.xlsx`. Once columns are a choice, the filter alone no longer answers what left the building. ⚠️ *Until 2026-10-01 this said the export was a field picker "not the displayed columns".* Since doc v1.82 the picker chooses the displayed columns and the export follows the table (see the column-picker rule below). It is still a choice, so the receipt still needs the field list, and that list is the URL's, never the officer's cookie.
   - ⚠️ **It records the fields that actually left, not the ones that were ticked** (`exportedFields` in `lib/export.ts`, phase 5a). The clipboard's `emails` and `names` formats emit one column each regardless of the picker, and logging four for an email copy answers §6's question with a superset — erring wide is still erring, and a receipt that over-reports is one nobody can reason from a year later. Found in the phase-5a walkthrough, and the fix lives in the pure core rather than the route because it is a decision, the same reason `planBulkAssign` is not inside `bulkAssignEvent`.
   - **The clipboard is audited exactly like the download.** Copying every matching email is the same egress as saving a file; only `Content-Disposition` differs, which is why both go through the one Route Handler.
 - 🔓 **The directory's columns ARE the export's columns: one Fields menu drives both** (officer, 2026-10-01; doc v1.82; `lib/directory-columns.ts`). From phase 5a (`4c8fe4e`, 2026-08-06) until then, **Fields (N)** on `/admin/members` was the export's field picker. Its choice lived in the toolbar's component state and never touched the table, so ticking a box and watching nothing change read as a broken control. That was a missing link, not a regression: history was checked back to `4c8fe4e`. Now the table draws the chosen columns, and Download XLSX/CSV and Copy table name exactly the columns on screen, in catalogue order.
-  - ⚠️ **The default table is the default file, and that reverses "Dues out of the default export"** (doc v1.44, §6), on the officer's instruction. `defaultDirectoryColumns` is `DEFAULT_EXPORT_FIELDS` (name, email, eid, total_points, dues) plus every live custom field with `show_in_directory`. Dues has been a default column since Stage 6.5, and a default download that disagreed with the screen it came from would be the defect. What stays out of the default file is everything the default table does not show; `tests/export.test.ts` pins both halves. The same decision retires §7 phase 5's "columns are the one thing that legitimately differs from the screen".
+  - ⚠️ **The default table is the default file, and that reverses "Dues out of the default export"** (doc v1.44, §6), on the officer's instruction. `defaultDirectoryColumns` is `DEFAULT_EXPORT_FIELDS` (name, email, eid, total_points, dues, and since migration 30 member_type and project_eligibility) plus every live custom field with `show_in_directory`. Dues has been a default column since Stage 6.5, and a default download that disagreed with the screen it came from would be the defect. What stays out of the default file is everything the default table does not show; `tests/export.test.ts` pins both halves. The same decision retires §7 phase 5's "columns are the one thing that legitimately differs from the screen".
   - 📌 **The choice is the `misa_directory_columns` cookie, and it holds a DELTA from the defaults** (`1~<show>~<hide>`), never a list. A list would freeze the defaults on the day an officer last ticked a box, so a field created later as a default column would never reach the officers who use the table most. A choice that leaves nothing to remember **deletes** the cookie, and Reset to default always does. 🪤 The delete names the **same Path** (`/admin/members`), or the browser treats it as a different cookie and the old one survives.
   - 🔓 **The server sets the cookie; script never writes it** (review, 2026-10-03). The officer-only Server Action `rememberDirectoryColumns` (`app/actions/directory-columns.ts`) canonicalises the posted value through the page's own parser and serializer. It refuses anything the page would not read back as a choice, including a value over the length the page reads. It then sets the result as an **HttpOnly** `Set-Cookie`, with the attributes spelled once in `DIRECTORY_COLUMNS_COOKIE_OPTIONS` (`Secure` in production). The first build wrote the cookie with `document.cookie`. WebKit's tracking prevention (Safari, and every browser on iOS) and Brave cap a script-written cookie at **seven days**, so on those browsers the year-long choice lasted a week. Setting a cookie in an action makes Next re-render the current page in the same response, so the toolbar calls no `router.refresh()`.
     - 🪤 **The delete is a `set` with `maxAge: 0`, never `cookies().delete()`.** `delete(name)` writes `Path=/`, which is a different cookie from ours. Spreading the options into `delete({…})` carries the year-long `maxAge` along, and that overrides the delete's expiry. Both were checked against Next's own serializer, and `tests/directory-columns.test.ts` runs the real one.
@@ -109,6 +109,12 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **React 19 resets an uncontrolled `<form action={…}>` once the action resolves.** Any form that re-renders with server state (validation errors, the §4.6 confirmation, `/attend`'s re-prompt) must echo the submitted values back in that state and drive every `defaultValue` from them — otherwise the officer's edits silently revert, a confirmation saves the old values, and the check-in re-prompt clears the fields the member is trying to correct. The same reset clears checkboxes, so **any selection state mirrored outside the form must be reset alongside it** — the bulk bar read "2 selected" above six empty boxes until it was.
   - Pass a **string, never `undefined`**. A nullish `defaultValue` following a non-nullish one makes React drop the `value` attribute, and the reset then clears the field — so `state.submitted?.x ?? ""`, never `state.submitted?.x`. No `key` remount is needed: the mutation phase writes the new attribute before `form.reset()` reads it.
   - **Never put `formAction` on a submit button whose `name`/`value` you read.** React drops the submitter's name from the FormData when it carries `formAction`, so the field arrives pre-hydration and vanishes after — a bug that only shows up on a slow phone. And **one carrier per field name**: React inserts the submitter's name/value immediately before the submitter, so a hidden input of the same name earlier in the form wins `formData.get()`.
+  - 🐛 **The reset reaches a CONTROLLED `<select>` too, so being controlled is only half the fix** (`/admin/members` item 2's review, finding 1, 2026-10-03). React writes a controlled select's value to the options' `selected` *property* and never sets `defaultSelected`, which is the `selected` attribute and the only thing `reset()` restores from. So the reset puts the DOM back on the option carrying that attribute while React state keeps the new value. After hydration that is the server-rendered pick, because React's server renderer marks it `selected=""`. A select first mounted on the client has no such option, and the HTML reset algorithm then picks the first enabled one. The officer sees the old option, and a later submit posts it.
+    - **React 19.2.4's order, read from the installed `react-dom`.** Only a *submitted* form (a submit event, `requestSubmit()` included) goes through `startHostTransition`, which calls `requestFormReset` before running the action, so the reset commits with the action's transition. In that commit, `form.reset()` runs at the end of the mutation phase: after every host update, the select's own write included, and before layout effects. So the reset beats React's write in the same commit and holds until something next re-renders the select, and a `useLayoutEffect` runs after it, before paint. A `useActionState` dispatch inside `startTransition` never reaches `startHostTransition`, so it requests no reset.
+    - **Reproduced standalone:** a page on the project's React 19.2.4, server-rendered, hydrated and run in headless Chrome under both React builds. The old code left all three sequential saves, and both of two overlapping saves, on the server-rendered option, and a later submit posted that stale option. Dispatching alone fixed the change path but not the sr-only submit button; the layout effect fixed both.
+    - **Confirmed in the app** (item 2's walkthrough, 2026-10-03): three sequential inline type saves each left the chosen value in the DOM select. It also explains item 1's "—" blank, seen once and never reproduced (`docs/build-log.md`).
+    - **The fix**, in `member-field-cell.tsx` and `member-type-cell.tsx`. A save-on-change control dispatches with `startTransition(() => formAction(formData))`, never `requestSubmit()`. A `useLayoutEffect` with **no dependency list** puts the DOM select back on the value React holds after every commit: `selected` does not change in the commit that resets, so a dependency list would skip exactly that one. The `<form action>` stays, for the sr-only button and for no-JS, and the effect is that button's guard. `tests/members.test.ts` ("the inline selects save by dispatching, never by submitting") pins both against comment-stripped source.
+    - ⚠️ **Not yet checked: four other forms hold a controlled `<select>` inside a `<form action>`**: the dues payment editor, the series form, the merge panel and the preset bar. `tasks.md` carries the list. Check the payment editor first: making its selects controlled is what fixed its "Nobody yet" snap-back (v1.39), and that alone does not stop this reset.
 - **A control's enabled state comes from the live form, not from the server's copy of the row.** Deriving "can this be approved?" from the fetched record meant picking an event left APPROVE disabled until a save round-tripped, turning one officer intent into two writes. Server state is the authority on what *is*; the form is the authority on what the officer is *about to do*.
 - **Never build a timestamp with `new Date("2026-09-01T18:00")`.** The server runs in UTC. Wall-clock times go through `centralWallTimeToInstant()` in `lib/events.ts`, which iterates civil dates and attaches the zone last — the only thing that keeps a weekly 6pm meeting at 6pm across the November DST change.
 - **Point adjustments require a `reason`, are voided rather than deleted, and may be negative.** A void is itself a recorded action with its own reason. (§4.2)
@@ -668,3 +674,142 @@ The event page's line renders only once that event has check-ins, so with 0
 attendance it is silent whether or not the pepper exists. The end-to-end check is
 after the first real event: the event should read *"Origin checking is on. N of M
 non-cellular check-ins came from one network…"* rather than naming the variable.
+
+## Member type and project eligibility (added 2026-10-03, migration 30)
+
+The short form is in `CLAUDE.md`, and the rule itself is §4.5 of the
+architecture doc (*Project eligibility*). What follows is why each rule has the
+shape it has, and what was measured.
+
+### What `member_directory` consumes stays a view, never a function
+
+🔓 **Postgres checks a view's contents in two different ways, and the
+difference decides where a rule may live.** A *relation* referenced inside a
+view (with `security_invoker` off, as every view here is) is checked as the view's
+**owner**. *EXECUTE on a function* referenced inside a view is checked against
+the **caller**, and a plain function's body runs as the caller too. That second
+half is the `current_term()` story (migration 21, and the
+owner-rights entry in the main list above): it is why anon holds EXECUTE on that
+function.
+
+`leaderboard` is defined over `member_directory`, and anon reads `leaderboard`.
+So the obvious shape for this rule, a helper function such as
+`project_eligibility(member_id, term)` called from `member_directory`, had two
+outcomes and both were bad: grant anon EXECUTE on it, or watch the public board
+answer **42501**. Migration 30 puts the rule in two views instead,
+`member_project_meetings` and `member_general_meeting_months`, with no grant to
+any API role, and `member_directory` asks only whether either holds a failure.
+
+✅ **Measured on the local stack, 2026-10-03:**
+
+- Both views' ACLs list only `postgres` and `service_role`.
+- Inside `begin; set local role anon; … rollback`, `leaderboard` returned its
+  29 rows, while each new view answered *permission denied for view …*.
+- `EXPLAIN (verbose) select * from leaderboard` shows `member_type` and
+  `project_eligibility` pruned to `NULL::text` in the output list, so the board
+  never evaluates either. **Nothing relies on the pruning:** the owner check is
+  what makes the design safe, and the pruning only makes it cheap.
+
+📌 **The rule: anything `member_directory` consumes must stay a view, or a
+function anon may execute.** Supabase's security advisor flags the two new
+owner-rights views, as it flags `member_directory` and `leaderboard`. That is
+the design; `security_invoker` would run the public board as anon.
+
+🪤 **A new function must `revoke execute … from public`, not only from anon and
+authenticated.** A function is executable by PUBLIC by default, and revoking the
+two roles by name leaves that grant in place. Migration 29's `member_terms()`
+did exactly that, under a comment calling it officer-only: its `proacl` is
+`=X/postgres,postgres=X/postgres,service_role=X/postgres`, and as anon on the
+local stack `select count(*) from public.member_terms()` returned 2. It is
+`security definer` over `member_directory`, but it returns only term names, so
+the exposure is small; the fix is open in `tasks.md`. The same omission on a
+function returning member data would have published it.
+
+### The verdict belongs to the row's term; the type does not
+
+Every aggregate on `member_directory` is scoped to the row's term (migration
+29), and `project_eligibility` follows that rule: a Spring 2026 row asks about
+Spring 2026's meetings. `member_type` does not. It is **one standing value per
+member**, copied onto every term row, because it is modelled on a custom-field
+dropdown, which holds one answer per member. The plan stated that as an
+interpretation for the officer to correct at approval, and it was approved.
+
+⚠️ **The consequence: changing someone's type re-judges their past terms too.**
+A past row is judged against today's type, so a member switched to Data project
+today can read **No** for a semester in which nobody expected anything of them.
+The member page's type section says so beside the select. A member-type filter
+under "All terms" keeps every term row of a member of that type, and an export
+of past terms judges each against today's type. If a per-term type is ever
+needed, it is a table keyed (member, term), not this column.
+
+### Never read `project_eligibility` from another term's row
+
+🔓 `/admin/members/[id]` shows the current term. A member not on that term's
+roster has no row for it, so the page synthesizes one from `identity`, which is
+**whichever term row came back first**. Before migration 30 every per-term
+figure on it was overwritten (zeros, a null rate, Not Paid). The new per-term
+column had to join that list: spreading `identity` through unchanged would print
+**another term's verdict as this term's**. The synthesized row sets
+`project_eligibility: null`, which renders "—" with a note that there is no
+verdict off the roster. `member_type` is inherited as it is, because it is
+standing. `tests/project-eligibility.test.ts` pins this with a source
+assertion.
+
+📌 The generalisable part: **when a row is synthesized from another term's row,
+every per-term column must be overwritten, and only standing columns may be
+inherited.** A new per-term column is a new line in that literal.
+
+### The Thursday rule has one home
+
+⚠️ "General meeting" has no marker in the schema yet. For now it is a published
+event that starts on a **Thursday in Central time** and is **not a Projects
+event**, which means a Thursday social counts. That rule lives in exactly one
+place, the `general_meetings` CTE of `member_general_meeting_months`, and
+nothing in TypeScript re-derives it. Replacing it is a `create or replace view`
+that changes that CTE's `WHERE` clause and nothing else, plus the member page's
+sentence that describes the rule to officers ("For now a general meeting is any
+published event on a Thursday (Central time) that isn't a project meeting").
+
+🪤 **It is Central's weekday and Central's month, never UTC's**, and the
+fixtures exist to prove the gap: a Thursday 7pm meeting is a Friday in UTC and
+counts; a Wednesday 8pm meeting is a Thursday in UTC and does not; a meeting at
+7:30pm on 30 September is 1 October in UTC and belongs to September.
+`tests/project-eligibility.test.ts` builds every instant with
+`centralWallTimeToInstant` and asserts each weekday with `toCentralFields`, so a
+hand-written ISO string cannot pass for a fixture.
+
+🪤 **`formatMonth` spells a month from a name table, never `new Date`.** The
+view hands back `2026-10-01`, a bare date that parses as UTC midnight, which is
+the evening of 30 September in Central. Any formatter that then applies the
+Central zone names the wrong month on every row.
+
+### A month is judged once it ends
+
+The officer's rule. A month is **complete** only when its Central month has
+ended **and** every meeting in it has ended (a late meeting on the last day can
+run past midnight). Until then it is *met* once 2 meetings are attended, and *in
+progress* otherwise. It is **never** *not met* while it runs, so an early miss
+cannot turn the verdict to No in week one. A missed **project** meeting, by
+contrast, counts the moment it ends.
+
+⚠️ **So `yes` means "nothing has failed so far".** It is provisional until the
+term's last month ends; a `no` is not. The member page says so beside the
+verdict.
+
+🪤 **A running month with one meeting scheduled reads "Needed 1" and stays "In
+progress" even once that meeting is attended.** `meetings_required` is
+`least(2, scheduled)`, which can grow while the month runs, so an early *met*
+needs 2 attended, the one result no later-scheduled meeting can undo. A
+one-meeting month is therefore judged only when it ends. It looks like a bug on
+the member page and is the rule working.
+
+### The directory's rows are keyed by member and term
+
+🪤 `member_directory` is one row per (member, term), so under **"Roster: All
+terms"** one member has a row per term, and `key={row.id}` repeated. On the
+seed, 26 of the 32 members have more than one row. React's behaviour with
+duplicate keys is undefined, and it may hand one term's row component to
+another. Each row owns its compare-and-set token and every inline cell's state,
+so with the inline type select that was a real hazard rather than a console
+warning. `member-table.tsx` keys rows `${row.id}:${row.term}`, which is unique
+on the view.

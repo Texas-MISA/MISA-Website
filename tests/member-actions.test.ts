@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeAudit } from "@/app/actions/audit";
@@ -11,6 +13,7 @@ import {
   setFieldValue,
   withoutToken,
 } from "@/lib/members";
+import { memberTypeSchema } from "@/lib/validation";
 
 import {
   cleanup,
@@ -318,6 +321,279 @@ describe("the member audit before/after", () => {
       )
     ).toEqual(["custom_fields"]);
   });
+});
+
+// ---------------------------------------------------------------------------
+// setMemberType (migration 30)
+// ---------------------------------------------------------------------------
+//
+// The same convention as the rest of this file: the action needs a request
+// context, so its database half is driven through the exact statements it runs
+// and its wiring is pinned against comment-stripped source.
+
+describe("setMemberType", () => {
+  const source = readFileSync("app/actions/members.ts", "utf8");
+  const code = source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+  // The action's own body, so an assertion cannot pass on a sibling's code.
+  const start = code.indexOf("export async function setMemberType(");
+  const body = code.slice(start, code.indexOf("\nexport ", start + 1));
+
+  it("🔓 opens with getOfficer() and returns unauthorized, never requireOfficer()", () => {
+    // requireOfficer()'s redirect() throws NEXT_REDIRECT, and the house catch
+    // would swallow it.
+    expect(start).toBeGreaterThan(-1);
+    expect(body).toMatch(
+      /^export async function setMemberType\([^)]*\)[^{]*\{\s*const officer = await getOfficer\(\);\s*if \(!officer\) return \{ status: "unauthorized" \};/
+    );
+    expect(code).not.toContain("requireOfficer");
+  });
+
+  it("parses with memberTypeSchema and answers invalid for anything it refuses", () => {
+    expect(body).toContain("memberTypeSchema.safeParse(");
+    expect(body).toContain('status: "invalid"');
+    // What "invalid" is: a type the CHECK would refuse, a missing anchor, a
+    // member id that is not a uuid.
+    const valid = {
+      memberId: "00000000-0000-4000-8000-0000000000aa",
+      memberType: "data_project",
+      expectedUpdatedAt: "2026-08-02T22:34:16.934133+00:00",
+    };
+    expect(memberTypeSchema.safeParse(valid).success).toBe(true);
+    for (const bad of [
+      { ...valid, memberType: "officer" },
+      { ...valid, memberType: "" },
+      { ...valid, memberType: "Data project" },
+      { ...valid, expectedUpdatedAt: "" },
+      { ...valid, memberId: "not-a-uuid" },
+    ]) {
+      expect(memberTypeSchema.safeParse(bad).success, JSON.stringify(bad)).toBe(
+        false
+      );
+    }
+  });
+
+  it("skips the write when the type is unchanged — because a no-op write still moves the token", async () => {
+    // The reason, measured: an UPDATE to the same value fires the updated_at
+    // trigger anyway, so writing it would bump the token and log a diff
+    // showing nothing.
+    const id = await createTestMember(db, track, testIdentity());
+    const before = await readMember(id);
+    expect(before.member_type).toBe("general");
+
+    await db.from("members").update({ member_type: "general" }).eq("id", id);
+    expect((await readMember(id)).updated_at).not.toBe(before.updated_at);
+
+    // …so the action compares BEFORE writing, and hands back the live token —
+    // to a current screen only ("an unchanged save", below).
+    const skip = body.indexOf("before.member_type === fields.memberType");
+    expect(skip).toBeGreaterThan(-1);
+    expect(skip).toBeLessThan(body.indexOf(".update("));
+    expect(body.slice(skip, body.indexOf(".update("))).toContain(
+      "updatedAt: before.updated_at"
+    );
+  });
+
+  it("reports a conflict when someone else saved first, and loses nothing", async () => {
+    const id = await createTestMember(db, track, testIdentity());
+    const stale = (await readMember(id)).updated_at;
+
+    // Another officer, in another tab, edits a note.
+    await db.from("members").update({ notes: "theirs" }).eq("id", id);
+
+    const { data: conflicted } = await db
+      .from("members")
+      .update({ member_type: "data_project" })
+      .eq("id", id)
+      .eq("updated_at", stale)
+      .select(AUDITED_MEMBER_COLUMNS)
+      .maybeSingle();
+
+    expect(conflicted).toBeNull();
+    expect(body).toContain('if (!after) return { status: "conflict" };');
+    const after = await readMember(id);
+    expect(after.member_type).toBe("general");
+    expect(after.notes).toBe("theirs");
+  });
+
+  it("audits symmetrically, with the type the only change and the note naming it", async () => {
+    const id = await createTestMember(db, track, testIdentity());
+    const before = await readMember(id);
+
+    const { data: after, error } = await db
+      .from("members")
+      .update({ member_type: "client_project" })
+      .eq("id", id)
+      .eq("updated_at", before.updated_at)
+      .select(AUDITED_MEMBER_COLUMNS)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!after) throw new Error("compare-and-set unexpectedly missed");
+
+    await writeAudit(db, {
+      entityType: "member",
+      entityId: id,
+      actorId: officerId,
+      action: "member.updated",
+      before: withoutToken(before),
+      after: withoutToken(after),
+      note: "Member type",
+    });
+
+    const row = await latestAuditRow(db, "member", id);
+    const beforeKeys = Object.keys(row!.before as object).sort();
+    expect(beforeKeys).toEqual(Object.keys(row!.after as object).sort());
+    expect(beforeKeys).not.toContain("updated_at");
+    expect(row!.note).toBe("Member type");
+    expect(
+      beforeKeys.filter(
+        (key) =>
+          JSON.stringify((row!.before as Record<string, unknown>)[key]) !==
+          JSON.stringify((row!.after as Record<string, unknown>)[key])
+      )
+    ).toEqual(["member_type"]);
+
+    // And the action writes exactly that row: the same verb, the same note.
+    expect(body).toContain('action: "member.updated"');
+    expect(body).toContain('note: "Member type"');
+    expect(body).toContain("revalidateMembers(fields.memberId)");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// An unchanged save (review, 2026-10-03)
+// ---------------------------------------------------------------------------
+//
+// A select fires change only when the pick differs from what it SHOWS, so a
+// save that changes nothing comes mostly from a STALE screen: another officer
+// already made that pick. Both actions used to answer it `done` with the live
+// token, the row adopted it, and the row's next save then passed the
+// compare-and-set over an edit its officer never saw. Now a stale token is a
+// `conflict`, and only a current screen gets `done`, with the token it already
+// holds. Same convention as above: the database half through the statements
+// the actions run, and the branch pinned in comment-stripped source — which is
+// also what says it writes nothing and audits nothing.
+
+/** The token both editing screens hold: the view's, read as they read it. */
+async function screenToken(id: string): Promise<string> {
+  const { data, error } = await db
+    .from("member_directory")
+    .select("updated_at")
+    .eq("id", id)
+    // One row per (member, term), and the token is the member's on every one.
+    .limit(1);
+  if (error) throw new Error(`directory read failed: ${error.message}`);
+  const token = data[0]?.updated_at;
+  if (!token) throw new Error("member has no directory row");
+  return token;
+}
+
+describe("an unchanged save", () => {
+  const code = readFileSync("app/actions/members.ts", "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  /** One action's skip branch: from its unchanged test up to its write. */
+  function skipBranch(action: string, unchanged: string): string {
+    const start = code.indexOf(`export async function ${action}(`);
+    expect(start, action).toBeGreaterThan(-1);
+    const body = code.slice(start, code.indexOf("\nexport ", start + 1));
+    const from = body.indexOf(unchanged);
+    const to = body.indexOf(".update(");
+    expect(from, action).toBeGreaterThan(-1);
+    expect(from, action).toBeLessThan(to);
+    return body.slice(from, to);
+  }
+
+  type Member = Awaited<ReturnType<typeof readMember>>;
+
+  const CASES = [
+    {
+      action: "setMemberType",
+      unchanged: "before.member_type === fields.memberType",
+      /** Stores the value the screen will pick. */
+      store: (id: string) =>
+        db.from("members").update({ member_type: "data_project" }).eq("id", id),
+      held: (row: Member) => row.member_type,
+      value: "data_project",
+    },
+    {
+      action: "setMemberFieldValue",
+      unchanged: "fieldValue(before.custom_fields, fields.key) === next",
+      store: (id: string) =>
+        db
+          .from("members")
+          .update({ custom_fields: { [KEY]: "Paid" } })
+          .eq("id", id),
+      held: (row: Member) => fieldValue(row.custom_fields, KEY),
+      value: "Paid",
+    },
+  ];
+
+  for (const c of CASES) {
+    it(`🔓 ${c.action} answers a stale token conflict, before it can answer done`, () => {
+      const branch = skipBranch(c.action, c.unchanged);
+      expect(branch).toMatch(
+        /if \(before\.updated_at !== fields\.expectedUpdatedAt\) \{\s*return \{ status: "conflict" \};\s*\}/
+      );
+      expect(branch.indexOf('status: "conflict"')).toBeLessThan(
+        branch.indexOf('status: "done"')
+      );
+      // Raw strings: a Date round trip truncates microseconds and would call
+      // every current screen stale.
+      expect(branch).not.toContain("new Date(");
+      // `done` hands back the token a current screen already holds. The branch
+      // ends at the write, and nothing on the way audits or revalidates.
+      expect(branch).toContain("updatedAt: before.updated_at");
+      expect(branch).not.toContain("writeAudit(");
+      expect(branch).not.toContain("revalidateMembers(");
+    });
+
+    it(`${c.action}: a pick made elsewhere leaves the screen stale, and the live token would lose an edit`, async () => {
+      const id = await createTestMember(db, track, testIdentity());
+      const screen = await screenToken(id);
+
+      // Another officer makes the same pick first, then writes a note.
+      const { error: theirPick } = await c.store(id);
+      if (theirPick) throw new Error(theirPick.message);
+      await db.from("members").update({ notes: "theirs" }).eq("id", id);
+
+      // The action's read: the value is unchanged, so this is the skip branch —
+      // with a token this screen never saw, so the answer is conflict.
+      const before = await readMember(id);
+      expect(c.held(before)).toBe(c.value);
+      expect(before.updated_at).not.toBe(screen);
+
+      // What `done` with that token used to buy: the row's next save, a note,
+      // passes the compare-and-set and overwrites "theirs".
+      const saveNote = (token: string) =>
+        db
+          .from("members")
+          .update({ notes: "mine" })
+          .eq("id", id)
+          .eq("updated_at", token)
+          .select("id")
+          .maybeSingle();
+      expect((await saveNote(screen)).data).toBeNull();
+      expect((await saveNote(before.updated_at)).data).not.toBeNull();
+      expect((await readMember(id)).notes).toBe("mine");
+    });
+
+    it(`${c.action}: a current screen's token is the action's read, so done keeps it`, async () => {
+      const id = await createTestMember(db, track, testIdentity());
+      const { error: stored } = await c.store(id);
+      if (stored) throw new Error(stored.message);
+      const screen = await screenToken(id);
+
+      // Two reads of two relations, one string: the raw compare cannot call a
+      // current screen stale, and the token `done` hands back is the one the
+      // screen already holds, so the row's token does not move.
+      const before = await readMember(id);
+      expect(c.held(before)).toBe(c.value);
+      expect(before.updated_at).toBe(screen);
+    });
+  }
 });
 
 describe("field definitions", () => {

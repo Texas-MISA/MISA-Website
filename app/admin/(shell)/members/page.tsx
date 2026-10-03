@@ -31,6 +31,7 @@ import { exportCatalogue, projectRow, type ExportField } from "@/lib/export";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
 import { fetchPresets } from "@/lib/member-presets";
 import type { FieldDefinition } from "@/lib/members";
+import { DEFAULT_MEMBER_TYPE } from "@/lib/member-types";
 import { presetSummary } from "@/lib/presets";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -60,12 +61,13 @@ import { SelectionProvider } from "./_components/selection";
 // anon key (§6).
 //
 // 📌 The COLUMNS are the officer's choice since 2026-10-01, and the same choice
-// is the export's. By default the table shows Member, Email, EID, Total points
-// and Dues plus every custom field marked as a default column; the toolbar's
-// Fields menu adds or hides any column in the export catalogue and remembers
-// that per browser in a cookie this page reads (set, HttpOnly, by the Server
-// Action in app/actions/directory-columns.ts), so the first paint already has
-// the officer's columns. Name is always shown, and so is the column the table
+// is the export's. By default the table shows Member, Email, EID, Total points,
+// Dues, Member type and Project eligibility (migration 30) plus every custom
+// field marked as a default column; the toolbar's Fields menu adds or hides any
+// column in the export catalogue and remembers that per browser in a cookie
+// this page reads (set, HttpOnly, by the Server Action in
+// app/actions/directory-columns.ts), so the first paint already has the
+// officer's columns. Name is always shown, and so is the column the table
 // is sorted by. The rules live in lib/directory-columns.ts; this page only
 // reads the cookie and fetches what the visible columns need. Everything that
 // is not on screen is still one click away on /admin/members/[id].
@@ -98,7 +100,7 @@ export const metadata: Metadata = { title: "Members" };
 // the browser: only the visible columns are projected into a row's `cells`.
 // `source` also drives the SELF pill beside the name, shown or not.
 const COLUMNS =
-  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, custom_fields, updated_at" as const;
+  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, member_type, project_eligibility, custom_fields, updated_at" as const;
 
 // The same list plus the attendance embed phase 6's event filter needs.
 //
@@ -114,7 +116,7 @@ const COLUMNS =
 // is set — unfiltered it still returns the right rows and the right count, but
 // it nests every member's whole attendance history into the payload for nothing.
 const COLUMNS_WITH_ATTENDANCE =
-  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, custom_fields, updated_at, attendance!left(event_id)" as const;
+  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, member_type, project_eligibility, custom_fields, updated_at, attendance!left(event_id)" as const;
 
 type DirectoryQueryResult =
   | { kind: "ok"; rows: MemberRow[]; total: number }
@@ -283,6 +285,9 @@ async function fetchDirectory(
   // the finished strings instead, for the visible plain columns only.
   const rows: MemberRow[] = raw.map((row) => ({
     id: row.id ?? "",
+    // Half of the row key — see MemberRow.term. Never null on this view: it is
+    // the roster CTE's grouping key.
+    term: row.term ?? "",
     eid: row.eid ?? "",
     fullName: row.full_name ?? "",
     email: row.email ?? "",
@@ -293,6 +298,12 @@ async function fetchDirectory(
     // is the honest default: "we have no record of a payment covering this
     // term" is exactly what Not Paid means.
     duesPaid: row.dues_paid_term ?? false,
+    // NOT NULL with a default on `members`, so the fallback only satisfies the
+    // view's nullable type — and General is what the column would have said.
+    memberType: row.member_type ?? DEFAULT_MEMBER_TYPE,
+    // Null stays null and renders as "—": the view answers for every row, so
+    // a null here is not a verdict and must not be dressed up as one.
+    projectEligibility: row.project_eligibility,
     customFields: row.custom_fields ?? {},
     // The compare-and-set anchor every inline cell posts back. Carried as the
     // raw PostgREST string all the way to the hidden input — a Date round trip

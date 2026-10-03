@@ -66,7 +66,7 @@ export const dynamic = "force-dynamic";
 // catalogue can reach, so the picker is limited by the catalogue rather than by
 // what happened to be selected here.
 const EXPORT_COLUMNS =
-  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, custom_fields" as const;
+  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, member_type, project_eligibility, custom_fields" as const;
 
 // The same list plus phase 6's attendance embed, spelled out in full rather than
 // concatenated for the reason above: PostgREST types the row off the literal.
@@ -74,9 +74,11 @@ const EXPORT_COLUMNS =
 // ⚠️ This has to stay in step with EXPORT_COLUMNS by hand, and the export
 // catalogue is what makes that safe — a column added to one and not the other
 // shows up as a missing field in the file rather than as a type error. Change
-// them together.
+// them together. tests/export.test.ts now checks every ExportSourceRow key
+// against both, because the chunk loop below CASTS to that type and so the
+// compiler cannot.
 const EXPORT_COLUMNS_WITH_ATTENDANCE =
-  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, custom_fields, attendance!left(event_id)" as const;
+  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, member_type, project_eligibility, custom_fields, attendance!left(event_id)" as const;
 
 /**
  * Rows per PostgREST request while paging through the result.

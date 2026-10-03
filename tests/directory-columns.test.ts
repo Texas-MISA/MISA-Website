@@ -81,6 +81,8 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     pending_count: 0,
     last_seen_at: "2026-03-01T02:00:00.000Z",
     dues_paid_term: false,
+    member_type: "general",
+    project_eligibility: "not_applicable",
     custom_fields: {},
     ...over,
   };
@@ -111,12 +113,17 @@ const keyOrder = catalogue.map((field) => field.key);
 
 describe("the default columns", () => {
   it("are the built-in defaults plus every live default custom field", () => {
+    // Member type and Project eligibility since migration 30: Member · Email ·
+    // EID · Total points · Dues · Member type · Project eligibility · then the
+    // default custom fields.
     expect(defaults).toEqual([
       "name",
       "email",
       "eid",
       "total_points",
       "dues",
+      "member_type",
+      "project_eligibility",
       "shirt_size",
     ]);
   });
@@ -273,7 +280,7 @@ describe("directoryColumnsPreference — the delta", () => {
 
   it("records only the differences", () => {
     // The walkthrough's example: tick Attendance rate, Last seen and Officer
-    // notes, untick Email.
+    // notes, untick Email. Every other default stays ticked.
     const chosen = keyOrder.filter((key) =>
       [
         "name",
@@ -282,6 +289,8 @@ describe("directoryColumnsPreference — the delta", () => {
         "attendance_rate",
         "last_seen_at",
         "dues",
+        "member_type",
+        "project_eligibility",
         "notes",
         "shirt_size",
       ].includes(key)
@@ -500,6 +509,8 @@ describe("resolveDirectoryColumns", () => {
       "total_points",
       "attendance_rate",
       "dues",
+      "member_type",
+      "project_eligibility",
       "notes",
       "shirt_size",
       "committee",
@@ -591,6 +602,33 @@ describe("no new sorting", () => {
     expect(column("shirt_size").definition).toEqual(SHIRT);
     expect(column("committee").definition).toEqual(COMMITTEE);
     expect(column("email").definition).toBeNull();
+  });
+
+  it("📌 gives the two migration-30 columns plain headers, though both are defaults", () => {
+    // Default columns, and still not sortable (officer: no new sorting). The
+    // header is the catalogue label, which is also the file's header.
+    expect(column("member_type")).toMatchObject({
+      label: "Member type",
+      sort: null,
+      numeric: false,
+    });
+    expect(column("project_eligibility")).toMatchObject({
+      label: "Project eligibility",
+      sort: null,
+      numeric: false,
+    });
+    expect(defaults).toContain("member_type");
+    expect(defaults).toContain("project_eligibility");
+  });
+
+  it("draws both with markup of their own, so neither arrives as server text", () => {
+    // The inline select and the eligibility pill — DEDICATED, so the page never
+    // formats either into `cells`.
+    expect(DEDICATED_COLUMNS.has("member_type")).toBe(true);
+    expect(DEDICATED_COLUMNS.has("project_eligibility")).toBe(true);
+    expect(
+      textCellFields(catalogue, defaults).map((field) => field.key)
+    ).toEqual([]);
   });
 
   it("draws only the visible keys", () => {

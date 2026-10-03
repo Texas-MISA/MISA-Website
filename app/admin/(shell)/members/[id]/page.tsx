@@ -17,13 +17,27 @@ import {
   type TermEventState,
 } from "@/lib/members";
 import { fetchMergeCandidates } from "@/lib/member-options";
+import {
+  DEFAULT_MEMBER_TYPE,
+  formatMeetingResult,
+  formatMemberType,
+  formatMonth,
+  formatMonthResult,
+  requiresProjectEligibility,
+} from "@/lib/member-types";
 import { rankDuplicateCandidates } from "@/lib/merge";
 import { formatPointCategory, signedPoints } from "@/lib/points";
+import {
+  fetchProjectRequirements,
+  type ProjectRequirements,
+  type RequirementMonth,
+} from "@/lib/project-requirements";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { PageHeader, SectionHeading } from "@/components/ui/page-header";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 import { Pill } from "@/components/ui/pill";
+import { EligibilityMark } from "../_components/eligibility-mark";
 import { MemberEditor } from "./_components/member-editor";
 import { MergePanel, type DuplicateHint } from "./_components/merge-panel";
 
@@ -49,7 +63,7 @@ export const metadata: Metadata = { title: "Member" };
 // lib/points.ts. Every column of the view, because this page is where the ones
 // the directory no longer shows have to land.
 const DIRECTORY_COLUMNS =
-  "id, eid, full_name, email, term, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate, notes, custom_fields, dues_paid_term, updated_at" as const;
+  "id, eid, full_name, email, term, source, joined_at, events_attended, attendance_points, bonus_points, total_points, pending_count, last_seen_at, events_possible, attendance_rate, notes, custom_fields, dues_paid_term, member_type, project_eligibility, updated_at" as const;
 
 const ATTENDANCE_COLUMNS =
   "id, event_id, status, submitted_at, submitted_name, submitted_eid, source" as const;
@@ -165,16 +179,34 @@ export default async function MemberDetailPage({
     events_possible: null,
     attendance_rate: null,
     dues_paid_term: false,
+    // 🔓 Null, and it renders as "—". The verdict is judged per (member, term)
+    // and this member has no row for this term — so `identity`, which is
+    // whichever term row came back first, carries ANOTHER term's verdict, and
+    // spreading it through unchanged would print that as this term's. The
+    // type is standing, so identity's member_type is right as it is.
+    project_eligibility: null,
   };
 
-  // The term's published events. Cancelled events credit nobody, and drafts are
-  // not something a member could have been asked to attend.
-  const termEvents = await db
-    .from("events")
-    .select(TERM_EVENT_COLUMNS)
-    .eq("term", term)
-    .eq("status", "published")
-    .order("starts_at", { ascending: true });
+  // The member's standing type — the same on every term row. NOT NULL with a
+  // default on `members`; the fallback only satisfies the view's nullable type.
+  const memberType = member.member_type ?? DEFAULT_MEMBER_TYPE;
+  const projectMember = requiresProjectEligibility(memberType);
+
+  // The term's published events, and — for a project member only — the
+  // months and meetings behind their verdict. Independent reads, so together.
+  // Cancelled events credit nobody, and drafts are not something a member could
+  // have been asked to attend.
+  const [termEvents, requirements] = await Promise.all([
+    db
+      .from("events")
+      .select(TERM_EVENT_COLUMNS)
+      .eq("term", term)
+      .eq("status", "published")
+      .order("starts_at", { ascending: true }),
+    projectMember
+      ? fetchProjectRequirements(db, id, term)
+      : Promise.resolve(null),
+  ]);
 
   // 🔓 Per-section failure flags, not `x.error ? []`. Each of these used to
   // render a read failure as an affirmative claim: "No adjustments have been
@@ -272,6 +304,9 @@ export default async function MemberDetailPage({
       joinedAt: member.joined_at ?? "",
       notes: member.notes,
       customFields: member.custom_fields,
+      // The ranker reads identity only; this is here because MergeMember
+      // carries it for the merge plan.
+      memberType,
     },
     mergeCandidates
   ).map((suggestion) => ({
@@ -323,6 +358,17 @@ export default async function MemberDetailPage({
               ? "The check-in form"
               : "An officer"}
           </Row>
+          {/* Read-only here; the select lives in the editor further down, which
+              owns the compare-and-set token every form on this page shares. */}
+          <Row label="Member type">
+            {formatMemberType(memberType)}
+            <a
+              href="#member-type"
+              className="ml-3 text-xs underline underline-offset-2"
+            >
+              Change
+            </a>
+          </Row>
           {/* Derived, not ticked. This replaced an Active / Inactive row on
               2026-08-25 when members.active was dropped — the flag answered the
               same question from a checkbox nobody kept up to date. */}
@@ -362,6 +408,25 @@ export default async function MemberDetailPage({
             <span className="font-medium">{member.total_points ?? 0}</span>
           </Row>
         </dl>
+      </section>
+
+      <section className="mt-12 max-w-3xl">
+        <SectionHeading>Project requirements — {term}</SectionHeading>
+        {requirements === null ? (
+          // Not a project type: one line, and no reads were made for it.
+          <p className="mt-2 text-sm text-misa-secondary">
+            Applies to data project and client project members; this
+            member&apos;s type is {formatMemberType(memberType)}.
+          </p>
+        ) : (
+          <ProjectRequirementsBreakdown
+            term={term}
+            onRoster={scoped !== null}
+            eligibility={member.project_eligibility}
+            pendingCount={member.pending_count ?? 0}
+            requirements={requirements}
+          />
+        )}
       </section>
 
       <section className="mt-12 max-w-3xl">
@@ -661,10 +726,12 @@ export default async function MemberDetailPage({
         )}
       </section>
 
-      {/* The custom fields and the officer notes both write `members`, so they
-          share one compare-and-set token and therefore one client owner. */}
+      {/* The member type, the custom fields and the officer notes all write
+          `members`, so they share one compare-and-set token and therefore one
+          client owner. */}
       <MemberEditor
         memberId={id}
+        memberType={memberType}
         definitions={definitions}
         customFields={member.custom_fields}
         notes={member.notes ?? ""}
@@ -701,6 +768,203 @@ export default async function MemberDetailPage({
       </section>
     </div>
   );
+}
+
+/**
+ * A project member's requirements for the current term (migration 30): the
+ * verdict, what it means, and the months and meetings it was judged from.
+ *
+ * 📌 The VERDICT is the directory row's `project_eligibility` — the same value
+ * the table prints — and never re-derived from the lists below. The lists come
+ * from the two views that verdict was computed from, so they explain it rather
+ * than compete with it; each fails on its own and says so.
+ *
+ * Server-rendered, like the rest of this page: every date goes through
+ * formatDay here, and a month through formatMonth's name table, never Intl on
+ * the client.
+ */
+function ProjectRequirementsBreakdown({
+  term,
+  onRoster,
+  eligibility,
+  pendingCount,
+  requirements,
+}: {
+  term: string;
+  /** False when the member has no row for this term — no verdict to show. */
+  onRoster: boolean;
+  eligibility: string | null;
+  /** All-time, like the view's column. Pending check-ins count for nothing
+   * until an officer resolves them, so any at all is worth saying. */
+  pendingCount: number;
+  requirements: ProjectRequirements;
+}) {
+  const { months, meetings } = requirements;
+
+  return (
+    <>
+      <p className="mt-2 text-sm text-misa-secondary">
+        Data project and client project members attend every project meeting,
+        and 2 general meetings in each calendar month — or all of them in a
+        month that holds fewer than 2.
+      </p>
+
+      <dl className="mt-4 grid grid-cols-1 gap-x-8 gap-y-3 border border-misa-border bg-white px-4 py-3 sm:grid-cols-[10rem_1fr]">
+        <Row label="Eligible">
+          <EligibilityMark value={eligibility} />
+          {!onRoster && (
+            <span className="ml-2 text-xs text-misa-muted">
+              not on the {term} roster, so there is no verdict for it
+            </span>
+          )}
+        </Row>
+      </dl>
+
+      {/* ⚠️ What a Yes is, said beside it: nothing has FAILED. A month is
+          judged once it is over, so until the term's last month ends a Yes is
+          provisional — and a No is not. */}
+      <p className="mt-3 text-sm text-misa-secondary">
+        <span className="font-medium">Yes means nothing has failed so far.</span>{" "}
+        A month counts once it is over, and a project meeting as soon as it
+        ends. For now a general meeting is any published event on a Thursday
+        (Central time) that isn&apos;t a project meeting.
+      </p>
+
+      {pendingCount > 0 && (
+        <p className="mt-2 text-sm text-misa-secondary">
+          {pendingCount} check-in{pendingCount === 1 ? " is" : "s are"} still
+          waiting for review, and{" "}
+          {pendingCount === 1 ? "it doesn't" : "they don't"} count toward these
+          requirements until an officer resolves{" "}
+          {pendingCount === 1 ? "it" : "them"}.
+        </p>
+      )}
+
+      <SectionHeading level="sub" className="mt-6">
+        General meetings by month
+      </SectionHeading>
+      {months.kind === "error" ? (
+        <ReadError what="this member's general meetings" className="mt-3" />
+      ) : months.rows.length === 0 ? (
+        <Notice className="mt-3">
+          No general meetings have been published in {term} yet, so no month
+          has anything to meet.
+        </Notice>
+      ) : (
+        <div className="mt-3">
+          <Table minWidth="min-w-[36rem]">
+            <THead>
+              <Tr hover={false}>
+                <Th>Month</Th>
+                <Th wrap>Thursday meetings</Th>
+                <Th numeric>Attended</Th>
+                <Th numeric>Needed</Th>
+                <Th>Result</Th>
+              </Tr>
+            </THead>
+            <tbody>
+              {months.rows.map((row) => (
+                <Tr key={row.month}>
+                  <Td className="whitespace-nowrap">{formatMonth(row.month)}</Td>
+                  <Td>{meetingsHeldText(row)}</Td>
+                  <Td numeric>{row.meetingsAttended}</Td>
+                  <Td numeric>{row.meetingsRequired}</Td>
+                  <Td>
+                    <MonthResultMark status={row.status} />
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
+
+      <SectionHeading level="sub" className="mt-6">
+        Project meetings
+      </SectionHeading>
+      {meetings.kind === "error" ? (
+        <ReadError what="this term's project meetings" className="mt-3" />
+      ) : meetings.rows.length === 0 ? (
+        <Notice className="mt-3">
+          No project meetings have been published in {term} yet.
+        </Notice>
+      ) : (
+        <div className="mt-3">
+          <Table minWidth="min-w-[32rem]">
+            <THead>
+              <Tr hover={false}>
+                <Th>Date</Th>
+                <Th>Meeting</Th>
+                <Th wrap>This member</Th>
+              </Tr>
+            </THead>
+            <tbody>
+              {meetings.rows.map((row) => (
+                <Tr key={row.eventId}>
+                  <Td className="whitespace-nowrap">
+                    {formatDay(row.startsAt)}
+                  </Td>
+                  <Td>
+                    <Link
+                      href={`/admin/events/${row.eventId}`}
+                      className="underline underline-offset-2"
+                    >
+                      {row.title}
+                    </Link>
+                  </Td>
+                  <Td>
+                    <MeetingResultMark status={row.status} />
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** "4 held" once a month is over; "2 so far / 4 scheduled" while it runs. */
+function meetingsHeldText(row: RequirementMonth): string {
+  return row.complete
+    ? `${row.meetingsHeld} held`
+    : `${row.meetingsHeld} so far / ${row.meetingsScheduled} scheduled`;
+}
+
+/** A month's result. In progress is muted text rather than a pill, for the
+ * reason `upcoming` is in the events grid: it is not a fact about the member
+ * yet. Anything unrecognised renders as itself. */
+function MonthResultMark({ status }: { status: string }) {
+  if (status === "met") {
+    return <Pill tone="affirm">{formatMonthResult(status)}</Pill>;
+  }
+  if (status === "not_met") {
+    return <Pill tone="critical">{formatMonthResult(status)}</Pill>;
+  }
+  if (status === "in_progress") {
+    return (
+      <span className="text-sm text-misa-muted">{formatMonthResult(status)}</span>
+    );
+  }
+  return <Pill tone="neutral">{formatMonthResult(status)}</Pill>;
+}
+
+/** A project meeting's result. A miss is CRITICAL here where the events grid
+ * keeps it neutral: here one miss is the whole verdict. */
+function MeetingResultMark({ status }: { status: string }) {
+  if (status === "attended") {
+    return <Pill tone="affirm">{formatMeetingResult(status)}</Pill>;
+  }
+  if (status === "missed") {
+    return <Pill tone="critical">{formatMeetingResult(status)}</Pill>;
+  }
+  if (status === "upcoming") {
+    return (
+      <span className="text-sm text-misa-muted">{formatMeetingResult(status)}</span>
+    );
+  }
+  return <Pill tone="neutral">{formatMeetingResult(status)}</Pill>;
 }
 
 /** The grid's three states, as words rather than colour alone.

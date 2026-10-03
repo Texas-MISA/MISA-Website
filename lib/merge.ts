@@ -41,6 +41,7 @@ import {
   type MemberCandidate,
 } from "@/lib/attendance";
 import { fieldValue, type FieldDefinition } from "@/lib/members";
+import { DEFAULT_MEMBER_TYPE } from "@/lib/member-types";
 
 // ---------------------------------------------------------------------------
 // The two members
@@ -63,6 +64,8 @@ export type MergeMember = {
   notes: string | null;
   /** Raw jsonb. Read it with `fieldValue`, never by indexing. */
   customFields: unknown;
+  /** `members.member_type` as stored (migration 30). See `mergedMemberType`. */
+  memberType: string;
 };
 
 /** One of the loser's (or the survivor's) attendance rows. */
@@ -106,6 +109,20 @@ export type PlannedField = {
   conflict: boolean;
 };
 
+/** What the survivor's member type becomes, and why. See `mergedMemberType`. */
+export type PlannedMemberType = {
+  survivorValue: string;
+  loserValue: string;
+  /** What the survivor's `member_type` is written as. */
+  value: string;
+  /** True when `value` is the duplicate's: the survivor was General. */
+  fromLoser: boolean;
+  /** The duplicate's type when both held a non-General type and they differed
+   * — kept off the survivor, and named in the preview so it is not lost
+   * silently. Null otherwise. */
+  dropped: string | null;
+};
+
 export type MergePlan = {
   /** Every one of the loser's attendance rows, in the order given. */
   attendance: PlannedAttendance[];
@@ -119,6 +136,8 @@ export type MergePlan = {
   notes: string | null;
   /** The earlier of the two `joined_at` values. */
   joinedAt: string;
+  /** The survivor's member type after the merge. */
+  memberType: PlannedMemberType;
 };
 
 export type MergePlanResult =
@@ -216,7 +235,53 @@ export function planMerge({
       // the duplicate row is an artefact of a typo rather than a second joining.
       joinedAt:
         loser.joinedAt < survivor.joinedAt ? loser.joinedAt : survivor.joinedAt,
+      memberType: mergedMemberType(survivor.memberType, loser.memberType),
     },
+  };
+}
+
+/**
+ * The survivor's member type after a merge (migration 30).
+ *
+ * 📌 General counts as "no answer", like an unset custom field: it is the
+ * column's default and every member's type until an officer sets one, so a
+ * General survivor has said nothing a duplicate's real type should lose to.
+ * The rule is therefore the custom-field one with General standing in for
+ * null:
+ *   * the survivor's type, unless it is General;
+ *   * the duplicate's, when the survivor is General;
+ *   * when both hold different non-General types, the SURVIVOR'S — the same
+ *     side a field conflict defaults to — with the duplicate's reported as
+ *     `dropped` so the preview can name it.
+ *
+ * Not offered as a choice the way a conflicting custom field is. A type is one
+ * select away on the survivor's own page afterwards, and the preview says
+ * which type is being kept and which is being dropped before anything is
+ * written.
+ */
+export function mergedMemberType(
+  survivor: string,
+  loser: string
+): PlannedMemberType {
+  const survivorAnswered = survivor !== DEFAULT_MEMBER_TYPE;
+  const loserAnswered = loser !== DEFAULT_MEMBER_TYPE;
+
+  if (!survivorAnswered && loserAnswered) {
+    return {
+      survivorValue: survivor,
+      loserValue: loser,
+      value: loser,
+      fromLoser: true,
+      dropped: null,
+    };
+  }
+
+  return {
+    survivorValue: survivor,
+    loserValue: loser,
+    value: survivor,
+    fromLoser: false,
+    dropped: survivorAnswered && loserAnswered && survivor !== loser ? loser : null,
   };
 }
 

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { centralWallTimeToInstant } from "@/lib/events";
 import type { Database } from "@/lib/types/database";
 
 // Shared fixtures for the integration tests. Everything targets the LOCAL
@@ -137,7 +138,9 @@ let currentTermSlot = 0;
 export async function createCurrentTermEvent(
   db: SupabaseClient<Database>,
   track: Tracker,
-  opts: { points?: number; title?: string } = {}
+  // `category` since migration 30, so a current-term Projects meeting can be
+  // placed — the one shape that moves `project_eligibility` on a live term.
+  opts: { points?: number; title?: string; category?: string } = {}
 ): Promise<{ id: string; title: string; term: string }> {
   // Each call takes its own three-hour slot going backwards, so two of these
   // in one run cannot collide on the published-window exclusion constraint.
@@ -154,6 +157,7 @@ export async function createCurrentTermEvent(
       ends_at: ends.toISOString(),
       status: "published",
       points: opts.points ?? 1,
+      category: opts.category,
     })
     .select("id, title, term")
     .single();
@@ -175,6 +179,47 @@ export async function createCurrentTermEvent(
   }
 
   return { id: data.id, title: data.title, term: data.term! };
+}
+
+/**
+ * A random year from `candidates` whose Central Fall holds no events at all.
+ *
+ * For a block that needs a term to ITSELF (migration 30): a far-past Fall,
+ * where every month is over and every verdict final whatever today is, or a
+ * far-future one, where every meeting is still ahead. Random, and re-picked
+ * past any Fall already holding events — a crashed earlier run's leftovers.
+ * Shared by project-eligibility.test.ts and member-directory.test.ts, so the
+ * two cannot drift on what "empty" means.
+ */
+export async function pickEmptyFall(
+  db: SupabaseClient<Database>,
+  candidates: number[]
+): Promise<number> {
+  const shuffled = [...candidates].sort(() => Math.random() - 0.5);
+  for (const year of shuffled) {
+    const { count, error } = await db
+      .from("events")
+      .select("id", { count: "exact", head: true })
+      .gte("starts_at", centralWallTimeToInstant(`${year}-08-01`, "00:00").toISOString())
+      .lt("starts_at", centralWallTimeToInstant(`${year + 1}-01-01`, "00:00").toISOString());
+    if (error) throw new Error(`fall window check failed: ${error.message}`);
+    if ((count ?? 0) === 0) return year;
+  }
+  throw new Error("every candidate Fall already holds events — clean the local stack");
+}
+
+/** An inserted event's generated term, read back — never typed (§4.7). */
+export async function termOfEvent(
+  db: SupabaseClient<Database>,
+  eventId: string
+): Promise<string> {
+  const { data, error } = await db
+    .from("events")
+    .select("term")
+    .eq("id", eventId)
+    .single();
+  if (error || !data.term) throw new Error("fixture event has no term");
+  return data.term;
 }
 
 /**
@@ -458,8 +503,9 @@ export async function createTestMember(
   identity: { fullName: string; eid: string; email: string },
   // The directory tests need members that seed rows cannot be confused with,
   // and `joined_at` is the only column phase 1 can filter on that the seed does
-  // not already populate across a wide range. Everything else defaults.
-  opts: { joinedAt?: Date; source?: string } = {}
+  // not already populate across a wide range. Everything else defaults —
+  // `member_type` (migration 30) included, to General, unless a test names one.
+  opts: { joinedAt?: Date; source?: string; memberType?: string } = {}
 ): Promise<string> {
   const { data, error } = await db
     .from("members")
@@ -469,6 +515,7 @@ export async function createTestMember(
       email: identity.email,
       joined_at: opts.joinedAt?.toISOString(),
       source: opts.source,
+      member_type: opts.memberType,
     })
     .select("id")
     .single();

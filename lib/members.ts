@@ -169,6 +169,13 @@ export const RESERVED_FIELD_KEYS: ReadonlySet<string> = new Set([
   // A directory column since migration 29, and a sortable/filterable one, so a
   // custom field keyed `term` would shadow it.
   "term",
+  // Migration 30. Both are directory columns, export columns and filters, so a
+  // custom field claiming either would compete for the header and the URL key.
+  // `member_type` matters twice over: a "Member type" dropdown is exactly what
+  // an officer would have built before the column existed, and two answers to
+  // one question is the duplicate-answer problem the dues keys exist to stop.
+  "member_type",
+  "project_eligibility",
 ]);
 
 /** Bounds on an option list, mirroring `valid_field_options()` in migration 18. */
@@ -370,9 +377,14 @@ export function isAllowedFieldValue(
  * ⚠️ Adding it costs the other callers nothing, and that is a property of
  * AuditTrail rather than luck: it renders only keys whose values DIFFER, so a
  * column no other mutation touches never appears in their diffs.
+ *
+ * 📌 `member_type` joined in migration 30, for the same reason as `joined_at`
+ * and more directly: `setMemberType` exists to change it, and a merge writes it
+ * (lib/merge.ts, `mergedMemberType`). The roster import's `member.imported` row
+ * now records the General every new member starts as, which is true.
  */
 export const AUDITED_MEMBER_COLUMNS =
-  "id, full_name, email, eid, joined_at, notes, custom_fields, updated_at" as const;
+  "id, full_name, email, eid, joined_at, member_type, notes, custom_fields, updated_at" as const;
 
 /** The same contract for a field definition. Kept separate from
  * `FIELD_COLUMNS` in lib/member-fields.ts, which is the narrower read the UI

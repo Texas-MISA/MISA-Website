@@ -70,7 +70,18 @@ app/admin/(shell)/      authed chrome + dashboard, events/, attendance/, points/
                         members/ (+ [id], fields/, presets/, import, merge, and
                         export/route.ts), dues/ (+ [id], import/), officers/;
                         later audit/. Route groups don't appear in URLs, so §5's
-                        route table is unchanged. _components/ holds shell-wide
+                        route table is unchanged. members/_components/ holds the
+                        row's inline cells — member-field-cell.tsx and
+                        member-type-cell.tsx (migration 30), both on the ROW'S
+                        CAS token and shared with [id], and both saving by
+                        DISPATCHING the action, never requestSubmit() — a
+                        submitted form's reset reverts even a controlled
+                        <select> (review, 2026-10-03); the type cell announces
+                        through an always-mounted sr-only live region — plus
+                        eligibility-mark.tsx (the calculated verdict as a mark,
+                        no "use client", shared with [id]). member-table.tsx
+                        keys rows by member AND term: under "All terms" a
+                        member has one row per term. _components/ holds shell-wide
                         pieces (status-pill.tsx, audit-trail.tsx, notice.tsx)
                         🔓 **ON THE v2 GROUND since phase 4 (2026-08-29)**:
                         layout.tsx's <main> is bg-misa-panel and content regions
@@ -95,8 +106,12 @@ app/actions/
                         Kept apart from officer-invite.ts. No role check (§9 #6)
   attendance-review.ts  officer resolution mutations
   points.ts             grantPoints, voidAdjustment — and nothing else
-  members.ts            setMemberFieldValue, saveMemberNotes, saveFieldDefinition,
-                        setFieldArchived. No role check, and it says so (§9 #6)
+  members.ts            setMemberFieldValue, setMemberType (migration 30: CAS, no
+                        write or audit row when unchanged — but a stale token
+                        is a conflict even then, in both — revalidates the
+                        directory AND the member page), saveMemberNotes,
+                        saveFieldDefinition, setFieldArchived. No role check,
+                        and it says so (§9 #6)
   dues.ts               previewImport / commitImport (re-parses server-side),
                         savePayment (one write, CAS) and voidPayment (no CAS)
   presets.ts            savePreset (create or update, no CAS) and deletePreset —
@@ -116,7 +131,10 @@ lib/
   auth.ts               getOfficer / requireOfficer — the authorization boundary
   supabase/             server.ts (anon), client.ts (browser, zero importers),
                         admin.ts (service role, `server-only`-guarded)
-  types/database.ts     generated — do not hand-edit
+  types/database.ts     generated — do not hand-edit. ⚠️ Except that migration 30's
+                        additions WERE hand-ported: CLI 2.119.0's output drifts
+                        from this file in unrelated ways. Generate into a scratch
+                        file and port only the migration's change (operations.md)
   events.ts             event domain core: Central wall-clock conversion, window
                         helpers, expandSeries, previewEventEdit — no next/* imports
   checkin.ts            check-in resolution core + ORPHAN_WINDOW_HOURS + rate limit.
@@ -134,6 +152,20 @@ lib/
   members.ts            classifyTermEvents, formatAttendanceRate, FIELD_KEY_PATTERN
                         (a security control), the `cf:` namespace, fieldValue/
                         setFieldValue, AUDITED_MEMBER_COLUMNS
+  member-types.ts       member type and project eligibility (migration 30), pure:
+                        MEMBER_TYPES (mirrors the CHECK — change both together),
+                        DEFAULT_MEMBER_TYPE, PROJECT_MEMBER_TYPES, and the
+                        type / eligibility / month / meeting labels as string
+                        tables behind type guards. 🪤 formatMonth uses a name
+                        table, never new Date on a bare date
+  project-requirements.ts
+                        fetchProjectRequirements — one member's months and
+                        project meetings for a term, from the two officer-only
+                        views. Each list fails on its own (Read<T>, never []).
+                        The VERDICT is not here: it is the directory row's
+                        project_eligibility, read off the page's own
+                        member_directory row so the page and the table cannot
+                        disagree
   filters.ts            directory filter core: parse → MemberFilter → query. The
                         query builder is typed structurally so tests drive a fake.
                         READ_CHUNK + chunkRange(); the window stays the CALLER's.
@@ -177,6 +209,7 @@ lib/
                         📌 An empty result is still a valid answer, and the
                         <Hatch> fallback stays reachable
   merge.ts              merge core: planMerge, mergeNotes, mergedCustomFields,
+                        mergedMemberType (General is "no answer"),
                         rankDuplicateCandidates. MIN_DUPLICATE_SCORE is NOT
                         MIN_SUGGESTION_SCORE — measured against constructed shapes
   member-import.ts      roster-import core: importColumns (built FROM
@@ -408,7 +441,14 @@ public/                 partners/ (4 logos); misa-logo.png (the real wordmark,
                         build-photos.mjs from the gitignored pictures/ — do not
                         hand-edit, and read the photography invariant before
                         adding to it
-tests/                  Vitest — integration tests against the local stack
+tests/                  Vitest — integration tests against the local stack.
+                        member-types.test.ts is pure; project-eligibility.test.ts
+                        places fixtures in a far-past and a far-future Fall (so
+                        every month's state is fixed whatever today's date is)
+                        and checks the views against member_directory's verdict.
+                        member-directory.test.ts's type filters sit on a
+                        far-past Fall too; both pick one with helpers.ts's
+                        pickEmptyFall
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()
 next.config.ts          redirects() only: /attend, /leaderboard and /lookup →

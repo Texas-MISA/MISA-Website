@@ -240,6 +240,33 @@ describe("presetSummary", () => {
     expect(parts).toContain("“rowan”");
   });
 
+  it("names member type and project eligibility with their column headers", () => {
+    // Migration 30. "No" alone describes nothing, so each line says which
+    // column it narrows — and in the directory's own words.
+    const parts = presetSummary(
+      filterOf("memberType=data_project&eligibility=no"),
+      FIELDS
+    );
+    expect(parts).toContain("Member type: Data project");
+    expect(parts).toContain("Project eligibility: No");
+    expect(
+      presetSummary(filterOf("eligibility=not_applicable"), FIELDS)
+    ).toContain("Project eligibility: N/A");
+  });
+
+  it("📌 describes a preset saved before migration 30 exactly as before", () => {
+    // A stored query with neither key parses to `all` for both, so the summary
+    // gains no line and the chip narrows what it always narrowed.
+    expect(presetSummary(filterOf("dues=unpaid"), FIELDS)).toEqual([
+      "Dues not paid",
+    ]);
+    expect(canonicalPresetQuery("dues=unpaid", FIELDS)).toBe("dues=unpaid");
+    // And the new keys survive canonicalisation on write.
+    expect(
+      canonicalPresetQuery("eligibility=no&memberType=client_project", FIELDS)
+    ).toBe("memberType=client_project&eligibility=no");
+  });
+
   it("uses the definition's label for a custom field, not its key", () => {
     expect(presetSummary(filterOf("cf%3Ashirt_size=M"), FIELDS)).toContain(
       "Shirt Size: M"

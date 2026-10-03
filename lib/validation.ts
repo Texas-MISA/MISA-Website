@@ -15,6 +15,7 @@ import {
   MAX_OPTION_LENGTH,
   RESERVED_FIELD_KEYS,
 } from "@/lib/members";
+import { MEMBER_TYPES } from "@/lib/member-types";
 import { MIN_OFFICER_PASSWORD } from "@/lib/officer-invites";
 import {
   MAX_GRANT_MEMBERS,
@@ -506,6 +507,28 @@ export const memberNotesSchema = z.object({
 });
 
 export type MemberNotesFields = z.infer<typeof memberNotesSchema>;
+
+/**
+ * Setting a member's type (migration 30): this member, one of the four types.
+ *
+ * An enum rather than a free string checked later, unlike a custom-field value:
+ * the list is closed and fixed in code (MEMBER_TYPES, mirroring
+ * `members_member_type_valid`), so there is no definition to load and nothing
+ * the form could post that the schema cannot judge. There is no empty "clear"
+ * option either: the column is NOT NULL, and General already means "no
+ * particular type".
+ *
+ * `expectedUpdatedAt` is the row-level compare-and-set anchor every member edit
+ * shares, carried as the raw PostgREST string for the reason memberFieldValue
+ * gives.
+ */
+export const memberTypeSchema = z.object({
+  memberId: z.uuid(),
+  memberType: z.enum(MEMBER_TYPES, "Pick a member type"),
+  expectedUpdatedAt: z.string().min(1),
+});
+
+export type MemberTypeFields = z.infer<typeof memberTypeSchema>;
 
 // ---------------------------------------------------------------------------
 // Saved filter presets (§7 Stage 6 phase 7a)

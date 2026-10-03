@@ -59,6 +59,8 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     pending_count: 0,
     last_seen_at: "2026-03-01T02:00:00.000Z",
     dues_paid_term: false,
+    member_type: "general",
+    project_eligibility: "not_applicable",
     custom_fields: {},
     ...over,
   };
@@ -103,6 +105,34 @@ describe("exportCatalogue", () => {
     for (const field of catalogue) {
       expect(field.key.startsWith("cf:")).toBe(false);
     }
+  });
+
+  it("places member type and project eligibility after Dues, as text", () => {
+    // Migration 30. Catalogue order is column order in the table, the picker
+    // and the file at once, so the two land beside the other calculated
+    // column rather than after the officer notes.
+    const keys = exportCatalogue([definition()]).map((field) => field.key);
+    const dues = keys.indexOf("dues");
+    expect(keys.slice(dues, dues + 4)).toEqual([
+      "dues",
+      "member_type",
+      "project_eligibility",
+      "notes",
+    ]);
+
+    const byKey = new Map(
+      exportCatalogue([]).map((field) => [field.key, field])
+    );
+    expect(byKey.get("member_type")).toMatchObject({
+      label: "Member type",
+      kind: "text",
+      source: "builtin",
+    });
+    expect(byKey.get("project_eligibility")).toMatchObject({
+      label: "Project eligibility",
+      kind: "text",
+      source: "builtin",
+    });
   });
 });
 
@@ -242,6 +272,56 @@ describe("projectRow", () => {
     expect(
       projectRow(row({ dues_paid_term: null }), pick("dues"))[0]
     ).toEqual({ kind: "empty" });
+  });
+
+  it("renders the member type and the verdict as the words the directory prints", () => {
+    // Migration 30. Text, so a spreadsheet and the screen read alike — and
+    // "N/A" trips none of = + - @, so the formula guard leaves it as typed.
+    expect(
+      projectRow(row({ member_type: "data_project" }), pick("member_type"))[0]
+    ).toEqual({ kind: "text", value: "Data project" });
+    expect(
+      projectRow(row({ member_type: "junior_director" }), pick("member_type"))[0]
+    ).toEqual({ kind: "text", value: "Junior director" });
+
+    for (const [stored, shown] of [
+      ["yes", "Yes"],
+      ["no", "No"],
+      ["not_applicable", "N/A"],
+    ] as const) {
+      expect(
+        projectRow(
+          row({ project_eligibility: stored }),
+          pick("project_eligibility")
+        )[0]
+      ).toEqual({ kind: "text", value: shown });
+    }
+  });
+
+  it("leaves a null type or verdict EMPTY, never a dash", () => {
+    // "—" is the screen's spelling of an empty cell (directoryCellText); a file
+    // leaves it blank, the same as a null rate.
+    expect(
+      projectRow(row({ member_type: null }), pick("member_type"))[0]
+    ).toEqual({ kind: "empty" });
+    expect(
+      projectRow(row({ project_eligibility: null }), pick("project_eligibility"))[0]
+    ).toEqual({ kind: "empty" });
+  });
+
+  it("puts both migration-30 columns IN the default field list", () => {
+    // They are default COLUMNS, and the default file is the default table.
+    expect(DEFAULT_EXPORT_FIELDS).toContain("member_type");
+    expect(DEFAULT_EXPORT_FIELDS).toContain("project_eligibility");
+    expect([...DEFAULT_EXPORT_FIELDS]).toEqual([
+      "name",
+      "email",
+      "eid",
+      "total_points",
+      "dues",
+      "member_type",
+      "project_eligibility",
+    ]);
   });
 
   it("puts dues IN the default field list (officer, 2026-10-01)", () => {
@@ -471,5 +551,51 @@ describe("the export route's boundaries", () => {
   it("carries no role check — a §9 consistency decision, not an oversight", () => {
     expect(source).not.toContain('role === "admin"');
     expect(source).not.toContain("officer.role");
+  });
+});
+
+describe("the select literals that feed ExportSourceRow", () => {
+  // 🪤 The route reads each chunk as `data as ExportSourceRow[]`, and that CAST
+  // compiles whether or not the select named every column — so a key the type
+  // gained and the route's literal lacked would export as a blank column with
+  // nothing failing anywhere. The page's literals are compile-checked through
+  // projectRow; the route's are not. This closes the gap for all four.
+  //
+  // The keys come from the `row()` fixture above, which is typed as an
+  // ExportSourceRow with every key REQUIRED — so tsc fails this file the moment
+  // the type gains a key the fixture does not carry, and this list cannot fall
+  // behind the type.
+  const literal = (path: string, name: string): string[] => {
+    const source = readFileSync(path, "utf8");
+    const match = new RegExp(`const ${name} =\\s*"([^"]+)"`).exec(source);
+    if (!match) throw new Error(`${name} in ${path} is no longer one string literal`);
+    return match[1].split(",").map((column) => column.trim());
+  };
+
+  const PAGE = "app/admin/(shell)/members/page.tsx";
+  const ROUTE = "app/admin/(shell)/members/export/route.ts";
+
+  const literals: [string, string[]][] = [
+    ["page COLUMNS", literal(PAGE, "COLUMNS")],
+    ["page COLUMNS_WITH_ATTENDANCE", literal(PAGE, "COLUMNS_WITH_ATTENDANCE")],
+    ["route EXPORT_COLUMNS", literal(ROUTE, "EXPORT_COLUMNS")],
+    [
+      "route EXPORT_COLUMNS_WITH_ATTENDANCE",
+      literal(ROUTE, "EXPORT_COLUMNS_WITH_ATTENDANCE"),
+    ],
+  ];
+
+  it.each(literals)("%s selects every ExportSourceRow column", (_name, columns) => {
+    for (const key of Object.keys(row())) {
+      expect(columns, key).toContain(key);
+    }
+  });
+
+  it("found four real literals, so the check above is not vacuous", () => {
+    for (const [name, columns] of literals) {
+      expect(columns.length, name).toBeGreaterThan(10);
+    }
+    expect(Object.keys(row())).toContain("member_type");
+    expect(Object.keys(row())).toContain("project_eligibility");
   });
 });

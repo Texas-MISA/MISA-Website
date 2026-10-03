@@ -4,7 +4,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyMemberFilter,
+  ELIGIBILITY_FILTERS,
   MEMBER_TERM_ALL,
+  MEMBER_TYPE_FILTERS,
   chunkRange,
   defaultDirection,
   hasRelationalFilter,
@@ -26,6 +28,7 @@ import {
   type SortableField,
 } from "@/lib/filters";
 import { customFieldKey } from "@/lib/members";
+import { MEMBER_TYPES, PROJECT_ELIGIBILITIES } from "@/lib/member-types";
 
 // Pure tests for the directory's filter core (§7 Stage 6 phase 1). No database:
 // applyMemberFilter is handed a recording fake in place of a PostgREST builder,
@@ -615,6 +618,139 @@ describe("dues status (Stage 6.5 phase 4)", () => {
     expect(params.get("dues")).toBe("unpaid");
     expect(params.get("sort")).toBe("total_points");
     expect(params.get("q")).toBe("sharma");
+  });
+});
+
+// Migration 30. Two more categorical selectors over default columns — the
+// member's type and the view's calculated eligibility verdict.
+describe("member type and project eligibility (migration 30)", () => {
+  it("both default to 'all', which narrows nothing", () => {
+    const filter = parseMemberFilter({});
+    expect(filter.memberType).toBe("all");
+    expect(filter.eligibility).toBe("all");
+    expect(isDefaultFilter(filter)).toBe(true);
+    const calls = callsFor({ memberType: "all", eligibility: "all" });
+    expect(calls.some(([, column]) => column === "member_type")).toBe(false);
+    expect(calls.some(([, column]) => column === "project_eligibility")).toBe(
+      false
+    );
+  });
+
+  it("accepts exactly the column's own values, and falls back on anything else", () => {
+    for (const memberType of MEMBER_TYPE_FILTERS) {
+      expect(parseMemberFilter({ memberType }).memberType).toBe(memberType);
+    }
+    for (const eligibility of ELIGIBILITY_FILTERS) {
+      expect(parseMemberFilter({ eligibility }).eligibility).toBe(eligibility);
+    }
+    // The list is MEMBER_TYPES plus `all`, so it cannot drift from the CHECK.
+    expect(MEMBER_TYPE_FILTERS.slice(1)).toEqual([...MEMBER_TYPES]);
+    expect(ELIGIBILITY_FILTERS.slice(1)).toEqual([...PROJECT_ELIGIBILITIES]);
+
+    for (const junk of ["officer", "DATA_PROJECT", "Data project", "1", ""]) {
+      expect(parseMemberFilter({ memberType: junk }).memberType, junk).toBe(
+        "all"
+      );
+    }
+    for (const junk of ["maybe", "YES", "N/A", "true", ""]) {
+      expect(parseMemberFilter({ eligibility: junk }).eligibility, junk).toBe(
+        "all"
+      );
+    }
+  });
+
+  it("translates each to one equality on the view's column", () => {
+    expect(callsFor({ memberType: "data_project" })).toContainEqual([
+      "eq",
+      "member_type",
+      "data_project",
+    ]);
+    expect(callsFor({ eligibility: "no" })).toContainEqual([
+      "eq",
+      "project_eligibility",
+      "no",
+    ]);
+    expect(callsFor({ eligibility: "not_applicable" })).toContainEqual([
+      "eq",
+      "project_eligibility",
+      "not_applicable",
+    ]);
+  });
+
+  it("composes with the term scope and the other categoricals as a conjunction", () => {
+    const calls = callsFor({
+      term: null,
+      memberType: "client_project",
+      eligibility: "no",
+      dues: "unpaid",
+    });
+    expect(calls).toContainEqual(["eq", "term", TEST_TERM]);
+    expect(calls).toContainEqual(["eq", "member_type", "client_project"]);
+    expect(calls).toContainEqual(["eq", "project_eligibility", "no"]);
+    expect(calls).toContainEqual(["eq", "dues_paid_term", false]);
+    expect(calls.some(([m]) => m === "range" || m === "limit")).toBe(false);
+  });
+
+  it("round-trips through the URL, omitting only the defaults", () => {
+    const filter = parseMemberFilter({
+      memberType: "junior_director",
+      eligibility: "yes",
+    });
+    const params = memberFilterToParams(filter);
+    expect(params.get("memberType")).toBe("junior_director");
+    expect(params.get("eligibility")).toBe("yes");
+    expect(parseMemberFilter(Object.fromEntries(params))).toEqual(filter);
+
+    const plain = memberFilterToParams(parseMemberFilter({}));
+    expect(plain.has("memberType")).toBe(false);
+    expect(plain.has("eligibility")).toBe(false);
+  });
+
+  it("sits after source in the URL, so the serialization is stable", () => {
+    expect(
+      memberFilterToParams(
+        parseMemberFilter({
+          pending: "has",
+          eligibility: "no",
+          memberType: "data_project",
+          source: "admin",
+          dues: "paid",
+        })
+      ).toString()
+    ).toBe("dues=paid&source=admin&memberType=data_project&eligibility=no&pending=has");
+  });
+
+  it("survives a change to any other control", () => {
+    // The memberFilterUrl trap again: anything the round trip drops is reset by
+    // the next keystroke in the search box.
+    const filter = parseMemberFilter({ memberType: "data_project", eligibility: "no" });
+    const next = new URLSearchParams(
+      memberFilterUrl(filter, { q: "dara" }, NO_FIELDS)
+    );
+    expect(next.get("memberType")).toBe("data_project");
+    expect(next.get("eligibility")).toBe("no");
+    expect(next.get("q")).toBe("dara");
+  });
+
+  it("is not sortable — no new sorting", () => {
+    expect(parseMemberFilter({ sort: "member_type" }).sort).toBe("name");
+    expect(parseMemberFilter({ sort: "project_eligibility" }).sort).toBe("name");
+    expect(sortColumn("member_type", NO_FIELDS)).toBeNull();
+    expect(sortColumn("project_eligibility", NO_FIELDS)).toBeNull();
+  });
+
+  it("📌 a query saved before either key existed still parses — to 'all'", () => {
+    // A saved view is a query string; one written before migration 30 carries
+    // neither key, and a missing key means "all". It narrows exactly what it
+    // narrowed before.
+    const old = parseMemberFilter(
+      Object.fromEntries(new URLSearchParams("dues=unpaid&source=self_checkin"))
+    );
+    expect(old.memberType).toBe("all");
+    expect(old.eligibility).toBe("all");
+    expect(memberFilterToParams(old).toString()).toBe(
+      "dues=unpaid&source=self_checkin"
+    );
   });
 });
 
@@ -1226,5 +1362,16 @@ describe("the filter controls stay controlled", () => {
     // Assembling from the incoming URL text is what let a stale control and the
     // query disagree in the first place.
     expect(source).not.toContain("new URLSearchParams");
+  });
+
+  it("has a control for each migration-30 filter, and Clear counts both", () => {
+    // A filter with no control on screen is the phase-1 defect from the other
+    // side — a count nobody can account for — and a Clear that ignored one
+    // would hide the only way back.
+    for (const field of ["memberType", "eligibility"]) {
+      expect(source).toContain(`value={filter.${field}}`);
+      expect(source).toContain(`update({ ${field}: e.target.value })`);
+      expect(source).toContain(`filter.${field} !== "all"`);
+    }
   });
 });

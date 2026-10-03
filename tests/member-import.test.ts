@@ -68,6 +68,10 @@ describe("importColumns", () => {
     const keys = importColumns([SHIRT]).map((c) => c.key);
     expect(keys).toContain("shirt_size");
     // The catalogue carries these; an import must not pretend to set them.
+    // Member type is not calculated, but it is not importable either (yet): an
+    // imported member starts as General like any other, and the type is set
+    // where it is audited one member at a time. Project eligibility IS
+    // calculated.
     for (const calculated of [
       "total_points",
       "attendance_rate",
@@ -77,6 +81,8 @@ describe("importColumns", () => {
       "events_attended",
       "source",
       "notes",
+      "member_type",
+      "project_eligibility",
     ]) {
       expect(keys).not.toContain(calculated);
     }
@@ -191,9 +197,12 @@ describe("planRosterImport", () => {
   });
 
   it("round-trips a file shaped like the export, ignoring calculated columns", () => {
+    // The default export carries Member type and Project eligibility since
+    // migration 30, so a downloaded file arrives with both — named as ignored,
+    // never set, never an error.
     const csv = [
-      "Name,Email,EID,Total points,Dues,Attendance rate (%),Shirt Size",
-      "Ada Lovelace,ada@example.edu,al1234,27,Paid,86,M",
+      "Name,Email,EID,Total points,Dues,Member type,Project eligibility,Attendance rate (%),Shirt Size",
+      "Ada Lovelace,ada@example.edu,al1234,27,Paid,Data project,Yes,86,M",
     ].join("\n");
     const result = plan(csv, { definitions: [SHIRT] });
     expect(result.kind).toBe("ok");
@@ -201,6 +210,8 @@ describe("planRosterImport", () => {
     expect(result.ignoredColumns).toEqual([
       "Total points",
       "Dues",
+      "Member type",
+      "Project eligibility",
       "Attendance rate (%)",
     ]);
     expect(result.rows[0].customFields).toEqual({ shirt_size: "M" });

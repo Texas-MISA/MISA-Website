@@ -9,6 +9,7 @@ import {
   matchAxisCount,
   mergeNotes,
   mergedCustomFields,
+  mergedMemberType,
   MIN_DUPLICATE_AXES,
   MIN_DUPLICATE_SCORE,
   planMerge,
@@ -53,6 +54,7 @@ function member(over: Partial<MergeMember> = {}): MergeMember {
     joinedAt: "2026-08-01T12:00:00.000Z",
     notes: null,
     customFields: {},
+    memberType: "general",
     ...over,
   };
 }
@@ -240,6 +242,63 @@ describe("planMerge — fields, notes and dates", () => {
   });
 });
 
+describe("mergedMemberType — General counts as no answer", () => {
+  // Migration 30. The custom-field rule with General standing in for "unset":
+  // it is the column's default and everybody's type until an officer says
+  // otherwise, so a General survivor has nothing a duplicate's real type should
+  // lose to.
+
+  it("keeps the survivor's real type over a General duplicate", () => {
+    expect(mergedMemberType("data_project", "general")).toEqual({
+      survivorValue: "data_project",
+      loserValue: "general",
+      value: "data_project",
+      fromLoser: false,
+      dropped: null,
+    });
+  });
+
+  it("takes the duplicate's real type when the survivor is General", () => {
+    // The preview says "Member type becomes Data project (from the duplicate)".
+    expect(mergedMemberType("general", "data_project")).toMatchObject({
+      value: "data_project",
+      fromLoser: true,
+      dropped: null,
+    });
+  });
+
+  it("keeps the survivor's when both are real and differ, and names the dropped one", () => {
+    // The one case that loses something, so it is reported rather than silent.
+    expect(mergedMemberType("data_project", "client_project")).toMatchObject({
+      value: "data_project",
+      fromLoser: false,
+      dropped: "client_project",
+    });
+  });
+
+  it("drops nothing when both agree, or both are General", () => {
+    expect(mergedMemberType("client_project", "client_project")).toMatchObject({
+      value: "client_project",
+      fromLoser: false,
+      dropped: null,
+    });
+    expect(mergedMemberType("general", "general")).toMatchObject({
+      value: "general",
+      fromLoser: false,
+      dropped: null,
+    });
+  });
+
+  it("is what planMerge puts in the plan", () => {
+    const p = plan({
+      survivor: { memberType: "general" },
+      loser: { memberType: "junior_director" },
+    });
+    expect(p.memberType).toEqual(mergedMemberType("general", "junior_director"));
+    expect(p.memberType.value).toBe("junior_director");
+  });
+});
+
 describe("mergeNotes", () => {
   it("keeps both, never overwrites", () => {
     expect(mergeNotes("Officer note A", "Officer note B")).toBe(
@@ -331,6 +390,15 @@ describe("the walkthrough's two UI findings", () => {
     // column — and before this the trail showed only notes and custom_fields
     // moving. §4.2 asks a mutation to record what it changed.
     expect(AUDITED_MEMBER_COLUMNS).toContain("joined_at");
+  });
+
+  it("audits member_type, which a merge writes too (migration 30)", () => {
+    // The same lesson as joined_at, learned before the walkthrough this time:
+    // commitMerge writes the survivor's type, so the trail must record it.
+    expect(AUDITED_MEMBER_COLUMNS).toContain("member_type");
+    const action = readFileSync("app/actions/member-merge.ts", "utf8");
+    expect(action).toContain("member_type: plan.memberType.value");
+    expect(action).toMatch(/const MERGE_MEMBER_COLUMNS =\s*"[^"]*\bmember_type\b/);
   });
 
   it("keeps the member picker outside the form React resets", () => {

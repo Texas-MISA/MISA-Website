@@ -14,18 +14,21 @@ import {
   setFieldValue,
   withoutToken,
 } from "@/lib/members";
+import type { MemberType } from "@/lib/member-types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   fieldDefinitionEditSchema,
   fieldDefinitionSchema,
   memberFieldValueSchema,
   memberNotesSchema,
+  memberTypeSchema,
 } from "@/lib/validation";
 
 // Member mutations (§4.2, §7 Stage 6 phase 4): one custom-field value, the
-// officer notes, and the field definitions themselves. Same house shape as
-// app/actions/points.ts and app/actions/attendance-review.ts — read either of
-// those for the shared rationale rather than repeating it here.
+// member type (migration 30), the officer notes, and the field definitions
+// themselves. Same house shape as app/actions/points.ts and
+// app/actions/attendance-review.ts — read either of those for the shared
+// rationale rather than repeating it here.
 //
 // members and member_field_definitions are both RLS deny-all, so every read and
 // write goes through the service-role client behind a getOfficer() guard. The
@@ -145,10 +148,18 @@ export async function setMemberFieldValue(
 
     // A no-op write would still bump updated_at and still log an audit row, and
     // that row's diff would show nothing changed — noise in the one log that
-    // exists to say who changed what. Auto-submit only fires on change, so this
+    // exists to say who changed what. Auto-save only fires on change, so this
     // is the second-tab and replayed-POST case rather than the common one.
+    //
+    // 🔓 And a second tab is a STALE screen: another officer already made this
+    // pick. Handing it the live token would let its next save pass the
+    // compare-and-set over an edit it never saw (review, 2026-10-03), so a
+    // token that does not match is a conflict here too — raw strings, as below.
     const next = fields.value === "" ? null : fields.value;
     if (fieldValue(before.custom_fields, fields.key) === next) {
+      if (before.updated_at !== fields.expectedUpdatedAt) {
+        return { status: "conflict" };
+      }
       return {
         status: "done",
         key: fields.key,
@@ -204,6 +215,135 @@ export async function setMemberFieldValue(
   } catch (e) {
     console.error(
       "setMemberFieldValue failed:",
+      e instanceof Error ? e.message : String(e)
+    );
+    return { status: "error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Member type (migration 30)
+// ---------------------------------------------------------------------------
+
+export type MemberTypeState =
+  | { status: "idle" }
+  | { status: "unauthorized" }
+  | { status: "error" }
+  /** Someone else changed this member between the render and the save. */
+  | { status: "conflict" }
+  | {
+      status: "invalid";
+      fieldErrors: Partial<Record<"memberId" | "memberType", string[]>>;
+    }
+  /** Carries the fresh token, which the row hands to its sibling cells. */
+  | { status: "done"; memberType: MemberType; updatedAt: string };
+
+/**
+ * Set one member's type.
+ *
+ * Called from the directory's inline cell and from the member detail page — the
+ * same action for both, for the reason setMemberFieldValue gives. It mirrors
+ * that action step for step, minus the definition lookup: the four types are a
+ * closed list in code and `memberTypeSchema` has already judged the value.
+ *
+ * 📌 Revalidates the directory AND the member's page, and that is the point
+ * rather than housekeeping: `project_eligibility` is calculated from the type,
+ * so the eligibility cell beside the select — and the member page's verdict —
+ * must come back in the same round trip as the save.
+ */
+export async function setMemberType(
+  _prev: MemberTypeState,
+  formData: FormData
+): Promise<MemberTypeState> {
+  const officer = await getOfficer();
+  if (!officer) return { status: "unauthorized" };
+
+  const parsed = memberTypeSchema.safeParse({
+    memberId: formData.get("memberId"),
+    memberType: formData.get("memberType"),
+    expectedUpdatedAt: formData.get("expectedUpdatedAt"),
+  });
+  if (!parsed.success) {
+    return {
+      status: "invalid",
+      fieldErrors: fieldErrorsOf<"memberId" | "memberType">(
+        parsed.error,
+        "memberType"
+      ),
+    };
+  }
+  const fields = parsed.data;
+
+  try {
+    const db = createAdminClient();
+
+    const { data: before, error: beforeError } = await db
+      .from("members")
+      .select(AUDITED_MEMBER_COLUMNS)
+      .eq("id", fields.memberId)
+      .maybeSingle();
+
+    if (beforeError || !before) {
+      console.error(
+        "setMemberType failed:",
+        beforeError?.message ?? "member not found"
+      );
+      return { status: "error" };
+    }
+
+    // Unchanged: no write, no audit row — the same rule as a custom field. A
+    // no-op update would still move updated_at and log a diff showing nothing.
+    // 🔓 And a conflict when the token is stale, never the live token handed
+    // to a screen that has not seen the edit — see setMemberFieldValue.
+    if (before.member_type === fields.memberType) {
+      if (before.updated_at !== fields.expectedUpdatedAt) {
+        return { status: "conflict" };
+      }
+      return {
+        status: "done",
+        memberType: fields.memberType,
+        updatedAt: before.updated_at,
+      };
+    }
+
+    const { data: after, error } = await db
+      .from("members")
+      .update({ member_type: fields.memberType })
+      .eq("id", fields.memberId)
+      // The raw PostgREST string, never a Date — see setMemberFieldValue.
+      .eq("updated_at", fields.expectedUpdatedAt)
+      // The same literal as `before` — see AUDITED_MEMBER_COLUMNS.
+      .select(AUDITED_MEMBER_COLUMNS)
+      .maybeSingle();
+
+    if (error) {
+      console.error("setMemberType failed:", error.message);
+      return { status: "error" };
+    }
+    // Zero rows back means another officer saved between the render and here.
+    if (!after) return { status: "conflict" };
+
+    await writeAudit(db, {
+      entityType: "member",
+      entityId: fields.memberId,
+      actorId: officer.userId,
+      action: "member.updated",
+      before: withoutToken(before),
+      after: withoutToken(after),
+      // The diff already reads `member_type: general → data_project`; the note
+      // names the field the officer recognises, as a custom field's label does.
+      note: "Member type",
+    });
+
+    revalidateMembers(fields.memberId);
+    return {
+      status: "done",
+      memberType: fields.memberType,
+      updatedAt: after.updated_at,
+    };
+  } catch (e) {
+    console.error(
+      "setMemberType failed:",
       e instanceof Error ? e.message : String(e)
     );
     return { status: "error" };
@@ -672,8 +812,9 @@ function fieldErrorsOf<K extends string>(
 function revalidateMembers(id: string | null) {
   revalidatePath(DIRECTORY);
   if (id) revalidatePath(`${DIRECTORY}/${id}`);
-  // Not /leaderboard: a custom field and a note change no point total. Grants
-  // and attendance do, and those revalidate it from their own actions.
+  // Not /leaderboard: a custom field, a note and a member type change no point
+  // total. Grants and attendance do, and those revalidate it from their own
+  // actions.
 }
 
 function revalidateFields() {

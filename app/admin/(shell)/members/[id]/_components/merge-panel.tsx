@@ -12,6 +12,8 @@ import {
   type PreviewState,
 } from "@/app/actions/member-merge";
 import type { MemberOption } from "@/lib/member-options";
+import { formatMemberType } from "@/lib/member-types";
+import type { PlannedMemberType } from "@/lib/merge";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { SectionHeading } from "@/components/ui/page-header";
 
@@ -268,6 +270,8 @@ function Preview({
         <Stat label="Payments" value={counts.payments} />
       </dl>
 
+      <MemberTypeLine planned={preview.memberType} />
+
       {collisions.length > 0 && (
         <div className="mt-4">
           <p className="text-sm font-medium">
@@ -362,6 +366,40 @@ function Preview({
         </button>
       )}
     </form>
+  );
+}
+
+/**
+ * What the survivor's member type becomes — always stated, because the merge
+ * writes it whether or not it changes.
+ *
+ * Not a choice, unlike a conflicting custom field: General is "no answer", so
+ * the duplicate's type wins only over a General survivor, and two different
+ * real types keep the survivor's. That second case is the one that loses
+ * something, so it names the type being dropped rather than letting it vanish.
+ * The words come from formatMemberType, a string table — nothing here formats
+ * a date or calls Intl.
+ */
+function MemberTypeLine({ planned }: { planned: PlannedMemberType }) {
+  const kept = formatMemberType(planned.value);
+  return (
+    <p className="mt-4 text-sm">
+      {planned.fromLoser ? (
+        <>
+          Member type becomes <span className="font-medium">{kept}</span> (from
+          the duplicate).
+        </>
+      ) : planned.dropped !== null ? (
+        <>
+          Member type stays <span className="font-medium">{kept}</span>; the
+          duplicate&apos;s {formatMemberType(planned.dropped)} is dropped.
+        </>
+      ) : (
+        <>
+          Member type stays <span className="font-medium">{kept}</span>.
+        </>
+      )}
+    </p>
   );
 }
 

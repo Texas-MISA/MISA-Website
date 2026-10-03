@@ -14,9 +14,11 @@ import {
   fieldDefinitionSchema,
   memberFieldValueSchema,
   memberNotesSchema,
+  memberTypeSchema,
   pointGrantSchema,
   pointVoidSchema,
 } from "@/lib/validation";
+import { MEMBER_TYPES } from "@/lib/member-types";
 
 // Pure unit tests — no database. The schema is the only email-format check
 // in the system, and the normalized-length refinement is what stops IDs like
@@ -278,6 +280,16 @@ describe("fieldDefinitionSchema", () => {
     expect(result.error?.issues[0].message).toMatch(/built-in/);
   });
 
+  it("refuses both migration-30 column names, with the built-in message", () => {
+    // A "Member type" dropdown is exactly what an officer would have built
+    // before the column existed. The same rule is the CHECK in migration 30.
+    for (const key of ["member_type", "project_eligibility"]) {
+      const result = fieldDefinitionSchema.safeParse({ ...FIELD_BASE, key });
+      expect(result.success, key).toBe(false);
+      expect(result.error?.issues[0].message, key).toMatch(/built-in/);
+    }
+  });
+
   it("refuses two options that differ only in case", () => {
     // The stored value IS the option text, so "Paid" and "paid" would be
     // indistinguishable once written into members.custom_fields — which is
@@ -389,6 +401,52 @@ describe("memberFieldValueSchema", () => {
       memberFieldValueSchema.safeParse({ ...VALUE_BASE, value: "Banana" })
         .success
     ).toBe(true);
+  });
+});
+
+describe("memberTypeSchema", () => {
+  const TYPE_BASE = {
+    memberId: UUID_A,
+    memberType: "data_project",
+    expectedUpdatedAt: "2026-08-02T22:34:16.934133+00:00",
+  };
+
+  it("accepts every member type and nothing else", () => {
+    // The list is MEMBER_TYPES, which mirrors members_member_type_valid — so
+    // the schema and the CHECK accept exactly the same four values.
+    for (const memberType of MEMBER_TYPES) {
+      expect(
+        memberTypeSchema.parse({ ...TYPE_BASE, memberType }).memberType
+      ).toBe(memberType);
+    }
+    for (const memberType of ["", "officer", "General", "Data project", "data project"]) {
+      expect(
+        memberTypeSchema.safeParse({ ...TYPE_BASE, memberType }).success,
+        memberType
+      ).toBe(false);
+    }
+  });
+
+  it("has no clear: the column is NOT NULL", () => {
+    expect(
+      memberTypeSchema.safeParse({ ...TYPE_BASE, memberType: null }).success
+    ).toBe(false);
+  });
+
+  it("requires the compare-and-set anchor, kept as the raw string", () => {
+    expect(
+      memberTypeSchema.safeParse({ ...TYPE_BASE, expectedUpdatedAt: "" }).success
+    ).toBe(false);
+    // Microseconds intact — a Date round trip would truncate them.
+    expect(memberTypeSchema.parse(TYPE_BASE).expectedUpdatedAt).toBe(
+      "2026-08-02T22:34:16.934133+00:00"
+    );
+  });
+
+  it("requires a real member id", () => {
+    expect(
+      memberTypeSchema.safeParse({ ...TYPE_BASE, memberId: "not-a-uuid" }).success
+    ).toBe(false);
   });
 });
 

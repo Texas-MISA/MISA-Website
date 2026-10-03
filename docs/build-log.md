@@ -7,6 +7,107 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🏷️ **Members gain a standing type, and the directory calculates project eligibility (officer, 2026-10-03; built the same day on `portal-launch`, not on `main`; migration 30 is LOCAL ONLY).** This is `/admin/members` item 2, doc v1.83; §4.5 of the architecture doc has the exact rule.
+
+  - **The root facts.** The officer asked for a member type that is "like a custom-field dropdown, but important; other features will read it later", with four values: General, Data project, Client project and Junior director. They also asked for a calculated **project eligibility** for data-project and client-project members. Those members must attend every Projects event, and 2 of each calendar month's general meetings. Two facts shaped the build:
+    - "General meeting" has no marker in the schema, so for now it is any published event on a Thursday in Central time that is not a Projects event.
+    - Nothing tracked a project member before this, so everyone starts as General.
+  - **Decisions (officer, 2026-10-03).**
+    - A month is judged once it ends, and a missed project meeting counts once it ends.
+    - The whole semester counts for everyone: projects have an application process.
+    - A month needs 2 meetings, or all of them when fewer than 2 were held.
+    - Everyone starts as General, and project members are assumed to be on the roster.
+    - There is no new sorting.
+    - Eligibility gates nothing, and with no excusals every miss counts.
+
+    The plan's interpretations were approved with it. Only published events count, and a meeting is held once it has ended. A Thursday Projects event is a project meeting only. The type is standing, not per term. A pending check-in counts for nothing until it is resolved.
+  - **What was built.**
+    - **Migration 30.**
+      - Section 0 refuses first, with a readable error and nothing changed, if any field definition (archived included) already uses `member_type` or `project_eligibility`. The re-added CHECK would otherwise fail with a message naming neither key, and production could hold one, built by an officer waiting for this feature.
+      - Then it adds `members.member_type` (CHECK, NOT NULL, default `general`, a catalogue-only change that rewrites no row and moves no compare-and-set token) and two officer-only views. `member_project_meetings` has one row per member × published Projects event. `member_general_meeting_months` has one row per member × term × Central month holding a general meeting; the Thursday rule lives only in its `general_meetings` CTE.
+      - `member_directory` gets the two columns appended by `create or replace`, with both revokes re-issued. Both keys are added to the reserved-key CHECK.
+      - It adds no table, so `scripts/wipe-remote.sh`'s accounting of the thirteen tables and `seed.sql`'s wipe list are unchanged. The seed names no type, so every seeded member is General.
+    - **`lib/member-types.ts`** (pure) holds the types, labels and formatters; `formatMonth` spells a month from a name table. **`lib/project-requirements.ts`** reads the two views for the member page, each list failing on its own.
+    - **`setMemberType`** in `app/actions/members.ts` follows `setMemberFieldValue` step for step, with `memberTypeSchema`. It skips the write and the audit row when the type is unchanged, and it writes a `member.updated` audit row with the note "Member type". It revalidates the directory and the member page, so the eligibility cell and the verdict arrive with the save. `AUDITED_MEMBER_COLUMNS` gains `member_type`, and `RESERVED_FIELD_KEYS` gains both keys.
+    - **The directory.**
+      - Both keys are dedicated columns and default fields, after Dues. The default table and file are now Member · Email · EID · Total points · Dues · Member type · Project eligibility, then the default custom fields.
+      - Neither sorts. The four select literals carry both columns.
+      - `member-type-cell.tsx` is a controlled select that saves on change, on the row's token. It announces through an always-mounted `sr-only` live region, and shows a value outside the list as a disabled option.
+      - `eligibility-mark.tsx` renders Yes as an affirm pill, No as a critical pill, N/A as muted text and null as "—".
+      - Two filters, `memberType` and `eligibility`, are parsed totally and serialised after `source`. Both go through `applyMemberFilter`, and `presetSummary` names them with their column headers.
+    - **The member page.**
+      - "Who this is" gains a read-only Member type row with a Change link to a new Member type section inside `MemberEditor`, which owns the compare-and-set token, so a type change followed by a notes save cannot conflict.
+      - A "Project requirements — {term}" section follows "This term". Any type but data or client project gets one line. A project member gets the verdict from the page's own directory row, a sentence saying Yes means nothing has failed so far, the Thursday rule in words, and a note when check-ins are pending.
+      - Two tables follow, each with its own error and empty notice. The months table reads Month · Thursday meetings · Attended · Needed · Result, with "N held" once the month is over and "N so far / M scheduled" while it runs. The project meetings table reads Date · Meeting · This member.
+    - **The merge.** `mergedMemberType` treats General as no answer. The survivor update writes the result, and the audit includes it. The preview always states the outcome and names a type that is dropped.
+  - 🔓 **Views, not functions, and it was measured.** Postgres checks EXECUTE on a function inside a view as the caller, and `leaderboard` is defined over `member_directory`, which anon reads through it. A relation inside a view is checked as its owner. With `psql` on the local stack:
+    - neither view has an ACL entry for anon or authenticated;
+    - inside `set local role anon`, `leaderboard` returned 29 rows while both views answered *permission denied for view*;
+    - `EXPLAIN (verbose)` on `leaderboard` shows `member_type` and `project_eligibility` pruned to `NULL::text`.
+
+    Nothing relies on the pruning.
+  - 🪤 **The directory's rows had to be keyed by member and term.** Under "Roster: All terms" a member has one row per term, and 26 of the 32 seeded members have more than one, so `key={row.id}` collided. Each row owns its compare-and-set token and its cells' state, and an inline select attaching to another term's row was the hazard. The key is `${row.id}:${row.term}`.
+  - 📌 **Behaviour that looks like a bug and is the rule.**
+    - A running month with one meeting scheduled reads "Needed 1" and stays "In progress" even once attended. An early *met* takes 2 attended, the only result a later-scheduled meeting cannot undo, so a one-meeting month is judged when it ends.
+    - The breakdown shows a missed project meeting as a critical pill, while the events grid keeps a miss neutral: there, one miss is the whole verdict.
+    - A past term's row is judged against today's type.
+  - 📌 **The roster import names both columns as ignored**, so a default export still round-trips; an imported member starts as General.
+  - 🪤 **`gen types` drifted, so the types were hand-ported.** `--linked` cannot see a local-only migration. CLI 2.119.0's `--local` output differs from the committed file in unrelated ways: it is unformatted, generated columns become `?: never`, `custom_fields` becomes `NonNullable<Json>`, and argument-less functions get `Args: Record<PropertyKey, never>`. Only migration 30's additions were ported, including the `Relationships` entries the generator emits for the new views. The full account is in `docs/operations.md`.
+  - 🐛 **Found, not fixed (pre-existing): anon can execute `member_terms()`.** Migration 29 revoked EXECUTE from anon and authenticated but not from PUBLIC, which every function grants by default. Its local `proacl` is `=X/postgres,…`, and as anon it returned 2 terms. It returns term names only. The fix is open in `tasks.md`, and the rule is now written down: a new function revokes from PUBLIC.
+  - ✅ **Tests.** `tests/member-types.test.ts` (pure, 15 cases) and `tests/project-eligibility.test.ts` (integration, 20 cases) are new. The integration fixtures sit in two terms:
+    - a random far-past Fall whose 30 September is a Thursday, where every month is final;
+    - a far-future Fall (2060–2099), where every month is still running.
+
+    They include one current-term Projects meeting asserted only in the direction that cannot depend on the date. Fifteen existing files gained cases:
+    - `tests/security.test.ts` names both views and asserts 42501 for anon and for a signed-in outsider.
+    - `tests/leaderboard.test.ts` keeps an ineligible data-project member on the board, read as anon.
+    - `tests/export.test.ts` checks every `ExportSourceRow` key against all four select literals. That closes the export route's silent-cast gap, where a missing column exported as a blank.
+
+    At hand-off the suite was 1,266 across 41 files, with five `tests/docs.test.ts` failures. The docs pass supplied what those asserted, and the suite is **1,266/1,266**.
+  - 🔍 **Review findings (independent review, 2026-10-03). Five findings, each verified and fixed the same day.**
+    - 🐛 **After a save, an inline select could show the wrong option.** React 19 calls `reset()` on a *submitted* `<form action>` once its action resolves. React never sets `defaultSelected` on a controlled `<select>`, so the reset puts it back on its first-rendered option, the server-rendered one after hydration, while state keeps the pick. The reset runs at the end of the commit, after React has written the select, so it wins until something next re-renders the cell. Both cells, `member-type-cell.tsx` and the pre-existing `member-field-cell.tsx`, now dispatch with `startTransition(() => formAction(formData))`, which requests no reset. A `useLayoutEffect` with no dependency list re-syncs the DOM after every commit, for the sr-only button that still submits.
+      - **Verified in isolation:** a standalone page on the project's React 19.2.4, server-rendered, hydrated and run in headless Chrome under both React builds.
+      - The old code left all three sequential saves, and both of two overlapping saves, on the server-rendered option; a later submit then posted that stale option.
+      - Dispatching alone fixed the change path but not the button, and the layout effect fixed both. `pending` stayed true, with the select disabled, while a save was in flight.
+      - A comment-stripped source test pins it.
+
+      **It explains item 1's "—" blank** (in item 1's entry below), and this item's walkthrough confirmed the fix in the app.
+    - **The directory test's type-filter block depended on the date.** It asserted Yes on the current term, which flips to No once that term holds an unattended, published, non-Projects Thursday in a month that has ended. A walkthrough fixture or a seed edit could put one there, and so could the file's own 3, 6 and 9-hour-old fixtures in a run just after midnight on the 1st. The seed's Fall 2026 events happen to avoid Thursdays. The block now owns a far-past Fall, picked as `tests/project-eligibility.test.ts` picks one. `pickEmptyFall` and `termOfEvent` moved to `tests/helpers.ts`, and the filters are scoped through `term`. With a hostile Thursday inserted into the current term, it still passed.
+    - 🔓 **An unchanged save from a stale screen was handed the live token.** A select fires only when the pick differs from what it shows, so `setMemberType`'s unchanged branch is reached mostly from a stale screen. Answering `done` with `before.updated_at` let the row's next save pass the compare-and-set over the other officer's edit. Both it and the pre-existing branch in `setMemberFieldValue` now answer `conflict` unless the token matches, as raw strings. The tests pin the branch and its database premises. The real actions were also run once from a scratch harness, with only the officer, the admin client and `revalidatePath` mocked. A stale token got `conflict` and a current one got `done` with the same token, with no write and no audit row either way.
+    - `docs/layout.md`'s `project-requirements.ts` entry stopped mid-sentence.
+    - **Two test comments overclaimed.** They said an anon read of the board proves that a relation inside a view is checked as the view's owner. The planner prunes `project_eligibility` from the board's plan, so that read never reaches either view, and the `psql` evidence above has the same confound. Both comments now say what the tests show. **The owner check was then measured without it:** a throwaway postgres-owned view that selects `project_eligibility` was granted to anon inside a rolled-back transaction. Read as anon, its plan held SubPlans over both views, and all 58 rows were judged with no permission error.
+    - **Noted by the review, NOT fixed (both pre-existing).** With save-on-change and `disabled={pending}`, arrow keys on a focused select in Chrome on Windows may fire a save per keypress (plausible, unverified). Anon can still execute `member_terms()` (above).
+    - **Found while fixing, NOT checked:** the dues payment editor, the series form, the merge panel and the preset bar each hold a controlled `<select>` inside a `<form action>`, so the reset may reach them too. The payment editor matters most: its "Nobody yet" snap-back (v1.39) was fixed by making the selects controlled, which alone does not stop this reset, and in the harness a submit after the reset posted the option on screen.
+
+    After the fixes the suite is **1,275/1,275 across 41 files**, and lint, `tsc` and `npm run build` are clean.
+  - ✅ **Walkthrough (2026-10-03, local stack, Chrome, dev server on :3005).** Everything below passed.
+    - **Columns.** The default table and the default file read Member · Email · EID · Total points · Dues · Member type · Project eligibility · Shirt Size. The two new headers don't sort, and every member starts General / N/A.
+    - **Inline type edits.**
+      - Three sequential saves each kept the chosen value in the DOM select. That is review finding 1's fix, confirmed in the app.
+      - Eligibility updated without a reload, to Yes / No / No.
+      - A type edit and then a shirt-size edit in the same row both saved, with no conflict.
+      - Two edits dispatched in the same tick: the second got "changed elsewhere — reload". That is the compare-and-set working, and nothing was lost.
+    - **Filters.** Member type = Data project gave 1 row. Project eligibility = No gave 2, and N/A gave 26 of 29. A saved view stored `memberType=client_project&eligibility=no`, summarised as "Member type: Client project · Project eligibility: No".
+    - **Export.**
+      - The default CSV header is `Name,Email,EID,Total points,Dues,Member type,Project eligibility,Shirt Size`.
+      - Cells read "Data project / Yes", "Client project / No" and "General / N/A".
+      - The filtered CSV had 2 rows, and the XLSX is a valid file.
+      - The `roster.exported` receipts list the 8 fields.
+    - **Member pages.**
+      - A data-project member who attended everything shows Yes. September reads "4 held · 4 · 2 · Met", and October "1 so far / 3 scheduled · 1 · 2 · In progress". The Sep 22 project meeting reads Attended, and Oct 13 reads Upcoming.
+      - A client-project member who missed the Sep 22 project meeting shows No, though September was Met at 2 of 4.
+      - A data-project member at 1 of 4 in September shows No, with September Not met.
+      - A General member shows the single N/A line.
+      - A type change on the member page, followed by a notes save, gave no conflict. The audit rows carry `member_type`.
+    - **Merge, on throwaway members.**
+      - General + a Data project duplicate previewed "Member type becomes Data project (from the duplicate)", and the survivor became Data project.
+      - Data project + a Client project duplicate previewed "Member type stays Data project; the duplicate's Client project is dropped", and the survivor kept Data project.
+      - Both `member.merged` audit rows record the type before and after.
+    - **Roster "All terms":** 59 rows, and no React key warnings in the console.
+    - **The portal.** `/portal/leaderboard`, `/portal/lookup` and `/portal` render for an anonymous visitor, with no error states.
+    - 🪤 **The automated Chrome tab reported `visibilityState: hidden`, so hydration stalled until a screenshot forced a frame.** Screenshots intermittently timed out, so the selects were driven by dispatching `change` events from JavaScript. Check `__reactProps` on an element before trusting an interaction. `docs/operations.md` has the note.
+    - **Cleanup.** The local database is back to the seed: 32 members, all General; 15 events; 208 attendance rows; 1 field definition; 0 presets; 0 stored custom values. Audit rows stay, since they are append-only.
+
 🧩 **The directory's Fields menu now chooses the table's columns, and the export is the table (officer, 2026-10-01; built 2026-10-03 on `portal-launch`, not on `main`).** It was reported as a bug: ticking fields in **Fields (N)** on `/admin/members` did not change the table. **It was not a regression.** Since phase 5a (`4c8fe4e`, 2026-08-06) that menu had been the **export** field picker. Its choice lived in `export-toolbar.tsx`'s `useState` and shaped Download and Copy table only, while the table drew fixed built-ins plus every custom field marked as a directory column. History was checked back to `4c8fe4e`, and the two were never wired together. So the fix was to build the link that was never there. Doc v1.82.
 
   - **The decisions (officer, 2026-10-01).** One picker drives the table and the export: Download XLSX/CSV and Copy table carry exactly the visible columns. The choice is remembered per browser in a cookie the server reads, so the first paint already has the officer's columns. There is no migration and no URL parameter, and saved views are unchanged. There is **no new sorting**: a newly displayable column gets a plain header, and `sortColumn`, `MemberSort` and `applyMemberFilter` did not change.
@@ -69,7 +170,7 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
       - Reset posts `null`, and a reload shows the defaults, so the same-Path delete works.
     - 🪤 **Chrome hid a `Path=/admin/members` cookie from `document.cookie` on a page reached by the sign-in redirect,** while the server received it. Chromium appears to keep the cookie URL of the document's first load (`/admin/login`) across the client-side navigation. A directly loaded page showed the cookie. This no longer matters for this cookie, which is HttpOnly now, but don't read cookie state from a page that arrived by redirect.
     - 🪤 **The browser tool's `form_input` on a `<select>` can change the DOM without firing React's `onChange`.** Two "saves" displayed the new value and never posted. Check the server log for the action call before believing an inline save.
-    - ⚠️ **Seen once and not reproduced:** right after the session's first pair of inline saves, the second cell's select showed "—" while the database held the new value, and a reload showed it. Two more attempts, in both orders, were clean. `member-field-cell.tsx` is untouched here, and the cells render with the same key and props as before. It is the same class as the phase-3 finding below (React 19's post-action form reset against a controlled select), so it is a candidate for a later item rather than this one.
+    - ⚠️ **Seen once and not reproduced:** right after the session's first pair of inline saves, the second cell's select showed "—" while the database held the new value, and a reload showed it. Two more attempts, in both orders, were clean. `member-field-cell.tsx` is untouched here, and the cells render with the same key and props as before. It is the same class as the phase-3 finding below (React 19's post-action form reset against a controlled select), so it is a candidate for a later item rather than this one. ✅ **Explained and fixed by item 2 (above).** It is item 2's review finding 1: React 19's form reset reaches a controlled select too. The fix is in `member-field-cell.tsx`, and item 2's walkthrough confirmed it in the app.
     - **Cleanup.** The walkthrough's two local fields and one member's values were deleted afterwards. Local is back to 1 definition and 0 stored values.
 
 🗑️ **`design-toolkit` marked STALE, to be scrapped (officer, 2026-10-01).** The branch that holds the Portal Rebuild (54 commits, tip `4b1ba13`) will not be merged. Its design toolkit had been split onto `design-tools` the day before, and that is what made dropping the rest cheap.

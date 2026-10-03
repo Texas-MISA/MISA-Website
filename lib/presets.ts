@@ -30,6 +30,10 @@ import {
   type SortableField,
 } from "@/lib/filters";
 import { parseCustomFieldKey, type FieldDefinition } from "@/lib/members";
+import {
+  formatMemberType,
+  formatProjectEligibility,
+} from "@/lib/member-types";
 
 /** Mirrors `member_filter_presets_name_not_blank`. The database is the
  * guarantee; this is what turns a violation into a `maxLength` on the input. */
@@ -160,6 +164,18 @@ export function presetSummary(
 
   if (filter.source === "admin") parts.push("Added by an officer");
   else if (filter.source === "self_checkin") parts.push("Self-registered");
+
+  // Migration 30. Named with their column headers, because "No" on its own
+  // describes nothing. A preset saved before either filter existed carries
+  // neither key, parses to `all`, and says nothing here — exactly as before.
+  if (filter.memberType !== "all") {
+    parts.push(`Member type: ${formatMemberType(filter.memberType)}`);
+  }
+  if (filter.eligibility !== "all") {
+    parts.push(
+      `Project eligibility: ${formatProjectEligibility(filter.eligibility)}`
+    );
+  }
 
   // Sorted for the same reason applyMemberFilter and memberFilterToParams sort
   // them: the summary must be a function of the filter, not of insertion order.

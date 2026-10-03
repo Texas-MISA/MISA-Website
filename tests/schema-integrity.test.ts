@@ -231,6 +231,87 @@ describe("a stored term is a real term", () => {
   });
 });
 
+describe("a member type is one of the four (migration 30)", () => {
+  // MEMBER_TYPES in lib/member-types.ts is the mirror; memberTypeSchema refuses
+  // the same values before they get here, and these are the database's half of
+  // that rule, by SQLSTATE.
+  const NOT_NULL_VIOLATION = "23502";
+
+  it("refuses a value outside the list", async () => {
+    const identity = testIdentity();
+    for (const memberType of ["officer", "Data project", "DATA_PROJECT", ""]) {
+      const { error } = await db.from("members").insert({
+        ...identityRow(identity),
+        member_type: memberType,
+      });
+      expect(error?.code, memberType).toBe(CHECK_VIOLATION);
+    }
+  });
+
+  it("refuses null — every member has a type", async () => {
+    const { error } = await db.from("members").insert({
+      ...identityRow(testIdentity()),
+      member_type: null as unknown as string,
+    });
+    expect(error?.code).toBe(NOT_NULL_VIOLATION);
+  });
+
+  it("defaults to general, which is what every insert that names no type gets", async () => {
+    // The roster import, self check-in and the test helper all insert without
+    // the column, so this default IS their behaviour.
+    const { data, error } = await db
+      .from("members")
+      .insert(identityRow(testIdentity()))
+      .select("id, member_type")
+      .single();
+    expect(error).toBeNull();
+    if (data) track.memberIds.push(data.id);
+    expect(data?.member_type).toBe("general");
+  });
+
+  it("accepts all four types", async () => {
+    for (const memberType of [
+      "general",
+      "data_project",
+      "client_project",
+      "junior_director",
+    ]) {
+      const { data, error } = await db
+        .from("members")
+        .insert({ ...identityRow(testIdentity()), member_type: memberType })
+        .select("id, member_type")
+        .single();
+      expect(error, memberType).toBeNull();
+      if (data) track.memberIds.push(data.id);
+      expect(data?.member_type).toBe(memberType);
+    }
+  });
+
+  it("refuses a custom field keyed with either new column name", async () => {
+    // member_field_definitions_key_not_builtin, re-added by migration 30 with
+    // both keys. Reaching it means the zod schema was skipped — a hand-run
+    // INSERT — which is exactly what the CHECK is for.
+    for (const key of ["member_type", "project_eligibility"]) {
+      const { error } = await db.from("member_field_definitions").insert({
+        key,
+        label: "TEST reserved key",
+        kind: "select",
+        options: ["A", "B"],
+      });
+      expect(error?.code, key).toBe(CHECK_VIOLATION);
+    }
+  });
+});
+
+/** The three NOT NULL identity columns, from a testIdentity(). */
+function identityRow(identity: ReturnType<typeof testIdentity>) {
+  return {
+    eid: identity.eid,
+    full_name: identity.fullName,
+    email: identity.email,
+  };
+}
+
 describe("the append-only log cannot be truncated", () => {
   // 🔓 The verb RLS cannot restrain. RLS covers SELECT/INSERT/UPDATE/DELETE
   // only, and the existing append-only triggers are BEFORE UPDATE and BEFORE

@@ -15,15 +15,18 @@ import { SectionHeading } from "@/components/ui/page-header";
 import { Notice } from "@/app/admin/(shell)/_components/notice";
 import { Pill } from "@/components/ui/pill";
 import { MemberFieldCell } from "../../_components/member-field-cell";
+import { MemberTypeCell } from "../../_components/member-type-cell";
 
 // The member detail page's editable half (§7 Stage 6 phase 4).
 //
-// ⚠️ One client owner for the custom fields AND the notes, for the same reason
-// directory-row.tsx owns its row: `members.updated_at` is a single row-level
-// compare-and-set token that every one of these forms posts. Saving a field
-// moves it, and a notes form still holding the render-time value would then
-// report a phantom conflict on a save the officer had every right to make. So
-// the token lives here and each form is handed the current one.
+// ⚠️ One client owner for the member type, the custom fields AND the notes,
+// for the same reason directory-row.tsx owns its row: `members.updated_at` is a
+// single row-level compare-and-set token that every one of these forms posts.
+// Saving a field moves it, and a notes form still holding the render-time value
+// would then report a phantom conflict on a save the officer had every right to
+// make. So the token lives here and each form is handed the current one — the
+// type select included, which is what lets a type change be followed by a
+// notes save with no conflict.
 //
 // ⚠️ Client Component: no Intl, no toLocale*. Node and Chrome ship different
 // ICU data and the hydration diff shows two apparently identical strings. Any
@@ -33,12 +36,15 @@ const NOTES_INITIAL: MemberNotesState = { status: "idle" };
 
 export function MemberEditor({
   memberId,
+  memberType,
   definitions,
   customFields,
   notes,
   updatedAt,
 }: {
   memberId: string;
+  /** `members.member_type` (migration 30), as stored. */
+  memberType: string;
   /** Every definition, archived included — filtered here rather than by the
    * page, so the two sections cannot disagree about what is live. */
   definitions: FieldDefinition[];
@@ -67,6 +73,25 @@ export function MemberEditor({
 
   return (
     <>
+      {/* `id` is the target of the "Change" link beside the type in "Who this
+          is" — the read-only half of this control, near the top of the page. */}
+      <section id="member-type" className="mt-12 max-w-3xl">
+        <SectionHeading>Member type</SectionHeading>
+        <p className="mt-2 text-sm text-misa-secondary">
+          Data project and client project members have project requirements;
+          the section above shows how they stand. Changing the type re-judges
+          past terms too — a member holds one type, not one per term.
+        </p>
+        <div className="mt-4 border border-misa-border bg-white px-4 py-3">
+          <MemberTypeCell
+            memberId={memberId}
+            value={memberType}
+            updatedAt={token}
+            onSaved={adoptToken}
+          />
+        </div>
+      </section>
+
       <section className="mt-12 max-w-3xl">
         <SectionHeading>Custom fields</SectionHeading>
 

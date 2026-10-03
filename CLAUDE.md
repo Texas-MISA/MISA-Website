@@ -28,7 +28,7 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Repository status
 
-**Stages 0–8 are COMPLETE. Stage 9 (launch) is in progress.** 30 migration files, through `…000029`. ✅ **Local and the remote are IN SYNC as of 2026-08-31** — migration 29 (`member_directory_terms`) was pushed with the code that reads it, which is the rule this line used to be warning about; 28 (`checkin_origin`) had gone out earlier. The next unclaimed number is **30**. 📌 **Confirm rather than assume** — `npx supabase migration list --linked` prints `local` against `remote` per migration, and a row with an empty `remote` is code waiting to 500 in production. 🪤 **26 and 27 were written by two sessions at once and both claimed 26 for a few minutes** — the collision surfaced as a 23505 on `schema_migrations_pkey` during `db reset`.
+**Stages 0–8 are COMPLETE. Stage 9 (launch) is in progress.** 31 migration files, through `…000030`. ⚠️ **Local is AHEAD of the remote: migration 30 (`member_type_project_eligibility`) is applied LOCALLY ONLY** (2026-10-03, on `portal-launch`); production is at `…000029`, in sync through 29 since 2026-08-31. 🔴 **Push 30 to production BEFORE the code that reads it** — without it every member-directory read in that code errors, previews included; the checklist is at the top of `tasks.md`. The next unclaimed number is **31**. 📌 **Confirm rather than assume** — `npx supabase migration list --linked` prints `local` against `remote` per migration, and a row with an empty `remote` is code waiting to 500 in production. 🪤 **26 and 27 were written by two sessions at once and both claimed 26 for a few minutes** — the collision surfaced as a 23505 on `schema_migrations_pkey` during `db reset`.
 
 ⚠️ **PRODUCTION IS THE CLUB'S REAL PUBLIC DOMAIN, https://www.txmisa.org.** A merge to `main` replaces the live club website. The production deployment's aliases are `www.txmisa.org`, `misa-website-txmisa-jds-projects.vercel.app` and `misa-website-git-main-txmisa-jds-projects.vercel.app`; confirm with `npx vercel inspect <deployment-url>`. `git push origin <branch>` without merging gives a preview URL instead. 🔴 **The apex `txmisa.org` has NO DNS A record (found 2026-09-30)** — only `www` resolves, so any link or QR code without `www` fails before reaching Vercel. 🪤 **It LOOKS fine in a browser that has visited the site**: Chrome autocompletes to `www` and hides it in the address bar. Test with `curl`. The fix is in the officer's Squarespace DNS, not in this repo: see the top of `tasks.md`. 📌 **The domain expires 2027-04-10.**
 
@@ -65,6 +65,7 @@ npx vitest run tests/checkin.test.ts -t "<test name>"
 ```bash
 npx supabase db push                    # apply pending migrations to the linked project
 npx supabase db reset                   # wipe, re-run migrations + seed.sql (local; needs Docker)
+npx supabase migration up --local       # apply pending migrations locally, KEEPING local auth.users
 npx supabase db query --linked "<sql>"  # ad-hoc SQL against the remote
 npx supabase gen types typescript --linked > lib/types/database.ts
 bash scripts/seed-remote.sh             # apply seed.sql to the remote (no Docker needed)
@@ -90,7 +91,7 @@ node --env-file=.env.local scripts/create-officer.mjs --email you@utexas.edu --r
 node --env-file=.env.local scripts/create-officer.mjs --email them@utexas.edu --revoke
 ```
 
-Regenerate `lib/types/database.ts` after **every** migration.
+Regenerate `lib/types/database.ts` after **every** migration. 🪤 **`--linked` cannot see a local-only migration**, and CLI 2.119.0's `--local` output drifts from the committed file in unrelated ways, so generate into a scratch file and hand-port only the migration's additions (`docs/operations.md`).
 
 The traps, each of which fails silently. Full text in [`docs/operations.md`](docs/operations.md):
 
@@ -195,7 +196,7 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 
 ### Dues and terms
 
-- **Dues status is calculated, never ticked.** "Official member" means a non-voided `dues_payments` row whose `covered_terms` includes **the row's term** — `member_directory.dues_paid_term`, renamed from `dues_paid_current_term` by migration 29 because the old name lies on any row not scoped to now. It gates nothing. `dues`, `dues_paid`, `dues_paid_current_term`, `dues_paid_term` and `term` are all **reserved custom-field keys**; the two retired names stay reserved because older exports and saved presets still refer to them.
+- **Dues status is calculated, never ticked.** "Official member" means a non-voided `dues_payments` row whose `covered_terms` includes **the row's term** — `member_directory.dues_paid_term`, renamed from `dues_paid_current_term` by migration 29 because the old name lies on any row not scoped to now. It gates nothing. `dues`, `dues_paid`, `dues_paid_current_term`, `dues_paid_term` and `term` (and since migration 30, `member_type` and `project_eligibility`) are all **reserved custom-field keys**; the two retired names stay reserved because older exports and saved presets still refer to them.
 - 🔓 **The dedupe key is Venmo's transaction ID; a content fingerprint is not acceptable.** The unique index **spans voided rows**.
 - 🪤 **Terms do not sort lexicographically.** Every "which term is later" question goes through `term_index()` / `termIndex` / `isLaterTerm`, never `max(term)` or `order by term`.
 - **The import is a Server Action, re-parses server-side, and never persists the uploaded file.** `MAX_IMPORT_BYTES` (512 KB) and `MAX_IMPORT_ROWS` (2000) **refuse; neither truncates**.
@@ -213,12 +214,20 @@ Decisions the architecture doc argues for at length. **Don't quietly reverse one
 - **Never type a term string.** `events.term` is generated via `term_of()`; a literal `'Fall 2026'` in application code is a bug.
 - **`wipe-remote.sh` accounts for ALL THIRTEEN tables in `public`.** A migration that adds a table has to place it.
 
+### Member type and project eligibility (migration 30)
+
+- 📌 **`project_eligibility` is calculated, never ticked, and gates nothing** (§9 #16): `yes` / `no` for data- and client-project members, `not_applicable` for everyone else. **`yes` means nothing has FAILED so far** — a month is judged once it ends, a project meeting once it ends — and with no excusals every miss counts.
+- 🔓 **What `member_directory` consumes stays a VIEW, never a function.** A relation inside a view is checked as the view's owner, but a function's EXECUTE as the CALLER, and anon reads `leaderboard` over `member_directory`. The rule lives in two officer-only views with no API-role grant. 🪤 **A new function must `revoke execute … from public`** — migration 29's `member_terms()` revoked anon and authenticated only, and anon can still call it (open in `tasks.md`).
+- ⚠️ **The type is STANDING; the verdict is the row's term.** Changing a type re-judges past terms. 🔓 **Never read `project_eligibility` off another term's row** — the member page's synthesized off-roster row sets it to `null`.
+- ⚠️ **"General meeting = published, Thursday in Central, not Projects" is TEMPORARY and lives ONLY in the `general_meetings` CTE** of `member_general_meeting_months`. Change it there, plus the member page's sentence describing it; never re-derive it in TypeScript.
+- **`MEMBER_TYPES` mirrors `members_member_type_valid`** — change both together, as with `EVENT_CATEGORIES`. 🪤 **Directory rows are keyed `${id}:${term}`**: under "All terms" a member has a row per term, each owning a CAS token.
+
 ### Rendering, errors and framework behaviour
 
 - 🔓 **A failed read must never render as an affirmative absence.** `x.error ? [] : x.data` renders the EMPTY state. Return a discriminated result; `lib/roster-index.ts` is the model.
 - 🪤 **`error.tsx` does not wrap the `layout.tsx` in its own segment.** `app/admin/error.tsx` exists solely to catch `AdminShellLayout`'s `requireOfficer()`. Both boundaries are load-bearing.
 - **Error boundaries use `unstable_retry`, not `reset`** (Next 16.2). They render `error.digest`.
-- **React 19 resets an uncontrolled `<form action={…}>` after the action resolves.** Echo submitted values back in server state; drive every `defaultValue` from them; pass a **string, never `undefined`**.
+- **React 19 resets an uncontrolled `<form action={…}>` after the action resolves.** Echo submitted values back in server state; drive every `defaultValue` from them; pass a **string, never `undefined`**. 🪤 **The reset also hits a CONTROLLED `<select>`**, because React never sets `defaultSelected`: the DOM goes back to its initial option while state holds the new value, and a later submit posts the stale option. A save-on-change control therefore dispatches with `startTransition(() => formAction(formData))`, never `requestSubmit()`, and re-syncs the DOM in a `useLayoutEffect` (`member-field-cell.tsx`); four other forms still use the pattern, listed in `tasks.md`.
 - **Never build a timestamp with `new Date("2026-09-01T18:00")`.** Use `centralWallTimeToInstant()` from `lib/events.ts`.
 - **Server Components own date formatting.** `Intl.DateTimeFormat` in a Client Component produces a hydration diff.
 - 📌 **Officer sign-in is the "Admin" NAV item** (`/admin/login`). 🔓 **RE-MEASURED 2026-09-18 at 1280: 342px left clearance, 450px right** — right of the wordmark is now ONE navy MEMBER PORTAL button, and 🔓 **check-in lives only inside the portal** (officer): nothing outside `/portal` links `/portal/attend`. The LEFT is the tighter side again; on a phone the tight spot is that button beside the centred wordmark. Any sixth nav item needs a fresh measurement. *(See `DESIGN.md` §Nav clearance for the full accounting.)*

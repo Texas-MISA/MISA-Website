@@ -1,5 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { writeAudit } from "@/app/actions/audit";
+import { AUDITED_MEMBER_COLUMNS, withoutToken } from "@/lib/members";
+import { mergedMemberType } from "@/lib/merge";
+
 import {
   cleanup,
   createCurrentTermEvent,
@@ -7,6 +11,7 @@ import {
   createTestAttendance,
   createTestMember,
   getTestOfficer,
+  latestAuditRow,
   newTracker,
   testClient,
 } from "./helpers";
@@ -44,13 +49,18 @@ describe("merging members", () => {
     await db.from("members").delete().like("eid", `${MARKER}%`);
   });
 
-  async function makeMember(name: string) {
+  async function makeMember(name: string, memberType?: string) {
     const id = eid();
-    const memberId = await createTestMember(db, track, {
-      fullName: name,
-      eid: id,
-      email: `${id}@example.edu`,
-    });
+    const memberId = await createTestMember(
+      db,
+      track,
+      {
+        fullName: name,
+        eid: id,
+        email: `${id}@example.edu`,
+      },
+      { memberType }
+    );
     return { memberId, eid: id };
   }
 
@@ -335,6 +345,53 @@ describe("merging members", () => {
       .eq("id", loser.memberId)
       .maybeSingle();
     expect(ghost).toBeNull();
+  });
+
+  it("writes the merged member type on the survivor and audits it on both sides", async () => {
+    // Migration 30, through commitMerge's step 3 verbatim: the survivor's own
+    // columns, compare-and-set, AUDITED_MEMBER_COLUMNS on both sides. A General
+    // survivor takes the duplicate's real type.
+    const survivor = await makeMember("Type Survivor");
+    const loser = await makeMember("Type Loser", "data_project");
+
+    const { data: before, error: beforeError } = await db
+      .from("members")
+      .select(AUDITED_MEMBER_COLUMNS)
+      .eq("id", survivor.memberId)
+      .single();
+    if (beforeError) throw new Error(beforeError.message);
+    expect(before.member_type).toBe("general");
+
+    const planned = mergedMemberType(before.member_type, "data_project");
+    expect(planned).toMatchObject({ value: "data_project", fromLoser: true });
+
+    const { data: after, error } = await db
+      .from("members")
+      .update({ member_type: planned.value })
+      .eq("id", survivor.memberId)
+      .eq("updated_at", before.updated_at)
+      .select(AUDITED_MEMBER_COLUMNS)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    expect(after?.member_type).toBe("data_project");
+
+    await writeAudit(db, {
+      entityType: "member",
+      entityId: survivor.memberId,
+      actorId: officerId,
+      action: "member.merged",
+      before: withoutToken(before),
+      after: withoutToken(after!),
+      note: `merged Type Loser (${loser.eid}) [${loser.memberId}] — fixture`,
+    });
+
+    const row = await latestAuditRow(db, "member", survivor.memberId);
+    const beforeSide = row!.before as Record<string, unknown>;
+    const afterSide = row!.after as Record<string, unknown>;
+    // Present on BOTH sides — a key on one side only renders as an erasure.
+    expect(beforeSide.member_type).toBe("general");
+    expect(afterSide.member_type).toBe("data_project");
+    expect(Object.keys(beforeSide).sort()).toEqual(Object.keys(afterSide).sort());
   });
 
   it("accepts 'member.merged' as an audit action on a member", async () => {

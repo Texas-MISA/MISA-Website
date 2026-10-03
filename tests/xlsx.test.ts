@@ -102,6 +102,8 @@ function row(over: Partial<ExportSourceRow> = {}): ExportSourceRow {
     pending_count: 0,
     last_seen_at: "2026-03-01T02:00:00.000Z",
     dues_paid_term: true,
+    member_type: "data_project",
+    project_eligibility: "not_applicable",
     custom_fields: {},
     ...over,
   };
@@ -280,6 +282,23 @@ describe("cells carry their type", () => {
     expect(header).toContain(">Name<");
     expect(header).toContain(">Email<");
     expect(header).toContain('s="1"');
+  });
+
+  it("writes member type and project eligibility as their words, in text cells", () => {
+    // Migration 30. The same words the directory prints and the CSV carries —
+    // one projection (projectRow), two writers — never the stored slugs.
+    const sheet = build(["member_type", "project_eligibility"], [row()]).get(
+      "xl/worksheets/sheet1.xml"
+    )!;
+    const [header, body] = sheet.split("</row>");
+
+    expect(header).toContain(">Member type<");
+    expect(header).toContain(">Project eligibility<");
+    expect(body).toContain("inlineStr");
+    expect(body).toContain(">Data project<");
+    expect(body).toContain(">N/A<");
+    expect(body).not.toContain("data_project");
+    expect(body).not.toContain("not_applicable");
   });
 });
 

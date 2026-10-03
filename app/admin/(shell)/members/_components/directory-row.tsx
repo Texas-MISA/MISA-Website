@@ -8,7 +8,9 @@ import { Tr } from "@/components/ui/table";
 import { EMPTY_CELL_TEXT, type DirectoryColumn } from "@/lib/directory-columns";
 import { fieldValue } from "@/lib/members";
 
+import { EligibilityMark } from "./eligibility-mark";
 import { MemberFieldCell } from "./member-field-cell";
+import { MemberTypeCell } from "./member-type-cell";
 import { SelectRowCell } from "./selection";
 import type { MemberRow } from "./member-table";
 
@@ -167,6 +169,31 @@ export function DirectoryRow({
                 ) : (
                   <Pill tone="neutral">not paid</Pill>
                 )}
+              </td>
+            );
+          case "member_type":
+            // Migration 30. Editable inline like a custom field, and on the
+            // ROW'S token for the same reason: the officer may change a type
+            // and then a shirt size in one row without a phantom conflict.
+            return (
+              <td key={column.key} className={text}>
+                <MemberTypeCell
+                  memberId={row.id}
+                  value={row.memberType}
+                  updatedAt={token}
+                  onSaved={adoptToken}
+                />
+              </td>
+            );
+          case "project_eligibility":
+            // ⚠️ Read-only, like Dues, and for the same reason: it is
+            // calculated (member_directory, migration 30), so a control here
+            // would be a second answer to one question. It follows a type
+            // change because setMemberType revalidates this page — the new
+            // verdict arrives in the same round trip as the save.
+            return (
+              <td key={column.key} className={text}>
+                <EligibilityMark value={row.projectEligibility} />
               </td>
             );
           default:

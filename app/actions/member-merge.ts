@@ -16,6 +16,7 @@ import {
   type MergePlan,
   type PlannedAttendance,
   type PlannedField,
+  type PlannedMemberType,
 } from "@/lib/merge";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { mergeSchema } from "@/lib/validation";
@@ -39,9 +40,11 @@ import { mergeSchema } from "@/lib/validation";
 const DIRECTORY = "/admin/members";
 
 /** One unbroken literal with `as const` — PostgREST types the returned row off
- * the string literal, and a concatenation widens it to plain `string`. */
+ * the string literal, and a concatenation widens it to plain `string`.
+ * `member_type` since migration 30: the plan decides what the survivor's
+ * becomes (`mergedMemberType`), so it has to read both. */
 const MERGE_MEMBER_COLUMNS =
-  "id, full_name, email, eid, normalized_eid, joined_at, notes, custom_fields, updated_at" as const;
+  "id, full_name, email, eid, normalized_eid, joined_at, member_type, notes, custom_fields, updated_at" as const;
 
 /** The attendance columns the plan needs, plus what the reject write audits. */
 const MERGE_ATTENDANCE_COLUMNS =
@@ -71,6 +74,9 @@ export type PreviewState =
       counts: MergeCounts;
       notes: string | null;
       joinedAt: string;
+      /** What the survivor's type becomes. The panel states it, including a
+       * type the duplicate held that is about to be dropped. */
+      memberType: PlannedMemberType;
     };
 
 export type CommitState =
@@ -113,6 +119,7 @@ async function loadMember(
       joinedAt: data.joined_at,
       notes: data.notes,
       customFields: data.custom_fields,
+      memberType: data.member_type,
     },
     label: `${data.full_name} (${data.eid})`,
     updatedAt: data.updated_at,
@@ -259,6 +266,7 @@ export async function previewMerge(
       counts: derived.counts,
       notes: derived.plan.notes,
       joinedAt: derived.plan.joinedAt,
+      memberType: derived.plan.memberType,
     };
   } catch (e) {
     console.error(
@@ -437,6 +445,9 @@ export async function commitMerge(
         custom_fields: mergedCustomFields(plan, choices),
         notes: plan.notes,
         joined_at: plan.joinedAt,
+        // Re-derived like everything else here, never posted: the preview's
+        // line is a statement of this rule, not a choice the form carries.
+        member_type: plan.memberType.value,
       })
       .eq("id", survivorId)
       .eq("updated_at", expectedUpdatedAt)

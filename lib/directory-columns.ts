@@ -120,13 +120,17 @@ export const LOCKED_COLUMNS: ReadonlySet<string> = new Set(["name"]);
 
 /**
  * The built-ins the directory row draws with markup of its own — the name link
- * and its SELF pill, the monospace EID, the Dues pill — rather than as plain
- * text from the server.
+ * and its SELF pill, the monospace EID, the Dues pill, the inline member-type
+ * select and the eligibility pill — rather than as plain text from the server.
  *
  * Every other built-in arrives as a server-formatted string in
  * `MemberRow.cells` (see `textCellFields`). tests/directory-columns.test.ts
  * asserts directory-row.tsx handles every key here, because a key added to
  * this set and not to the row would render nothing at all.
+ *
+ * 📌 Neither migration-30 column is SORTABLE, though both are default columns
+ * (officer, carried over from 2026-10-01: no new sorting). MEMBER_SORTS is
+ * untouched, so `directoryColumns` gives both a plain header.
  */
 export const DEDICATED_COLUMNS: ReadonlySet<string> = new Set([
   "name",
@@ -134,6 +138,8 @@ export const DEDICATED_COLUMNS: ReadonlySet<string> = new Set([
   "eid",
   "total_points",
   "dues",
+  "member_type",
+  "project_eligibility",
 ]);
 
 /**

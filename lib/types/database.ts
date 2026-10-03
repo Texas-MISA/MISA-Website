@@ -173,6 +173,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "attendance_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "member_project_meetings"
+            referencedColumns: ["event_id"]
+          },
+          {
             foreignKeyName: "attendance_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
@@ -185,6 +192,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "member_directory"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_general_meeting_months"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "attendance_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_project_meetings"
+            referencedColumns: ["member_id"]
           },
           {
             foreignKeyName: "attendance_member_id_fkey"
@@ -323,6 +344,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "member_directory"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dues_payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_general_meeting_months"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "dues_payments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_project_meetings"
+            referencedColumns: ["member_id"]
           },
           {
             foreignKeyName: "dues_payments_member_id_fkey"
@@ -473,6 +508,7 @@ export type Database = {
           full_name: string
           id: string
           joined_at: string
+          member_type: string
           normalized_eid: string | null
           notes: string | null
           source: string
@@ -485,6 +521,7 @@ export type Database = {
           full_name: string
           id?: string
           joined_at?: string
+          member_type?: string
           normalized_eid?: string | null
           notes?: string | null
           source?: string
@@ -497,6 +534,7 @@ export type Database = {
           full_name?: string
           id?: string
           joined_at?: string
+          member_type?: string
           normalized_eid?: string | null
           notes?: string | null
           source?: string
@@ -604,6 +642,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "point_adjustments_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "member_project_meetings"
+            referencedColumns: ["event_id"]
+          },
+          {
             foreignKeyName: "point_adjustments_member_id_fkey"
             columns: ["member_id"]
             isOneToOne: false
@@ -616,6 +661,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "member_directory"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "point_adjustments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_general_meeting_months"
+            referencedColumns: ["member_id"]
+          },
+          {
+            foreignKeyName: "point_adjustments_member_id_fkey"
+            columns: ["member_id"]
+            isOneToOne: false
+            referencedRelation: "member_project_meetings"
+            referencedColumns: ["member_id"]
           },
           {
             foreignKeyName: "point_adjustments_member_id_fkey"
@@ -652,12 +711,42 @@ export type Database = {
           id: string | null
           joined_at: string | null
           last_seen_at: string | null
+          member_type: string | null
           notes: string | null
           pending_count: number | null
+          project_eligibility: string | null
           source: string | null
           term: string | null
           total_points: number | null
           updated_at: string | null
+        }
+        Relationships: []
+      }
+      member_general_meeting_months: {
+        Row: {
+          meetings_attended: number | null
+          meetings_held: number | null
+          meetings_required: number | null
+          meetings_scheduled: number | null
+          member_id: string | null
+          month: string | null
+          month_complete: boolean | null
+          status: string | null
+          term: string | null
+        }
+        Relationships: []
+      }
+      member_project_meetings: {
+        Row: {
+          attended: boolean | null
+          ends_at: string | null
+          event_id: string | null
+          held: boolean | null
+          member_id: string | null
+          starts_at: string | null
+          status: string | null
+          term: string | null
+          title: string | null
         }
         Relationships: []
       }

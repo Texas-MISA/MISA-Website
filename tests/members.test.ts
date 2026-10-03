@@ -15,6 +15,7 @@ import {
   isAllowedFieldValue,
   isValidFieldKey,
   parseCustomFieldKey,
+  RESERVED_FIELD_KEYS,
   setFieldValue,
   withoutToken,
   type TermEventInput,
@@ -178,6 +179,17 @@ describe("isValidFieldKey", () => {
 
   it("rejects keys that collide with a built-in column", () => {
     for (const key of ["email", "eid", "full_name", "total_points", "notes"]) {
+      expect(isValidFieldKey(key), key).toBe(false);
+    }
+  });
+
+  it("rejects the two migration-30 column names", () => {
+    // Real columns since migration 30, and filters and export fields too, so a
+    // custom field claiming either would compete for the header and the URL
+    // key. Well-formed, like the dues keys — only the reservation stops them.
+    for (const key of ["member_type", "project_eligibility"]) {
+      expect(FIELD_KEY_PATTERN.test(key), `${key} is well-formed`).toBe(true);
+      expect(RESERVED_FIELD_KEYS.has(key), key).toBe(true);
       expect(isValidFieldKey(key), key).toBe(false);
     }
   });
@@ -355,6 +367,8 @@ describe("the audited column lists", () => {
   it("carry the columns the member editors actually move", () => {
     expect(AUDITED_MEMBER_COLUMNS).toContain("custom_fields");
     expect(AUDITED_MEMBER_COLUMNS).toContain("notes");
+    // Migration 30: setMemberType exists to move it, and a merge writes it.
+    expect(AUDITED_MEMBER_COLUMNS).toContain("member_type");
     expect(AUDITED_FIELD_COLUMNS).toContain("archived_at");
     expect(AUDITED_FIELD_COLUMNS).toContain("options");
   });
@@ -447,6 +461,11 @@ describe("the phase-4 client components format no dates", () => {
     // server. The picker and its toolbar must never start doing it themselves.
     "../app/admin/(shell)/members/_components/export-toolbar.tsx",
     "../app/admin/(shell)/_components/export-controls.tsx",
+    // Migration 30: the type select is a Client Component, and the verdict
+    // mark is imported by one, so it is bundled for the browser as well.
+    "../app/admin/(shell)/members/_components/member-type-cell.tsx",
+    "../app/admin/(shell)/members/_components/eligibility-mark.tsx",
+    "../app/admin/(shell)/members/[id]/_components/merge-panel.tsx",
   ];
 
   for (const path of files) {
@@ -456,6 +475,42 @@ describe("the phase-4 client components format no dates", () => {
       const source = read(path);
       expect(source).not.toMatch(/Intl\.\w+\(/);
       expect(source).not.toMatch(/toLocale\w*\(/);
+    });
+  }
+});
+
+describe("the inline selects save by dispatching, never by submitting", () => {
+  // 🐛 Review, 2026-10-03. React 19 reset()s a SUBMITTED `<form action>` once
+  // its action resolves, and reset() puts even a CONTROLLED <select> back on
+  // its first-rendered option while state keeps the pick — React never sets
+  // `defaultSelected` on one. Reproduced on every save in a standalone React
+  // 19.2.4 page, overlapping saves included, and the likely cause of item 1's
+  // one-off "—" blank. A directly dispatched action requests no reset, and the
+  // layout effect re-syncs the DOM for the sr-only button that still submits.
+  //
+  // Matched against COMMENT-STRIPPED source, as in tests/directory-columns:
+  // both files name requestSubmit in prose to say why they do not call it.
+  const code = (path: string) =>
+    read(path)
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+
+  for (const path of [
+    "../app/admin/(shell)/members/_components/member-field-cell.tsx",
+    "../app/admin/(shell)/members/_components/member-type-cell.tsx",
+  ]) {
+    it(`${path.split("/").pop()} dispatches through startTransition and never calls requestSubmit`, () => {
+      const source = code(path);
+      expect(source).not.toContain("requestSubmit(");
+      expect(source).toMatch(/startTransition\(\(\) => formAction\(formData\)\)/);
+      // The form keeps the action, for the sr-only button and for no-JS.
+      expect(source).toContain("<form action={formAction}");
+      // And after every commit — a dependency list would skip the one that
+      // resets — the DOM select is put back on the value React holds.
+      expect(source).toMatch(
+        /useLayoutEffect\(\(\) => \{[^}]*\.value = selected;\s*\}\);/
+      );
+      expect(source).toContain("ref={selectRef}");
     });
   }
 });

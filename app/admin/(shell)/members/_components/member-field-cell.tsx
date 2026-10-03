@@ -2,7 +2,14 @@
 
 import { controlClass } from "@/components/ui/field";
 
-import { useActionState, useEffect, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   setMemberFieldValue,
@@ -52,6 +59,13 @@ export function MemberFieldCell({
   // visibly snap back to the previous option for the length of the revalidation
   // round trip — the officer sees their pick undone and picks again. Same class
   // of bug as the filter boxes in phase 1, same fix.
+  //
+  // 🐛 And only half the fix (review, 2026-10-03): the reset reaches a
+  // CONTROLLED select too. React never sets `defaultSelected` on one, so reset()
+  // puts it back on its first-rendered option while `selected` keeps the pick —
+  // on every save, in a standalone React 19.2.4 page, and the likely cause of
+  // item 1's one-off "—" blank. Hence the dispatch in onChange, and the layout
+  // effect below.
   const [selected, setSelected] = useState(value);
 
   // Resync when the server sends a newer value — another officer's save, or our
@@ -62,6 +76,16 @@ export function MemberFieldCell({
     setSeen(value);
     setSelected(value);
   }
+
+  // 🪤 The reset runs after React's own update in that commit, so the DOM is
+  // re-synced after every commit — no dependency list, because `selected` does
+  // not change in the one that resets. It guards the sr-only button below,
+  // which still submits.
+  const selectRef = useRef<HTMLSelectElement>(null);
+  useLayoutEffect(() => {
+    const select = selectRef.current;
+    if (select && select.value !== selected) select.value = selected;
+  });
 
   // An effect, and one of the few places it is the right tool: this calls a
   // *parent's* setter, which React forbids during render. The token only moves
@@ -79,16 +103,22 @@ export function MemberFieldCell({
       <input type="hidden" name="expectedUpdatedAt" value={updatedAt} />
 
       <select
+        ref={selectRef}
         name="value"
         aria-label={definition.label}
         value={selected}
         disabled={pending}
         onChange={(event) => {
           setSelected(event.target.value);
-          // Auto-submit: picking IS the save. The audit log is the undo, and a
+          // Auto-save: picking IS the save. The audit log is the undo, and a
           // SAVE button beside every cell in a 25-row table is the thing this
-          // screen exists to avoid.
-          event.currentTarget.form?.requestSubmit();
+          // screen exists to avoid. Dispatched, never requestSubmit(): only a
+          // submitted form is reset when its action resolves.
+          const form = event.currentTarget.form;
+          if (form) {
+            const formData = new FormData(form);
+            startTransition(() => formAction(formData));
+          }
         }}
         className={controlClass("xs")}
       >

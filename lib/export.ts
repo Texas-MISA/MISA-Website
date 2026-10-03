@@ -19,6 +19,10 @@
 
 import { toCentralFields } from "@/lib/events";
 import { fieldValue, type FieldDefinition } from "@/lib/members";
+import {
+  formatMemberType,
+  formatProjectEligibility,
+} from "@/lib/member-types";
 
 /**
  * A projected cell, typed rather than stringified.
@@ -61,6 +65,13 @@ export type ExportField = {
  * never imports the generated database types and a test can hand it a literal.
  * Every field is nullable because `member_directory` is a view and the generated
  * Row types every column as nullable.
+ *
+ * ⚠️ A key added here must be added to all four select literals that feed it —
+ * COLUMNS and COLUMNS_WITH_ATTENDANCE in members/page.tsx, EXPORT_COLUMNS and
+ * EXPORT_COLUMNS_WITH_ATTENDANCE in members/export/route.ts. The page's are
+ * compile-checked through `projectRow`; the route's are not, because it casts
+ * each chunk to this type, so a missing column there would export as a blank
+ * cell. tests/export.test.ts checks every key against all four.
  */
 export type ExportSourceRow = {
   id: string | null;
@@ -80,6 +91,8 @@ export type ExportSourceRow = {
   pending_count: number | null;
   last_seen_at: string | null;
   dues_paid_term: boolean | null;
+  member_type: string | null;
+  project_eligibility: string | null;
   custom_fields: unknown;
 };
 
@@ -157,6 +170,22 @@ const BUILTIN_FIELDS: readonly ExportField[] = [
   // It is also how the filter param and the sort key spell it, so all three
   // agree.
   { key: "dues", label: "Dues", kind: "text", source: "builtin" },
+  // Migration 30. Text, and the words the directory prints ("Data project",
+  // "N/A"), for the reason Dues is: the file and the screen must read alike,
+  // and the formula guard fires on text — none of these words begins with
+  // = + - @. Both keys are reserved (RESERVED_FIELD_KEYS, and migration 30's
+  // key_not_builtin CHECK), so the catalogue stays one namespace.
+  //
+  // ⚠️ Project eligibility is the ROW'S term's, like the figures beside it,
+  // while the type is the member's standing one — a file of past terms judges
+  // each against today's type.
+  { key: "member_type", label: "Member type", kind: "text", source: "builtin" },
+  {
+    key: "project_eligibility",
+    label: "Project eligibility",
+    kind: "text",
+    source: "builtin",
+  },
   { key: "notes", label: "Officer notes", kind: "text", source: "builtin" },
 ];
 
@@ -178,6 +207,9 @@ const BUILTIN_FIELDS: readonly ExportField[] = [
  * breakdown and attendance figures, pending, last seen, joined, source and
  * term leave only when an officer puts them on screen first. Narrow is still
  * the default — it is the table's narrow now, not a second, narrower one.
+ *
+ * Member type and project eligibility (migration 30) are default columns, so
+ * they are default fields — the rule above, applied rather than revisited.
  */
 export const DEFAULT_EXPORT_FIELDS: readonly string[] = [
   "name",
@@ -185,6 +217,8 @@ export const DEFAULT_EXPORT_FIELDS: readonly string[] = [
   "eid",
   "total_points",
   "dues",
+  "member_type",
+  "project_eligibility",
 ];
 
 /**
@@ -349,6 +383,19 @@ function builtinCell(row: ExportSourceRow, key: string): ExportCell {
         : {
             kind: "text",
             value: row.dues_paid_term ? "Paid" : "Not Paid",
+          };
+    case "member_type":
+      // Null is an empty cell, never "—": the dash is the screen's spelling of
+      // an empty cell (directoryCellText), and a file leaves it blank.
+      return row.member_type === null
+        ? { kind: "empty" }
+        : { kind: "text", value: formatMemberType(row.member_type) };
+    case "project_eligibility":
+      return row.project_eligibility === null
+        ? { kind: "empty" }
+        : {
+            kind: "text",
+            value: formatProjectEligibility(row.project_eligibility),
           };
     case "notes":
       return textCell(row.notes);

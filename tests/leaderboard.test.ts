@@ -302,6 +302,61 @@ describe("leaderboard contents", () => {
     expect((await leaderboardRow(memberId))?.total_points).toBe(0);
   });
 
+  it("keeps an INELIGIBLE project member on the board, read as anon (migration 30)", async () => {
+    // Two things at once. Eligibility gates nothing — it is an officer's label,
+    // not a standing — so a data-project member who missed a project meeting is
+    // ranked like anyone else. And the board, defined over member_directory,
+    // stays readable by anon now that member_directory reads two officer-only
+    // views, which anon is refused directly (tests/security.test.ts).
+    //
+    // ⚠️ That is NOT proof that a relation inside a view is checked as the
+    // view's owner. The planner prunes project_eligibility from the board's
+    // plan (EXPLAIN shows NULL::text), so an anon board read never reaches
+    // either view. The owner check was verified separately with psql, through
+    // a view that does select the column (docs/build-log.md, migration 30).
+    const identity = testIdentity();
+    const memberId = await createTestMember(db, track, identity, {
+      memberType: "data_project",
+    });
+    // A Projects meeting that has ended, unattended: a miss.
+    const missed = await createCurrentTermEvent(db, track, {
+      points: 3,
+      category: "projects",
+    });
+    // And one ordinary event attended, so there are points to rank.
+    const attended = await createCurrentTermEvent(db, track, { points: 4 });
+    await createTestAttendance(db, track, {
+      eventId: attended.id,
+      memberId,
+      submittedName: identity.fullName,
+      submittedEid: identity.eid,
+      submittedEmail: identity.email,
+      submittedAt: new Date(),
+      status: "present",
+    });
+
+    // Ineligible, as the officer directory sees it…
+    const { data: directory, error: directoryError } = await db
+      .from("member_directory")
+      .select("project_eligibility")
+      .eq("id", memberId)
+      .eq("term", missed.term)
+      .single();
+    expect(directoryError).toBeNull();
+    expect(directory?.project_eligibility).toBe("no");
+
+    // …and on the public board all the same.
+    const anon = anonClient();
+    const { data: board, error } = await anon
+      .from("leaderboard")
+      .select("id, total_points, term")
+      .eq("id", memberId);
+    expect(error).toBeNull();
+    expect(board).toEqual([
+      { id: memberId, total_points: 4, term: missed.term },
+    ]);
+  });
+
   it("ignores an event outside the current term", async () => {
     // The 2030 slots every other file uses. Scoping is what stops last year's
     // standings leaking into this year's board (§4.4).

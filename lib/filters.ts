@@ -45,15 +45,23 @@
 // 📌 What arrived in their place is `term`, and it is a SCOPE rather than a
 // narrowing filter — see the field's own note in MemberFilter for why null,
 // not a term string, is what "the current term" is spelled as.
+//
+// 📌 Migration 30 added two categorical filters, `memberType` and
+// `eligibility`, and both keep the phase-3 rule: Member type and Project
+// eligibility are default COLUMNS, so each filter narrows on something the
+// table shows. Neither is sortable (no new sorting).
 
-// The only import here, and deliberately a pure one: lib/members.ts owns the
-// key format and the `cf:` namespace, so both modules cannot drift on what a
-// custom sort key looks like. Still no next/* and no supabase-js.
+// Deliberately pure imports, and only two. lib/members.ts owns the key format
+// and the `cf:` namespace, so both modules cannot drift on what a custom sort
+// key looks like; lib/member-types.ts owns the member types and eligibility
+// values, so the filter cannot offer one the CHECK would not store. Still no
+// next/* and no supabase-js.
 import {
   customFieldColumn,
   customFieldKey,
   parseCustomFieldKey,
 } from "@/lib/members";
+import { MEMBER_TYPES, PROJECT_ELIGIBILITIES } from "@/lib/member-types";
 
 /**
  * Sortable columns, as the URL spells them. Mapped to real column names by
@@ -206,6 +214,28 @@ export const MEMBER_SOURCES = ["all", "admin", "self_checkin"] as const;
 export type MemberSource = (typeof MEMBER_SOURCES)[number];
 
 /**
+ * Member type, plus an `all` default (migration 30).
+ *
+ * Built FROM lib/member-types.ts's list rather than restated, so this selector
+ * can never offer a type `members_member_type_valid` would refuse, nor miss one
+ * it would accept. `all` first because it is the default and narrows nothing —
+ * the categorical rule every selector in the top row follows.
+ */
+export const MEMBER_TYPE_FILTERS = ["all", ...MEMBER_TYPES] as const;
+export type MemberTypeFilter = (typeof MEMBER_TYPE_FILTERS)[number];
+
+/**
+ * Project eligibility, plus an `all` default (migration 30), against the view's
+ * calculated `project_eligibility`.
+ *
+ * ⚠️ Like Dues, this filters a value nobody ticked: the view derives it from
+ * attendance, so "No" here is "something has failed this term" and "Yes" is
+ * "nothing has failed so far" (see PROJECT_ELIGIBILITIES).
+ */
+export const ELIGIBILITY_FILTERS = ["all", ...PROJECT_ELIGIBILITIES] as const;
+export type EligibilityFilter = (typeof ELIGIBILITY_FILTERS)[number];
+
+/**
  * Whether a chosen event is being asked about as attendance or as absence
  * (phase 6).
  *
@@ -297,6 +327,18 @@ export type MemberFilter = {
    * why this is a filter rather than the column phase 3 removed.
    */
   source: MemberSource;
+  /**
+   * One member type, or any (migration 30), against `member_type`.
+   *
+   * The type is STANDING — one per member, not one per term — so under "All
+   * terms" this keeps every term row of a member of that type.
+   */
+  memberType: MemberTypeFilter;
+  /**
+   * One eligibility verdict, or any (migration 30), against
+   * `project_eligibility`, which is judged for the ROW'S term.
+   */
+  eligibility: EligibilityFilter;
   /**
    * Officer-defined field filters (phase 5c): definition key → the one value
    * being matched. Absent key means "not filtered on"; the object is empty in
@@ -507,6 +549,23 @@ export function parseMemberFilter(
     ? (rawSource as MemberSource)
     : "all";
 
+  // Migration 30. Anything outside the column's own domain — a retired type, a
+  // typo, a preset saved before either key existed — is `all`, which narrows
+  // nothing. That is what keeps every older saved view working unchanged.
+  const rawMemberType = one(params, "memberType");
+  const memberType: MemberTypeFilter = (
+    MEMBER_TYPE_FILTERS as readonly string[]
+  ).includes(rawMemberType)
+    ? (rawMemberType as MemberTypeFilter)
+    : "all";
+
+  const rawEligibility = one(params, "eligibility");
+  const eligibility: EligibilityFilter = (
+    ELIGIBILITY_FILTERS as readonly string[]
+  ).includes(rawEligibility)
+    ? (rawEligibility as EligibilityFilter)
+    : "all";
+
   // 🔓 Dropped unless it is a uuid. The id is interpolated into the query, so
   // "it came from the picker" is not a property this function can verify.
   const rawEvent = one(params, "event").trim();
@@ -569,6 +628,8 @@ export function parseMemberFilter(
     maxPoints: intOrNull(one(params, "maxPoints"), 1_000_000),
     dues,
     source,
+    memberType,
+    eligibility,
     custom,
     event,
     eventMode,
@@ -609,6 +670,10 @@ export function memberFilterToParams(
   if (merged.term !== null) params.set("term", merged.term);
   if (merged.dues !== "all") params.set("dues", merged.dues);
   if (merged.source !== "all") params.set("source", merged.source);
+  if (merged.memberType !== "all") params.set("memberType", merged.memberType);
+  if (merged.eligibility !== "all") {
+    params.set("eligibility", merged.eligibility);
+  }
   if (merged.pending !== "all") params.set("pending", merged.pending);
   if (merged.q) params.set("q", merged.q);
 
@@ -914,6 +979,14 @@ export function applyMemberFilter<Q extends FilterableQuery<Q>>(
   // §4.2's roster-cleanup query, back as a filter after phase 3 removed it as a
   // column.
   if (filter.source !== "all") q = q.eq("source", filter.source);
+
+  // Migration 30. Both are plain columns on the view — the type a member holds
+  // and the verdict the view calculates for the row's term — so each is one
+  // equality, here and nowhere else, for the reason the dues clause gives.
+  if (filter.memberType !== "all") q = q.eq("member_type", filter.memberType);
+  if (filter.eligibility !== "all") {
+    q = q.eq("project_eligibility", filter.eligibility);
+  }
 
   // Officer-defined fields. `custom_fields->>key = value` through the view —
   // the same expression the sort orders by, which is why they share one

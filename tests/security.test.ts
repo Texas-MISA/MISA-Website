@@ -155,6 +155,12 @@ describe("anon access", () => {
     // nothing at all.
     expect(views).toContain("leaderboard");
     expect(views).toContain("member_directory");
+    // Migration 30's two, named so the sweep below provably reaches them:
+    // between them they list every member beside every meeting they missed,
+    // and they sit UNDER the public board, so they are the views most likely
+    // to be granted by someone "fixing" a 42501 on leaderboard.
+    expect(views).toContain("member_project_meetings");
+    expect(views).toContain("member_general_meeting_months");
 
     const readable: string[] = [];
     for (const view of views) {
@@ -169,6 +175,34 @@ describe("anon access", () => {
     }
 
     expect(readable.sort()).toEqual([...ANON_READABLE].sort());
+  });
+});
+
+describe("the eligibility views sit under the board without opening it (migration 30)", () => {
+  // 🔓 member_directory reads two officer-only views, and the public board
+  // reads member_directory. What this file shows is both ends from outside:
+  // anon reads the board ("can still read the leaderboard", above) and is
+  // refused both views directly (below).
+  //
+  // ⚠️ Not WHY the board still works. That rests on a relation inside a view
+  // being checked as the VIEW OWNER — a function's EXECUTE is checked as the
+  // caller, which is why the rule lives in views — but the planner prunes
+  // project_eligibility from the board's plan (EXPLAIN shows NULL::text), so an
+  // anon board read never reaches either view. The owner check was verified
+  // separately with psql (docs/build-log.md, migration 30).
+  it("refuses anon and a signed-in non-officer both views, by permission", async () => {
+    for (const role of [anonClient(), await signInAsOutsider(testClient())]) {
+      for (const view of [
+        "member_project_meetings",
+        "member_general_meeting_months",
+      ] as const) {
+        const { data, error } = await role.from(view).select("*").limit(1);
+        expect(error?.code, view).toBe("42501");
+        expect(data ?? [], view).toEqual([]);
+      }
+    }
+    // The board itself staying readable is asserted above ("can still read the
+    // leaderboard") and, with an ineligible member on it, in leaderboard.test.ts.
   });
 });
 
