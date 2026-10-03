@@ -6,6 +6,10 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## ✂️ `/portal/lookup` UNLISTED (2026-10-03, officer, until it has been reworked)
+
+The route still resolves (noindex) and the `/lookup` redirect stays; nothing links it. Removed from four places, each commented: the portal hub's `DESTINATIONS`, `RecoveryNav` (404s), the breakdown line under the leaderboard, and `ResultPanel` after a check-in. - [ ] Relist all four once the lookup changes ship.
+
 ## ✅ Member portal phase 1 — LIVE on `main` since 2026-09-30 (`b273977`, shipped alone from `portal-launch`)
 
 Plan and full record in [`docs/member-portal-plan.md`](docs/member-portal-plan.md); doc v1.81.

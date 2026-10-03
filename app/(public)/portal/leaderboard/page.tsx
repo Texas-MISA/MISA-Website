@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { Banner, ReadError } from "@/components/ui/banner";
 import { PageHero } from "@/components/ui/chevron-section";
@@ -231,21 +230,14 @@ export default async function LeaderboardPage() {
           </div>
         )}
 
-        {/* The board is a bare total by design (§9 #11), so it cannot tell a
-            member which of their points were attendance and which were granted.
-            /lookup is where that breakdown lives — link it, or the answer is
-            "ask an officer", which is what this stage exists to end. */}
-        <p className="mt-8 text-sm text-misa-muted">
-          Want your own breakdown — which events you attended, what&apos;s still
-          pending, and why your total is what it is?{" "}
-          <Link
-            href="/portal/lookup"
-            className="text-misa-blue underline hover:text-misa-blue-dark"
-          >
-            Look up your attendance
-          </Link>
-          .
-        </p>
+        {/* ✂️ The "Look up your attendance" line that linked /portal/lookup
+            here is UNLISTED as of 2026-10-03 (officer, until the lookup has
+            been reworked). The board is a bare total by design (§9 #11), so
+            that line is the one to restore first. Relisting is four places —
+            see `DESTINATIONS` in app/(public)/portal/page.tsx. It read:
+              Want your own breakdown — which events you attended, what's still
+              pending, and why your total is what it is? <Link
+              href="/portal/lookup">Look up your attendance</Link>. */}
       </Section>
     </>
   );

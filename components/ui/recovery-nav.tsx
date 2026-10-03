@@ -35,7 +35,9 @@ const DESTINATIONS = [
   ["/about", "About Us"],
   ["/portal", "Member Portal"],
   ["/portal/leaderboard", "Leaderboard"],
-  ["/portal/lookup", "My Attendance"],
+  // ✂️ ["/portal/lookup", "My Attendance"] is UNLISTED as of 2026-10-03
+  // (officer). Relisting it is four places — see `DESTINATIONS` in
+  // app/(public)/portal/page.tsx for the list.
   ["/contact", "Contact Us"],
 ] as const;
 

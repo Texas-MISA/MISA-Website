@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useActionState } from "react";
 
 import {
@@ -357,18 +356,11 @@ function ResultPanel({
         {heading}
       </h2>
       <p className="mt-2 leading-[1.65] text-misa-body">{children}</p>
-      {/* Stage 7 phase 2. On every terminal outcome, including `pending` and
-          `duplicate` — those are the two where someone most wants to see for
-          themselves that the system has them, rather than take a sentence's
-          word for it. */}
-      <p className="mt-4 text-sm text-misa-muted">
-        <Link
-          href="/portal/lookup"
-          className="text-misa-blue underline hover:text-misa-blue-dark"
-        >
-          Check your points and attendance
-        </Link>
-      </p>
+      {/* ✂️ The "Check your points and attendance" link to /portal/lookup
+          that sat here on every terminal outcome (Stage 7 phase 2) is UNLISTED
+          as of 2026-10-03 (officer, until the lookup has been reworked).
+          Relisting is four places — see `DESTINATIONS` in
+          app/(public)/portal/page.tsx. */}
     </Panel>
   );
 }

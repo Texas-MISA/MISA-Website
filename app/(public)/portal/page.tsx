@@ -23,7 +23,8 @@ import { Section } from "@/components/ui/section";
 // 📌 **Rows, not a three-up card grid.** Three equal cards side by side is the
 // feature-row tell `design-taste-frontend` bans, and at `sm` a third of the
 // column is too narrow for "My Attendance" at the Title size. Rows also keep
-// the narrow single column the three member pages themselves use.
+// the narrow single column the three member pages themselves use. (Two rows
+// since 2026-10-03, while My Attendance is unlisted — see `DESTINATIONS`.)
 //
 // 🔓 **All three buttons are formatted the SAME — one skin, one width
 // (officer, 2026-09-18).** Check In was first built as the lone primary with
@@ -46,7 +47,7 @@ import { Section } from "@/components/ui/section";
 
 export const metadata: Metadata = {
   title: "Member Portal",
-  description: "Check in, see the standings, or look up your own attendance.",
+  description: "Check in, or see the standings.",
   robots: { index: false, follow: false },
 };
 
@@ -68,12 +69,15 @@ const DESTINATIONS = [
     body: "Current-term standings for MISA members.",
     action: "Leaderboard",
   },
-  {
-    href: "/portal/lookup",
-    title: "My Attendance",
-    body: "Look up your own MISA attendance, points and dues status.",
-    action: "Lookup",
-  },
+  // ✂️ "My Attendance" (/portal/lookup) is UNLISTED as of 2026-10-03 (officer,
+  // until it has been reworked). The route still resolves; nothing links it.
+  // Relisting it is exactly four places, this one included: this list,
+  // `DESTINATIONS` in components/ui/recovery-nav.tsx, the breakdown line on
+  // app/(public)/portal/leaderboard/page.tsx, and `ResultPanel` in
+  // app/(public)/portal/attend/_components/checkin-form.tsx. Its entry was:
+  //   { href: "/portal/lookup", title: "My Attendance",
+  //     body: "Look up your own MISA attendance, points and dues status.",
+  //     action: "Lookup" }
 ] as const;
 
 // One skin for every destination (see the header note), full width on a phone
