@@ -60,16 +60,21 @@ import {
  * SORT_COLUMNS below; the two are separate so a URL cannot name a column that
  * is not meant to be sortable.
  *
- * Exactly the columns the table displays. Phase 1 allowed ten, which was right
- * when the table had ten — a sort on a column nobody can see rearranges the list
- * for no visible reason. Phase 3 cut it to four; `email` became sortable there,
- * having been displayed since phase 1 with no header of its own.
+ * The built-in columns of the DEFAULT table. Phase 1 allowed ten, which was
+ * right when the table had ten — a sort on a column nobody can see rearranges
+ * the list for no visible reason. Phase 3 cut it to four; `email` became
+ * sortable there, having been displayed since phase 1 with no header of its own.
  *
  * `dues` (Stage 6.5 phase 4) is the fifth, and it obeys the same rule from the
  * other side: it is sortable *because* it is displayed. It maps to
  * `dues_paid_term`, a boolean the view calculates — nothing about this
  * key is officer-defined, so it belongs here rather than behind the `cf:`
  * namespace.
+ *
+ * ⚠️ Since 2026-10-01 the table can display MORE than these five: the Fields
+ * menu shows any export column, and none of them became sortable (officer: no
+ * new sorting). "Sorted ⇒ displayed" still holds, because
+ * lib/directory-columns.ts forces the sorted column onto the screen.
  */
 export const MEMBER_SORTS = [
   "name",
@@ -99,7 +104,7 @@ export const MEMBER_SORT_LABELS: Record<MemberBuiltinSort, string> = {
 };
 
 /**
- * A sort key, as the URL spells it: one of the four built-ins, or `cf:<key>`
+ * A sort key, as the URL spells it: one of the five built-ins, or `cf:<key>`
  * naming a custom field.
  *
  * A bare string rather than a union, because the custom half is officer-defined
@@ -139,7 +144,9 @@ export type SortableField = { key: string; showInDirectory: boolean };
  *
  * A field that is not shown in the directory is not sortable either: sorting by
  * a column nobody can see rearranges the list for no visible reason, which is
- * the same argument that cut phase 1's ten sort keys down to four.
+ * the same argument that cut phase 1's ten sort keys down to four. Since
+ * 2026-10-01 "shown in the directory" means a DEFAULT column: an officer can
+ * show any other field from the Fields menu, and it still does not sort.
  */
 export function sortColumn(
   sort: MemberSort,
@@ -535,8 +542,8 @@ export function parseMemberFilter(
     if (value !== null) custom[field.key] = value;
   }
 
-  // A sort key is either one of the four built-ins or `cf:<key>` naming a
-  // definition that exists and is shown in the directory. Anything else — a
+  // A sort key is either one of the five built-ins or `cf:<key>` naming a
+  // definition that exists and is a default directory column. Anything else — a
   // retired phase-1 key, a field archived since the officer bookmarked the URL,
   // or typed nonsense — degrades to `name` rather than reaching the query.
   const rawSort = one(params, "sort");

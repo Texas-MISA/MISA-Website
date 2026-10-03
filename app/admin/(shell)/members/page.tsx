@@ -1,11 +1,24 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 
 import { Notice, ReadError } from "@/app/admin/(shell)/_components/notice";
 import { requireOfficer } from "@/lib/auth";
 import {
+  defaultDirectoryColumns,
+  directoryCellText,
+  directoryColumns,
+  DIRECTORY_COLUMNS_COOKIE,
+  forcedSortColumn,
+  parseDirectoryColumns,
+  resolveDirectoryColumns,
+  textCellFields,
+  visibleColumnKeys,
+} from "@/lib/directory-columns";
+import {
   applyMemberFilter,
   chunkRange,
+  defaultDirection,
   isDefaultFilter,
   MEMBER_TERM_ALL,
   memberFilterToParams,
@@ -14,7 +27,7 @@ import {
   READ_CHUNK,
 } from "@/lib/filters";
 import { fetchEventOptions } from "@/lib/event-options";
-import { exportCatalogue } from "@/lib/export";
+import { exportCatalogue, projectRow, type ExportField } from "@/lib/export";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
 import { fetchPresets } from "@/lib/member-presets";
 import type { FieldDefinition } from "@/lib/members";
@@ -46,13 +59,23 @@ import { SelectionProvider } from "./_components/selection";
 // `authenticated` only and must never be read from a Client Component with the
 // anon key (§6).
 //
-// Four columns as of phase 3 — Name, Email, EID, Total Points — with everything
-// else on /admin/members/[id]. The relational filters (attended or missed a
-// specific event, has pending submissions) need an attendance subquery rather
-// than a column comparison and live in their own labelled panel. "Not seen
-// since" was the third of them until 2026-08-25 and went with `members.active`:
-// both answered "is this person still around" by inference, and the term scope
-// now answers it from evidence.
+// 📌 The COLUMNS are the officer's choice since 2026-10-01, and the same choice
+// is the export's. By default the table shows Member, Email, EID, Total points
+// and Dues plus every custom field marked as a default column; the toolbar's
+// Fields menu adds or hides any column in the export catalogue and remembers
+// that per browser in a cookie this page reads (set, HttpOnly, by the Server
+// Action in app/actions/directory-columns.ts), so the first paint already has
+// the officer's columns. Name is always shown, and so is the column the table
+// is sorted by. The rules live in lib/directory-columns.ts; this page only
+// reads the cookie and fetches what the visible columns need. Everything that
+// is not on screen is still one click away on /admin/members/[id].
+//
+// The relational filters (attended or missed a specific event, has pending
+// submissions) need an attendance subquery rather than a column comparison and
+// live in their own labelled panel. "Not seen since" was the third of them
+// until 2026-08-25 and went with `members.active`: both answered "is this
+// person still around" by inference, and the term scope now answers it from
+// evidence.
 
 export const metadata: Metadata = { title: "Members" };
 
@@ -62,12 +85,20 @@ export const metadata: Metadata = { title: "Members" };
 // collapses the result into an untyped error shape. The wrapped-and-concatenated
 // version of this line cost a build here too.
 //
-// `source` is not a displayed column — it drives the SELF badge beside the
-// name. `active` used to sit beside it driving an INACTIVE badge; migration 29
-// dropped the column, and the badge went with it. The view keeps every other
-// column for the detail page.
+// 📌 The export route's EXPORT_COLUMNS plus `updated_at`, and the width is the
+// point: since 2026-10-01 any column in the export catalogue can be on screen,
+// and the visible ones go through the export's own `projectRow`, which takes a
+// row carrying every column it knows. Change this with the route's literals.
+// A column `ExportSourceRow` gains and this select lacks is a compile error at
+// the projectRow call in fetchDirectory, because the row type comes off this
+// literal. `updated_at` is the row's compare-and-set token, which the export
+// has no use for.
+//
+// The wider read costs bytes between PostgREST and this server, not bytes to
+// the browser: only the visible columns are projected into a row's `cells`.
+// `source` also drives the SELF pill beside the name, shown or not.
 const COLUMNS =
-  "id, eid, full_name, email, source, total_points, dues_paid_term, custom_fields, updated_at" as const;
+  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, custom_fields, updated_at" as const;
 
 // The same list plus the attendance embed phase 6's event filter needs.
 //
@@ -83,7 +114,7 @@ const COLUMNS =
 // is set — unfiltered it still returns the right rows and the right count, but
 // it nests every member's whole attendance history into the payload for nothing.
 const COLUMNS_WITH_ATTENDANCE =
-  "id, eid, full_name, email, source, total_points, dues_paid_term, custom_fields, updated_at, attendance!left(event_id)" as const;
+  "id, eid, full_name, email, term, source, joined_at, notes, total_points, attendance_points, bonus_points, events_attended, events_possible, attendance_rate, pending_count, last_seen_at, dues_paid_term, custom_fields, updated_at, attendance!left(event_id)" as const;
 
 type DirectoryQueryResult =
   | { kind: "ok"; rows: MemberRow[]; total: number }
@@ -153,11 +184,33 @@ type DirectoryRow = NonNullable<
   Awaited<ReturnType<typeof narrowSelect>>["data"]
 >[number];
 
+/**
+ * One row's plain built-in columns, as the text the table prints.
+ *
+ * Through `projectRow` — the export's own projection — so the screen and the
+ * file cannot disagree about what a cell holds, only about how it is written.
+ * `directoryCellText` calls Intl for dates, which is why this happens HERE on
+ * the server and the row receives finished strings.
+ */
+function cellText(
+  row: DirectoryRow,
+  textFields: readonly ExportField[]
+): Record<string, string> {
+  const cells = projectRow(row, textFields);
+  return Object.fromEntries(
+    textFields.map((field, index) => [field.key, directoryCellText(cells[index])])
+  );
+}
+
 async function fetchDirectory(
   db: ReturnType<typeof createAdminClient>,
   filter: ReturnType<typeof parseMemberFilter>,
   fields: readonly FieldDefinition[],
-  currentTerm: string
+  currentTerm: string,
+  /** The visible built-ins drawn as plain text — `textCellFields`. A column
+   * that is not on screen is not in here, so its values never leave the
+   * server: hidden officer notes stay hidden. */
+  textFields: readonly ExportField[]
 ): Promise<DirectoryQueryResult> {
   // applyMemberFilter is the only thing that translates a filter into a query.
   // The export calls it on the same filter and reads the same way — that
@@ -223,9 +276,11 @@ async function fetchDirectory(
     if (data.length < READ_CHUNK || raw.length >= total) break;
   }
 
-  // No timestamp reaches the table any more, so there is nothing to pre-format
-  // here — the columns that needed it moved to the detail page, which formats
-  // them on the server for the same reason.
+  // ⚠️ Every date and rate the table prints is formatted HERE, on the server.
+  // Since 2026-10-01 an officer can put Last seen, Joined and the attendance
+  // rate back on screen, and DirectoryRow is a Client Component — Intl there
+  // runs on both sides of hydration with different ICU data. `cells` carries
+  // the finished strings instead, for the visible plain columns only.
   const rows: MemberRow[] = raw.map((row) => ({
     id: row.id ?? "",
     eid: row.eid ?? "",
@@ -243,6 +298,7 @@ async function fetchDirectory(
     // raw PostgREST string all the way to the hidden input — a Date round trip
     // truncates the microseconds and the CAS then never matches.
     updatedAt: row.updated_at ?? "",
+    cells: cellText(row, textFields),
   }));
 
   return { kind: "ok", rows, total };
@@ -276,12 +332,51 @@ export default async function AdminMembersPage({
   // Never re-derived from the clock a second time — one fact, one source.
   const scopeTerm = filter.term ?? currentTerm;
 
+  // The columns (2026-10-01), resolved before the read because they decide
+  // which cells it formats. The rules are lib/directory-columns.ts's; this is
+  // only the wiring:
+  //   - `preferred` is the officer's choice (P) — the defaults adjusted by the
+  //     cookie, which parses totally, so a garbage value is the defaults;
+  //   - `sorted` is the column the sort forces on screen, if any;
+  //   - `visibleKeys` is what the table draws AND what the toolbar exports.
+  // Read on every request, never cached: the cookie is per browser and this
+  // page is dynamic anyway (requireOfficer reads the session).
+  const catalogue = exportCatalogue(fields);
+  const defaults = defaultDirectoryColumns(catalogue, fields);
+  // The cookie as parsed, and handed to the toolbar as well as resolved here:
+  // the toolbar's next change is built on it, so an entry naming a key this
+  // catalogue lacks is kept rather than dropped. That matters most when
+  // fetchFieldDefinitions has failed and the catalogue has no custom fields.
+  const previous = parseDirectoryColumns(
+    (await cookies()).get(DIRECTORY_COLUMNS_COOKIE)?.value
+  );
+  const preferred = resolveDirectoryColumns(catalogue, defaults, previous);
+  const sorted = forcedSortColumn(filter.sort);
+  const visibleKeys = visibleColumnKeys(catalogue, preferred, sorted);
+  const columns = directoryColumns(catalogue, visibleKeys, fields);
+
+  // Where the toolbar goes when the officer hides the column the table is
+  // sorted by: this filter with the sort back at its default, so the column
+  // can actually leave. Built by the one serializer, like every other link to
+  // this screen.
+  const unsortedQuery = memberFilterToParams(filter, {
+    sort: "name",
+    dir: defaultDirection("name"),
+  }).toString();
+  const unsortedHref = `/admin/members${unsortedQuery ? `?${unsortedQuery}` : ""}`;
+
   // The directory read and the event picker are independent, so they go
   // together. fetchEventOptions is the same all-status list the attendance queue
   // and manual entry offer — an officer asking who missed a cancelled event is
   // asking a real question, and a published-only picker could not answer it.
   const [result, eventsResult, presetsResult, terms] = await Promise.all([
-    fetchDirectory(db, filter, fields, currentTerm),
+    fetchDirectory(
+      db,
+      filter,
+      fields,
+      currentTerm,
+      textCellFields(catalogue, visibleKeys)
+    ),
     fetchEventOptions(db),
     fetchPresets(db),
     fetchTerms(db),
@@ -436,14 +531,23 @@ export default async function AdminMembersPage({
               total={result.total}
               visibleIds={result.rows.map((row) => row.id)}
             >
+              {/* The toolbar and the table get the SAME resolution: the
+                  table draws `columns`, and the toolbar rebuilds the visible
+                  keys from `preferred` and `sorted` to name them in the export
+                  URL — so the file is the table on screen. */}
               {result.total > 0 && (
                 <ExportToolbar
                   filterParams={filterKey}
-                  catalogue={exportCatalogue(fields)}
+                  catalogue={catalogue}
+                  preferred={preferred}
+                  previous={previous}
+                  defaults={defaults}
+                  sorted={sorted}
+                  unsortedHref={unsortedHref}
                 />
               )}
 
-              <MemberTable rows={result.rows} filter={filter} fields={fields} />
+              <MemberTable rows={result.rows} filter={filter} columns={columns} />
             </SelectionProvider>
           </>
         )}

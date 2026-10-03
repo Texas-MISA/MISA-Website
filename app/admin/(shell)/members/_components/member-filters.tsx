@@ -171,9 +171,12 @@ export function MemberFilters({
     );
   }
 
-  // The directory columns, which is exactly the set parseMemberFilter will
-  // accept a `cf:` filter for — so a control exists for every filter that can
-  // be applied, and no filter can be applied without a control.
+  // The DEFAULT columns (show_in_directory), which is exactly the set
+  // parseMemberFilter will accept a `cf:` filter for — so a control exists for
+  // every filter that can be applied, and no filter can be applied without a
+  // control. Since 2026-10-01 an officer can also SHOW a field that is not a
+  // default column, from the Fields menu. It gets no filter here: that change
+  // added no sorting (officer) and left the filters exactly as they were.
   const filterable = definitions.filter((d) => d.showInDirectory);
 
   const relationalCount = relationalFilterCount(filter);

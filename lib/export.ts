@@ -127,14 +127,27 @@ const BUILTIN_FIELDS: readonly ExportField[] = [
   // Labelled "(%)" because both writers emit the scaled integer rather than the
   // stored fraction — see percentCell() below for why the two agree.
   { key: "attendance_rate", label: "Attendance rate (%)", kind: "percent", source: "builtin" },
-  { key: "pending_count", label: "Pending submissions", kind: "number", source: "builtin" },
-  { key: "last_seen_at", label: "Last seen", kind: "date", source: "builtin" },
+  // ⚠️ "(all-time)" is in the LABEL, not in a footnote. These two are the only
+  // aggregates on member_directory that ignore the row's term, and since
+  // 2026-10-01 a label here is the header in three places at once — the
+  // directory table, the Fields picker and the file. A bare "Last seen" beside
+  // this term's points reads as this term's. The roster import ignores both
+  // columns by construction (lib/member-import.ts), so renaming them strands
+  // nothing.
+  { key: "pending_count", label: "Pending submissions (all-time)", kind: "number", source: "builtin" },
+  { key: "last_seen_at", label: "Last seen (all-time)", kind: "date", source: "builtin" },
   { key: "joined_at", label: "Joined", kind: "date", source: "builtin" },
   // ⚠️ Replaced "Active" on 2026-08-25, when members.active was dropped. It is
   // not a like-for-like swap: this names the SEMESTER the row's points,
   // attendance, rate and dues belong to, so a saved file can still be read a
-  // year later. Every export carries it whether or not the officer ticked it —
-  // see exportedFields, which records what actually left.
+  // year later.
+  //
+  // 🐛 This note used to say every export carries the column whether or not it
+  // was ticked. Nothing ever did that: parseFieldSelection and exportedFields
+  // pass the chosen list through untouched, so a file has a Term column only
+  // when the officer picked one. What always names the semester is the xlsx
+  // sheet tab and the audit receipt's resolved `term` (both in the route) — a
+  // CSV without this column does not.
   { key: "term", label: "Term", kind: "text", source: "builtin" },
   { key: "source", label: "Source", kind: "text", source: "builtin" },
   // Stage 6.5 phase 4 — ONE catalogue entry, not a new mechanism. `dues` is
@@ -148,18 +161,30 @@ const BUILTIN_FIELDS: readonly ExportField[] = [
 ];
 
 /**
- * What an export selects when the officer has not chosen.
+ * The built-in half of the directory's default columns — and, since 2026-10-01,
+ * of the default export, because the two are now one list.
  *
- * The four displayed columns plus email. Deliberately not "everything": the
- * picker exists for the officer who wants names and shirt sizes and nothing
- * else, and defaulting narrow is a §6 PII mitigation rather than only a
- * convenience — notes and EIDs leave the building only when asked for.
+ * `defaultDirectoryColumns` (lib/directory-columns.ts) adds every live custom
+ * field marked as a default column to this, and the result is both what the
+ * table shows an officer who has not customised it and what a request naming
+ * no `fields` exports. One picker drives the table and the file, so the default
+ * file is the default table.
+ *
+ * ⚠️ THAT REVERSES A RULE, on the officer's instruction (2026-10-01). Dues used
+ * to be opt-in here — "has this person paid" leaving the building only when
+ * somebody asked — and it is now a default, because Dues has been a default
+ * COLUMN since Stage 6.5 and the file has to match the screen. What stays out
+ * is still everything the default table does not show: notes, the points
+ * breakdown and attendance figures, pending, last seen, joined, source and
+ * term leave only when an officer puts them on screen first. Narrow is still
+ * the default — it is the table's narrow now, not a second, narrower one.
  */
 export const DEFAULT_EXPORT_FIELDS: readonly string[] = [
   "name",
   "email",
   "eid",
   "total_points",
+  "dues",
 ];
 
 /**
@@ -242,12 +267,16 @@ export function parseFieldSelection(
   raw: string | string[] | undefined | null,
   catalogue: readonly ExportField[],
   // 📌 Parameterized in Stage 8 phase 2, when the attendance and adjustment
-  // archives became a second and third caller with their own catalogues. It
-  // defaults to the member list so no existing caller changes, but a ledger
-  // export passing the member defaults would fall back to a set of keys its
-  // catalogue does not contain — and `chosen.length > 0` would then be false
-  // for a request that named nothing, yielding an empty file rather than a
-  // sensible default.
+  // archives became a second and third caller with their own catalogues — a
+  // ledger export falling back to the member defaults would filter its
+  // catalogue down to nothing and serve an empty file for a request that
+  // named no fields.
+  //
+  // The roster route stopped relying on the default on 2026-10-01: it passes
+  // `defaultDirectoryColumns(…)`, which is this list plus the custom fields
+  // marked as default columns, so a request naming nothing exports the table
+  // an un-customised officer sees. The default here is the built-in half of
+  // that, kept so a caller with no definitions to hand still gets a file.
   defaults: readonly string[] = DEFAULT_EXPORT_FIELDS
 ): ExportField[] {
   const requested = new Set(

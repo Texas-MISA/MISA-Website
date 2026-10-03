@@ -43,10 +43,17 @@ export default async function MemberFieldsPage() {
         }
       />
 
+      {/* 📌 "Default column" rather than "directory column" since 2026-10-01:
+          any field can be put on the table from the directory's Fields menu,
+          and this flag decides only what an officer sees before choosing —
+          and, still, which fields can be sorted and filtered on. */}
       <p className="mt-6 max-w-2xl text-sm text-misa-secondary">
         Dropdowns officers can set on any member — t-shirt size, committee,
-        major. Fields marked as directory columns appear in the roster table and
-        can be sorted on; the rest live on each member&apos;s own page.
+        major. A default column is in every officer&apos;s roster table unless
+        they hide it from Fields, and can be sorted and filtered on. A field
+        hidden by default stays off the table until an officer shows it from
+        Fields, and cannot be sorted or filtered on. Every field can also be
+        set on each member&apos;s own page.
       </p>
 
       <section className="mt-10">
@@ -54,8 +61,8 @@ export default async function MemberFieldsPage() {
         <div className="mt-4">
           {live.length === 0 ? (
             <Notice>
-              No custom fields yet. The directory shows its four built-in
-              columns until you add one.
+              No custom fields yet. The directory shows only built-in columns
+              until you add one.
             </Notice>
           ) : (
             <FieldTable rows={live} />
@@ -111,15 +118,11 @@ function FieldTable({ rows }: { rows: FieldDefinition[] }) {
                 and read back out of an export header. */}
             <Td className="font-mono text-xs">{row.key}</Td>
             <Td>{row.options.join(", ")}</Td>
+            {/* "Editable inline" applies either way: a field hidden by default
+                is still editable from the table once an officer shows it. */}
             <Td>
-              {row.showInDirectory ? (
-                <>
-                  Directory column
-                  {row.editableInline ? ", editable inline" : ", read-only"}
-                </>
-              ) : (
-                "Member page only"
-              )}
+              {row.showInDirectory ? "Default column" : "Hidden by default"}
+              {row.editableInline ? ", editable inline" : ", read-only"}
             </Td>
             <Td numeric>{row.sortOrder}</Td>
           </Tr>

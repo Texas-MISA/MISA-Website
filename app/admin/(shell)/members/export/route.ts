@@ -1,5 +1,6 @@
 import { getOfficer } from "@/lib/auth";
 import { writeAudit } from "@/app/actions/audit";
+import { defaultDirectoryColumns } from "@/lib/directory-columns";
 import {
   applyMemberFilter,
   isDefaultFilter,
@@ -139,8 +140,21 @@ export async function GET(request: Request): Promise<Response> {
     // before anybody noticed.
     const currentTerm = await fetchCurrentTerm(db);
 
+    // 🔓 The fields come from the URL and NOTHING else. Since 2026-10-01 the
+    // toolbar names exactly the columns on screen, and a request naming none
+    // falls back to the directory's DEFAULT columns — the table an officer who
+    // never customised it sees, Dues included.
+    //
+    // This route never reads the `misa_directory_columns` cookie, though the
+    // browser sends it here (its Path is a prefix of this one). The URL is the
+    // contract the audit receipt records, and a file that depended on which
+    // browser followed the link could not be reproduced from that receipt.
     const catalogue = exportCatalogue(fields);
-    const chosen = parseFieldSelection(params.getAll("fields"), catalogue);
+    const chosen = parseFieldSelection(
+      params.getAll("fields"),
+      catalogue,
+      defaultDirectoryColumns(catalogue, fields)
+    );
 
     // "The 25 rows on this page" versus "all N matching this filter" are the two
     // selection modes, and conflating them is the classic bug this screen is

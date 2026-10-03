@@ -2,13 +2,13 @@ import { ChevronDown, ChevronsUpDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 
 import { Table, THead, Th, Tr } from "@/components/ui/table";
+import type { DirectoryColumn } from "@/lib/directory-columns";
 import {
   defaultDirection,
   memberFilterToParams,
   type MemberFilter,
   type MemberSort,
 } from "@/lib/filters";
-import { customFieldKey, type FieldDefinition } from "@/lib/members";
 
 import { DirectoryRow } from "./directory-row";
 import { SelectAllHeader } from "./selection";
@@ -21,11 +21,20 @@ import { SelectAllHeader } from "./selection";
 // has to be a Client Component because it owns the compare-and-set token its
 // cells share (the reason is written out in directory-row.tsx).
 //
-// Four built-in columns (phase 3): Name, Email, EID, Total Points. Everything
-// the phase-1 table showed beside them — joined, source, events, rate, the
-// attendance/bonus split, pending, last seen — lives on /admin/members/[id],
-// which is why the name links there. Officer-defined columns follow them, in
-// the order officers arranged.
+// 📌 The columns are not fixed here any more (2026-10-01). The page resolves
+// them from the officer's Fields choice — remembered in a cookie — plus Name,
+// which is locked, plus the column the table is sorted by, and hands this file
+// the result in catalogue order. The default is Member, Email, EID, Total
+// points and Dues, then every custom field marked as a default column; any
+// other export field can be added, and the export carries exactly what is
+// drawn here. lib/directory-columns.ts owns all of it.
+//
+// ⚠️ A header SORTS only where `sortColumn` already accepts the key, which
+// `column.sort` encodes; every other header is plain text (officer decision,
+// 2026-10-01: no new sorting). Showing a column does not make it sortable, and
+// a link that pretended otherwise would be worse than none — parseMemberFilter
+// degrades a key `sortColumn` refuses to `name`, so the header would silently
+// sort the table by Member.
 
 /** This table renders at exactly one route. Hoisted rather than parameterised:
  * a `basePath` prop would invent a seam nothing uses. */
@@ -36,11 +45,9 @@ export type MemberRow = {
   eid: string;
   fullName: string;
   email: string;
-  /** Not a column. Drives the INACTIVE badge, which is an annotation on the
-   * name rather than a field of its own — and the only on-screen signal that
-   * the roster scope is showing someone deactivated. */
-  /** Likewise: the SELF badge marks a row the check-in form created, which is
-   * §4.2's roster-cleanup signal. */
+  /** Drives the SELF pill beside the name, which marks a row the check-in form
+   * created — §4.2's roster-cleanup signal. The Source COLUMN, when an officer
+   * shows it, is printed from `cells` like every other plain built-in. */
   source: string;
   totalPoints: number;
   /**
@@ -58,24 +65,31 @@ export type MemberRow = {
   customFields: unknown;
   /** The row's compare-and-set token, as the raw PostgREST string. */
   updatedAt: string;
+  /**
+   * The visible plain built-ins — everything on screen outside the dedicated
+   * columns and the custom fields — as finished text, keyed by catalogue key.
+   *
+   * ⚠️ Formatted on the SERVER (`directoryCellText`), because dates go through
+   * Intl and the row is a Client Component. Only visible columns are in here,
+   * so a hidden column's values — officer notes above all — never reach the
+   * browser. Read it with `Object.hasOwn`; a missing key renders as "—".
+   */
+  cells: Record<string, string>;
 };
 
 export function MemberTable({
   rows,
   filter,
-  fields,
+  columns,
 }: {
   rows: MemberRow[];
   filter: MemberFilter;
-  /** Every live definition. The directory columns are filtered out of it here,
-   * so the header list and the cell list cannot disagree. */
-  fields: FieldDefinition[];
+  /** The visible columns in display order, from `directoryColumns`. The header
+   * row and every DirectoryRow map over this one list, so the headers and the
+   * cells cannot disagree. */
+  columns: DirectoryColumn[];
 }) {
   if (rows.length === 0) return null;
-
-  // The same predicate sortColumn() applies, and that is the point: a header
-  // only exists for a column that is actually sortable.
-  const columns = fields.filter((field) => field.showInDirectory);
 
   // The filter rides along to the detail page so its back link returns to the
   // view the officer was working, not the unfiltered default — the same idiom
@@ -101,35 +115,31 @@ export function MemberTable({
       <THead sticky>
         <Tr hover={false}>
           {/* One Client Component cell in an otherwise server-rendered head —
-              the other headers are navigation links, this is a control. */}
+              the other headers are navigation links or plain text, this is a
+              control. */}
           <SelectAllHeader />
-          <SortHeader filter={filter} column="name" align="left">
-            Member
-          </SortHeader>
-          <SortHeader filter={filter} column="email" align="left">
-            Email
-          </SortHeader>
-          <SortHeader filter={filter} column="eid" align="left">
-            EID
-          </SortHeader>
-          <SortHeader filter={filter} column="total_points">
-            Total points
-          </SortHeader>
-          {/* Last of the built-ins, so the officer-defined columns stay a
-              contiguous block after them. */}
-          <SortHeader filter={filter} column="dues" align="left">
-            Dues
-          </SortHeader>
-          {columns.map((field) => (
-            <SortHeader
-              key={field.key}
-              filter={filter}
-              column={customFieldKey(field.key)}
-              align="left"
-            >
-              {field.label}
-            </SortHeader>
-          ))}
+          {/* Catalogue order — the built-ins, then the officer-defined
+              fields as one contiguous block — which is also the export's
+              column order, so the file reads left to right like the table. */}
+          {columns.map((column) =>
+            column.sort === null ? (
+              // A phrase rather than a word in most cases ("Pending
+              // submissions (all-time)"), so it may wrap instead of widening
+              // its column to the full uppercase label.
+              <Th key={column.key} numeric={column.numeric} wrap className="px-3">
+                {column.label}
+              </Th>
+            ) : (
+              <SortHeader
+                key={column.key}
+                filter={filter}
+                column={column.sort}
+                align={column.numeric ? "right" : "left"}
+              >
+                {column.label}
+              </SortHeader>
+            )
+          )}
         </Tr>
       </THead>
       <tbody>
@@ -137,7 +147,7 @@ export function MemberTable({
           <DirectoryRow
             key={row.id}
             row={row}
-            fields={columns}
+            columns={columns}
             detailHref={detailHref(row.id)}
           />
         ))}

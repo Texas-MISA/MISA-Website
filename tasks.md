@@ -6,6 +6,35 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## 🧩 Fields picker drives the member table's columns (officer, 2026-10-01) — on `portal-launch`, NOT on `main`
+
+Ticking fields in **Fields (N)** on `/admin/members` never changed the table. That menu was the **export** field picker (`4c8fe4e`, 2026-08-06). It never touched the table, so this was a missing link, not a regression. Now **one picker drives both**: the table shows the chosen columns, and Download XLSX/CSV and Copy table export exactly those. The choice is remembered per browser in the `misa_directory_columns` cookie, as a delta from the defaults. Name and the sorted column are always shown, and nothing new sorts. **Dues is now in the default export**, a recorded reversal. Full record: doc v1.82 and [`docs/build-log.md`](docs/build-log.md).
+
+- ✅ **Implementation.** `lib/directory-columns.ts` (new, pure), plus the page, the table, the row, the toolbar, the shared `FieldPicker`, the export route's fallback, the field editor's relabel and the fields list. No migration.
+- ✅ **Unit tests.** `tests/directory-columns.test.ts` has 48 tests. `tests/export.test.ts`'s Dues rule is flipped (Dues is IN the defaults), with a companion pinning what stays out. Before the docs pass the full suite was **1148/1150**; the 2 failures were the docs-map tests that pass fixes.
+- ✅ **Docs.** Architecture doc v1.82, with both reversals recorded: §6's "Dues only when asked for" and §7 phase 5's "columns legitimately differ from the screen". Also `CLAUDE.md`, `docs/invariants.md`, `docs/layout.md`, the build log and this block.
+- ✅ **Review fixes (2026-10-03).**
+  - The cookie is now set HttpOnly by the officer-only Server Action `rememberDirectoryColumns`, not by `document.cookie`, which WebKit and Brave cap at 7 days. That action writes no audit row.
+  - "Updating the table…" and failures are announced.
+  - A change keeps entries for keys the page cannot see, so a failed definitions read erases nothing.
+  - The note reads "hiding it sorts by name".
+  - `tests/directory-columns.test.ts` now has 67 tests, and the full suite is **1171/1171**.
+
+  Full record: [`docs/build-log.md`](docs/build-log.md). 🪤 **For the walkthrough, the cookie is HttpOnly**, so `document.cookie` no longer shows it. Read and edit it in DevTools → Application → Cookies.
+- ✅ **Browser walkthrough on the local stack (2026-10-03, Chrome, `Environments: .env.development.local, .env.local`).** Run on the first build, then the changed paths again after the review fixes.
+  - **Columns:** the defaults are right. Ticking and unticking updates the table in place, and the picker stays open. "All 29 matching selected" survives a column change.
+  - **Persistence:** the choice survives a reload, opening a member and coming back (by the back link and by browser Back), and a term change.
+  - **Sorting:** Hiding the sorted column drops the sort, and a hidden sorted column is forced on with its note. `?sort=attendance_rate` falls back to Member, because nothing new sorts.
+  - **Export:** the CSV and TSV headers match the table, and the receipts list exactly those fields. The default export includes Dues.
+  - **Fields editor:** with a customised cookie, a new default field still appeared. A field hidden by default is listed in Fields and shows a plain header when ticked.
+  - **Inline edits:** two saves in one row both landed, with no phantom conflict.
+  - **Robustness:** the ledger pickers are unchanged. Garbage cookies fall back to the defaults.
+  - **After the review fixes:** each change is one `rememberDirectoryColumns` POST, with no extra refresh. The cookie is HttpOnly and persists, and Reset deletes it.
+  - **Notes:** one unreproduced display blip in an inline cell is recorded in the build log. The local walkthrough data has been deleted.
+- 🐛 **Open, pre-existing and out of scope: `/admin/members?sort=toString` shows "Couldn't load the directory."** `sortColumn` in `lib/filters.ts` (line 157; it was 150 before this change's comment edits) does `SORT_COLUMNS[sort] ?? null`, which reads `Object.prototype` for a key like `toString`. It is not an injection risk. The fix is a one-line `Object.hasOwn` guard, and `lib/presets.ts:204` (`MEMBER_SORT_LABELS[sort] ?? sort`) has the same shape. It is a candidate for a later item in this series.
+
+---
+
 ## 🗑️ `design-toolkit` is STALE and will be scrapped (officer, 2026-10-01)
 
 The portal-redesign branch (54 commits not on `main`; tip `4b1ba13`, plus the commit that marks it) **will not be merged.**

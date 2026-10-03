@@ -442,6 +442,11 @@ describe("the phase-4 client components format no dates", () => {
     "../app/admin/(shell)/members/_components/member-field-cell.tsx",
     "../app/admin/(shell)/members/[id]/_components/member-editor.tsx",
     "../app/admin/(shell)/members/fields/_components/field-form.tsx",
+    // Since 2026-10-01 these two drive the directory's columns, and the row
+    // above prints dates and rates again — all of them formatted on the
+    // server. The picker and its toolbar must never start doing it themselves.
+    "../app/admin/(shell)/members/_components/export-toolbar.tsx",
+    "../app/admin/(shell)/_components/export-controls.tsx",
   ];
 
   for (const path of files) {

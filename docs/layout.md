@@ -105,6 +105,10 @@ app/actions/
                         ONE atomic insert, the CSV never leaves the browser
   member-merge.ts       previewMerge / commitMerge — the write ORDER is a safety
                         property; re-count, then refuse to delete unless all zero
+  directory-columns.ts  rememberDirectoryColumns ONLY — sets the directory's column
+                        cookie HttpOnly from the SERVER (WebKit and Brave cap a
+                        document.cookie write at 7 days). Writes NO audit row: a
+                        display preference in the officer's browser, not club data
   events.ts             event mutations
   auth.ts               sign in / sign out
   audit.ts              shared admin_audit writer — no "use server", see Invariants
@@ -183,6 +187,12 @@ lib/
                         extension. Points go out as a NUMBER, never signedPoints
   xlsx.ts               hand-rolled, dependency-free workbook writer over node:zlib.
                         Consumes the SAME projectRow output as the CSV writer
+  directory-columns.ts  the directory's columns, which ARE the export's (2026-10-01):
+                        defaults, the misa_directory_columns cookie (a DELTA from
+                        the defaults, resolved with Sets only; its attributes for
+                        the action; a change keeps keys the page cannot see), Name
+                        and the sorted column always shown, no new sorting. The
+                        export route never reads the cookie
   csv.ts                the one CSV tokenizer — quoted fields may contain newlines
   dues.ts               dues domain core: Venmo parsing, note → EID matching, the
                         amount → terms rule, and the ONLY place term ordering lives

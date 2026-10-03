@@ -244,11 +244,36 @@ describe("projectRow", () => {
     ).toEqual({ kind: "empty" });
   });
 
-  it("keeps dues OUT of the default field list", () => {
-    // 🔓 Opt-in through the picker. Defaulting narrow is a §6 PII mitigation
-    // rather than a convenience, and "has this person paid" is exactly the kind
-    // of thing that should leave the building only when someone asked for it.
-    expect(DEFAULT_EXPORT_FIELDS).not.toContain("dues");
+  it("puts dues IN the default field list (officer, 2026-10-01)", () => {
+    // 📌 A REVERSAL, and a recorded one. Dues used to be opt-in here, on the
+    // §6 reading that "has this person paid" should leave the building only
+    // when somebody asked. Since 2026-10-01 one picker drives the directory
+    // table AND the export, and the default file is the default table — which
+    // has shown Dues since Stage 6.5. Keeping it out would make the default
+    // download disagree with the screen it was downloaded from.
+    expect(DEFAULT_EXPORT_FIELDS).toContain("dues");
+  });
+
+  it("keeps everything the default table does not show OUT of the defaults", () => {
+    // The companion, and the half of the old rule that survives: narrow is
+    // still the default. Notes, the points breakdown and attendance figures,
+    // pending, last seen, joined, source and term leave the building only after
+    // an officer has put them on screen.
+    for (const key of [
+      "notes",
+      "attendance_points",
+      "bonus_points",
+      "events_attended",
+      "events_possible",
+      "attendance_rate",
+      "pending_count",
+      "last_seen_at",
+      "joined_at",
+      "source",
+      "term",
+    ]) {
+      expect(DEFAULT_EXPORT_FIELDS, key).not.toContain(key);
+    }
   });
 });
 

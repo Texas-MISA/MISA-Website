@@ -18,8 +18,9 @@ import type { Database } from "@/lib/types/database";
 // oversight. A cap that silently truncates is the failure mode CLAUDE.md names,
 // and definitions are officer-created one at a time: a roster can plausibly
 // reach 500 members, but nobody hand-creates 500 dropdowns. The bound that
-// matters is on how many become directory COLUMNS, and show_in_directory is
-// what officers set for that.
+// matters is on how many become DEFAULT directory columns, and
+// show_in_directory is what officers set for that. Since 2026-10-01 an officer
+// can show any other field from the Fields menu (lib/directory-columns.ts).
 
 type Client = SupabaseClient<Database>;
 
@@ -58,7 +59,7 @@ export async function fetchFieldDefinitions(
   if (error) {
     console.error("field definitions query failed:", error.message);
     // An empty list, not a throw. A failed read here must not take the whole
-    // directory down with it: the four built-in columns are the screen's job
+    // directory down with it: the built-in columns are the screen's job
     // and they do not depend on this. The cost is a directory that silently
     // loses its custom columns for one request, which is visible; the
     // alternative is an error page in place of the roster.

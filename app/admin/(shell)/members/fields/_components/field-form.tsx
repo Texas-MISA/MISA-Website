@@ -185,12 +185,19 @@ export function FieldForm({ definition }: { definition?: FieldDefinition }) {
             defaultChecked={values.showInDirectory}
             className={`mt-1 ${CHECKBOX}`}
           />
+          {/* 📌 Relabelled on 2026-10-01, when the directory's Fields menu
+              started choosing the table's columns: this no longer decides
+              WHETHER a field can be a column, only whether it is one by
+              default. Sorting and filtering still follow this flag alone
+              (sortColumn and parseMemberFilter read it), so the hint says so
+              rather than letting a shown-from-Fields column look sortable. */}
           <span>
-            Show as a column in the directory
+            Show as a default column in the directory
             <span className="block text-xs text-misa-muted">
-              Off keeps it on the member&apos;s own page only. Every field ever
-              created would otherwise widen the table forever — and a field that
-              is not a column cannot be sorted on either.
+              On: every officer sees it in the table unless they hide it from
+              Fields, and it can be sorted and filtered on. Off: it stays off
+              the table until an officer shows it from Fields, and it cannot be
+              sorted or filtered on.
             </span>
           </span>
         </label>
