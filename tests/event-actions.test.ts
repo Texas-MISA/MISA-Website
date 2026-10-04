@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeAudit, writeAuditBatch } from "@/app/actions/audit";
@@ -63,6 +65,8 @@ describe("series creation", () => {
       location: "UTC 3.102",
       points: 1,
       category: "general_and_other",
+      // Ticked, so the column default (false) cannot satisfy the assertion.
+      countsAsGeneralMeeting: true,
       seriesId,
     });
 
@@ -71,7 +75,7 @@ describe("series creation", () => {
     const { data, error } = await db
       .from("events")
       .insert(drafts)
-      .select("id, status, series_id");
+      .select("id, status, series_id, counts_as_general_meeting");
 
     expect(error).toBeNull();
     data!.forEach((row) => track.eventIds.push(row.id));
@@ -79,6 +83,8 @@ describe("series creation", () => {
     expect(data).toHaveLength(12);
     expect(data!.every((r) => r.status === "draft")).toBe(true);
     expect(new Set(data!.map((r) => r.series_id)).size).toBe(1);
+    // The series form's one box reached every stored row (migration 31).
+    expect(data!.every((r) => r.counts_as_general_meeting === true)).toBe(true);
   });
 
   it("lets overlapping drafts coexist, because the constraint is published-only", async () => {
@@ -487,12 +493,14 @@ describe("duplicateDraft against a stored row", () => {
       category: "professional_dev",
       checkinOpensAt: at(slot, 17.75),
       checkinClosesAt: at(slot, 19.25),
+      // Ticked, so a copy that fell back to the column default would show.
+      countsAsGeneralMeeting: true,
     });
 
     const { data: row } = await db
       .from("events")
       .select(
-        "title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, verify_origin"
+        "title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, verify_origin, counts_as_general_meeting"
       )
       .eq("id", source.id)
       .single();
@@ -505,7 +513,7 @@ describe("duplicateDraft against a stored row", () => {
       // back to it when checkin_closes_at is null. Selecting it keeps the row
       // an honest EventWindowRow rather than one that happens to work because
       // this fixture sets an explicit close.
-      .select("id, status, series_id, points, category, starts_at, ends_at, checkin_opens_at, checkin_closes_at")
+      .select("id, status, series_id, points, category, starts_at, ends_at, checkin_opens_at, checkin_closes_at, counts_as_general_meeting")
       .single();
 
     expect(error).toBeNull();
@@ -515,10 +523,125 @@ describe("duplicateDraft against a stored row", () => {
     expect(inserted!.series_id).toBeNull();
     expect(inserted!.points).toBe(3);
     expect(inserted!.category).toBe("professional_dev");
+    // The copy keeps the source's box (officer, 2026-10-04).
+    expect(inserted!.counts_as_general_meeting).toBe(true);
 
     const window = effectiveWindow(inserted!);
     expect(window.opens.getTime()).toBe(
       new Date(inserted!.starts_at).getTime() - 15 * 60_000
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Migration 31 — counts_as_general_meeting reaches every events column list,
+// and the box the officer submitted reaches the save and the series
+// ---------------------------------------------------------------------------
+//
+// The actions need a request context, so their wiring is pinned against
+// comment-stripped source, the convention tests/member-actions.test.ts uses.
+// Comments are stripped so a list mentioned in prose cannot satisfy a check.
+
+describe("counts_as_general_meeting in the events actions (migration 31)", () => {
+  const strip = (source: string) =>
+    source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const actions = strip(readFileSync("app/actions/events.ts", "utf8"));
+  /** Every one-line double-quoted string in the module. */
+  const literals = (code: string) =>
+    [...code.matchAll(/"([^"\n]*)"/g)].map((match) => match[1]);
+  /** The select string chained after the first `anchor`. */
+  const selectAfter = (code: string, anchor: string) => {
+    const start = code.indexOf(anchor);
+    expect(start, anchor).toBeGreaterThan(-1);
+    return /\.select\(\s*"([^"]*)"/.exec(code.slice(start))?.[1] ?? "";
+  };
+  /** One exported action, from its declaration to the next export. */
+  const actionBody = (name: string) => {
+    const start = actions.indexOf(`export async function ${name}(`);
+    expect(start, name).toBeGreaterThan(-1);
+    const end = actions.indexOf("\nexport ", start + 1);
+    return actions.slice(start, end === -1 ? undefined : end);
+  };
+  /** From `anchor` to the first `close` after it: one object literal. */
+  const between = (code: string, anchor: string, close: string) => {
+    const start = code.indexOf(anchor);
+    expect(start, anchor).toBeGreaterThan(-1);
+    return code.slice(start, code.indexOf(close, start));
+  };
+  /**
+   * Every value `code` maps the property `key` to, with all whitespace removed,
+   * so line breaks and spacing pass and a different value never does. The
+   * lookbehind keeps `fields.key` itself from reading as a property.
+   */
+  const mappedValues = (code: string, key: string) =>
+    [
+      ...code.matchAll(new RegExp(`(?<![\\w.$])${key}\\s*:\\s*([^,}\\r\\n]*)`, "g")),
+    ].map((match) => match[1].replace(/\s+/g, ""));
+
+  it("saves the box the officer submitted, on create and on edit alike", () => {
+    // 🪤 The generated Insert and Update types make the column optional, so a
+    // payload that dropped it, or wrote a literal, would compile, and every
+    // database test above would still pass. The insert spreads `values` and the
+    // update sends it, so the mapping has to be in that literal, and nowhere
+    // else in the action can override it.
+    const save = actionBody("saveEvent");
+    const values = between(save, "const values = {", "};");
+    expect(mappedValues(values, "counts_as_general_meeting")).toEqual([
+      "fields.countsAsGeneralMeeting",
+    ]);
+    expect(mappedValues(save, "counts_as_general_meeting")).toHaveLength(1);
+  });
+
+  it("gives every event of a series the series form's box", () => {
+    // SeriesSpec makes the key REQUIRED, so dropping it is a compile error. A
+    // literal `true` or `false` still compiles, and would stamp that answer on
+    // every event the series creates, whatever the officer ticked.
+    const series = actionBody("createSeries");
+    const spec = between(series, "expandSeries({", "});");
+    expect(mappedValues(spec, "countsAsGeneralMeeting")).toEqual([
+      "fields.countsAsGeneralMeeting",
+    ]);
+    expect(mappedValues(series, "countsAsGeneralMeeting")).toHaveLength(1);
+    // And the insert spreads each draft as it is: a column written there would
+    // override what expandSeries copied from the spec.
+    expect(mappedValues(series, "counts_as_general_meeting")).toEqual([]);
+  });
+
+  it("🪤 is in every list that names verify_origin — all five of them", () => {
+    // Both sides of an audit before/after must select the same columns, or the
+    // log invents a change that never happened (migration 28's note). The five
+    // are create after, update before and after, delete before and the
+    // duplicate's source read.
+    const withVerifyOrigin = literals(actions).filter((list) =>
+      /\bverify_origin\b/.test(list)
+    );
+    // Counted, so this guard cannot pass by matching nothing — and a sixth
+    // list is a decision for whoever adds it, not a silent pass.
+    expect(withVerifyOrigin).toHaveLength(5);
+    for (const list of withVerifyOrigin) {
+      expect(list).toMatch(/\bcounts_as_general_meeting\b/);
+    }
+  });
+
+  it("is recorded on every series.created receipt and every duplicate's", () => {
+    expect(selectAfter(actions, ".insert(drafts.map(")).toMatch(
+      /\bcounts_as_general_meeting\b/
+    );
+    expect(selectAfter(actions, ".insert({ ...draft,")).toMatch(
+      /\bcounts_as_general_meeting\b/
+    );
+  });
+
+  it("is selected by the events list, whose result is cast rather than typed", () => {
+    // `data as unknown as EventListRow[]`: nothing type-checks this string
+    // against the row type, so a missing column renders as no marker at all.
+    const page = strip(
+      readFileSync("app/admin/(shell)/events/page.tsx", "utf8")
+    );
+    const listSelect = literals(page).filter((list) =>
+      list.includes("attendance(count)")
+    );
+    expect(listSelect).toHaveLength(1);
+    expect(listSelect[0]).toMatch(/\bcounts_as_general_meeting\b/);
   });
 });

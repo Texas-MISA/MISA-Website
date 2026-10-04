@@ -1,6 +1,18 @@
+import { readFileSync } from "node:fs";
+
 import { afterAll, describe, expect, it } from "vitest";
 
-import { cleanup, newTracker, testClient, testIdentity } from "./helpers";
+import {
+  at,
+  claimSlot,
+  cleanup,
+  createTestEvent,
+  GENERAL_MEETINGS_FROM,
+  newTracker,
+  setGeneralMeetingsFrom,
+  testClient,
+  testIdentity,
+} from "./helpers";
 
 // The constraints migration 22 added (Stage 8 phase 1) — the "Data Integrity"
 // half of the stage.
@@ -299,6 +311,117 @@ describe("a member type is one of the four (migration 30)", () => {
         options: ["A", "B"],
       });
       expect(error?.code, key).toBe(CHECK_VIOLATION);
+    }
+  });
+});
+
+describe("the general-meeting marker and its start month (migration 31)", () => {
+  const NOT_NULL_VIOLATION = "23502";
+  const MIGRATION_31 =
+    "supabase/migrations/20260730000031_general_meeting_marker.sql";
+
+  // Every case below that moves the start puts it back in a `finally`; this is
+  // the second guard tests/helpers.ts asks for, because the value is read by a
+  // view every other file's verdicts come through.
+  afterAll(async () => {
+    await setGeneralMeetingsFrom(db, GENERAL_MEETINGS_FROM);
+  });
+
+  it("starts every event unticked unless the insert names it, per event", async () => {
+    // Drafts, so the ticked one never becomes a general meeting in any view
+    // while it exists.
+    const slot = claimSlot();
+    const a = await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+      status: "draft",
+    });
+    const b = await createTestEvent(db, track, {
+      starts: at(slot, 20),
+      ends: at(slot, 21),
+      status: "draft",
+    });
+    const ticked = await createTestEvent(db, track, {
+      starts: at(slot, 22),
+      ends: at(slot, 23),
+      status: "draft",
+      countsAsGeneralMeeting: true,
+    });
+
+    const read = async () => {
+      const { data, error } = await db
+        .from("events")
+        .select("id, counts_as_general_meeting")
+        .in("id", [a.id, b.id, ticked.id]);
+      expect(error).toBeNull();
+      return new Map(
+        (data ?? []).map((row) => [row.id, row.counts_as_general_meeting])
+      );
+    };
+
+    // The default is false: an insert that does not name the column — the
+    // seed, every fixture, any older code — gets an unticked event.
+    const before = await read();
+    expect(before.get(a.id)).toBe(false);
+    expect(before.get(b.id)).toBe(false);
+    expect(before.get(ticked.id)).toBe(true);
+
+    // 📌 And it is genuinely PER EVENT: ticking one leaves the other alone.
+    const { error } = await db
+      .from("events")
+      .update({ counts_as_general_meeting: true })
+      .eq("id", a.id);
+    expect(error).toBeNull();
+    const after = await read();
+    expect(after.get(a.id)).toBe(true);
+    expect(after.get(b.id)).toBe(false);
+  });
+
+  it("defaults the start to GENERAL_MEETINGS_FROM, in the migration's own source", () => {
+    // The helper's constant is what every test restores to, so it has to be the
+    // value a fresh database starts with — read from the migration, not typed
+    // twice and trusted to agree.
+    const sql = readFileSync(MIGRATION_31, "utf8");
+    expect(sql).toContain(
+      "general_meetings_from date not null default date '2026-10-01'"
+    );
+    const match =
+      /general_meetings_from date not null default date '(\d{4}-\d{2}-\d{2})'/.exec(
+        sql
+      );
+    expect(match?.[1]).toBe(GENERAL_MEETINGS_FROM);
+  });
+
+  it("refuses a start that is not the first of a month, and takes one that is", async () => {
+    try {
+      const { error } = await db
+        .from("app_settings")
+        .update({ general_meetings_from: "2026-10-15" })
+        .eq("id", true);
+      expect(error?.code).toBe(CHECK_VIOLATION);
+
+      const first = await db
+        .from("app_settings")
+        .update({ general_meetings_from: "2027-01-01" })
+        .eq("id", true)
+        .select("general_meetings_from")
+        .single();
+      expect(first.error).toBeNull();
+      expect(first.data?.general_meetings_from).toBe("2027-01-01");
+    } finally {
+      await setGeneralMeetingsFrom(db, GENERAL_MEETINGS_FROM);
+    }
+  });
+
+  it("refuses null — there is always a start", async () => {
+    try {
+      const { error } = await db
+        .from("app_settings")
+        .update({ general_meetings_from: null as unknown as string })
+        .eq("id", true);
+      expect(error?.code).toBe(NOT_NULL_VIOLATION);
+    } finally {
+      await setGeneralMeetingsFrom(db, GENERAL_MEETINGS_FROM);
     }
   });
 });

@@ -337,6 +337,12 @@ export type EventDraft = {
   // re-enable verification on a copy of an event the officer had turned it off
   // for. expandSeries leaves it unset on purpose and takes that default.
   verify_origin?: boolean;
+  // "Count as general meeting" (migration 31). REQUIRED, unlike verify_origin,
+  // because both producers have an answer and neither may fall back to the
+  // column default by forgetting it: expandSeries takes the series form's one
+  // box, and duplicateDraft copies the source's (officer, 2026-10-04), so a
+  // copy of a counted meeting counts and a copy of an uncounted one does not.
+  counts_as_general_meeting: boolean;
 };
 
 export type SeriesSpec = {
@@ -352,6 +358,9 @@ export type SeriesSpec = {
   location: string | null;
   points: number;
   category: string | null;
+  /** The series form's "Count as general meeting" box, applied to EVERY event
+   * the series creates (officer, 2026-10-04). Unticked by default. */
+  countsAsGeneralMeeting: boolean;
   /** Caller-generated so expandSeries stays pure and deterministic. */
   seriesId: string;
 };
@@ -410,6 +419,7 @@ export function expandSeries(spec: SeriesSpec): EventDraft[] {
         category: spec.category,
         status: "draft",
         series_id: spec.seriesId,
+        counts_as_general_meeting: spec.countsAsGeneralMeeting,
       });
     }
 
@@ -430,6 +440,7 @@ export type EventSourceRow = EventWindowRow & {
   points: number;
   category: string | null;
   verify_origin: boolean;
+  counts_as_general_meeting: boolean;
 };
 
 /**
@@ -476,6 +487,7 @@ export function duplicateDraft(
     status: "draft",
     series_id: null,
     verify_origin: source.verify_origin,
+    counts_as_general_meeting: source.counts_as_general_meeting,
   };
 }
 

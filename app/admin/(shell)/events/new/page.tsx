@@ -53,6 +53,11 @@ export default async function NewEventPage() {
             // separate statements of one decision, so moving one without the
             // other is a silent disagreement between the form and the schema.
             verifyOrigin: true,
+            // Mirrors events.counts_as_general_meeting's `default false`
+            // (migration 31), and the officer's 2026-10-04 call that the box
+            // is not ticked by default: an officer decides, event by event,
+            // which meetings count toward the monthly requirement.
+            countsAsGeneralMeeting: false,
           }}
         />
       </div>

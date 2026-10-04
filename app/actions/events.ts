@@ -49,7 +49,8 @@ type FieldName =
   | "points"
   | "category"
   | "status"
-  | "verifyOrigin";
+  | "verifyOrigin"
+  | "countsAsGeneralMeeting";
 
 /**
  * The raw strings the officer submitted, echoed back so the form can restore
@@ -149,13 +150,18 @@ export async function saveEvent(
       category: fields.category,
       status: fields.status,
       verify_origin: fields.verifyOrigin,
+      // Migration 31. Toggling it on a past event silently re-judges that
+      // event's month (officer, 2026-10-04): no §4.6 warning, audited as an
+      // ordinary event.updated. It does reach impactToken through `values`,
+      // so a confirmation cannot apply a box the officer has since flipped.
+      counts_as_general_meeting: fields.countsAsGeneralMeeting,
     };
 
     if (!id) {
       const { data, error } = await db
         .from("events")
         .insert({ ...values, created_by: officer.userId })
-        .select("id, title, starts_at, ends_at, points, status, term, verify_origin")
+        .select("id, title, starts_at, ends_at, points, status, term, verify_origin, counts_as_general_meeting")
         .single();
 
       if (error) return insertError(error);
@@ -173,7 +179,7 @@ export async function saveEvent(
       const { data: current, error: readError } = await db
         .from("events")
         .select(
-          "id, title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, updated_at, verify_origin"
+          "id, title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, updated_at, verify_origin, counts_as_general_meeting"
         )
         .eq("id", id)
         .single();
@@ -235,7 +241,7 @@ export async function saveEvent(
         .update(values)
         .eq("id", id)
         .eq("updated_at", current.updated_at)
-        .select("id, title, starts_at, ends_at, points, status, term, verify_origin")
+        .select("id, title, starts_at, ends_at, points, status, term, verify_origin, counts_as_general_meeting")
         .maybeSingle();
 
       if (error) return insertError(error);
@@ -365,7 +371,7 @@ export async function deleteEvent(
 
     const { data: before, error: readError } = await db
       .from("events")
-      .select("id, title, starts_at, ends_at, status, points, category, verify_origin")
+      .select("id, title, starts_at, ends_at, status, points, category, verify_origin, counts_as_general_meeting")
       .eq("id", id)
       .single();
     if (readError || !before) {
@@ -472,6 +478,8 @@ export async function createSeries(
       location: fields.location,
       points: fields.points,
       category: fields.category,
+      // The form's one box, applied to every event in the series.
+      countsAsGeneralMeeting: fields.countsAsGeneralMeeting,
       seriesId,
     });
 
@@ -485,7 +493,9 @@ export async function createSeries(
     const { data, error } = await db
       .from("events")
       .insert(drafts.map((d) => ({ ...d, created_by: officer.userId })))
-      .select("id, title, starts_at");
+      // counts_as_general_meeting rides along so each series.created receipt
+      // records whether that event counts (migration 31).
+      .select("id, title, starts_at, counts_as_general_meeting");
 
     if (error) {
       console.error("createSeries failed:", error.message);
@@ -725,7 +735,7 @@ export async function duplicateEvent(
     const { data: source, error: readError } = await db
       .from("events")
       .select(
-        "title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, verify_origin"
+        "title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, verify_origin, counts_as_general_meeting"
       )
       .eq("id", id)
       .single();
@@ -739,7 +749,7 @@ export async function duplicateEvent(
     const { data, error } = await db
       .from("events")
       .insert({ ...draft, created_by: officer.userId })
-      .select("id, title, starts_at, ends_at, points, status")
+      .select("id, title, starts_at, ends_at, points, status, counts_as_general_meeting")
       .single();
 
     if (error) {
@@ -788,6 +798,8 @@ function echo(formData: FormData): SubmittedEventValues {
     category: read("category"),
     status: read("status", "draft"),
     verifyOrigin: read("verifyOrigin"),
+    // "" is unticked: a checkbox that is not ticked sends nothing at all.
+    countsAsGeneralMeeting: read("countsAsGeneralMeeting"),
   };
 }
 

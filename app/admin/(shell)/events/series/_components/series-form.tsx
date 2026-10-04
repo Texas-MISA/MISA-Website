@@ -5,7 +5,7 @@ import { useActionState } from "react";
 
 import { createSeries, type SeriesFormState } from "@/app/actions/events";
 import { BUTTON_PRIMARY, BUTTON_PRIMARY_SM } from "@/components/ui/button";
-import { controlClass } from "@/components/ui/field";
+import { CHECKBOX, controlClass } from "@/components/ui/field";
 import {
   EVENT_CATEGORIES,
   formatCategory,
@@ -208,6 +208,29 @@ export function SeriesForm({ defaultDate }: { defaultDate: string }) {
           </select>
         </Field>
       </div>
+
+      {/* "Count as general meeting" (migration 31). ONE box for the whole
+          series: createSeries applies it to every event it creates. No
+          defaultChecked, on purpose — the officer's 2026-10-04 call is that
+          the box starts unticked, here as on a single event. A bare <label>,
+          not <Field>: Field renders a <label> of its own, and nested labels
+          are invalid HTML (see the event form's verifyOrigin checkbox). */}
+      <label className="flex max-w-3xl items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          name="countsAsGeneralMeeting"
+          className={`${CHECKBOX} mt-0.5`}
+        />
+        <span>
+          <span className="font-medium">Count as general meeting</span>
+          <span className="block text-misa-muted">
+            Ticks the box on every event in the series. Each one then counts
+            toward the general meetings data project and client project members
+            must attend each month, once it is published. You can change it on
+            any single event later.
+          </span>
+        </span>
+      </label>
 
       {/* Series are always generated as drafts; the action ignores anything
           else, and publishing is a separate, deliberate step. */}

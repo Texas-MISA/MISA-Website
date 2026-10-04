@@ -1295,15 +1295,17 @@ describe("relational filters against the view", () => {
 //
 // 📌 On a FAR-PAST Fall of its own, never the current term (review,
 // 2026-10-03). A current-term verdict depends on the date: one unattended,
-// published, non-Projects Thursday in a month that has already ended turns a
-// project member's Yes into No. A walkthrough fixture or a seed edit can put
-// one there, and so can this file's own createCurrentTermEvent fixtures (3, 6
-// and 9 hours back) in a run starting just after midnight Central on the 1st,
-// when the month before ended on a Thursday. In a Fall that ended decades ago,
-// holding one Projects meeting and nothing else, every verdict is final and
-// the meeting alone decides it. Chosen as tests/project-eligibility.test.ts
-// chooses its own; the filters are scoped to it through `term`, as the Roster
-// control would scope them.
+// published meeting ticked "Count as general meeting", in a month that has
+// already ended and is on or after app_settings.general_meetings_from
+// (migration 31), turns a project member's Yes into No. A walkthrough fixture
+// or a seed edit can put one there. (Under migration 30's Thursday rule this
+// file's own createCurrentTermEvent fixtures could too; they are never ticked,
+// so now they cannot.) A Fall that ended decades ago is before the start
+// month, so none of its months is judged at all, and holding one Projects
+// meeting and nothing else, the meeting alone decides every verdict — final
+// whatever today is. Chosen as tests/project-eligibility.test.ts chooses its
+// own; the filters are scoped to it through `term`, as the Roster control
+// would scope them.
 //
 // `t3qtyp` is a strict narrowing of `t3q`, like every other block's marker.
 // ---------------------------------------------------------------------------
@@ -1328,7 +1330,8 @@ describe("member type and eligibility filters against the view", () => {
 
     // A Projects meeting that ended long ago. Attending it is the difference
     // between Yes and No for the two project types, and the term holds no
-    // general meeting, so no month can be judged short of one.
+    // general meeting (nothing is ticked, and every month is before the start
+    // month anyway), so no month can be judged short of one.
     const starts = centralWallTimeToInstant(`${year}-10-14`, "18:00");
     const meeting = await createTestEvent(db, track, {
       starts,

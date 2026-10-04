@@ -36,6 +36,8 @@ const SERIES_BASE: Omit<SeriesSpec, "firstDate" | "untilDate" | "weekdays"> = {
   location: "UTC 3.102",
   points: 1,
   category: "general_and_other",
+  // The series form's box starts unticked (officer, 2026-10-04).
+  countsAsGeneralMeeting: false,
   seriesId: "00000000-0000-4000-8000-000000000001",
 };
 
@@ -199,6 +201,28 @@ describe("expandSeries", () => {
         weekdays: [],
       })
     ).toEqual([]);
+  });
+
+  // Migration 31: the series form has ONE "Count as general meeting" box, and
+  // it applies to every event the series creates — ticked or not. Never left
+  // to the column default, which would make a ticked series uncounted.
+  it("carries the general-meeting box onto every draft, both ways", () => {
+    for (const countsAsGeneralMeeting of [true, false]) {
+      const drafts = expandSeries({
+        ...SERIES_BASE,
+        countsAsGeneralMeeting,
+        firstDate: "2026-09-01",
+        untilDate: "2026-09-29",
+        weekdays: [2, 4], // Tuesday and Thursday — the weekday decides nothing
+      });
+      expect(drafts).toHaveLength(9);
+      expect(
+        drafts.every(
+          (d) => d.counts_as_general_meeting === countsAsGeneralMeeting
+        ),
+        String(countsAsGeneralMeeting)
+      ).toBe(true);
+    }
   });
 });
 
@@ -510,6 +534,7 @@ describe("duplicateDraft", () => {
     points: 2,
     category: "general_and_other",
     verify_origin: true,
+    counts_as_general_meeting: true,
   };
 
   it("defaults to the same wall time seven civil days later, across DST", () => {
@@ -543,6 +568,17 @@ describe("duplicateDraft", () => {
   it("carries verify_origin, in both directions", () => {
     expect(duplicateDraft(source).verify_origin).toBe(true);
     expect(duplicateDraft({ ...source, verify_origin: false }).verify_origin).toBe(false);
+  });
+
+  // Migration 31 (officer, 2026-10-04): a duplicate copies the box from its
+  // source. The column defaults to false, so a copy that dropped it would
+  // quietly stop next week's general meeting counting toward anyone's month.
+  it("carries counts_as_general_meeting, in both directions", () => {
+    expect(duplicateDraft(source).counts_as_general_meeting).toBe(true);
+    expect(
+      duplicateDraft({ ...source, counts_as_general_meeting: false })
+        .counts_as_general_meeting
+    ).toBe(false);
   });
 
   it("is always a draft and never joins the source's series", () => {

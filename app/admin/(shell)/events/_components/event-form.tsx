@@ -41,6 +41,7 @@ export type EventFormValues = {
   category: string;
   status: string;
   verifyOrigin: boolean;
+  countsAsGeneralMeeting: boolean;
 };
 
 export function EventForm({ initial }: { initial: EventFormValues }) {
@@ -114,6 +115,9 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
           // "on" / "" rather than a boolean, because `v` mirrors the raw
           // strings the server echoes back on an invalid or unconfirmed save.
           verifyOrigin: initial.verifyOrigin ? "on" : "",
+          // Same shape, and a string either way — never undefined, so the box
+          // is driven by an echoed value on every render (CLAUDE.md, React 19).
+          countsAsGeneralMeeting: initial.countsAsGeneralMeeting ? "on" : "",
         };
 
   return (
@@ -299,6 +303,30 @@ export function EventForm({ initial }: { initial: EventFormValues }) {
           </Field>
         )}
       </div>
+
+      {/* "Count as general meeting" (migration 31, officer 2026-10-04). Every
+          event starts unticked, the new-event page included. Honoured in any
+          category, and an officer may flip it after the event: that silently
+          re-judges the month, with no warning step, and is audited as an
+          ordinary event.updated. A bare <label> for the reason given on the
+          checkbox below. */}
+      <label className="flex max-w-3xl items-start gap-3 text-sm">
+        <input
+          type="checkbox"
+          name="countsAsGeneralMeeting"
+          defaultChecked={v.countsAsGeneralMeeting === "on"}
+          className={`${CHECKBOX} mt-0.5`}
+        />
+        <span>
+          <span className="font-medium">Count as general meeting</span>
+          <span className="block text-misa-muted">
+            Counts toward the general meetings data project and client project
+            members must attend each month, once the event is published. Works
+            in any category: a ticked Projects event is still a project meeting
+            too. You can change this after the event.
+          </span>
+        </span>
+      </label>
 
       {/* Check-in location verification (§6). Spec:
           docs/checkin-location-verification.md.

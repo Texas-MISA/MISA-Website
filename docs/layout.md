@@ -81,7 +81,20 @@ app/admin/(shell)/      authed chrome + dashboard, events/, attendance/, points/
                         eligibility-mark.tsx (the calculated verdict as a mark,
                         no "use client", shared with [id]). member-table.tsx
                         keys rows by member AND term: under "All terms" a
-                        member has one row per term. _components/ holds shell-wide
+                        member has one row per term. members/[id]'s Project
+                        requirements section states the month general meetings
+                        count from, read from app_settings (migration 31), or a
+                        ReadError — never a sentence that leaves it out.
+                        events/_components/ holds event-form.tsx and
+                        event-table.tsx; events/series/_components/ holds
+                        series-form.tsx. Both forms carry a bare-label "Count as
+                        general meeting" checkbox (migration 31), unticked by
+                        default; the table's "general meeting" pill marks a
+                        ticked event. 🪤 events/page.tsx CASTS its rows to
+                        EventListRow, so nothing type-checks its select string:
+                        a column the type names and the select omits reads as
+                        undefined, and the pill would silently never render
+                        (event-actions.test.ts pins it). _components/ holds shell-wide
                         pieces (status-pill.tsx, audit-trail.tsx, notice.tsx)
                         🔓 **ON THE v2 GROUND since phase 4 (2026-08-29)**:
                         layout.tsx's <main> is bg-misa-panel and content regions
@@ -132,11 +145,16 @@ lib/
   supabase/             server.ts (anon), client.ts (browser, zero importers),
                         admin.ts (service role, `server-only`-guarded)
   types/database.ts     generated — do not hand-edit. ⚠️ Except that migration 30's
-                        additions WERE hand-ported: CLI 2.119.0's output drifts
-                        from this file in unrelated ways. Generate into a scratch
-                        file and port only the migration's change (operations.md)
+                        and 31's additions WERE hand-ported: CLI 2.119.0's output
+                        drifts from this file in unrelated ways. Generate into a
+                        scratch file and port only the migration's change
+                        (operations.md)
   events.ts             event domain core: Central wall-clock conversion, window
-                        helpers, expandSeries, previewEventEdit — no next/* imports
+                        helpers, expandSeries, duplicateDraft, previewEventEdit —
+                        no next/* imports. EventDraft's counts_as_general_meeting
+                        is REQUIRED (migration 31), unlike verify_origin, so
+                        expandSeries applies the series form's one box and
+                        duplicateDraft copies the source's, never the default
   checkin.ts            check-in resolution core + ORPHAN_WINDOW_HOURS + rate limit.
                         Lookup and creation are separate on purpose
   lookup.ts             the member self-service core. 🔴 The gate is the EID
@@ -161,9 +179,14 @@ lib/
   project-requirements.ts
                         fetchProjectRequirements — one member's months and
                         project meetings for a term, from the two officer-only
-                        views. Each list fails on its own (Read<T>, never []).
-                        The VERDICT is not here: it is the directory row's
-                        project_eligibility, read off the page's own
+                        views, plus the month general meetings count from
+                        (app_settings.general_meetings_from, migration 31: the
+                        value the months view filters on). Each of the three
+                        reads fails on its own (Read<T> or
+                        GeneralMeetingsFrom, never []), and a missing settings
+                        row is an error, since deny-all RLS answers anon with
+                        zero rows. The VERDICT is not here: it is the directory
+                        row's project_eligibility, read off the page's own
                         member_directory row so the page and the table cannot
                         disagree
   filters.ts            directory filter core: parse → MemberFilter → query. The
@@ -285,8 +308,9 @@ scripts/wipe-remote.sh  EMPTIES the linked project's club data — the "testing 
                         seed-remote.sh rather than a mode of it. Keeps officer
                         sign-ins, officer_invites, and the admin_audit rows about
                         invites and officer access; leaves app_settings and
-                        checkin_throttle alone. Its header accounts for all twelve
-                        public tables, and that accounting is the invariant
+                        checkin_throttle alone. Its header accounts for all
+                        thirteen public tables, and that accounting is the
+                        invariant
 scripts/organise-pictures.mjs  sorts the officers LOCAL picture library into one
                         folder per page; unnamed files pool into gallery/. Moves,
                         never overwrites — the directory is gitignored, so there
@@ -446,9 +470,17 @@ tests/                  Vitest — integration tests against the local stack.
                         places fixtures in a far-past and a far-future Fall (so
                         every month's state is fixed whatever today's date is)
                         and checks the views against member_directory's verdict.
-                        member-directory.test.ts's type filters sit on a
-                        far-past Fall too; both pick one with helpers.ts's
-                        pickEmptyFall
+                        Since migration 31 its general meetings are TICKED
+                        fixtures, and the far-past block pins the start to its
+                        own August, since no month after the real 2026-10-01
+                        start has ended yet. member-directory.test.ts's type
+                        filters sit on a far-past Fall too; both pick one with
+                        helpers.ts's pickEmptyFall. helpers.ts also holds
+                        GENERAL_MEETINGS_FROM and setGeneralMeetingsFrom():
+                        the start is GLOBAL state every file's verdicts read,
+                        so a test's move is undone in a finally and a block's
+                        pin in its afterAll, and global-setup.ts heals it at
+                        suite start and puts the developer's value back after
 proxy.ts                admin route protection — Next 16 renamed middleware.ts;
                         the exported function is proxy(), not middleware()
 next.config.ts          redirects() only: /attend, /leaderboard and /lookup →

@@ -103,6 +103,7 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
   - **An import's column list is `exportCatalogue`'s importable subset**, so the export's labels are the import's headers and a file can round-trip. Calculated columns are ignored *and named* in the preview. Columns are located **by name, never by position**.
 - **A wrapped PostgREST column list is a build break, not a style choice.** This has now bitten twice, in `lib/points.ts` and again in the directory page. PostgREST types the returned row off the string *literal*, so `"a, b" + "c"` widens to plain `string` and collapses the result to `GenericStringError` — the symptom is every field access failing at once, which reads as a schema problem. One unbroken literal with `as const`, every time. Assume it once per screen that selects more than a handful of columns.
 - **Both sides of an audit before/after must select the same columns.** `AuditTrail` diffs the union of their keys and renders a key present on one side only as `—`, so a narrower `.select()` on the update *invents changes that never happened*: voiding a point adjustment logged `reason: "Staffed the info booth" → —` and `awarded_by: <uuid> → —`, as though the void had erased both. `AUDITED_ADJUSTMENT_COLUMNS` in `lib/points.ts` is the shared list — one unbroken string literal with `as const`, because PostgREST types the returned row off the literal and a concatenation widens to `string`.
+  - 🪤 **Events have no shared list.** `app/actions/events.ts` carries five literal column lists that name `verify_origin`: the create's after, the update's before and after, the delete's before, and the duplicate's source read. A new `events` column has to reach all five, as `verify_origin` did (migration 28) and `counts_as_general_meeting` did (migration 31). `tests/event-actions.test.ts` reads comment-stripped source and requires exactly five, each naming the new column, so a sixth list is a decision rather than a silent pass. ⚠️ The update's own before and after still differ (15 columns against 9 since migration 31). That has been recorded in `tasks.md` since migration 28, and it stays latent while no page renders an event's audit trail.
 - **`admin_audit.action` is a closed union in TypeScript and free text in SQL; readers must tolerate unknown values.** Two pre-Stage-5 rows on the production database carry the bare verbs `reject` and `void` and are permanently uncorrectable — the append-only trigger raises P0001 on `UPDATE` and `DELETE` alike. Format with a fallback to the raw string.
 - **Date-range filters are Central-anchored and half-open:** `.gte(centralWallTimeToInstant(from, "00:00"))` … `.lt(centralWallTimeToInstant(addCivilDays(to, 1), "00:00"))`. A bare `.lte("submitted_at", "2026-04-07")` is a UTC-midnight cut that silently drops five to six hours of a Central day — the same class of bug as `new Date("2026-09-01T18:00")`, and it fails plausibly.
 - **Server Components own date formatting.** `Intl.DateTimeFormat` inside a Client Component runs on both sides of hydration, and Node and Chrome ship different ICU data for the space before "PM". The resulting React diff shows two strings that look character-for-character identical. Pass formatted labels down as props.
@@ -675,7 +676,7 @@ attendance it is silent whether or not the pepper exists. The end-to-end check i
 after the first real event: the event should read *"Origin checking is on. N of M
 non-cellular check-ins came from one network…"* rather than naming the variable.
 
-## Member type and project eligibility (added 2026-10-03, migration 30)
+## Member type and project eligibility (added 2026-10-03, migration 30; general meetings revised 2026-10-04, migration 31)
 
 The short form is in `CLAUDE.md`, and the rule itself is §4.5 of the
 architecture doc (*Project eligibility*). What follows is why each rule has the
@@ -714,6 +715,17 @@ any API role, and `member_directory` asks only whether either holds a failure.
 function anon may execute.** Supabase's security advisor flags the two new
 owner-rights views, as it flags `member_directory` and `leaderboard`. That is
 the design; `security_invoker` would run the public board as anon.
+
+📌 **Migration 31 applied the same rule to a setting.** The month general
+meetings count from is a row, `app_settings.general_meetings_from`, which
+`member_general_meeting_months` reads as a **relation**, so as its owner, while
+`app_settings` stays deny-all to every API role. A `general_meetings_from()`
+helper would have been the `project_eligibility(member_id, term)` mistake again.
+✅ **Re-measured on the local stack, 2026-10-04:** the view's ACL still lists
+only `postgres` and `service_role`. As anon, `leaderboard` reads and the view
+answers 42501. `leaderboard`'s verbose plan never touches either eligibility
+view, the new events column or `app_settings`, because `project_eligibility` is
+pruned.
 
 🪤 **A new function must `revoke execute … from public`, not only from anon and
 authenticated.** A function is executable by PUBLIC by default, and revoking the
@@ -759,24 +771,86 @@ assertion.
 every per-term column must be overwritten, and only standing columns may be
 inherited.** A new per-term column is a new line in that literal.
 
-### The Thursday rule has one home
+### The general-meeting rule has one home
 
-⚠️ "General meeting" has no marker in the schema yet. For now it is a published
-event that starts on a **Thursday in Central time** and is **not a Projects
-event**, which means a Thursday social counts. That rule lives in exactly one
-place, the `general_meetings` CTE of `member_general_meeting_months`, and
-nothing in TypeScript re-derives it. Replacing it is a `create or replace view`
-that changes that CTE's `WHERE` clause and nothing else, plus the member page's
-sentence that describes the rule to officers ("For now a general meeting is any
-published event on a Thursday (Central time) that isn't a project meeting").
+📌 A general meeting is a **published** event with **"Count as general
+meeting" ticked** (`events.counts_as_general_meeting`, migration 31, officer
+2026-10-04), in **any category**, whose Central month is on or after
+`app_settings.general_meetings_from`. The weekday decides nothing. That rule
+lives in exactly one place, the `general_meetings` CTE of
+`member_general_meeting_months`, and nothing in TypeScript re-derives it. The
+member page describes it in one sentence and reads the start month from
+`app_settings` rather than typing it, so the sentence and the table cannot
+disagree.
 
-🪤 **It is Central's weekday and Central's month, never UTC's**, and the
-fixtures exist to prove the gap: a Thursday 7pm meeting is a Friday in UTC and
-counts; a Wednesday 8pm meeting is a Thursday in UTC and does not; a meeting at
-7:30pm on 30 September is 1 October in UTC and belongs to September.
-`tests/project-eligibility.test.ts` builds every instant with
-`centralWallTimeToInstant` and asserts each weekday with `toCentralFields`, so a
-hand-written ISO string cannot pass for a fixture.
+⚠️ *Until 2026-10-04 this section was "The Thursday rule has one home".* There
+was no marker, so a general meeting was inferred: a published event starting on
+a Thursday in Central time that was not a Projects event, which meant a Thursday
+social counted. Its prediction held. Replacing it was a `create or replace view`
+that changed that CTE's `WHERE` clause and nothing else, plus the member page's
+sentence.
+
+📌 **Every event starts unticked.** Existing events take the column default and
+new ones start unticked because both forms do. There is no backfill: a constant
+default is a catalogue change, so no row was rewritten, the `updated_at` trigger
+did not fire, and no officer's compare-and-set token moved. Migration 31 asserts
+that no event is ticked.
+
+📌 **A ticked Projects event is a project meeting AND a general meeting.**
+`member_project_meetings` still takes every published Projects event, ticked or
+not. The box adds the event to the months view as well, so missing it counts
+against both.
+
+🪤 **It is Central's month, never UTC's**, and the fixtures exist to prove the
+gap: a meeting at 7:30pm on 30 September is 1 October in UTC and belongs to
+September. `tests/project-eligibility.test.ts` builds every instant with
+`centralWallTimeToInstant`, so a hand-written ISO string cannot pass for a
+fixture. Its fixtures still sit on known weekdays, checked with
+`toCentralFields`, but only to prove the weekday no longer matters: an unticked
+Thursday counts for nothing, and a ticked Wednesday counts.
+
+🪤 **The start-month cutoff compares the SAME Central-month expression the view
+groups by**, `date_trunc('month', starts_at at time zone 'America/Chicago')::date`.
+A cutoff written on the instant (`starts_at >= '2026-10-01'`) would keep the
+7:30pm meeting on 30 September 2026, which is 1 October in UTC. The grouping
+would then file it under September, a month the officer said is not judged, and
+judge September on that one meeting. With one expression, the month a meeting is
+filed under and the month the cutoff tests cannot disagree. The test that moves
+the start to its fixture year's October asserts that the 30 September meeting
+leaves with September rather than crossing into October.
+
+🔓 **The start lives in `app_settings`, never in a function and never as a
+literal in the view.** A function would be checked as the caller (the first
+section above). A literal could not be moved by the tests, and no month on or
+after 2026-10-01 has ended yet, so a judged month exists only on a far-past
+fixture term under an earlier start. Like the dues prices it changes by
+migration, with no UI. Its CHECK is first-of-month, because the view compares
+it with a month and a mid-month value would silently mean the month after.
+🪤 The CHECK is `extract(day from general_meetings_from) = 1`, not
+`date_trunc('month', general_meetings_from) = general_meetings_from`: on a
+`date`, `date_trunc` resolves to the timestamptz overload, which is not
+immutable.
+
+🪤 **The start is GLOBAL STATE that the tests move.** The months view reads it
+for every member and term, and through it so does every file's
+`project_eligibility`. Every move goes back to a known value, never to whatever
+was read first (`tests/helpers.ts`):
+
+- a single test's move, in a `finally`, to the value its block runs on: the
+  far-past block's own pin inside `withStart`, otherwise `GENERAL_MEETINGS_FROM`;
+- a block's pin, in that block's `afterAll` and again in the file's, to
+  `GENERAL_MEETINGS_FROM`;
+- `tests/global-setup.ts` sets `GENERAL_MEETINGS_FROM` at suite start, which
+  heals a value a killed run left behind, and puts the developer's own value
+  back when the suite ends, so a walkthrough's earlier start survives
+  `npm test`. 🪤 So does a killed run's leftover, which looks the same: the run
+  never reads it, but the local admin UI does until it is reset by hand
+  (`docs/operations.md`).
+
+`tests/leaderboard.test.ts` and `tests/global-setup.ts` handle `current_term`
+the same way. `tests/schema-integrity.test.ts` reads the migration's default
+from its source and checks it against that constant, so the value tests restore
+and the value a fresh database starts with cannot drift apart.
 
 🪤 **`formatMonth` spells a month from a name table, never `new Date`.** The
 view hands back `2026-10-01`, a bare date that parses as UTC midnight, which is
@@ -795,6 +869,15 @@ contrast, counts the moment it ends.
 ⚠️ **So `yes` means "nothing has failed so far".** It is provisional until the
 term's last month ends; a `no` is not. The member page says so beside the
 verdict.
+
+📌 **A month before `app_settings.general_meetings_from` is never judged at
+all** (migration 31, officer 2026-10-04). It has no row, so it is neither met
+nor not met and needs nothing, whatever was ticked in it. Project meetings have
+no start, so a project meeting missed in September 2026 still fails the term,
+and the member page says so: *"earlier months are not judged, but their project
+meetings are."* The start is one fixed month, not one per term, so a later
+term's September is judged in full. The first month this judges is October
+2026, and it is judged once it ends, on 1 November.
 
 🪤 **A running month with one meeting scheduled reads "Needed 1" and stays "In
 progress" even once that meeting is attended.** `meetings_required` is

@@ -7,6 +7,95 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+☑️ **An officer now ticks which events count as general meetings, and the monthly requirement starts in October 2026 (officer, 2026-10-04; built the same day on `portal-launch`; migration 31 is local only, and nothing has shipped).** This is `/admin/members` item 3, doc v1.84; §4.5 of the architecture doc has the exact rule.
+
+  - **The root facts.** Item 2 had to infer a general meeting, because the schema had no marker: any published event on a Thursday in Central time that was not a Projects event. That was item 2's one temporary rule, and it lived in one CTE so that replacing it would be one edit. The officer asked for the marker, and for the requirement to start in October 2026.
+  - **Decisions (officer, 2026-10-04).**
+    - A "Count as general meeting" checkbox on each event replaces the Thursday rule.
+    - Every event starts unticked, existing and new: "the box is not ticked by default".
+    - The box is honoured in every category, so a ticked Projects event is both kinds of meeting, and missing it counts against both.
+    - Only the general-meeting requirement starts in October 2026; earlier months are never judged. Project meetings are not cut off.
+    - The start is one fixed point, not one per term.
+
+    The plan's interpretations were approved with it. Duplicating an event copies its box. The series form has one box, unticked by default, for every event it creates. Toggling a past event re-judges its month at once, with no warning, as an ordinary audited `event.updated`. "October" is the Central calendar month. A small pill marks ticked events in the events list.
+  - **What was built.**
+    - **Migration 31.**
+      - `events.counts_as_general_meeting`, `boolean not null default false`. There is no `UPDATE` backfill: a constant default is a catalogue change, so no row was rewritten and no officer's compare-and-set token moved.
+      - `app_settings.general_meetings_from`, `date not null default date '2026-10-01'`, with a first-of-month CHECK. 🪤 The CHECK is `extract(day from …) = 1`, because `date_trunc` on a date resolves to the timestamptz overload, which is not immutable.
+      - A read-only assertion block, in migration 26's style: one settings row, a start of 2026-10-01, and 0 ticked events.
+      - `create or replace view member_general_meeting_months`. It is migration 30's definition verbatim, except the `general_meetings` CTE's `WHERE` (published, ticked, and a Central month on or after the start) and its comment. The revokes are re-issued. `member_project_meetings`, `member_directory` and `leaderboard` are untouched.
+    - **The event screens.**
+      - `countsAsGeneralMeeting` joins `eventBase` in `lib/validation.ts`, where absent parses as false. That is right for both forms that spread the base. `verifyOrigin` stays out of it, because its column defaults true and the series form does not render it.
+      - `saveEvent`, `deleteEvent`, `createSeries` and `duplicateEvent` carry the column in every list that names `verify_origin`.
+      - `EventDraft.counts_as_general_meeting` is required, so neither `expandSeries` nor `duplicateDraft` can fall back to the default by forgetting it.
+      - Both forms gain a bare-label checkbox with help text, because a `<Field>` would nest one label inside another. The events list gains a "general meeting" pill beside the title.
+    - **The member page.** `fetchProjectRequirements` gains a third read, the start, which fails on its own. The Thursday sentence becomes a description of the box. It is followed by "General meetings count from October 2026; earlier months are not judged, but their project meetings are", or by a ReadError. The months table's "Thursday meetings" header becomes "Meetings".
+  - 🔓 **Where the start lives, and why not in a function.** It could have been a literal in the view, a function or a row.
+    - **A function** would be checked as the caller. Anon reads `leaderboard`, which reads `member_directory`, which reads this view, so the function would need an anon grant or would turn the public board into a 42501. That is the rule item 2 established.
+    - **A literal** would be safe but could not be moved, and the tests have to move it. No month on or after 2026-10-01 has ended, so the only judged months are on a far-past fixture term under an earlier start.
+    - **A row in `app_settings`** is both safe and movable. That singleton already holds the dues prices and the term pin. The view reads it as a relation, as its owner, and `app_settings` stays deny-all.
+  - 🪤 **The cutoff reuses the grouping's expression**, `date_trunc('month', starts_at at time zone 'America/Chicago')::date`. A cutoff on the instant would keep the 7:30pm meeting on 30 September 2026, which is 1 October in UTC. The grouping would then judge September on that one meeting.
+  - 🪤 **Five lists, counted.** Events have no shared column constant, so the column was added by hand to the five literal lists in `app/actions/events.ts` that name `verify_origin`. A source test strips the comments and finds every list naming `verify_origin`. It requires exactly five, and each must name the new column. Two more tests cover the series and duplicate receipts and the events list's select, whose result is cast rather than typed.
+  - ✅ **Tests.** 18 new cases across six files, and no new file.
+    - `tests/helpers.ts` gained `countsAsGeneralMeeting` on `createTestEvent`, the constant `GENERAL_MEETINGS_FROM` and `setGeneralMeetingsFrom()`. The start is global state that every file's verdicts read, so every move goes back to a known value, never the one it read. A test's move is undone in a `finally`, to its block's pin inside `withStart`, and a block's pin in that block's `afterAll` and the file's. Since the review, `tests/global-setup.ts` also sets the constant at suite start and puts the developer's value back at the end (below).
+    - `tests/project-eligibility.test.ts` was rebuilt on ticked fixtures, and its far-past term pins the start to that year's August. The new cases:
+      - an unticked Thursday and a ticked Wednesday;
+      - a ticked Projects event counting as both kinds;
+      - a ticked draft or cancelled event counting as neither;
+      - an October start leaving September unjudged, with the 30 September meeting still in it;
+      - the real start emptying every far-past month, while a missed project meeting still says No;
+      - the far-future term's September being judged, which shows the start is fixed rather than per term.
+    - `tests/schema-integrity.test.ts` checks the default per event, the first-of-month CHECK (23514) and the refusal of null (23502). It also checks the migration's default against `GENERAL_MEETINGS_FROM`, read from the migration's source.
+    - `tests/member-types.test.ts` gained a guard. Its source assertions read migration 30, so the guard fails if a later migration redefines `member_directory` or the type CHECK.
+    - Also `tests/events.test.ts`, `tests/event-actions.test.ts` and `tests/validation.test.ts`.
+
+    At hand-off the suite was 1,293 across 41 files. The only failure was `tests/docs.test.ts`'s migration count, which the docs pass supplied. After it: **1,293/1,293**, with `tsc`, lint and `npm run build` clean. After the review fixes: **1,295/1,295** (below).
+  - ✅ **Verified with `psql` on the local stack.**
+    - The view's ACL lists only `postgres` and `service_role`.
+    - As anon, `leaderboard` reads and the view answers 42501.
+    - The view's definition names `counts_as_general_meeting` and `general_meetings_from`, and no longer uses `isodow`.
+    - `leaderboard`'s verbose plan never touches the eligibility views, the new column or `app_settings`.
+    - The local database is back at the seed: 32 members, 15 events, 208 attendance rows, nothing ticked, and a start of 2026-10-01.
+  - 📌 **Found, not fixed (pre-existing).**
+    - The `event.updated` audit's before and after still select different columns, now 15 against 9. Migration 28 recorded it at 14 against 8. No page renders an event's audit trail, so it stays latent.
+    - The series form's invalid state echoes no values, so a failed submit resets every field, the new box included.
+
+    Later candidates: ticking the box in bulk, and a "general meetings only" filter on `/admin/events`.
+  - 🔍 **Review findings (independent review, 2026-10-04). No bugs, and five findings, each verified and fixed the same day.**
+    - **The write path was unguarded.** No test calls the actions, and the generated `Insert` and `Update` types make the column optional. With `saveEvent`'s payload line and `createSeries`' spec line both deleted, `tsc` reported only the series line (TS2345, because `SeriesSpec` requires the key). A literal `true` or `false` compiles in both places. Two comment-stripped source guards in `tests/event-actions.test.ts` now pin the mappings:
+      - `counts_as_general_meeting` to `fields.countsAsGeneralMeeting`, inside `saveEvent`'s `values` literal, which both the insert and the update send;
+      - `countsAsGeneralMeeting` to `fields.countsAsGeneralMeeting`, inside the `expandSeries` call.
+
+      Whitespace is ignored and the value is not. Each guard also requires that nothing else in its action writes the column, so an override in the insert fails too. **Each was watched failing.** The save line was deleted, then made `false`, then `true`, then overridden in the insert. The series line was made `false`, then `true`, then overridden in its insert. Each break failed exactly its own guard, and a reflowed but equivalent line passed. The source was restored from a copy, and its hash matched the original.
+    - **The start had no suite-start heal.** `tests/global-setup.ts` already healed and restored `current_term`, but nothing did the same for the start. So a run killed inside the far-past block would leave a value like `1987-08-01` for every later run to read.
+      - `pinGeneralMeetingsFrom()` now snapshots the start, and sets `GENERAL_MEETINGS_FROM` for the run if the snapshot differs. At the end it puts the snapshot back, unconditionally, because a developer may have moved the start for a walkthrough. It imports the constant from `tests/helpers.ts`, so there is no twin to drift.
+      - **Checked:** with the start set to `1987-08-01`, a throwaway probe test read 2026-10-01 mid-run, and `1987-08-01` was back afterwards.
+      - 🪤 A killed run's leftover is therefore put back too, because it looks like a deliberate value. `docs/operations.md` says how to reset it.
+      - The comments and docs that said every mover restores the constant in a `finally` AND an `afterAll` were also wrong about `withStart`, which restores its block's own pin. They now say what the code does.
+    - **The member page's empty months notice left out the start.** When the start reads, the notice ends "…ticked and falls in October 2026 or later.", using the value already read. When the read fails, its ReadError stands above, and the sentence ends at "ticked.".
+    - **The rollout's transient state was not written down.** Between pushing 31 and shipping the code, `main`'s member page still describes the Thursday rule while the view counts nothing. A project member's page therefore reads "No general meetings have been published in Fall 2026 yet". It is now in `tasks.md`'s checklist and in v1.84's rollout text.
+    - **Three pre-existing doc errors**, each checked against its source:
+      - §4.1 listed the dues defaults as 3000/5000, which migration 26 made 4000/7000;
+      - §4.1 left out `events.verify_origin` (migration 28);
+      - `docs/layout.md` said `wipe-remote.sh` accounts for twelve tables, where the script and the local schema both say thirteen.
+    - **Noticed while fixing, NOT fixed:** the architecture doc's Stage 6.5 section still names "$30 and $50 (configured, §4.1)" as the prices that resolve automatically.
+
+    After the fixes the suite is **1,295/1,295 across 41 files**, and lint and `tsc` are clean.
+  - ✅ **The browser walkthrough (2026-10-04, Chrome, local stack; dev banner `Environments: .env.development.local, .env.local`).** One defect was found and fixed, and every step passed.
+    - **Forms:** the box is unticked by default on the event form and the series form. It survived an invalid save (end before start). The duplicate carried it, and a two-event series stamped it on both rows. The events list pills exactly the ticked events.
+    - **Member page:**
+      - Fixtures: three August seed meetings ticked, and the start moved to 2026-08-01 with `psql`.
+      - Result for a data-project member: "General meetings count from August 2026", a **Meetings** column, and August reading 3 held, 1 attended, 2 needed, **Not met**. The directory agreed.
+      - At the real start the page says October 2026, and the empty notice ends "…falls in October 2026 or later."
+    - 🐛 **Fixed: "Fall 2026yet".** The empty notice's source read `{term} yet`, and server rendering dropped the space after the expression. That is `e3266e6`'s trap exactly, so it is now an explicit `{" "}`. Lint, `tsc`, the build and 1,295 tests were all green with it live.
+    - 🐛 **Found, NOT fixed (pre-existing since Stage 4, `ebe3233`): every edit of an existing event demands "Save anyway".**
+      - The warning reads "The event moves from Sun, Oct 11, 6:00 PM to Sun, Oct 11, 6:00 PM".
+      - `previewEventEdit` compares `starts_at` and `ends_at` as raw strings. PostgREST's `+00:00` never equals `toISOString()`'s `.000Z`.
+      - The fix is to compare instants. It is outside item 3 and recorded in `tasks.md`.
+    - **No console errors or hydration warnings.**
+    - **Cleanup:** local is the seed again (32 members all General, 15 events, 0 ticked, 208 attendance rows, start 2026-10-01).
+  - 🔴 **Not shipped.** Migration 31 is local only, and it must reach production before the code. Alone it is safe: the live code never names either column, and the view change can only turn a No into a Yes. `tasks.md` has the checklist.
+
 🚀 **`/admin/members` items 1 and 2 went live on 2026-10-04, as `55cb81e`, a day after migration 30.** The column picker (`54365df`, doc v1.82) and member type with project eligibility (`e2531bb`, doc v1.83) shipped together. The schema went out first and the code second, which is the order v1.79 taught.
 
   - **The merge.** On 2026-10-03, `origin/main` gained `d7a8754`, which unlists `/portal/lookup`, so the branches had diverged. A trial `git merge-tree` found one conflict, in `tasks.md`, where both sides had added a block at the top. `main` was merged into `portal-launch` with both blocks kept, and `CLAUDE.md` merged cleanly. The code did not overlap: outside comments, nothing on the branch links `/portal/lookup`.

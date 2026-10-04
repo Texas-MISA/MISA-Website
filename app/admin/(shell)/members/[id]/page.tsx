@@ -771,13 +771,19 @@ export default async function MemberDetailPage({
 }
 
 /**
- * A project member's requirements for the current term (migration 30): the
- * verdict, what it means, and the months and meetings it was judged from.
+ * A project member's requirements for the current term (migrations 30 and 31):
+ * the verdict, what it means, and the months and meetings it was judged from.
  *
  * 📌 The VERDICT is the directory row's `project_eligibility` — the same value
  * the table prints — and never re-derived from the lists below. The lists come
  * from the two views that verdict was computed from, so they explain it rather
  * than compete with it; each fails on its own and says so.
+ *
+ * 📌 What counts as a general meeting is an officer's tick on the event, in any
+ * category, and the month they count from is `app_settings` — the value the
+ * months view filters on, read rather than typed here, so this sentence and
+ * the table under it cannot disagree. A failed read of that month is a
+ * ReadError, never a sentence that silently leaves the start out.
  *
  * Server-rendered, like the rest of this page: every date goes through
  * formatDay here, and a month through formatMonth's name table, never Intl on
@@ -799,7 +805,7 @@ function ProjectRequirementsBreakdown({
   pendingCount: number;
   requirements: ProjectRequirements;
 }) {
-  const { months, meetings } = requirements;
+  const { months, meetings, generalMeetingsFrom } = requirements;
 
   return (
     <>
@@ -826,9 +832,24 @@ function ProjectRequirementsBreakdown({
       <p className="mt-3 text-sm text-misa-secondary">
         <span className="font-medium">Yes means nothing has failed so far.</span>{" "}
         A month counts once it is over, and a project meeting as soon as it
-        ends. For now a general meeting is any published event on a Thursday
-        (Central time) that isn&apos;t a project meeting.
+        ends. A general meeting is any published event with &ldquo;Count as
+        general meeting&rdquo; ticked, in any category, so a ticked Projects
+        event counts toward both.
+        {generalMeetingsFrom.kind === "ok" && (
+          <>
+            {" "}
+            General meetings count from{" "}
+            {formatMonth(generalMeetingsFrom.month)}; earlier months are not
+            judged, but their project meetings are.
+          </>
+        )}
       </p>
+      {generalMeetingsFrom.kind === "error" && (
+        <ReadError
+          what="the month general meetings count from"
+          className="mt-2"
+        />
+      )}
 
       {pendingCount > 0 && (
         <p className="mt-2 text-sm text-misa-secondary">
@@ -847,8 +868,16 @@ function ProjectRequirementsBreakdown({
         <ReadError what="this member's general meetings" className="mt-3" />
       ) : months.rows.length === 0 ? (
         <Notice className="mt-3">
-          No general meetings have been published in {term} yet, so no month
-          has anything to meet.
+          {/* 🪤 The space after {term} is an explicit {" "}: a plain one did not
+              survive server rendering ("Fall 2026yet"), the trap e3266e6 found. */}
+          No general meetings count in {term}{" "}yet, so no month has anything
+          to meet. An event counts once it is published with &ldquo;Count as
+          general meeting&rdquo; ticked
+          {/* The start already read above, never a typed month. When that read
+              failed, its ReadError stands above and the sentence ends here. */}
+          {generalMeetingsFrom.kind === "ok"
+            ? ` and falls in ${formatMonth(generalMeetingsFrom.month)} or later.`
+            : "."}
         </Notice>
       ) : (
         <div className="mt-3">
@@ -856,7 +885,7 @@ function ProjectRequirementsBreakdown({
             <THead>
               <Tr hover={false}>
                 <Th>Month</Th>
-                <Th wrap>Thursday meetings</Th>
+                <Th wrap>Meetings</Th>
                 <Th numeric>Attended</Th>
                 <Th numeric>Needed</Th>
                 <Th>Result</Th>

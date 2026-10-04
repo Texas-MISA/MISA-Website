@@ -57,7 +57,7 @@ export default async function EventDetailPage({
   const { data: event, error } = await db
     .from("events")
     .select(
-      "id, title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, series_id, verify_origin"
+      "id, title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, series_id, verify_origin, counts_as_general_meeting"
     )
     .eq("id", id)
     .maybeSingle();
@@ -206,6 +206,7 @@ export default async function EventDetailPage({
             initial={{
               id: event.id,
               verifyOrigin: event.verify_origin,
+              countsAsGeneralMeeting: event.counts_as_general_meeting,
               title: event.title,
               description: event.description ?? "",
               location: event.location ?? "",

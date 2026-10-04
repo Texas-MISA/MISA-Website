@@ -95,6 +95,9 @@ export async function createTestEvent(
     seriesId?: string;
     checkinOpensAt?: Date;
     checkinClosesAt?: Date;
+    /** "Count as general meeting" (migration 31). Omitted, it is dropped from
+     * the JSON and the row takes the column default — unticked. */
+    countsAsGeneralMeeting?: boolean;
   }
 ): Promise<{ id: string; title: string }> {
   const title = opts.title ?? `TEST event ${crypto.randomUUID().slice(0, 8)}`;
@@ -110,12 +113,52 @@ export async function createTestEvent(
       series_id: opts.seriesId,
       checkin_opens_at: opts.checkinOpensAt?.toISOString(),
       checkin_closes_at: opts.checkinClosesAt?.toISOString(),
+      counts_as_general_meeting: opts.countsAsGeneralMeeting,
     })
     .select("id, title")
     .single();
   if (error) throw new Error(`fixture event insert failed: ${error.message}`);
   track.eventIds.push(data.id);
   return data;
+}
+
+/**
+ * `app_settings.general_meetings_from` as migration 31 sets it: the first
+ * Central month whose general meetings are judged. Typed here exactly once, and
+ * tests/schema-integrity.test.ts checks it against the migration's own source.
+ */
+export const GENERAL_MEETINGS_FROM = "2026-10-01";
+
+/**
+ * Move the month general meetings are judged from.
+ *
+ * ⚠️ GLOBAL STATE, shared by every test file: `member_general_meeting_months`
+ * reads it for every member and every term, and through it so does
+ * `member_directory.project_eligibility`. So every move goes back to a KNOWN
+ * value, never to whatever was read first, and twice over:
+ *   - a single test's move, in a `finally`, to the value its block runs on:
+ *     the block's own pin inside project-eligibility's `withStart`, otherwise
+ *     GENERAL_MEETINGS_FROM;
+ *   - a block's pin, and any test's move inside it, in that block's
+ *     `afterAll`, to GENERAL_MEETINGS_FROM, and again in the file's `afterAll`
+ *     where the file has one.
+ * tests/global-setup.ts sets GENERAL_MEETINGS_FROM at suite start, which heals
+ * a value a killed run left behind, and puts the developer's own value back
+ * when the suite ends. tests/leaderboard.test.ts and global-setup handle
+ * `current_term` the same way.
+ *
+ * Why it moves at all: no month on or after 2026-10-01 has ended yet, so a
+ * judged month exists only on a far-past fixture term, under an earlier start.
+ */
+export async function setGeneralMeetingsFrom(
+  db: SupabaseClient<Database>,
+  month: string
+): Promise<void> {
+  const { error } = await db
+    .from("app_settings")
+    .update({ general_meetings_from: month })
+    .eq("id", true);
+  if (error) throw new Error(`general_meetings_from update failed: ${error.message}`);
 }
 
 let currentTermSlot = 0;

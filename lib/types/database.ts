@@ -93,6 +93,7 @@ export type Database = {
           current_term: string | null
           dues_one_term_cents: number
           dues_two_term_cents: number
+          general_meetings_from: string
           id: boolean
           updated_at: string
           updated_by: string | null
@@ -101,6 +102,7 @@ export type Database = {
           current_term?: string | null
           dues_one_term_cents?: number
           dues_two_term_cents?: number
+          general_meetings_from?: string
           id?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -109,6 +111,7 @@ export type Database = {
           current_term?: string | null
           dues_one_term_cents?: number
           dues_two_term_cents?: number
+          general_meetings_from?: string
           id?: boolean
           updated_at?: string
           updated_by?: string | null
@@ -373,6 +376,7 @@ export type Database = {
           category: string | null
           checkin_closes_at: string | null
           checkin_opens_at: string | null
+          counts_as_general_meeting: boolean
           created_at: string
           created_by: string | null
           description: string | null
@@ -392,6 +396,7 @@ export type Database = {
           category?: string | null
           checkin_closes_at?: string | null
           checkin_opens_at?: string | null
+          counts_as_general_meeting?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -411,6 +416,7 @@ export type Database = {
           category?: string | null
           checkin_closes_at?: string | null
           checkin_opens_at?: string | null
+          counts_as_general_meeting?: boolean
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -776,6 +782,7 @@ export type Database = {
           category: string | null
           checkin_closes_at: string | null
           checkin_opens_at: string | null
+          counts_as_general_meeting: boolean
           created_at: string
           created_by: string | null
           description: string | null

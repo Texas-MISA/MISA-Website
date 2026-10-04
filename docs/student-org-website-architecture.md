@@ -1,8 +1,44 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.83
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000030` as of 2026-10-04.** ✅ **Migration 30 (member type and project eligibility, v1.83) reached production on 2026-10-03, a day ahead of the code that reads it, which went live on 2026-10-04** as `55cb81e` with v1.82's column picker. Both steps were checked by rendered response. 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
+**Version:** 1.84
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000030` as of 2026-10-04.** ✅ **Migration 30 (member type and project eligibility, v1.83) reached production on 2026-10-03, a day ahead of the code that reads it, which went live on 2026-10-04** as `55cb81e` with v1.82's column picker. Both steps were checked by rendered response. 🔶 **Migration 31 (the "Count as general meeting" checkbox and the October 2026 start, v1.84) is built on `portal-launch` and is LOCAL ONLY.** It must reach production BEFORE its code, and neither has shipped. 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
 **Last updated:** October 2026
+
+> **v1.84: an officer ticks which events count as general meetings, and the monthly requirement starts in October 2026.**
+>
+> Officer decisions, 2026-10-04 (`/admin/members` item 3). Built 2026-10-04 on `portal-launch`, and **not yet on `main`**. Migration 31 (`general_meeting_marker`), applied to the local stack only. No new table, function, route, module or environment variable: two columns, one view's `WHERE` clause, the two event forms, the events list and the member page (§4.1, §4.5, §4.6).
+>
+> - **`events.counts_as_general_meeting`, a "Count as general meeting" checkbox on every event, replaces v1.83's Thursday rule.** A general meeting is now a published event with the box ticked, **in any category**. The weekday decides nothing: an unticked Thursday counts for nothing, and a ticked Wednesday counts. The rule still lives in exactly one place, the `general_meetings` CTE of `member_general_meeting_months`, and v1.83 was right about the cost of replacing it: that CTE's `WHERE` clause and the member page's sentence, nothing else.
+> - 📌 **Every event starts UNTICKED** (officer: "the box is not ticked by default"). Existing events take the column default (`boolean not null default false`). There is no `UPDATE` backfill, so no row was rewritten, the `updated_at` trigger did not fire, and no officer's compare-and-set token moved. New events start unticked because the new-event page and the series form both default unticked. The migration asserts that no event is ticked. An officer decides which meetings count, and no rule guesses on their behalf.
+> - **A ticked Projects event is a project meeting AND a general meeting**, so missing it counts against both. `member_project_meetings` is unchanged and still takes every published Projects event, ticked or not.
+> - **Only the monthly general-meeting requirement starts in October 2026** (officer). A Central month before the start is never judged: it has no row, so it needs nothing. **Project meetings are NOT cut off**, so every published Projects event in the term still counts, September's included. The start is one fixed point, not one per term, so later terms count in full. "October" is the **Central** calendar month, like every month the view files a meeting under. A 7:30pm meeting on 30 September is 1 October in UTC and stays in September.
+> - 🔓 **The start lives in `app_settings.general_meetings_from`**: a `date`, default `2026-10-01`, with the CHECK `app_settings_general_meetings_from_first_of_month`, because the view compares it with a month and a mid-month value would silently mean the month after. Like the dues prices, it is changed by migration and has no UI. Two reasons put it in a table, and either alone would decide it:
+>   - **Permissions.** The view reads it as a **relation**, so it is checked as the view's owner. A helper function would be checked as the **caller**, and anon reads `leaderboard`, which reads `member_directory`, which reads this view. The function would need an anon grant, or it would turn the board into a 42501 (§6). `app_settings` stays deny-all to every API role.
+>   - **Tests have to move it.** No month on or after 2026-10-01 has ended yet, so a judged month exists only on a far-past fixture term under an earlier start. A literal in the view could not be pinned; a row can. The tests pin it the way `tests/leaderboard.test.ts` pins `current_term`, and always restore a known value, never the one they read: a test's move in a `finally`, a block's pin in its `afterAll`, and `tests/global-setup.ts` sets `GENERAL_MEETINGS_FROM` at suite start and puts the developer's own value back at the end (`tests/helpers.ts`).
+>
+>   🪤 The cutoff compares the **same Central-month expression the view groups by**, so the month a meeting is filed under and the month the cutoff tests cannot disagree.
+> - **Unchanged from v1.83:** only published events count, a meeting is held once it ends, a month is judged once it ends, and the verdict gates nothing (§9 #16).
+> - 📌 **Interpretations, approved with the plan.**
+>   - Duplicating an event copies its box.
+>   - The recurring-series form has one box, unticked by default, and it applies to every event the series creates.
+>   - Toggling a past event re-judges that event's month at once, with no edit-impact warning. It is an ordinary audited `event.updated` (§4.6).
+>   - "October" is the Central calendar month.
+>   - A small "general meeting" pill marks a ticked event in the `/admin/events` list. It sits beside the title rather than in Category, because the box is honoured in any category.
+> - **The member page describes the box instead of the Thursday rule, and states the start**: *"General meetings count from October 2026; earlier months are not judged, but their project meetings are."* It reads the month from `app_settings`, the value the view filters on, so the sentence and the table cannot disagree. A failed read, or a missing row, is a `ReadError`, never a sentence that silently leaves the start out. 🪤 Under deny-all RLS an anon client gets **zero rows** from `app_settings` rather than an error, so the read treats "no row" as a failure. The months table's "Thursday meetings" header is now "Meetings".
+> - 📌 **The new events column is anon-readable on published rows** through `events_public_read`, like every other events column. It is schedule information (which meetings count) and names nobody.
+> - 🪤 **`app/actions/events.ts` holds five literal column lists that name `verify_origin`**: the create's after, the update's before and after, the delete's before, and the duplicate's source read. Both sides of an audit must select the same columns, so the new column is in all five. It is also in the series insert's select and the duplicate's after, so every receipt records the box. `tests/event-actions.test.ts` pins this against source and counts exactly five, so a sixth list is a decision for whoever adds it.
+> - 🔴 **Migration 31 is LOCAL ONLY, and it must reach production BEFORE the code** (v1.79's lesson). The code selects both new columns, and a select naming a column the database lacks is a 42703. Shipped first, the code would fail like this: the events list could not load, an event's page would render its error boundary, and every event save would fail. The member page could not say when general meetings start. A pushed preview of this branch reads production's database, so it fails the same way until the migration is applied there. The other order is safe:
+>   - the live code never names either column, so its inserts take the unticked default;
+>   - the view change can only turn a No into a Yes, because only ticked events from October count, and nothing is ticked yet.
+>
+>   ⚠️ Between the push and the code, the live member page still describes the Thursday rule while the view counts nothing, so a project member's page reads "No general meetings have been published in Fall 2026 yet". That is expected, not a failure, and it clears once the code ships and officers tick October's meetings.
+>
+>   `tasks.md` carries the checklist. Once the code ships, officers tick October 2026's general meetings by hand on `/admin/events`. October is judged only once it ends, on 1 November.
+> - 📌 **Found, not fixed (both pre-existing):**
+>   - `saveEvent`'s `event.updated` audit still selects different columns before (now 15) and after (now 9). That has been recorded since migration 28. It is latent, because no page renders an event's audit trail.
+>   - The series form's invalid state echoes no values, so a failed submit resets every field, the new box included.
+>
+>   Later candidates (§7 Stage 10): ticking the box in bulk, and a "general meetings only" filter on `/admin/events`.
 
 > **v1.83: members gain a standing type, and the directory calculates whether project members are meeting their requirements.**
 >
@@ -11,8 +47,8 @@
 > - **`members.member_type` is a real column, not a custom field** (officer: "like a custom-field dropdown, but important; other features will read it later"). General, Data project, Client project or Junior director, with a CHECK, NOT NULL and a default of `general`. A custom field is exactly what nothing may build on: its key and options are officer-defined and the database constrains neither. **Everyone starts as General** (officer), because nothing tracked a project member before this. Officers set the type inline on the directory or in a "Member type" section on the member page, and every change is an audited `member.updated` row with the note "Member type".
 > - **`member_directory.project_eligibility` is `yes`, `no` or `not_applicable`, calculated and never ticked, and it gates nothing** (§9 #16). Data-project and client-project members must attend **every published Projects event**, and **2 of each Central calendar month's general meetings**, or all of them when fewer than 2 were held; a month with none needs nothing. Every other type is `not_applicable`. It is judged for **the row's term**, like every aggregate on the view. §4.5 has the exact rule.
 > - **A month is judged once it ends (officer).** Until then it is met (once 2 are attended) or in progress, never failed, so one early miss cannot turn the verdict to No in week one. A missed project meeting counts the moment it ends. ⚠️ **`yes` therefore means "nothing has failed so far"** and stays provisional until the term's last month is over. The member page says so beside the verdict.
-> - 📌 **Interpretations, stated at approval and built as stated.** Only **published** events count, and a meeting is held once `ends_at < now()`, the attendance-rate denominator's own test. A Thursday Projects event is a project meeting and nothing else. A check-in still pending review counts for nothing until an officer resolves it, and the member page says so when the member has any. The whole semester counts for everyone (officer: projects have an application process, so nobody joins one mid-semester).
-> - ⚠️ **"General meeting" has no marker yet.** For now it is any published event that starts on a Thursday in Central time and is not a Projects event, **so a Thursday social counts too.** The rule lives in exactly one place, the `general_meetings` CTE in migration 30, so a real marker later is one edit there (§7 Stage 10).
+> - 📌 **Interpretations, stated at approval and built as stated.** Only **published** events count, and a meeting is held once `ends_at < now()`, the attendance-rate denominator's own test. A Thursday Projects event is a project meeting and nothing else. A check-in still pending review counts for nothing until an officer resolves it, and the member page says so when the member has any. The whole semester counts for everyone (officer: projects have an application process, so nobody joins one mid-semester). *(v1.84: two of these are superseded. A ticked Projects event is now a project meeting AND a general meeting. And for general meetings the whole semester no longer counts: they are judged only from October 2026 (`app_settings.general_meetings_from`). Project meetings still count for the whole term.)*
+> - ⚠️ **"General meeting" has no marker yet.** For now it is any published event that starts on a Thursday in Central time and is not a Projects event, **so a Thursday social counts too.** The rule lives in exactly one place, the `general_meetings` CTE in migration 30, so a real marker later is one edit there (§7 Stage 10). *(v1.84: superseded. Migration 31 added the marker, the "Count as general meeting" checkbox, honoured in any category, and the weekday no longer decides anything. The one edit predicted here was the whole change: that CTE's `WHERE` clause, plus the member page's sentence.)*
 > - ⚠️ **The type is STANDING, unlike every aggregate around it.** A member holds one type, not one per term, so a past term's row is judged against today's type, and changing someone's type re-judges their past terms too. The member page's type section says so.
 > - 🔓 **The rule lives in two officer-only VIEWS, not in functions**: `member_project_meetings` and `member_general_meeting_months`. `member_directory` only asks whether either found a failure. Postgres checks EXECUTE on a function referenced inside a view against the **caller**, and the public `leaderboard` is defined over `member_directory`, so a helper function there would need an anon grant or would turn the board into a 42501. A relation referenced inside a view is checked as the view's **owner**, so the two views hold no grant for any API role and anon still reads the board. Verified on the local stack; the evidence is in §6.
 > - **Both columns are default columns and default export fields.** The default table and the default file are now Member · Email · EID · Total points · Dues · Member type · Project eligibility, then the default custom fields: v1.82's "the default file is the default table", applied rather than revisited. **Neither sorts** (no new sorting). Two new filters, `memberType` and `eligibility`, are parsed totally and applied in `applyMemberFilter` like `source`; a preset saved before them parses to "all" and narrows nothing. The roster import names both columns as ignored, so a downloaded file still imports.
@@ -2475,6 +2511,18 @@ create table events (
   created_by         uuid references auth.users(id),
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now(),
+  -- Check-in origin verification (migration 28): whether the review screens
+  -- derive origin flags for this event. It gates DERIVATION, not collection:
+  -- origins are captured on every self check-in either way, which is what makes
+  -- flipping it after the event work. Advisory only (§6, and
+  -- docs/checkin-location-verification.md).
+  verify_origin      boolean not null default true,
+  -- "Count as general meeting" (migration 31, officer 2026-10-04): whether this
+  -- event counts toward data and client project members' monthly general
+  -- meetings once it is published (4.5). Honoured in EVERY category, so a ticked
+  -- Projects event is a project meeting and a general meeting. Every event
+  -- starts unticked: the default, no backfill, and both forms default unticked.
+  counts_as_general_meeting boolean not null default false,
   constraint valid_window check (ends_at > starts_at)
 );
 
@@ -2695,10 +2743,23 @@ create table app_settings (
   -- raising the price never rewrites what last year's payments bought — and
   -- re-importing an old statement after a change would land differently,
   -- which is one more reason the dedupe has to hold.
-  dues_one_term_cents  integer not null default 3000 check (dues_one_term_cents  > 0),
-  dues_two_term_cents  integer not null default 5000 check (dues_two_term_cents  > 0),
+  --
+  -- Raised from $30 / $50 to $40 / $70 by migration 26, deliberately by
+  -- migration: there is no UI, so every price change is dated and reviewed.
+  dues_one_term_cents  integer not null default 4000 check (dues_one_term_cents  > 0),
+  dues_two_term_cents  integer not null default 7000 check (dues_two_term_cents  > 0),
   updated_by   uuid references auth.users(id),
-  updated_at   timestamptz not null default now()
+  updated_at   timestamptz not null default now(),
+  -- The first Central month whose general meetings are judged (migration 31,
+  -- officer 2026-10-04). Earlier months have no row in the months view and so
+  -- need nothing; project meetings have no start. One fixed point, not one per
+  -- term. Read by member_general_meeting_months as a RELATION, so as the view's
+  -- owner, never through a function (4.5, §6). Changed by migration, like the
+  -- prices: there is no UI. First-of-month, because the view compares it with
+  -- a month and a mid-month value would silently mean the month after.
+  general_meetings_from date not null default date '2026-10-01'
+    constraint app_settings_general_meetings_from_first_of_month
+    check (extract(day from general_meetings_from) = 1)
 );
 
 -- Officer accounts, keyed to Supabase Auth users.
@@ -3061,21 +3122,22 @@ left join bonus_agg      ba on ba.member_id = m.id;
 
 ---
 
-#### Project eligibility (migration 30, v1.83)
+#### Project eligibility (migration 30, v1.83; general meetings revised by migration 31, v1.84)
 
 **Two columns are appended**, by `create or replace`, so nothing is dropped and `leaderboard`, defined over this view, is not touched:
 
 - **`member_type`** is the member's **standing** type, copied from `members` and identical on every term row.
 - **`project_eligibility`** is `yes`, `no` or `not_applicable`. It is calculated, never ticked, it **gates nothing** (§9 #16), and it is judged for **the row's term**.
 
-**The rule (officer, 2026-10-03), exactly as the views implement it.**
+**The rule (officer, 2026-10-03; general meetings revised 2026-10-04), exactly as the views implement it.**
 
 - It applies to `data_project` and `client_project` members. Every other type is `not_applicable`, whatever they attended.
 - **Only published events count.** Cancelled events and drafts never count, either as meetings or as misses. A meeting is **held** once `ends_at < now()`, the test the attendance-rate denominator uses. **Attended** means a `present` attendance row for the member; it is an `EXISTS`, so two present rows for one meeting count once. A check-in still **pending** counts for nothing until an officer resolves it.
-- **Project meetings** are the published events with `category = 'projects'`. Each is *attended*, *missed* (held and not attended) or *upcoming*, in that order of precedence: attendance is a fact and outranks the clock, as in the member page's events grid. **A missed project meeting fails the term the moment it ends.**
-- **General meetings**, for now, are published events that **start on a Thursday in Central time and are not Projects events**. ⚠️ **This is temporary, and it lives in exactly one place:** the `general_meetings` CTE of `member_general_meeting_months`. A real general-meeting marker later replaces that CTE's `WHERE` clause and nothing else (§7 Stage 10). Until then **a Thursday social counts**, and a Thursday Projects event is a project meeting only.
-- **They are grouped by Central calendar month**, per member and term, as every date in this app is. A meeting at 7:30pm on 30 September is 00:30 UTC on 1 October and belongs to September; a meeting at 7pm on a Thursday is a Friday in UTC and counts; a Wednesday 8pm meeting is a Thursday in UTC and does not. `tests/project-eligibility.test.ts` pins all three.
-- Each month row carries `meetings_scheduled`, `meetings_held`, `meetings_attended` and **`meetings_required = least(2, meetings_scheduled)`**. A month with no general meeting has **no row**, and so needs nothing; so does a month whose only Thursday event was cancelled.
+- **Project meetings** are the published events with `category = 'projects'`, whatever their general-meeting box says. Each is *attended*, *missed* (held and not attended) or *upcoming*, in that order of precedence: attendance is a fact and outranks the clock, as in the member page's events grid. **A missed project meeting fails the term the moment it ends.** Project meetings have **no start month**, so every one in the term counts.
+- **General meetings** are published events with **"Count as general meeting" ticked** (`events.counts_as_general_meeting`, migration 31, officer 2026-10-04), **in any category**. A ticked Projects event is therefore a project meeting AND a general meeting, and missing it counts against both. The weekday decides nothing. Every event starts unticked, and officers tick the ones that count, one event at a time or one box per new series. **The rule lives in exactly one place**, the `general_meetings` CTE of `member_general_meeting_months`, and nothing in TypeScript re-derives it. *(Until v1.84 there was no marker, so a general meeting was inferred as a published event starting on a Thursday in Central time that was not a Projects event. A Thursday social counted, and a Thursday Projects event was a project meeting only. Replacing it was that CTE's `WHERE` clause and nothing else, as v1.83 said it would be.)*
+- **General meetings count from `app_settings.general_meetings_from`, which is October 2026** (officer, 2026-10-04). A Central month before it is never judged: it has **no row**, so it needs nothing. The start is one fixed point, not one per term, so later terms count in full. Project meetings are not cut off (above). The value is a `date` with a first-of-month CHECK, changed by migration (like the dues prices) and never through a UI. The view reads it as a relation, for the reason given under the two views below. 🪤 **The cutoff compares the same Central-month expression the view groups by**, so the month a meeting is filed under and the month the cutoff tests cannot disagree. A cutoff on the UTC instant would keep a 7:30pm meeting on 30 September 2026 (1 October in UTC), and the grouping would then file it under a September the officer said is not judged.
+- **They are grouped by Central calendar month**, per member and term, as every date in this app is. A meeting at 7:30pm on 30 September is 00:30 UTC on 1 October and belongs to September. In 2026 that puts it before the start, so it is never judged. `tests/project-eligibility.test.ts` pins both halves. *(v1.83 also pinned two weekday cases, a Thursday 7pm meeting being a Friday in UTC and a Wednesday 8pm one a Thursday. They stopped mattering in v1.84, when the weekday stopped deciding anything.)*
+- Each month row carries `meetings_scheduled`, `meetings_held`, `meetings_attended` and **`meetings_required = least(2, meetings_scheduled)`**. A month with no general meeting has **no row**, and so needs nothing. So does a month whose only ticked event was cancelled or is still a draft, and so does every month before the start.
 - **A month is COMPLETE once its Central month has ended AND every meeting in it has ended** (a meeting late on the last day can run past midnight). From then on held equals scheduled, so `least(2, scheduled)` is the officer's "2, or all of them when fewer than 2 were held". A complete month is **met** if `meetings_attended >= meetings_required`, otherwise **not met**.
 - **A month still running is met once 2 meetings are attended, and in progress otherwise. It is never not met.** The officer's "judge it when it ends": an early miss cannot fail a month that has meetings still to come.
 - **`project_eligibility` is `no` if, in the row's term, any project meeting is `missed` or any month is `not_met`, and `yes` otherwise.**
@@ -3088,9 +3150,9 @@ left join bonus_agg      ba on ba.member_id = m.id;
 - **A project member with no row for a term has no verdict for it.** The roster rule did not change (officer: every project member is assumed to be on the semester's roster already), and the two views cover every member, so the member page still lists the months and meetings behind an off-roster member while showing the verdict as "—".
 - **The events grid and the breakdown legitimately differ in tone.** The grid keeps a miss neutral; the breakdown shows a missed project meeting as a critical pill, because there one miss is the whole verdict. Like the grid, eligibility is published-only while `attendance_agg` counts drafts, so neither is derived from the other.
 
-**Two officer-only views carry the rule, and that is a security decision rather than a style.** `member_project_meetings` is one row per member × published Projects event. `member_general_meeting_months` is one row per member × term × Central month holding at least one general meeting. `member_directory` only asks whether either holds a failure for the row's term. 🔓 They are views, **not functions**, because `leaderboard` is defined over this view and anon reads `leaderboard`: Postgres checks EXECUTE on a function referenced inside a view as the **caller**, but a relation referenced inside a view as the view's **owner**. Neither view holds a grant for any API role; see §6 for the measurement. The planner also prunes both new columns from the board's plan, but nothing relies on that.
+**Two officer-only views carry the rule, and that is a security decision rather than a style.** `member_project_meetings` is one row per member × published Projects event. `member_general_meeting_months` is one row per member × term × Central month holding at least one general meeting. `member_directory` only asks whether either holds a failure for the row's term. 🔓 They are views, **not functions**, because `leaderboard` is defined over this view and anon reads `leaderboard`: Postgres checks EXECUTE on a function referenced inside a view as the **caller**, but a relation referenced inside a view as the view's **owner**. Neither view holds a grant for any API role; see §6 for the measurement. The planner also prunes both new columns from the board's plan, but nothing relies on that. 🔓 **The same reasoning put the general-meeting start in a table** (migration 31): the months view reads `app_settings.general_meetings_from` as a relation, checked as its owner, and `app_settings` stays deny-all to every API role. A function returning the start would be checked as the caller, and anon is the caller of the public board. A literal inside the view could not be moved by the tests, and no month on or after 2026-10-01 has ended yet, so a judged month exists only on a far-past fixture term under an earlier start.
 
-**Three readers, one rule.** The directory table and its filter read `project_eligibility`; the member page takes its verdict from its own directory row, so the page and the table cannot disagree; and `fetchProjectRequirements` (`lib/project-requirements.ts`) reads the two views for the months and meetings the verdict was judged from, each list failing on its own. 🔓 **The member page's synthesized off-roster row sets `project_eligibility` to `null`**, never the value on `identity`, which is whichever term row came back first and therefore another term's verdict. `member_type` may be inherited from it, because the type is standing.
+**Three readers, one rule.** The directory table and its filter read `project_eligibility`; the member page takes its verdict from its own directory row, so the page and the table cannot disagree; and `fetchProjectRequirements` (`lib/project-requirements.ts`) reads the two views for the months and meetings the verdict was judged from, each list failing on its own. Since migration 31 it makes a third read, `app_settings.general_meetings_from`, the value the months view filters on. The page uses it to say when general meetings start, so the sentence and the table cannot disagree. A failed read **or a missing row** is an error: under deny-all RLS an anon client gets zero rows, not an error, and a start that failed to load must never read as "every month is judged". 🔓 **The member page's synthesized off-roster row sets `project_eligibility` to `null`**, never the value on `identity`, which is whichever term row came back first and therefore another term's verdict. `member_type` may be inherited from it, because the type is standing.
 
 ### 4.6 Event edit semantics
 
@@ -3103,6 +3165,7 @@ Events are editable at any point, including after attendance exists. That flexib
 | Move `starts_at` / `ends_at` | Same as above | Allowed with the same warning |
 | Move `starts_at` **across a term boundary** | The event and all its attendance silently move to the other term's leaderboard | `term` is generated from `starts_at` (§4.7), so this happens automatically with no prompt. Detect it in the edit form — compare `term_of(old)` with `term_of(new)` — and warn explicitly, since rescheduling a July meeting into August moves every attendee's points between semesters |
 | Toggle `verify_origin` | None. It changes what the officer's review screen **derives**, never what was recorded | Allowed at any time, including long after the event, with no warning. 🔓 Origins are captured on every check-in regardless of this flag, which is precisely what makes turning it on afterwards work — see §9 #14. It is an ordinary audited event edit |
+| Toggle `counts_as_general_meeting` ("Count as general meeting", migration 31) | None. It changes which events the general-meeting months count, never what was recorded | Allowed at any time, including long after the event, with no warning (officer, 2026-10-04). It **re-judges that event's month at once**, if the event is published and its month is on or after `app_settings.general_meetings_from`, so a finished month can flip between met and not met, and a project member's verdict with it. It is an ordinary audited `event.updated`. The box is part of the edit-impact token, so confirming another change's warning cannot apply a box the officer has since flipped |
 | Delete an event with attendance | Would orphan real records | Blocked. Offer `status = 'cancelled'` instead, which preserves history and removes it from the upcoming list |
 
 Cancelled events are excluded from leaderboard totals but remain visible in a member's attendance history, so someone who attended an event that was later cancelled can still see they were there.
@@ -3268,10 +3331,18 @@ $$;
                        server-side              (migrations 24 and 25)
 /admin/login           Officer sign-in
 /admin                 Dashboard — recent check-ins, pending review count
-/admin/events          Schedule list — filter by term, status, category
+/admin/events          Schedule list — filter by term, status, category. A
+                       "general meeting" pill beside the title marks an event
+                       ticked "Count as general meeting" (migration 31, v1.84)
 /admin/events/new      Create one event, as a draft or published
 /admin/events/series   Create a recurring series — expanded to one draft per date
 /admin/events/[id]     Edit event, view its attendance, duplicate, cancel
+                       Since migration 31 (v1.84) the event form and the series
+                       form carry a "Count as general meeting" checkbox,
+                       unticked by default. A series applies its one box to
+                       every event it creates, a duplicate copies its source's,
+                       and toggling it after the event re-judges that month
+                       with no warning (§4.6)
 /admin/members         Roster directory — sort, filter, select, copy, export.
                        Its Fields menu chooses the table's columns AND the
                        export's (v1.82), remembered per browser in the
@@ -3296,6 +3367,8 @@ $$;
                        project member — the verdict off the page's own
                        directory row, general meetings by month, and the
                        term's project meetings; one line for any other type.
+                       Since migration 31 (v1.84) it states the month general
+                       meetings count from, read from app_settings.
                        The merge preview states the member-type outcome
 /admin/members/import  Upload a roster CSV — parse, preview, confirm. Create-only:
                        a row matching an existing member on either unique index
@@ -3370,7 +3443,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Anon key over-permission | RLS: anon role can `select` only from `leaderboard` and published `events`. All writes go through Server Actions. ✅ **Proven exhaustively in Stage 8**, not reasoned about: `tests/security.test.ts` sweeps every declared table × select/insert/update/delete × anon **and** authenticated, re-reading each write probe as service role to confirm nothing moved. |
 | A signed-in non-officer reads the roster | 🔓 **This was live, and Stage 8 phase 1 closed it (migration 22).** `member_directory` carries every member's name, EID and email; migration 15 revoked it from `anon` and **granted it to `authenticated`** on the understanding that `authenticated` means "an officer". It does not — it is the role any holder of a valid user JWT gets, and `disable_signup` was `false` on production, so it was one confirmed email away for anyone. What distinguishes an officer is an `admin_profiles` row, and **that check lives in `lib/auth.ts`, in the application; PostgREST never runs it.** Reproduced on the local stack before the fix (a signed-up user with no profile read back a real EID), then revoked. Nothing read the view that way — every module touching member data uses the service-role client. ⚠️ The general lesson, which is migration 15's lesson one role over: **a grant to `authenticated` is a grant to the public whenever signup is open.** |
 | `grant all` includes TRUNCATE, which RLS cannot restrain | 🔓 Found in Stage 8's audit. RLS covers SELECT/INSERT/UPDATE/DELETE and **nothing else**, and `admin_audit`'s append-only triggers are `before update` and `before delete` — so TRUNCATE slipped past both while migration 12 handed it to `anon` with `all privileges`. Not reachable (PostgREST exposes no TRUNCATE verb and the API roles are NOLOGIN), but migration 12's stated doctrine — "granting anon DML changes nothing, RLS is the boundary" — **is false for exactly this verb**, on exactly the table where it matters most. Migration 22 narrows anon/authenticated to `select` and adds a statement-level `before truncate` trigger behind that, because a grant can be re-widened by a later migration and a trigger has to be dropped on purpose. |
-| Officer-only views underneath the public board (migration 30) | `member_project_meetings` and `member_general_meeting_months` list every member beside every meeting they missed, and they sit **under** `member_directory`, which `leaderboard` is defined over. 🔓 **The rule is expressed as views, not functions, because Postgres checks the two differently:** EXECUTE on a function referenced inside a view is checked against the **caller** (which is why anon holds EXECUTE on `current_term()`), while a **relation** referenced inside a view is checked as the view's **owner**. A helper function inside `member_directory` would therefore need an anon grant or would turn the public board into a 42501. **Anything `member_directory` consumes must stay a view, or a function anon may execute.** Both views revoke anon and authenticated in the migration, and `tests/security.test.ts` names both and asserts a 42501 for anon and for a signed-in non-officer. ✅ **Measured on the local stack, 2026-10-03:** neither view's ACL has an entry for anon or authenticated (only `postgres` and `service_role`); as anon, `leaderboard` returned its 29 rows while both views answered *permission denied*; and `EXPLAIN (verbose)` on `leaderboard` shows `member_type` and `project_eligibility` pruned to `NULL::text`, so the board never evaluates them. Nothing relies on that pruning. 🪤 **Supabase's security advisor flags these two owner-rights views**, exactly as it flags `member_directory` and `leaderboard`. That is intentional: `security_invoker` would run every read as the caller, and the caller of the public board is anon. 🪤 **A new function must `revoke execute … from public`**, not only from anon and authenticated: a function is executable by PUBLIC by default. Migration 29's `member_terms()` revoked the two roles and not PUBLIC, so anon can still execute it (`proacl` holds `=X/postgres`). It returns only term names; the fix is open in `tasks.md`. |
+| Officer-only views underneath the public board (migration 30) | `member_project_meetings` and `member_general_meeting_months` list every member beside every meeting they missed, and they sit **under** `member_directory`, which `leaderboard` is defined over. 🔓 **The rule is expressed as views, not functions, because Postgres checks the two differently:** EXECUTE on a function referenced inside a view is checked against the **caller** (which is why anon holds EXECUTE on `current_term()`), while a **relation** referenced inside a view is checked as the view's **owner**. A helper function inside `member_directory` would therefore need an anon grant or would turn the public board into a 42501. **Anything `member_directory` consumes must stay a view, or a function anon may execute.** Both views revoke anon and authenticated in the migration, and `tests/security.test.ts` names both and asserts a 42501 for anon and for a signed-in non-officer. ✅ **Measured on the local stack, 2026-10-03:** neither view's ACL has an entry for anon or authenticated (only `postgres` and `service_role`); as anon, `leaderboard` returned its 29 rows while both views answered *permission denied*; and `EXPLAIN (verbose)` on `leaderboard` shows `member_type` and `project_eligibility` pruned to `NULL::text`, so the board never evaluates them. Nothing relies on that pruning. 🪤 **Supabase's security advisor flags these two owner-rights views**, exactly as it flags `member_directory` and `leaderboard`. That is intentional: `security_invoker` would run every read as the caller, and the caller of the public board is anon. 🪤 **A new function must `revoke execute … from public`**, not only from anon and authenticated: a function is executable by PUBLIC by default. Migration 29's `member_terms()` revoked the two roles and not PUBLIC, so anon can still execute it (`proacl` holds `=X/postgres`). It returns only term names; the fix is open in `tasks.md`. 📌 **Migration 31 (v1.84) gave `member_general_meeting_months` a read of `app_settings.general_meetings_from`, made as a relation for exactly this reason.** It runs as the view's owner, and `app_settings` stays deny-all to every API role. The migration re-issues the view's revokes, although a `create or replace` keeps its privileges, so a later drop-and-create copied from it cannot leave them out. ✅ **Re-measured on the local stack, 2026-10-04:** the view's ACL still lists only `postgres` and `service_role`. As anon, `leaderboard` reads while the view answers 42501. `leaderboard`'s verbose plan never touches either eligibility view, the new events column or `app_settings` (`project_eligibility` is pruned). |
 | Spam / bot submissions | Honeypot field, per-IP rate limit on the check-in action, submissions rejected outside any open window |
 | Check-in on behalf of someone else | **Partially mitigated 2026-08-22 by check-in location verification** (migration 28; spec `docs/checkin-location-verification.md`). ✂️ **The rotating per-event venue code this row used to name is DROPPED** — the two overlap enough that building both was redundant, and the officer chose the one that needs no screen at the venue and works retroactively. What ships: each event's most common check-in origin is treated as the venue, and check-ins from elsewhere are surfaced to officers as a pill. ⚠️ **Advisory only, and it misses the likeliest form of the fraud entirely** — a friend in the room checking in an absent member is on the venue origin by construction. 🔓 It also creates a documented public bypass: cellular is never flagged, so turning off wifi defeats it. That is the accepted price of not flagging real attendees whose phone had not joined the wifi, and it is correct only while nothing gates on the flag. 🔓 **No IP is stored** — a peppered, event-scoped digest and a four-value network label, and the event id inside the digest is what stops the table tracing a member across a semester. |
 | Attendance data enumeration | `/lookup` requires EID **and** matching email before returning history. 🔓 **Built as ONE query carrying both predicates** (`findMemberByBoth`, Stage 7 phase 2), never `lib/checkin.ts`'s ordered fallback — that shape resolves on the EID *or* the email, which would silently reduce this to the EID-alone gate the row below accepts only for check-in. Two tests exist purely to fail if someone "makes it more forgiving". The email side goes through `escapeIlike`, so a `%` is a literal rather than a wildcard past half the gate. |
@@ -3860,10 +3933,15 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 **Left out of member type and project eligibility (migration 30, v1.83) on purpose, as later candidates:**
 
 - **A member-facing view of project eligibility in the portal.** The officer page's breakdown is built from `fetchProjectRequirements`, which takes any client, but showing it to a member is a §6 question first: today `/portal/lookup` resolves on the EID alone.
-- **A real general-meeting marker**, replacing the temporary "published, Thursday in Central, not Projects" rule. It is one edit: the `general_meetings` CTE of `member_general_meeting_months`, plus the member page's sentence that describes the rule.
+- ✅ **A real general-meeting marker — DONE in v1.84** (migration 31, officer 2026-10-04). It replaced the temporary "published, Thursday in Central, not Projects" rule with the "Count as general meeting" checkbox, honoured in any category. As this line predicted, it was one edit: the `general_meetings` CTE of `member_general_meeting_months`, plus the member page's sentence that describes the rule. The same item added the October 2026 start (`app_settings.general_meetings_from`).
 - **Excused absences for the project requirements.** Today every miss counts (§9 #16); #5's deferral is what this would revisit.
 - **A bulk "Set member type"** for the selected members. Today the type is set one member at a time, which is also how each change gets its own audit row.
 - **Member type in the roster import.** Today an imported member starts as General, and the import names a Member type column as ignored.
+
+**Left out of the general-meeting marker (migration 31, v1.84) on purpose, as later candidates:**
+
+- **Ticking "Count as general meeting" in bulk** for selected events. Today it is one event at a time, or one box for a whole new series.
+- **A "general meetings only" filter on `/admin/events`.** Today the list marks a ticked event with a pill and filters by term, status and category only.
 
 **"Dues tracking and payment status" was on this list and is now Stage 6.5** (v1.34). What remains deliberately out of scope, and should stay on this list rather than creeping into 6.5:
 
@@ -4028,7 +4106,18 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
     /login/page.tsx          outside the (shell) group — see the note below
     /(shell)                 authed chrome; route groups don't appear in URLs
       page.tsx
-      /events/...
+      /events/...            _components: event-form.tsx and event-table.tsx;
+                             the series form is
+                             /series/_components/series-form.tsx. Since
+                             migration 31 both forms carry a bare-label "Count
+                             as general meeting" checkbox, unticked by default,
+                             and the table's "general meeting" pill marks a
+                             ticked event. 🪤 page.tsx CASTS its rows to
+                             EventListRow, so nothing type-checks its select
+                             string: a column the type names and the select
+                             omits reads as undefined, and the pill would
+                             silently never render. tests/event-actions.test.ts
+                             pins that column in the select
       /attendance/...
       /points/...
       /members/...           directory, /[id] detail page, and /fields (list,
@@ -4140,14 +4229,20 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
     client.ts                browser client
     admin.ts                 service-role client, `server-only`-guarded —
                              the only place it is constructed (§6)
-  types/database.ts          generated types. ⚠️ Migration 30's additions were
-                             HAND-PORTED: the current CLI's output drifts from
-                             this file in unrelated ways (docs/operations.md)
+  types/database.ts          generated types. ⚠️ Migration 30's and 31's
+                             additions were HAND-PORTED: the current CLI's
+                             output drifts from this file in unrelated ways
+                             (docs/operations.md)
   validation.ts              zod schemas
   attendance.ts              resolution core: interval parsing, gap
                              description, member scoring, previewResolution
   points.ts                  point categories, formatting, grant bounds
-  events.ts                  event domain core
+  events.ts                  event domain core. EventDraft's
+                             counts_as_general_meeting is REQUIRED (migration
+                             31), unlike verify_origin, so neither producer can
+                             fall back to the column default by forgetting it:
+                             expandSeries applies the series form's one box,
+                             and duplicateDraft copies the source's
   checkin.ts                 check-in resolution core
   lookup.ts                  the member self-service core (Stage 7 phase 2).
                              Pure, same contract as checkin.ts. 🔓 Its gate is
@@ -4340,11 +4435,17 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
   project-requirements.ts    fetchProjectRequirements(db, memberId, term) — the
                              months and the project meetings behind one
                              member's verdict, read from the two officer-only
-                             views (migration 30). Takes the client, like
-                             roster-index.ts. Each list fails ON ITS OWN, as a
-                             discriminated Read<T>, never []. The VERDICT is
-                             not here: it is the page's own directory row, so
-                             the page and the table cannot disagree
+                             views (migration 30), and since migration 31 the
+                             month general meetings count from
+                             (app_settings.general_meetings_from, the value the
+                             months view filters on). Takes the client, like
+                             roster-index.ts. Each of the three reads fails ON
+                             ITS OWN, as a discriminated result, never [] — and
+                             a missing settings row is an error too, because
+                             deny-all RLS answers anon with zero rows. The
+                             VERDICT is not here: it is the page's own
+                             directory row, so the page and the table cannot
+                             disagree
   member-fields.ts           fetchFieldDefinitions — the live definitions, read
                              once per request and shared by the directory's
                              columns and sort, the detail page, the fields admin

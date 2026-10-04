@@ -21,6 +21,9 @@ export type EventListRow = {
   status: string;
   term: string | null;
   series_id: string | null;
+  /** "Count as general meeting" (migration 31). Read through a cast in
+   * events/page.tsx, so its select string has to name this column. */
+  counts_as_general_meeting: boolean;
   // PostgREST returns an embedded aggregate as a single-element array.
   attendance: { count: number }[];
 };
@@ -61,6 +64,13 @@ export function EventTable({ rows }: { rows: EventListRow[] }) {
                 >
                   {row.title}
                 </Link>
+                {/* Beside the title, not in Category: the box is honoured in
+                    every category, so a Projects event can carry it too. */}
+                {row.counts_as_general_meeting && (
+                  <Pill tone="info" size="sm" className="ml-2">
+                    general meeting
+                  </Pill>
+                )}
                 {position && (
                   <span className="ml-2 text-xs text-misa-muted">
                     {position}

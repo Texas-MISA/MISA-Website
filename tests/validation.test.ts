@@ -10,6 +10,7 @@ import {
   checkinSchema,
   duesPaymentSaveSchema,
   duesVoidSchema,
+  eventSchema,
   fieldDefinitionEditSchema,
   fieldDefinitionSchema,
   memberFieldValueSchema,
@@ -17,6 +18,7 @@ import {
   memberTypeSchema,
   pointGrantSchema,
   pointVoidSchema,
+  seriesSchema,
 } from "@/lib/validation";
 import { MEMBER_TYPES } from "@/lib/member-types";
 
@@ -477,6 +479,60 @@ describe("memberNotesSchema", () => {
       memberNotesSchema.safeParse({ ...NOTES_BASE, notes: "x".repeat(2001) })
         .success
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// "Count as general meeting" (migration 31)
+// ---------------------------------------------------------------------------
+//
+// In eventBase, so both schemas read it. Presence is the signal: a ticked box
+// posts "on", an unticked one posts nothing — and absent has to mean false,
+// the column's default and the officer's "every event starts unticked".
+
+describe("countsAsGeneralMeeting", () => {
+  // The raw strings the forms post, as echo() collects them.
+  const EVENT_INPUT = {
+    title: "General Meeting",
+    description: "",
+    location: "",
+    date: "2026-10-08",
+    startTime: "19:00",
+    endTime: "20:00",
+    openEarlyMinutes: "15",
+    closeLateMinutes: "15",
+    points: "1",
+    category: "general_and_other",
+    status: "draft",
+  };
+  const SERIES_INPUT = {
+    ...EVENT_INPUT,
+    untilDate: "2026-12-03",
+    weekdays: ["4"],
+  };
+
+  it("eventSchema reads a ticked box as true, and blank or absent as false", () => {
+    expect(
+      eventSchema.parse({ ...EVENT_INPUT, countsAsGeneralMeeting: "on" })
+        .countsAsGeneralMeeting
+    ).toBe(true);
+    expect(
+      eventSchema.parse({ ...EVENT_INPUT, countsAsGeneralMeeting: "" })
+        .countsAsGeneralMeeting
+    ).toBe(false);
+    expect(eventSchema.parse(EVENT_INPUT).countsAsGeneralMeeting).toBe(false);
+  });
+
+  it("seriesSchema reads it the same way — it is in the shared base", () => {
+    expect(
+      seriesSchema.parse({ ...SERIES_INPUT, countsAsGeneralMeeting: "on" })
+        .countsAsGeneralMeeting
+    ).toBe(true);
+    expect(
+      seriesSchema.parse({ ...SERIES_INPUT, countsAsGeneralMeeting: "" })
+        .countsAsGeneralMeeting
+    ).toBe(false);
+    expect(seriesSchema.parse(SERIES_INPUT).countsAsGeneralMeeting).toBe(false);
   });
 });
 

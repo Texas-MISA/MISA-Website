@@ -134,6 +134,15 @@ const eventBase = {
       "Unknown category"
     ),
   status: z.enum(EVENT_STATUSES),
+  // "Count as general meeting" (migration 31, officer 2026-10-04). Presence is
+  // the signal, as for verifyOrigin below: an unticked box sends nothing, so
+  // absent parses as false. That is correct for BOTH forms that spread this —
+  // the column defaults to false, every event starts unticked, and the event
+  // form and the series form both render the box.
+  countsAsGeneralMeeting: z
+    .string()
+    .optional()
+    .transform((v) => typeof v === "string" && v.length > 0),
 };
 
 // The database's valid_window check is the real backstop; this exists so the
@@ -154,6 +163,12 @@ export const eventSchema = z
     // and every series-created event would silently ship with verification
     // OFF — the opposite of the column's `default true`. Left out of the insert
     // entirely, a series event takes the database default, which is correct.
+    //
+    // `countsAsGeneralMeeting` IS in eventBase, and the difference is the
+    // default, not the shape: its column defaults to FALSE and both forms
+    // render it, so "absent means false" is the right reading on both. A flag
+    // defaulting true belongs in a base only once every form spreading that
+    // base renders it.
     verifyOrigin: z
       .string()
       .optional()

@@ -75,7 +75,11 @@ async function fetchEvents(
   let query = db
     .from("events")
     .select(
-      "id, title, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, series_id, attendance(count)"
+      // 🪤 The result is CAST to EventListRow below, so nothing type-checks
+      // this string against that type: a column named there and missing here
+      // reads as undefined, and the general-meeting marker would silently
+      // never render. tests/event-actions.test.ts pins counts_as_general_meeting.
+      "id, title, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, series_id, counts_as_general_meeting, attendance(count)"
     )
     .order("starts_at", { ascending: false })
     .limit(200);
