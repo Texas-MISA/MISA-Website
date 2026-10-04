@@ -7,7 +7,42 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
-☑️ **An officer now ticks which events count as general meetings, and the monthly requirement starts in October 2026 (officer, 2026-10-04; built the same day on `portal-launch`; migration 31 is local only, and nothing has shipped).** This is `/admin/members` item 3, doc v1.84; §4.5 of the architecture doc has the exact rule.
+🚀 **`/admin/members` item 3 went live on 2026-10-04: migration 31 at about 15:56 Central, then the code as `65cb0af` at 15:58** (officer: "ship the migration and push to the main site"). The officer saved the phantom "Save anyway" bug the walkthrough found for later.
+
+  - **The pre-check found real types.** Since item 2 went live that morning, officers had typed members: 14 data project, 19 client project, 33 General. Before the push, Fall 2026 read 27 No, 6 Yes and 33 N/A. The No count was driven by 26 unmet September months under the Thursday rule, and by 10 missed project meetings.
+  - **The migration.**
+    - Production's clock read 15:54 on a Sunday, `open_event_at(now())` was empty, and the next window was Thursday 10/8 at 17:45.
+    - `migration list --linked` showed 30 level and 31 pending, and the dry run named 31 alone.
+    - After `db push --linked --skip-vault --yes`:
+      - 31 shows `local` = `remote`;
+      - the start is 2026-10-01, and 0 of 16 events are ticked;
+      - the view's ACL lists only `postgres` and `service_role`, and its definition carries the box and no `isodow`.
+  - **The effect, measured: verdicts moved only from No to Yes, as designed.**
+    - Fall 2026 now reads 10 No, 23 Yes and 33 N/A.
+    - The 10 are exactly the members with a missed project meeting.
+    - No month row exists until officers tick meetings.
+  - **From outside, before the code.** Through PostgREST with the anon key:
+    - `leaderboard` answered 66 rows;
+    - both eligibility views and `member_directory` answered 401 / `42501`;
+    - `app_settings` gave 0 rows;
+    - published `events` rows carry `counts_as_general_meeting`.
+
+    `main`'s code rendered every public page on the migrated schema.
+  - **The code.**
+    - The suite passed 1,295/1,295 on the exact tree, and the rollback target was recorded as `dpl_6U45Mji9pNDez7gffdmENpU9hoP1` (`0fec4f4`).
+    - The clock was re-read, then `git push origin portal-launch:main` fast-forwarded `0fec4f4..65cb0af`.
+    - `dpl_AMU9MZsAk11GEtYzwUxuvL44yAT1` was Ready and aliased in about 45 seconds.
+  - **Checked by rendered response.**
+    - **Public:** eleven pages with their own `<h1>` and no error strings, the leaderboard's 66 rows, the 308s, `/admin/*` answering 307, and `/portal/lookup` still unlisted.
+    - **Officer side, read-only, in a signed-in Chrome; nothing was submitted:**
+      - both forms render the box unticked, and so does an existing event;
+      - the list renders 16 rows and no pill;
+      - the directory reads 10 No, 23 Yes and 33 N/A;
+      - a project member's page says "General meetings count from October 2026", and its empty notice reads "…in Fall 2026 yet…", so the space fix is live.
+  - **Rollback:** Vercel Instant Rollback to `dpl_6U45Mji9pNDez7gffdmENpU9hoP1`, whose code ran on 31 between the pushes and passed every check. For a code rollback, revert `65cb0af`.
+  - ⬜ **Left to the officers:** tick October 2026's general meetings on `/admin/events`. October is judged once it ends, on 1 November.
+
+☑️ **An officer now ticks which events count as general meetings, and the monthly requirement starts in October 2026 (officer, 2026-10-04; built the same day on `portal-launch`, and live on `main` that afternoon, in the entry above).** This is `/admin/members` item 3, doc v1.84; §4.5 of the architecture doc has the exact rule.
 
   - **The root facts.** Item 2 had to infer a general meeting, because the schema had no marker: any published event on a Thursday in Central time that was not a Projects event. That was item 2's one temporary rule, and it lived in one CTE so that replacing it would be one edit. The officer asked for the marker, and for the requirement to start in October 2026.
   - **Decisions (officer, 2026-10-04).**
@@ -94,7 +129,7 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
       - The fix is to compare instants. It is outside item 3 and recorded in `tasks.md`.
     - **No console errors or hydration warnings.**
     - **Cleanup:** local is the seed again (32 members all General, 15 events, 0 ticked, 208 attendance rows, start 2026-10-01).
-  - 🔴 **Not shipped.** Migration 31 is local only, and it must reach production before the code. Alone it is safe: the live code never names either column, and the view change can only turn a No into a Yes. `tasks.md` has the checklist.
+  - ✅ **Shipped the same afternoon:** migration 31 first, then the code, in the entry above. Alone, the migration was safe: the live code never named either column, and the view change could only turn a No into a Yes.
 
 🚀 **`/admin/members` items 1 and 2 went live on 2026-10-04, as `55cb81e`, a day after migration 30.** The column picker (`54365df`, doc v1.82) and member type with project eligibility (`e2531bb`, doc v1.83) shipped together. The schema went out first and the code second, which is the order v1.79 taught.
 
