@@ -966,10 +966,10 @@ function meetingsHeldText(row: RequirementMonth): string {
  * yet. Anything unrecognised renders as itself. */
 function MonthResultMark({ status }: { status: string }) {
   if (status === "met") {
-    return <Pill tone="affirm">{formatMonthResult(status)}</Pill>;
+    return <Pill tone="affirm" fill>{formatMonthResult(status)}</Pill>;
   }
   if (status === "not_met") {
-    return <Pill tone="critical">{formatMonthResult(status)}</Pill>;
+    return <Pill tone="critical" fill>{formatMonthResult(status)}</Pill>;
   }
   if (status === "in_progress") {
     return (
@@ -983,10 +983,10 @@ function MonthResultMark({ status }: { status: string }) {
  * keeps it neutral: here one miss is the whole verdict. */
 function MeetingResultMark({ status }: { status: string }) {
   if (status === "attended") {
-    return <Pill tone="affirm">{formatMeetingResult(status)}</Pill>;
+    return <Pill tone="affirm" fill>{formatMeetingResult(status)}</Pill>;
   }
   if (status === "missed") {
-    return <Pill tone="critical">{formatMeetingResult(status)}</Pill>;
+    return <Pill tone="critical" fill>{formatMeetingResult(status)}</Pill>;
   }
   if (status === "upcoming") {
     return (
