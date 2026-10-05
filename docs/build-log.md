@@ -17,6 +17,18 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
     - `tests/event-actions.test.ts` gains "previewEventEdit against a stored row". It reads a real row with `saveEvent`'s column list and rebuilds an untouched edit with `toCentralFields`, `windowOffsetsOf`, `centralWallTimeToInstant` and `deriveCheckinWindow`. It takes the term from `term_of` and expects no warning. It first asserts that the two spellings really differ, so it cannot pass vacuously.
     - Against the old `!==`, the first unit case and the integration case both failed with the bug's own warning (`fromStart` `…+00:00`, `toStart` `….000Z`). A fix that compared only `starts_at` fails the end-alone case.
   - **Checks:** 1,299/1,299 across 41 files, and lint and `tsc` clean.
+  - ✅ **Review (2026-10-05): APPROVE, no defects.**
+  - ✅ **Browser walkthrough (2026-10-05, local stack; Chrome as a local officer, banner `Environments: .env.development.local, .env.local`): PASS on all six flows,** on the seeded "Resume Workshop" (published, 15 present check-ins, window offsets 0/0).
+    - A title-only edit, its revert, and ticking and unticking "Count as general meeting" each saved on one submit.
+    - A real move of both times warned "The event moves from Sun, Aug 2, 10:00 AM to Sun, Aug 2, 11:00 AM Central. 15 recorded check-ins fall outside the new window, and keep their credit." and wrote nothing.
+    - Widening "Closes late" from 0 to 30 saved on one submit. Narrowing it to 15, and restoring it to 0, each showed the narrowed warning; the first wrote nothing, and "Save anyway" saved the second.
+    - Every save was one POST, with 0 console errors or warnings. The event is back to its recorded values, and the counts are unchanged (32 members, 15 events, 208 attendance rows, 0 ticked). Six append-only `event.updated` rows and a local test officer remain; the next `db reset` clears the officer.
+  - 📌 **What the fix makes visible.** `window_narrowed` is reachable on a real edit for the first time since Stage 4. `moved` used to be true on every stored row, so `narrowed && !moved` never held, and a narrowed window showed the phantom "moves" sentence instead. Officers now see "The check-in window gets narrower…", and a widening alone saves in one submit, both as §4.6 says.
+  - **Found, NOT fixed** (`tasks.md` has the detail):
+    - 🐛 **An end-only edit still reads like the old bug,** waiting on the officer. It rightly warns, but the `times_moved` sentence renders `formatEventRange(warning.fromStart, warning.fromStart)`, so moving the end 11:30 → 12:00 read "moves from Sun, Aug 2, 10:00 AM to Sun, Aug 2, 10:00 AM". Candidate fix: `fromEnd`/`toEnd` on the variant.
+    - 📌 **`publishSeries` matches a conflict to its draft by `starts_at` string.** It is safe while both sides come from one PostgREST read, and fragile otherwise: a misleading `conflict_race`, with no wrong data. Candidate fix: a `candidateId` on `Conflict`.
+    - ⏭️ **Optional hardening:** a source guard on the select string the stored-row test copies from `saveEvent`.
+    - **Evidence for an open item, not a new one:** a window-only edit's `event.updated` row had 15 keys in `before` and 9 in `after`, without the window columns, so the change left no trace in `after`.
 
 🚀 **`/admin/members` item 3 went live on 2026-10-04: migration 31 at about 15:56 Central, then the code as `65cb0af` at 15:58** (officer: "ship the migration and push to the main site"). The officer saved the phantom "Save anyway" bug the walkthrough found for later.
 
