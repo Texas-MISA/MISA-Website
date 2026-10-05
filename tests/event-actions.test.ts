@@ -4,10 +4,15 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { writeAudit, writeAuditBatch } from "@/app/actions/audit";
 import {
+  centralWallTimeToInstant,
+  deriveCheckinWindow,
   duplicateDraft,
   effectiveWindow,
   expandSeries,
   findWindowConflicts,
+  previewEventEdit,
+  toCentralFields,
+  windowOffsetsOf,
 } from "@/lib/events";
 
 import {
@@ -530,6 +535,75 @@ describe("duplicateDraft against a stored row", () => {
     expect(window.opens.getTime()).toBe(
       new Date(inserted!.starts_at).getTime() - 15 * 60_000
     );
+  });
+});
+
+describe("previewEventEdit against a stored row", () => {
+  it("asks nothing of an edit that moves no time, in PostgREST's own spelling", async () => {
+    // 🪤 Until 2026-10-05 every edit of an existing event came back asking for
+    // "Save anyway": `current` arrives as `…+00:00` and `proposed` as
+    // `….000Z`, and `moved` compared the strings. Only a real round trip
+    // through PostgREST has the first spelling, so this one unchanged edit is
+    // rebuilt exactly as the page and saveEvent build it.
+    const slot = claimSlot();
+    const event = await createTestEvent(db, track, {
+      starts: at(slot, 18),
+      ends: at(slot, 19),
+      status: "published",
+      checkinOpensAt: at(slot, 17.75),
+      checkinClosesAt: at(slot, 19.25),
+    });
+
+    // The column list saveEvent reads `current` with.
+    const { data: current, error } = await db
+      .from("events")
+      .select(
+        "id, title, description, location, starts_at, ends_at, checkin_opens_at, checkin_closes_at, points, category, status, term, updated_at, verify_origin, counts_as_general_meeting"
+      )
+      .eq("id", event.id)
+      .single();
+    expect(error).toBeNull();
+
+    // The edit page fills the form from the row…
+    const fields = toCentralFields(current!.starts_at);
+    const endFields = toCentralFields(current!.ends_at);
+    const offsets = windowOffsetsOf(current!);
+
+    // …and saveEvent turns the untouched form back into `values`.
+    const startsAt = centralWallTimeToInstant(fields.date, fields.time);
+    const endsAt = centralWallTimeToInstant(fields.date, endFields.time);
+    const window = deriveCheckinWindow({
+      startsAt,
+      endsAt,
+      openEarlyMinutes: offsets.openEarlyMinutes,
+      closeLateMinutes: offsets.closeLateMinutes,
+    });
+    const proposed = {
+      points: current!.points,
+      starts_at: startsAt.toISOString(),
+      ends_at: endsAt.toISOString(),
+      checkin_opens_at: window.checkinOpensAt,
+      checkin_closes_at: window.checkinClosesAt,
+    };
+
+    // The premise: the two sides really are spelled differently. If PostgREST
+    // ever wrote `.000Z`, this test would stop proving anything.
+    expect(proposed.starts_at).not.toBe(current!.starts_at);
+    expect(proposed.ends_at).not.toBe(current!.ends_at);
+
+    const { data: newTerm, error: termError } = await db.rpc("term_of", {
+      ts: proposed.starts_at,
+    });
+    expect(termError).toBeNull();
+
+    expect(
+      previewEventEdit({
+        current: current!,
+        proposed,
+        newTerm: newTerm!,
+        presentRows: [],
+      })
+    ).toEqual([]);
   });
 });
 

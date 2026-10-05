@@ -7,6 +7,17 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🐛 **Fixed 2026-10-05 on `portal-launch`, NOT yet on `main` or production: every edit of an existing event asked for "Save anyway".** The item-3 walkthrough found it and the officer saved it for later (two entries below). It had been live since Stage 4 (`ebe3233`, 2026-07-30).
+
+  - **What broke.** `previewEventEdit` decided whether an edit moved the event with a string `!==` on `starts_at` and `ends_at`. `saveEvent` reads `current` through PostgREST, which spells a timestamptz `2026-10-11T23:00:00+00:00`, and builds `proposed` with `toISOString()`, which spells the same instant `2026-10-11T23:00:00.000Z`. The strings never matched, so every edit came back as `needs_confirmation` with a `times_moved` warning naming the same time twice, and the officer had to submit twice. Nothing was lost: the second submit saved what the first had sent.
+  - **Why the suite missed it.** Every `previewEventEdit` fixture in `tests/events.test.ts` spelled both sides `.000Z`, and no test ran the preview on a row read back through PostgREST. A string compare is right only when both sides share a spelling: the trap `withinCheckinWindow` already guards against for the check-in window.
+  - **The fix.** `moved` compares instants through an unexported `sameInstant()` in `lib/events.ts`, for both times. `narrowed` already compared `Date`s and was right all along. A real move of either time still warns, as §4.6 requires. `impactToken`, which keeps the raw `updated_at`, the warning's raw `fromStart`/`toStart` strings and the form are untouched.
+  - **The tests.**
+    - `tests/events.test.ts` gains three cases with `current` spelled `+00:00` and `proposed` spelled `.000Z`. The same instants report nothing, a real move reports exactly `times_moved`, and a move of the end alone still reports it.
+    - `tests/event-actions.test.ts` gains "previewEventEdit against a stored row". It reads a real row with `saveEvent`'s column list and rebuilds an untouched edit with `toCentralFields`, `windowOffsetsOf`, `centralWallTimeToInstant` and `deriveCheckinWindow`. It takes the term from `term_of` and expects no warning. It first asserts that the two spellings really differ, so it cannot pass vacuously.
+    - Against the old `!==`, the first unit case and the integration case both failed with the bug's own warning (`fromStart` `…+00:00`, `toStart` `….000Z`). A fix that compared only `starts_at` fails the end-alone case.
+  - **Checks:** 1,299/1,299 across 41 files, and lint and `tsc` clean.
+
 🚀 **`/admin/members` item 3 went live on 2026-10-04: migration 31 at about 15:56 Central, then the code as `65cb0af` at 15:58** (officer: "ship the migration and push to the main site"). The officer saved the phantom "Save anyway" bug the walkthrough found for later.
 
   - **The pre-check found real types.** Since item 2 went live that morning, officers had typed members: 14 data project, 19 client project, 33 General. Before the push, Fall 2026 read 27 No, 6 Yes and 33 N/A. The No count was driven by 26 unmet September months under the Thursday rule, and by 10 missed project meetings.

@@ -622,6 +622,15 @@ export type PreviewInput = {
 };
 
 /**
+ * Do two timestamp strings name the same instant, however each is spelled? An
+ * unparseable string gives NaN, which equals nothing, so it reads as a move:
+ * the side that warns.
+ */
+function sameInstant(a: string, b: string): boolean {
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
+/**
  * The §4.6 warnings an officer must see before saving an edit.
  *
  * Every one of these edits is *allowed*. None of them revoke anything:
@@ -660,9 +669,15 @@ export function previewEventEdit(input: PreviewInput): EventWarning[] {
   const narrowed =
     proposedWindow.opens > currentWindow.opens ||
     proposedWindow.closes < currentWindow.closes;
+  // Instants, never strings. `current` comes from PostgREST, which spells a
+  // timestamptz `2026-10-11T23:00:00+00:00`; `proposed` comes from
+  // toISOString(), which spells the same instant `2026-10-11T23:00:00.000Z`.
+  // A string `!==` is correct only when both sides happen to share a spelling,
+  // and here they never do: it reported every edit as a move (fixed
+  // 2026-10-05). Same family as withinCheckinWindow.
   const moved =
-    input.proposed.starts_at !== input.current.starts_at ||
-    input.proposed.ends_at !== input.current.ends_at;
+    !sameInstant(input.proposed.starts_at, input.current.starts_at) ||
+    !sameInstant(input.proposed.ends_at, input.current.ends_at);
 
   // Only when the window changed *on its own*. Moving an event forward also
   // moves its window forward, which trips the "narrowed" test — reporting both

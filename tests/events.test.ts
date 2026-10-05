@@ -484,6 +484,71 @@ describe("previewEventEdit", () => {
       membersAffected: 3,
     });
   });
+
+  // 🪤 The two spellings saveEvent really compares. `current` is read through
+  // PostgREST, which writes a timestamptz as `+00:00`; `proposed` is built with
+  // toISOString(), which writes `.000Z`. Every fixture above spells both sides
+  // `.000Z`, which is how a string compare made EVERY edit of an existing
+  // event ask for "Save anyway" with the whole suite green.
+  const stored = {
+    ...current,
+    starts_at: "2026-09-01T23:00:00+00:00",
+    ends_at: "2026-09-02T00:00:00+00:00",
+  };
+
+  it("reports no move when the same instants are spelled two ways", () => {
+    expect(
+      previewEventEdit({
+        current: stored,
+        proposed: {
+          ...current,
+          starts_at: "2026-09-01T23:00:00.000Z",
+          ends_at: "2026-09-02T00:00:00.000Z",
+        },
+        newTerm: "Fall 2026",
+        presentRows,
+      })
+    ).toEqual([]);
+  });
+
+  it("still reports a real move across the two spellings", () => {
+    const warnings = previewEventEdit({
+      current: stored,
+      proposed: {
+        ...current,
+        starts_at: "2026-09-08T23:00:00.000Z",
+        ends_at: "2026-09-09T00:00:00.000Z",
+      },
+      newTerm: "Fall 2026",
+      presentRows,
+    });
+
+    expect(warnings.map((w) => w.kind)).toEqual(["times_moved"]);
+    // The warning still carries both raw strings, as each side spelled it.
+    expect(warnings[0]).toMatchObject({
+      fromStart: "2026-09-01T23:00:00+00:00",
+      toStart: "2026-09-08T23:00:00.000Z",
+      checkinsNowOutside: 3,
+    });
+  });
+
+  it("still reports a move of the end alone across the two spellings", () => {
+    // Same start, an hour later finish. The window only widens, so a move is
+    // the one thing there is to report.
+    const warnings = previewEventEdit({
+      current: stored,
+      proposed: {
+        ...current,
+        starts_at: "2026-09-01T23:00:00.000Z",
+        ends_at: "2026-09-02T01:00:00.000Z",
+      },
+      newTerm: "Fall 2026",
+      presentRows,
+    });
+
+    expect(warnings.map((w) => w.kind)).toEqual(["times_moved"]);
+    expect(warnings[0]).toMatchObject({ checkinsNowOutside: 0 });
+  });
 });
 
 describe("impactToken", () => {
