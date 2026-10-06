@@ -1,10 +1,12 @@
 # Dues & membership status — Venmo reconciliation
 
-📋 **One planned addition, not built:** a way to record a payment that did not
-arrive through Venmo — cash, Zelle, a wrong account. The plan is the *Planned —
-manual dues entry* section below; the short version is that it records a
-**payment row**, never a status flag, and needs one migration to relax four
-columns that assumed Venmo was the only source.
+✅ **Manual dues entry is BUILT on `portal-launch` (2026-10-05) and NOT LIVE.**
+An officer records a payment that did not come through Venmo (Cash, Zelle or
+Other) at `/admin/dues/new`. It writes a **payment row**, never a status flag,
+through migration 32 (`manual_dues_entry`), which is **applied locally and not
+to production**. 🔴 **Migration 32 must reach production before the code that
+reads it**, or every dues screen fails with 42703 on `source`. See the *Manual
+dues entry* section below for what was built and what changed from the plan.
 
 **Status:** ✅ **COMPLETE — all 4 phases.** Phases 1–3 on 2026-08-06 (migration
 19, `lib/dues.ts`, `lib/roster-index.ts`, `app/actions/dues.ts`,
@@ -366,15 +368,58 @@ The detail page reads that member's `dues_payments` rows directly and shows
 what they are paid through — ordered by `termsFrom` semantics, never by a
 string compare.
 
-## 📋 Planned — manual dues entry (NOT BUILT, requested 2026-08-15)
+## ✅ Manual dues entry (BUILT on `portal-launch` 2026-10-05, NOT LIVE; requested 2026-08-15)
 
 A way for an officer to mark a member as having paid when the money did not come
 through the Venmo statement: cash at a meeting, Zelle, a transfer to the wrong
 account, a payment Venmo exported after the officer had already reconciled that
 month.
 
+### What was built (2026-10-05)
+
+Two steps on `portal-launch`, neither on `main`. The plan below is kept as
+written, with its stale facts corrected in place and one decision reversed (the
+correction note under the schema heading).
+
+- **Migration 32 (`manual_dues_entry`).** `venmo_txn_id` and `import_batch_id`
+  become nullable. A new `source` column holds `venmo_import` (the default, so
+  the import is unchanged) or the method an officer picked: `cash`, `zelle` or
+  `other`. `dues_source_matches_provenance` requires an imported row to carry
+  both ids and a manual row to carry neither. 🔓 **`dues_payments_txn_idx`
+  stays a FULL unique index**, and the migration asserts it. `amount_cents > 0`
+  is unchanged, and there is no view change. 🔴 **Applied locally only. It must
+  reach production before the code**, which selects `source` on every dues
+  screen.
+- **The method list (officer, 2026-10-05): Cash, Zelle, Other.** There is no
+  manual Venmo method: a Venmo payment typed in by hand would be counted again
+  when its statement is imported, and the dedupe could not catch it, because
+  the hand-typed row has no transaction id. The form says so and points at
+  *Import a statement*. A note is optional, and **required for Other**; that is
+  a form rule, not a CHECK.
+- **`createPayment`** (`app/actions/dues.ts`) validates with
+  `duesPaymentCreateSchema`. The amount is dollars as typed, converted to whole
+  cents, more than zero and at most $500 (a fat-finger guard). The date and
+  time are Central and may not be in the future, with five minutes of grace.
+  The start term must be one of `startTermOptions(paidAt)`. It makes one insert
+  with both ids null and `start_term` set explicitly, writes one `dues.recorded`
+  audit row, and revalidates the ledger, the payment, the directory and the
+  member's page.
+- **`/admin/dues/new`.** Member, amount, the date and time paid (labelled
+  *Central time*, pre-filled with now), method, start term, terms covered (with
+  the real prices) and note. The start-term options follow the date field
+  through `startTermOptionsForDate`, which offers exactly the set the server
+  accepts. A May–July date shows the summer warning. Entry points: *Record a
+  payment* on `/admin/dues`, and on the member page's Dues section with
+  `?member=` pre-selecting them.
+- **How a payment arrived is shown** on the payment page and in the ledger's
+  and the member page's Payer cell (see the settled question below).
+- **A hand-entered payment always credits a member.** `savePayment` refuses to
+  clear the member on one: a cash payment from nobody has no payer name for the
+  suggestions to rank. Imported rows can still be unlinked.
+
 **The whole plan turns on one sentence: this records a PAYMENT, not a status.**
-It writes a `dues_payments` row, so `member_directory.dues_paid_current_term`
+It writes a `dues_payments` row, so `member_directory.dues_paid_term` (named
+`dues_paid_current_term` when this was written; migration 29 renamed it)
 keeps deriving the answer exactly as it does today and the manual row inherits
 the edit path (`savePayment`), the void path (`voidPayment`), the audit trail
 and the term arithmetic without any of them being touched. **What must not be
@@ -383,11 +428,11 @@ Migration 19 §6 reserves `dues`, `dues_paid` and `dues_paid_current_term` as
 custom-field keys precisely to make that unbuildable, and §4.5's argument is
 unchanged: two answers to one question with nothing to say which is right.
 
-### The schema does not accept a manual row yet — four columns say so
+### The schema did not accept a manual row — four columns said so
 
 Every one of these is a NOT NULL or a CHECK written when Venmo was the only
-source, so this needs **one migration** (next unclaimed number; local and remote
-are at 25):
+source, so this needs **one migration**. It became migration 32; when this was
+written, local and remote were at 25.
 
 > 🔴 **Correction (2026-10-05, built as migration 32): keep the unique index
 > FULL. Item 1's partial index would have broken the import.** A partial unique
@@ -469,6 +514,17 @@ recorded by Priya" and "Venmo txn 4429…" have very different evidentiary weigh
 when a member disputes their status. The argument against is another column on a
 ledger that is already wide. Recommendation: show it on `/admin/dues/[id]` where
 there is room, not in the ledger.
+
+✅ **Settled 2026-10-05 (officer): on the payment page AND in the ledger, with
+no new column.**
+- **The ledger and the member page:** a hand-entered row's Payer cell shows the
+  method (Cash, Zelle or Other) where an imported row shows the payer's name.
+  The label lives once, in `PAYMENT_METHOD_LABELS` in `lib/dues.ts`.
+- **The payment page:** a hand-entered row shows *How it was paid* in place of
+  *From*, the recording officer's note as the note, and *Recorded … CT by* in
+  place of *Imported … CT by*. It hides *EID matched* and *Venmo ID*, which
+  describe a statement row and would only show empty. An imported row renders
+  exactly as before.
 
 ## Consequences to accept, and say out loud
 

@@ -68,9 +68,14 @@ app/admin/login/        officer sign-in — deliberately OUTSIDE the (shell) gro
                         whose layout calls requireOfficer()
 app/admin/(shell)/      authed chrome + dashboard, events/, attendance/, points/,
                         members/ (+ [id], fields/, presets/, import, merge, and
-                        export/route.ts), dues/ (+ [id], import/), officers/;
-                        later audit/. Route groups don't appear in URLs, so §5's
-                        route table is unchanged. members/_components/ holds the
+                        export/route.ts), dues/ (+ [id], import/, new/),
+                        officers/; later audit/. dues/new/ is manual dues entry
+                        (migration 32): page.tsx formats Central "now" and the
+                        prices, and _components/payment-form.tsx is the client
+                        form, whose start terms follow the date field through
+                        startTermOptionsForDate. Route groups don't appear in
+                        URLs, so §5's route table is unchanged.
+                        members/_components/ holds the
                         row's inline cells — member-field-cell.tsx and
                         member-type-cell.tsx (migration 30), both on the ROW'S
                         CAS token and shared with [id], and both saving by
@@ -126,7 +131,10 @@ app/actions/
                         saveFieldDefinition, setFieldArchived. No role check,
                         and it says so (§9 #6)
   dues.ts               previewImport / commitImport (re-parses server-side),
-                        savePayment (one write, CAS) and voidPayment (no CAS)
+                        savePayment (one write, CAS; refuses clearing the member
+                        of a hand-entered payment), voidPayment (no CAS), and
+                        createPayment (manual entry, migration 32: one insert,
+                        both Venmo ids null, one dues.recorded audit row)
   presets.ts            savePreset (create or update, no CAS) and deletePreset —
                         a REAL delete, since nothing is keyed to a preset
   member-import.ts      previewRosterImport / commitRosterImport — create-only,
@@ -251,7 +259,10 @@ lib/
                         export route never reads the cookie
   csv.ts                the one CSV tokenizer — quoted fields may contain newlines
   dues.ts               dues domain core: Venmo parsing, note → EID matching, the
-                        amount → terms rule, and the ONLY place term ordering lives
+                        amount → terms rule, and the ONLY place term ordering lives.
+                        Since migration 32 also PAYMENT_METHODS and their labels,
+                        and the Intl-free civil-date term helpers the manual-entry
+                        form calls in the browser
   roster-index.ts       the uncapped {memberId, normalizedEid, emailLower} index,
                         paged in 1000s, returning a discriminated error
   officer-invites.ts    mintInviteToken, hashInviteToken (only the DIGEST is stored),

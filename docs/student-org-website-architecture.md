@@ -1,8 +1,21 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.84
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and the schema and code are in sync at `…000031` as of 2026-10-04.** ✅ **Migration 30 (member type and project eligibility, v1.83) reached production on 2026-10-03, a day ahead of the code that reads it, which went live on 2026-10-04** as `55cb81e` with v1.82's column picker. Both steps were checked by rendered response. ✅ **Migration 31 (the "Count as general meeting" checkbox and the October 2026 start, v1.84) reached production on 2026-10-04, minutes ahead of its code, which went live the same afternoon as `65cb0af`.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
+**Version:** 1.85
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and production's schema and code are in sync at `…000031` as of 2026-10-04.** 🏗️ **Manual dues entry (v1.85) is built on `portal-launch` and NOT live: migration 32 is applied locally only, and must reach production before its code.** ✅ **Migration 30 (member type and project eligibility, v1.83) reached production on 2026-10-03, a day ahead of the code that reads it, which went live on 2026-10-04** as `55cb81e` with v1.82's column picker. Both steps were checked by rendered response. ✅ **Migration 31 (the "Count as general meeting" checkbox and the October 2026 start, v1.84) reached production on 2026-10-04, minutes ahead of its code, which went live the same afternoon as `65cb0af`.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
 **Last updated:** October 2026
+
+> **v1.85: an officer can record a dues payment that did not come through Venmo: Cash, Zelle or Other.**
+>
+> Built 2026-10-05 on `portal-launch` in two steps (`fa1724e`, then the screens), and **NOT live**. Requested 2026-08-15 (v1.64); the method list and where it shows are officer decisions of 2026-10-05. Full record: `docs/dues-and-membership.md` (*Manual dues entry*) and `docs/build-log.md`.
+>
+> - 📌 **It records a PAYMENT, not a status.** One `dues_payments` row, so `member_directory.dues_paid_term` derives membership from it exactly as from an imported row, and the edit, void and audit paths apply unchanged.
+> - **Migration 32 (`manual_dues_entry`)**: `venmo_txn_id` and `import_batch_id` become nullable, and a `source` column says where the row came from: `venmo_import` (the default) or the method an officer picked, `cash`, `zelle` or `other`. **`dues_source_matches_provenance`** requires an imported row to carry both ids and a manual row neither. `amount_cents > 0` is unchanged, so a comped membership stays out of scope. No view changes.
+> - 🔓 **`dues_payments_txn_idx` stays a FULL unique index. This reverses v1.64**, which said to make it partial. A partial unique index is the `ON CONFLICT` arbiter only when the statement repeats its predicate, and PostgREST's `on_conflict` cannot, so the import's upsert would fail with **42P10** on every statement (measured). NULLs are distinct in a unique index, so manual rows coexist under the full one, and it still spans voided rows. The migration asserts the index is still full.
+> - 📌 **No manual Venmo method** (officer). A hand-typed Venmo payment would be counted again when its statement is imported, and the dedupe could not catch it.
+> - **`/admin/dues/new`** (§5) records one: member, amount, date and time paid (Central), method, start term, terms covered, and a note that is **required for Other**. The start term is checked against `startTermOptions(paidAt)` (§4.7), and the form offers that same set from the date as typed. Entry points: the ledger, and the member page's Dues section.
+> - **Where it shows (officer): the payment page and the ledger, no new column.** The ledger's and the member page's Payer cell show the method; the payment page shows *How it was paid* and *Recorded … by*, and hides the Venmo-only rows.
+> - **A hand-entered payment always credits a member**: `savePayment` refuses to clear it, since there is no payer name for the suggestions to rank.
+> - 🔴 **DEPLOY ORDER: migration 32 BEFORE the code.** The code selects `source` on every dues screen, so without 32 they fail with 42703. The reverse is harmless: older code never names `source`, and its inserts take the default.
 
 > **v1.84: an officer ticks which events count as general meetings, and the monthly requirement starts in October 2026.**
 >
@@ -406,7 +419,9 @@
 > decision rather than a side effect of this one. 🪤 The unique index must
 > become **partial** (`where venmo_txn_id is not null`) rather than dropped — it
 > spans voided rows on purpose, and a synthesised `manual:<uuid>` id would make
-> every reader of that column wrong about what it holds.
+> every reader of that column wrong about what it holds. *(Reversed in v1.85:
+> the index stays FULL. A partial one would have failed the import's upsert
+> with 42P10, and NULLs already coexist under a full unique index.)*
 
 > **v1.63: /about's history row starts level.** Requested 2026-08-15 with a
 > screenshot. One file.
@@ -2605,11 +2620,13 @@ create table point_adjustments (
 -- already a complete concurrency guard: zero rows back means someone voided it
 -- first. The asymmetry with attendance is intentional.
 
--- Dues payments, reconciled from Venmo statement CSVs (§7 Stage 6.5). One row
--- per transaction in the statement. This is the only source of membership
--- status: 4.5's dues_paid_current_term is derived from these rows and nothing
--- else, which is why a hand-ticked "Paid Dues" custom field is forbidden by
--- the reserved-key check below.
+-- Dues payments, reconciled from Venmo statement CSVs (§7 Stage 6.5), or
+-- recorded by hand by an officer for cash, Zelle or another method (migration
+-- 32, v1.85). One row per transaction in a statement, or per payment recorded.
+-- This table is the only source of membership status: 4.5's dues_paid_term
+-- (dues_paid_current_term until migration 29) is derived from these rows and
+-- nothing else, whichever way they arrived, which is why a hand-ticked "Paid
+-- Dues" custom field is forbidden by the reserved-key check below.
 --
 -- Shape is the union of the two patterns already here: editable like
 -- attendance (the parser can attribute a payment wrongly, and correcting that
@@ -2625,7 +2642,18 @@ create table dues_payments (
   -- A fingerprint over (datetime, amount, payer, note) is NOT an acceptable
   -- substitute — two members can send the same amount in the same minute, and
   -- collapsing them silently loses a payment somebody made.
-  venmo_txn_id   text not null,
+  --
+  -- Nullable since migration 32: a payment recorded by hand has no transaction
+  -- id, and is never given a synthesised one. Null exactly when source is not
+  -- venmo_import (dues_source_matches_provenance, below).
+  venmo_txn_id   text,
+  -- Where the row came from: a statement upload, or the method an officer
+  -- picked when recording it by hand (migration 32). There is no manual
+  -- 'venmo': a hand-typed Venmo payment would be counted again when its
+  -- statement is imported. lib/dues.ts PAYMENT_METHODS mirrors the manual three.
+  source         text not null default 'venmo_import'
+                 constraint dues_payments_source_valid
+                 check (source in ('venmo_import','cash','zelle','other')),
   -- Null means the note resolved to no member, or to more than one. Such a row
   -- is stored and queued, never discarded (4.2), and never creates a member.
   --
@@ -2669,8 +2697,10 @@ create table dues_payments (
   covered_terms  text[] generated always as
                  (terms_from(start_term, terms_covered)) stored,
   -- Which uploaded statement this arrived in, so a bad import is reviewable
-  -- and bulk-voidable in one action without a staging table.
-  import_batch_id uuid not null,
+  -- and bulk-voidable in one action without a staging table. Null on a manual
+  -- row, which arrived in no batch (migration 32).
+  import_batch_id uuid,
+  -- On a manual row these mean who recorded it and when; the names are kept.
   imported_by    uuid not null references auth.users(id),
   imported_at    timestamptz not null default now(),
   voided_at      timestamptz,
@@ -2685,12 +2715,26 @@ create table dues_payments (
   constraint dues_void_requires_reason check (
     (voided_at is null) = (void_reason is null)
   ),
+  -- Migration 32. An import carries both its transaction id and its batch, and
+  -- a manual row carries neither: a manual row holding a Venmo id would sit in
+  -- the dedupe index and could make the next import skip the real payment.
+  constraint dues_source_matches_provenance check (
+    (source = 'venmo_import' and venmo_txn_id is not null
+                             and import_batch_id is not null)
+    or
+    (source <> 'venmo_import' and venmo_txn_id is null
+                              and import_batch_id is null)
+  ),
   -- Editable, unlike a point adjustment, so it needs a real CAS token.
   updated_at     timestamptz not null default now()
 );
 
 -- The dedupe. Spans voided rows on purpose: re-importing a statement whose
 -- payment an officer already voided must stay a no-op, not resurrect it.
+-- 🔓 FULL, never partial (migration 32 asserts it). A partial unique index is
+-- the ON CONFLICT arbiter only when the statement repeats its predicate, and
+-- PostgREST's on_conflict cannot, so the import's upsert would fail with 42P10.
+-- NULLs are distinct, so any number of manual rows coexist under it.
 create unique index dues_payments_txn_idx     on dues_payments (venmo_txn_id);
 create index dues_payments_member_idx  on dues_payments (member_id);
 create index dues_payments_covered_idx on dues_payments using gin (covered_terms);
@@ -3395,12 +3439,15 @@ $$;
 /admin/dues/[id]       Payment detail — reassign the member, correct the term
                        or the term count, void it with a reason, and its
                        history                       (Stage 6.5 phase 3)
-/admin/dues/new        Record a payment that did not arrive through Venmo — cash,
-                       Zelle, a transfer to the wrong account. It writes a
-                       dues_payments ROW, not a flag: dues status stays derived,
-                       so this inherits the existing edit and void paths
-                       unchanged. Plan in docs/dues-and-membership.md
-                                                                   (NOT BUILT)
+/admin/dues/new        Record a payment that did not arrive through Venmo — Cash,
+                       Zelle or Other (a note is required for Other). It writes
+                       a dues_payments ROW, not a flag: dues status stays
+                       derived, so this inherits the existing edit and void
+                       paths unchanged. ?member= pre-selects a member, from
+                       their page's Dues section. No Venmo method: a Venmo
+                       payment comes in through /import, and typing it here
+                       too would count it twice
+                       (migration 32, v1.85; built on portal-launch, NOT live)
 /admin/attendance      Review queue — all submissions, filterable by status
 /admin/attendance/new  Officer manual entry — the recovery path for a member the
                        check-in form refused                    (Stage 5 phase 3)
@@ -4144,7 +4191,10 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              it, and the export route never does. Both the
                              header row and every directory-row.tsx map the
                              one resolved column list
-      /dues/...              Stage 6.5 — the ledger, /[id] payment detail, and
+      /dues/...              Stage 6.5 — the ledger, /[id] payment detail,
+                             /new (manual entry, migration 32: a client form
+                             whose start terms follow the date field through
+                             startTermOptionsForDate), and
                              /import. The import is a Server Action, NOT a route
                              handler: a Server Action takes a File in FormData,
                              and only downloads need response headers. Its client
@@ -4198,8 +4248,10 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              check anywhere in it, deliberately (§9 #6)
     dues.ts                  Stage 6.5 — previewImport (parse only, writes
                              nothing), commitImport (re-parses server-side
-                             rather than trusting the preview), and the
-                             corrections: reassign, set terms, void
+                             rather than trusting the preview), the
+                             corrections: reassign, set terms, void, and
+                             createPayment (migration 32: a payment recorded
+                             by hand, one insert, one dues.recorded row)
     presets.ts               Stage 6 phase 7a — savePreset (create or update in
                              one action, no CAS: one full-page form, the same
                              argument saveFieldDefinition makes) and
@@ -4467,7 +4519,13 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              arithmetic. 🪤 Terms do not sort
                              lexicographically: every "which term is later"
                              question goes through termIndex / isLaterTerm
-                             here, never a string compare at a call site
+                             here, never a string compare at a call site.
+                             Migration 32 added PAYMENT_METHODS and their
+                             labels, manualPaymentMemberError, and the
+                             Intl-free civil-date helpers (termOfCivilDate,
+                             startTermOptionsForDate, isSummerCivilDate) that
+                             the manual-entry form calls in the browser; they
+                             share startTermOptions' window by construction
   csv.ts                     the CSV tokenizer, extracted from dues.ts in phase
                              7b when the roster import became its second caller.
                              ONE implementation on purpose: the multi-line
