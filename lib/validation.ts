@@ -440,6 +440,13 @@ export const duesVoidSchema = z.object({
  * year". `civilDate` itself is left alone: the event forms share it.
  */
 const calendarDate = z.string().superRefine((v, ctx) => {
+  const issue = calendarDateIssue(v);
+  if (issue) ctx.addIssue({ code: "custom", message: issue });
+});
+
+/** What is wrong with a date for `calendarDate`, or null when nothing is. One
+ * answer, and the first that applies. */
+function calendarDateIssue(v: string): string | null {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
   if (match) {
     const [y, m, d] = match.slice(1).map(Number);
@@ -449,21 +456,22 @@ const calendarDate = z.string().superRefine((v, ctx) => {
       probe.getUTCMonth() === m - 1 &&
       probe.getUTCDate() === d
     ) {
-      if (y < 2000) ctx.addIssue({ code: "custom", message: "Check the year" });
-      return;
+      return y < 2000 ? "Check the year" : null;
     }
   }
-  ctx.addIssue({ code: "custom", message: "Pick a date" });
-});
+  return "Pick a date";
+}
 
 /** `HH:MM` on a 24-hour clock, with one message whatever is wrong. `civilTime`
  * alone accepts `25:99`. */
 const clockTime = z.string().superRefine((v, ctx) => {
-  const match = /^(\d{2}):(\d{2})$/.exec(v);
-  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) {
-    ctx.addIssue({ code: "custom", message: "Pick a time" });
-  }
+  if (!isClockTime(v)) ctx.addIssue({ code: "custom", message: "Pick a time" });
 });
+
+function isClockTime(v: string): boolean {
+  const match = /^(\d{2}):(\d{2})$/.exec(v);
+  return match !== null && Number(match[1]) <= 23 && Number(match[2]) <= 59;
+}
 
 /**
  * Dollars as typed, to integer cents. Refused rather than clamped at both ends:
@@ -545,47 +553,56 @@ export const duesPaymentCreateSchema = z
           message: "Say how it was paid",
         });
       }
+
+      // The future check lives here, not in the transform below, so it is
+      // reported in the same pass as every other field's error (walkthrough,
+      // 2026-10-05: it used to appear only once everything else was valid). It
+      // runs only on a date and a time that are themselves valid; a malformed
+      // one already has its own message, and only then is the instant real.
+      if (
+        typeof data.paidDate === "string" &&
+        typeof data.paidTime === "string" &&
+        calendarDateIssue(data.paidDate) === null &&
+        isClockTime(data.paidTime)
+      ) {
+        const now = Date.now();
+        const paidAt = centralWallTimeToInstant(data.paidDate, data.paidTime);
+        if (paidAt.getTime() > now + PAID_AT_FUTURE_GRACE_MS) {
+          // Point at the field that is wrong. Both strings are `YYYY-MM-DD`, so
+          // a string compare is a date compare here (this is not a term string).
+          const futureDay = data.paidDate > toCentralFields(new Date(now)).date;
+          ctx.addIssue({
+            code: "custom",
+            path: [futureDay ? "paidDate" : "paidTime"],
+            message: futureDay
+              ? "That date is in the future"
+              : "That time is in the future",
+          });
+        }
+      }
     },
-    // Run even when another field failed, so "Other" with no note is reported
-    // in the same round trip as a bad amount rather than one submit later.
-    // Only `method` and `note` are read, and each holds either its parsed
-    // value or the raw string, so a failure elsewhere cannot fake this one.
-    // The guard is for input that is not an object at all.
+    // Run even when another field failed, so "Other" with no note and a future
+    // date are reported in the same round trip as a bad amount rather than one
+    // submit later. Only `method`, `note`, `paidDate` and `paidTime` are read,
+    // and each holds either its parsed value or the raw string, which the
+    // checks above test before trusting. The guard is for input that is not an
+    // object at all.
     {
       when: (payload) =>
         typeof payload.value === "object" && payload.value !== null,
     }
   )
-  // A pipe, so this runs only once every field above is valid: it needs a
-  // real date, a real time and a parsed amount.
-  .transform((data, ctx) => {
-    const now = Date.now();
-    const paidAt = centralWallTimeToInstant(data.paidDate, data.paidTime);
-
-    if (paidAt.getTime() > now + PAID_AT_FUTURE_GRACE_MS) {
-      // Point at the field that is wrong. Both strings are `YYYY-MM-DD`, so a
-      // string compare is a date compare here (this is not a term string).
-      const futureDay = data.paidDate > toCentralFields(new Date(now)).date;
-      ctx.addIssue({
-        code: "custom",
-        path: [futureDay ? "paidDate" : "paidTime"],
-        message: futureDay
-          ? "That date is in the future"
-          : "That time is in the future",
-      });
-      return z.NEVER;
-    }
-
-    return {
-      memberId: data.memberId,
-      amountCents: data.amount,
-      paidAt,
-      method: data.method,
-      startTerm: data.startTerm,
-      termsCovered: data.termsCovered,
-      note: data.note,
-    };
-  });
+  // A pipe, so this runs only once every field above is valid and nothing
+  // above added an issue: it needs a real date, a real time and a parsed amount.
+  .transform((data) => ({
+    memberId: data.memberId,
+    amountCents: data.amount,
+    paidAt: centralWallTimeToInstant(data.paidDate, data.paidTime),
+    method: data.method,
+    startTerm: data.startTerm,
+    termsCovered: data.termsCovered,
+    note: data.note,
+  }));
 
 export type DuesPaymentCreateFields = z.infer<typeof duesPaymentCreateSchema>;
 

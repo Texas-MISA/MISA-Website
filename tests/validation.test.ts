@@ -759,6 +759,21 @@ describe("duesPaymentCreateSchema", () => {
     ).toEqual([anHourOn.date === today ? "paidTime" : "paidDate"]);
   });
 
+  it("reports a future date in the same pass as another field's error", () => {
+    // Walkthrough, 2026-10-05: the future check used to run only once every
+    // other field was valid, so the officer met it one submit later.
+    const twoDaysOn = centralAt(2 * 86_400_000);
+    expect(
+      failingFields({
+        ...BASE,
+        amount: "forty",
+        method: "other",
+        paidDate: twoDaysOn.date,
+        paidTime: "09:00",
+      })
+    ).toEqual(["amount", "note", "paidDate"]);
+  });
+
   it("allows a time a minute ahead, inside the clock-skew grace", () => {
     const soon = centralAt(60_000);
     expect(

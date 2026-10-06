@@ -19,7 +19,20 @@ import { voidPayment, type PaymentVoidState } from "@/app/actions/dues";
 
 const initial: PaymentVoidState = { status: "idle" };
 
-export function VoidPaymentForm({ id }: { id: string }) {
+// No select here, so the React 19 reset that moved the payment editor's selects
+// (2026-10-05) has nothing to reach: the one field is an uncontrolled textarea
+// whose defaultValue IS the echoed reason, so the reset restores what the
+// officer typed.
+
+export function VoidPaymentForm({
+  id,
+  fromStatement,
+}: {
+  id: string;
+  /** False for a payment recorded by hand (migration 32), which has no
+   * statement to re-import. */
+  fromStatement: boolean;
+}) {
   const [state, formAction, pending] = useActionState(voidPayment, initial);
 
   // Echoed back so React 19's post-action reset doesn't wipe a reason the
@@ -52,7 +65,7 @@ export function VoidPaymentForm({ id }: { id: string }) {
         calculated from live payments, so this member stops counting as official
         for every term this payment covered. It is not a delete — the row stays
         here with this reason and your name against it — and it cannot be undone.
-        Re-importing the statement will not bring it back.
+        {fromStatement && " Re-importing the statement will not bring it back."}
       </p>
 
       <button

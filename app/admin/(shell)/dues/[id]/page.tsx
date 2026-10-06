@@ -399,7 +399,7 @@ export default async function PaymentDetailPage({
           </dl>
         ) : (
           <div className="mt-4">
-            <VoidPaymentForm id={payment.id} />
+            <VoidPaymentForm id={payment.id} fromStatement={method === null} />
           </div>
         )}
       </section>

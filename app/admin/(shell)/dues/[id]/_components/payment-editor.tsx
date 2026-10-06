@@ -5,7 +5,13 @@ import { Banner } from "@/components/ui/banner";
 import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
 import { controlClass } from "@/components/ui/field";
 
-import { useActionState, useState } from "react";
+import {
+  startTransition,
+  useActionState,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   savePayment,
@@ -126,10 +132,60 @@ export function PaymentEditor({
   const set = (patch: Partial<SubmittedPaymentValues>) =>
     setValues((current) => ({ ...current, ...patch }));
 
+  // 🐛 **Being controlled is only half the fix** (browser walkthrough,
+  // 2026-10-05). React 19 reset()s a SUBMITTED `<form action>` once its action
+  // resolves, and reset() puts even a controlled <select> back on its
+  // first-rendered option, because React never sets `defaultSelected` on one.
+  // After a save all three selects showed their first options (another
+  // member, an older term, "Undecided") while state held the saved values, and
+  // a second, untouched Save posted what was on screen: it reassigned the
+  // payment and wrote a dues.assigned row. On an import row the same second
+  // Save would have unlinked the member.
+  //
+  // The fix is the one member-field-cell.tsx and member-type-cell.tsx use,
+  // shaped for a form with a submit button:
+  //   1. onSubmit prevents the default and dispatches the action itself, inside
+  //      startTransition. A dispatched action requests no reset, so nothing
+  //      moves the selects. (React sees the prevented submit and starts its
+  //      host transition with no action, and so no reset.)
+  //   2. A layout effect re-syncs each select's DOM value from state after
+  //      EVERY commit. No dependency list: in the commit that resets, the state
+  //      does not change. It covers any path that still submits, and is cheap.
+  // `action={formAction}` stays, for a submit before hydration: that is a full
+  // page post whose response renders the form fresh, so no reset reaches it.
+  const memberSelect = useRef<HTMLSelectElement>(null);
+  const startTermSelect = useRef<HTMLSelectElement>(null);
+  const termsSelect = useRef<HTMLSelectElement>(null);
+  useLayoutEffect(() => {
+    for (const [select, value] of [
+      [memberSelect.current, values.memberId],
+      [startTermSelect.current, values.startTerm],
+      [termsSelect.current, values.termsCovered],
+    ] as const) {
+      // Only to a value the select offers. Setting one it does not offer
+      // leaves it on nothing, and a select on nothing posts nothing.
+      if (
+        select &&
+        select.value !== value &&
+        Array.from(select.options).some((option) => option.value === value)
+      ) {
+        select.value = value;
+      }
+    }
+  });
+
   const fieldErrors = state.status === "invalid" ? state.fieldErrors : undefined;
 
   return (
-    <form action={formAction} className="max-w-xl border border-misa-border bg-white px-4 py-3">
+    <form
+      action={formAction}
+      onSubmit={(event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        startTransition(() => formAction(formData));
+      }}
+      className="max-w-xl border border-misa-border bg-white px-4 py-3"
+    >
       <input type="hidden" name="id" value={id} />
       <input type="hidden" name="expectedUpdatedAt" value={token} />
 
@@ -139,6 +195,7 @@ export function PaymentEditor({
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-misa-muted">Credit this payment to</span>
           <select
+            ref={memberSelect}
             name="memberId"
             value={values.memberId}
             onChange={(e) => set({ memberId: e.target.value })}
@@ -164,6 +221,7 @@ export function PaymentEditor({
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-misa-muted">Starts covering</span>
           <select
+            ref={startTermSelect}
             name="startTerm"
             value={values.startTerm}
             onChange={(e) => set({ startTerm: e.target.value })}
@@ -182,6 +240,7 @@ export function PaymentEditor({
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-misa-muted">Terms bought</span>
           <select
+            ref={termsSelect}
             name="termsCovered"
             value={values.termsCovered}
             onChange={(e) => set({ termsCovered: e.target.value })}

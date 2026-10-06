@@ -799,8 +799,9 @@ export type PaymentCreateState =
     }
   /** The picked member was deleted between the render and the save. */
   | { status: "stale_member"; values: SubmittedPaymentCreateValues }
-  /** The new payment's id. No redirect: the form decides where to go. */
-  | { status: "done"; id: string };
+  /** The new payment's id, and the terms it covers (null while nobody has
+   * decided how many it bought). No redirect: the form decides where to go. */
+  | { status: "done"; id: string; coveredTerms: string[] | null };
 
 /** Bounds on what is reflected back, not on what is validated (see below). */
 const PAYMENT_CREATE_ECHO_LIMITS = {
@@ -930,7 +931,13 @@ export async function createPayment(
     // The member's own page lists their payments and says whether they are
     // official, so it moves too.
     revalidatePath(`/admin/members/${fields.memberId}`);
-    return { status: "done", id: created.id };
+    return {
+      status: "done",
+      id: created.id,
+      // Read back from the generated column, so the confirmation says what the
+      // row actually covers rather than what the form asked for.
+      coveredTerms: created.covered_terms,
+    };
   } catch (e) {
     console.error(
       "createPayment failed:",

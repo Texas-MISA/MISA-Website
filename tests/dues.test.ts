@@ -827,7 +827,45 @@ describe("the payment editor owns the row's compare-and-set token", () => {
 
   it("has exactly one form posting the row", () => {
     // If a second <form action={…}> appears here, the invariant above is gone.
-    expect(editor.match(/<form action=/g) ?? []).toHaveLength(1);
+    expect(editor.match(/<form\s+action=/g) ?? []).toHaveLength(1);
+  });
+
+  it("🐛 saves by dispatching, so React's form reset never moves its selects", () => {
+    // Browser walkthrough, 2026-10-05. React 19 reset()s a SUBMITTED
+    // `<form action>` once its action resolves, and reset() puts even a
+    // controlled <select> back on its first-rendered option: after a save the
+    // three selects showed another member, an older term and "Undecided", and
+    // a second, untouched Save posted them, reassigning the payment. The fix is
+    // tests/members.test.ts's for the inline cells, shaped for a submit button:
+    // onSubmit prevents the default and dispatches, and a layout effect with
+    // no dependency list puts each select's DOM value back after every commit.
+    //
+    // Matched against COMMENT-STRIPPED source, as tests/members.test.ts does.
+    const code = editor
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+    expect(code).not.toContain("requestSubmit(");
+    expect(code).toMatch(
+      /onSubmit=\{\(event\) => \{\s*event\.preventDefault\(\);\s*const formData = new FormData\(event\.currentTarget\);\s*startTransition\(\(\) => formAction\(formData\)\);\s*\}\}/
+    );
+    // The action stays on the form, for a submit before hydration.
+    expect(code).toMatch(/<form\s+action=\{formAction\}/);
+    // After every commit: a dependency list would skip the commit that resets.
+    expect(code).toMatch(/useLayoutEffect\(\(\) => \{[\s\S]*?select\.value = value;[\s\S]*?\}\);/);
+    expect(code).not.toMatch(/useLayoutEffect\(\(\) => \{[\s\S]*?\}, \[/);
+    for (const ref of ["memberSelect", "startTermSelect", "termsSelect"]) {
+      expect(code).toContain(`ref={${ref}}`);
+    }
+  });
+
+  it("leaves the void form alone: it has no select for the reset to move", () => {
+    // Its one field is an uncontrolled textarea whose defaultValue IS the
+    // echoed reason, so a reset restores what the officer typed.
+    const voidForm = read(
+      "../app/admin/(shell)/dues/[id]/_components/void-payment-form.tsx"
+    );
+    expect(voidForm).not.toContain("<select");
+    expect(voidForm).toContain("defaultValue={value}");
   });
 
   it("🐛 drives every select from state, never defaultValue", () => {

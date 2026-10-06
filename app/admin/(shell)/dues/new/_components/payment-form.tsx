@@ -112,15 +112,31 @@ export function PaymentForm({
     }
   }
 
-  // On `done` the form unmounts, and focus would drop to <body>. It goes to the
-  // confirmation's first action instead, so a keyboard or screen-reader user
-  // lands on what just happened. Focus is DOM work, which is what an effect is
-  // for; nothing here sets state.
+  // Focus, which every answer would otherwise drop to <body>. Effects, because
+  // focus is DOM work; nothing here sets state.
+  //  - On `done` the form unmounts, so focus goes to the confirmation's first
+  //    action, and a keyboard or screen-reader user lands on what happened.
+  //  - Every other answer from the server, and "Record another", remounts the
+  //    fields under a new `generation` key, taking the focused control with
+  //    them. Focus goes to the first field with an error, or else to the first
+  //    field (walkthrough, 2026-10-05).
+  //  - Nothing on first load (`generation` 0): the page does not grab focus.
   const openPayment = useRef<HTMLAnchorElement>(null);
+  const form = useRef<HTMLFormElement>(null);
   const done = state.status === "done" && !dismissed;
   useEffect(() => {
-    if (done) openPayment.current?.focus();
-  }, [done]);
+    if (done) {
+      openPayment.current?.focus();
+      return;
+    }
+    if (generation === 0 || !form.current) return;
+    const target =
+      (state.status === "invalid"
+        ? form.current.querySelector<HTMLElement>('[aria-invalid="true"]')
+        : null) ??
+      form.current.querySelector<HTMLElement>("select, input, textarea");
+    target?.focus();
+  }, [done, generation, state.status]);
 
   function recordAnother() {
     setDismissed(true);
@@ -176,7 +192,14 @@ export function PaymentForm({
 
       {done ? (
         <Banner tone="affirm" as="div">
-          <p>Payment recorded. It counts toward the member&apos;s dues for the terms it covers.</p>
+          {/* What the stored row covers, read back by the action, so a
+              "Decide later" payment is not described as counting. */}
+          <p>
+            Payment recorded.{" "}
+            {state.coveredTerms && state.coveredTerms.length > 0
+              ? `It counts toward the member's dues for ${state.coveredTerms.join(", ")}.`
+              : "It covers nothing until someone decides how many terms it bought."}
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Link
               ref={openPayment}
@@ -223,7 +246,7 @@ export function PaymentForm({
             </Banner>
           ) : null}
 
-          <form action={formAction} className="mt-6">
+          <form ref={form} action={formAction} className="mt-6">
             <div key={generation} className="flex flex-col gap-5">
               <Field label="Member" error={errors.memberId?.[0]}>
                 <Select
