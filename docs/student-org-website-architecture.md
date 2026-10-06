@@ -2307,7 +2307,7 @@ Two already-recorded items that this scenario makes concrete rather than hypothe
 
 **One non-technical limit worth knowing:** Vercel Hobby prohibits commercial use. A student org is fine, and stays fine right up until the site **handles** dues, ticketing, or sponsorship — at which point the constraint is the plan's terms, not any of the numbers above.
 
-**Stage 6.5 walks up to that line without crossing it, and it is worth being precise about why** (v1.34). Recording that a payment arrived is not handling a payment. No card or bank details enter the system, no money moves through it, and there is no checkout: dues are paid in Venmo, and the site reconciles a CSV statement after the fact. The clause bites the day this site takes a payment — a Stripe button, a ticketing flow — not the day it reads a spreadsheet about one. Keep the distinction in mind if in-app payment ever gets proposed (§7 Stage 10 lists it as deliberately out of scope); that proposal is a plan change as much as a feature.
+**Stage 6.5 walks up to that line without crossing it, and it is worth being precise about why** (v1.34). Recording that a payment arrived is not handling a payment. No card or bank details enter the system, no money moves through it, and there is no checkout: dues are paid outside it (Venmo, cash, Zelle), and the site reconciles a Venmo CSV statement, or an officer records a payment by hand (v1.85), after the fact. The clause bites the day this site takes a payment — a Stripe button, a ticketing flow — not the day it reads a spreadsheet about one. Keep the distinction in mind if in-app payment ever gets proposed (§7 Stage 10 lists it as deliberately out of scope); that proposal is a plan change as much as a feature.
 
 ### 2.6 Function region
 
