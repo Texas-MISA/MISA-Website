@@ -7,6 +7,20 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🚀 **The "Save anyway" fix went live on 2026-10-05, as `6e50104`, at about 21:04 Central** (officer: "yes, deploy it", after reviewing `6e50104`). No migration was involved.
+
+  - **The gate.**
+    - Production's database clock read 21:01 Central, and `open_event_at(now())` was null. The next window is Family Feud, Thursday 10/8 at 17:45.
+    - `migration list --linked` showed every migration through `…000031` with `local` = `remote`, and nothing pending.
+    - The live deployment was `dpl_A5ZTvqbPqYmPMyHHHJctqEzKHQWu`, created at 01:49 Central the same day. It is taken to be `30b8764`, the verdict pills: it was the day's only production deployment and held the `git-main` alias. `vercel inspect` shows no SHA, though, so the link is inferred.
+  - **The push.** `main` fast-forwarded `30b8764..6e50104`, confirmed with `git ls-remote`. That range is the fix (`5827860`), two records commits (`8f8d09f`, `1f1bbf5`), and the merge `6e50104`, which had brought `30b8764` into the branch.
+  - **The deploy.** `dpl_HoL7CJzgRe62A6HMJQGQPqimWhVW` was Ready at about 21:04 after a 43 s build. `vercel inspect www.txmisa.org` names it, and all three production aliases point to it.
+  - **Checked by rendered response.**
+    - Eleven pages answered 200, with exactly one `<h1>` each and no error strings: `/`, `/about`, `/officers`, `/gallery`, `/contact`, `/projects`, `/portal`, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` and `/admin/login`.
+    - `/admin/events` answered 307 to `/admin/login?next=%2Fadmin%2Fevents`.
+  - ⬜ **Not exercised on production.** The fix sits behind an officer sign-in, and editing a real event writes a real audit row, so it is left to the officer.
+  - **Rollback:** Vercel Instant Rollback to `dpl_A5ZTvqbPqYmPMyHHHJctqEzKHQWu`. There is no schema change. For a code rollback, revert `5827860` on `main`.
+
 🐛 **Fixed 2026-10-05 on `portal-launch`, NOT yet on `main` or production: every edit of an existing event asked for "Save anyway".** The item-3 walkthrough found it and the officer saved it for later (two entries below). It had been live since Stage 4 (`ebe3233`, 2026-07-30).
 
   - **What broke.** `previewEventEdit` decided whether an edit moved the event with a string `!==` on `starts_at` and `ends_at`. `saveEvent` reads `current` through PostgREST, which spells a timestamptz `2026-10-11T23:00:00+00:00`, and builds `proposed` with `toISOString()`, which spells the same instant `2026-10-11T23:00:00.000Z`. The strings never matched, so every edit came back as `needs_confirmation` with a `times_moved` warning naming the same time twice, and the officer had to submit twice. Nothing was lost: the second submit saved what the first had sent.
