@@ -17,7 +17,7 @@ import {
 } from "@/lib/dues";
 import { formatInstant } from "@/lib/events";
 import { ReadError } from "@/app/admin/(shell)/_components/notice";
-import { fetchMemberOptions } from "@/lib/member-options";
+import { fetchMemberOptions, includeMemberOption } from "@/lib/member-options";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 import { PageHeader, SectionHeading } from "@/components/ui/page-header";
@@ -178,6 +178,19 @@ export default async function PaymentDetailPage({
   // Derived from the payment date by the same rule the database uses (§4.7) —
   // never a typed term string, here or in the picker's options.
   const derivedTerm = termOf(paidAt);
+
+  // The editor's member picker. An imported payment keeps "Nobody yet" and
+  // the plain roster list, exactly as before. A payment recorded by hand gets
+  // no "Nobody yet" (savePayment refuses to unlink it), so its credited member
+  // must be in the list: the select is controlled, and a value matching no
+  // option would show, and on the next save post, the first member listed.
+  // The empty option also stays on a hand-entered row that somehow credits
+  // nobody, for the same reason.
+  const allowUnassign = method === null || payment.member_id === null;
+  const memberOptions = members.kind === "ok" ? members.options : [];
+  const editorMembers = allowUnassign
+    ? memberOptions
+    : includeMemberOption(memberOptions, payment.members);
 
   return (
     <div>
@@ -352,7 +365,8 @@ export default async function PaymentDetailPage({
               <PaymentEditor
                 id={payment.id}
                 updatedAt={payment.updated_at}
-                members={members.kind === "ok" ? members.options : []}
+                members={editorMembers}
+                allowUnassign={allowUnassign}
                 memberId={payment.member_id}
                 startTerm={payment.start_term}
                 termsCovered={payment.terms_covered}

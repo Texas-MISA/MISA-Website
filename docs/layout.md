@@ -69,13 +69,13 @@ app/admin/login/        officer sign-in — deliberately OUTSIDE the (shell) gro
 app/admin/(shell)/      authed chrome + dashboard, events/, attendance/, points/,
                         members/ (+ [id], fields/, presets/, import, merge, and
                         export/route.ts), dues/ (+ [id], import/, new/),
-                        officers/; later audit/. dues/new/ is manual dues entry
-                        (migration 32): page.tsx formats Central "now" and the
-                        prices, and _components/payment-form.tsx is the client
-                        form, whose start terms follow the date field through
-                        startTermOptionsForDate. Route groups don't appear in
+                        officers/; later audit/. Route groups don't appear in
                         URLs, so §5's route table is unchanged.
-                        members/_components/ holds the
+                        dues/new/ is manual dues entry (migration 32): page.tsx
+                        formats Central "now" and the prices, and
+                        _components/payment-form.tsx is the client form, whose
+                        start terms follow the date field through
+                        startTermOptionsForDate. members/_components/ holds the
                         row's inline cells — member-field-cell.tsx and
                         member-type-cell.tsx (migration 30), both on the ROW'S
                         CAS token and shared with [id], and both saving by

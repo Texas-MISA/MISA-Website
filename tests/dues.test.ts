@@ -37,6 +37,7 @@ import {
   type RosterEntry,
 } from "@/lib/dues";
 import { centralWallTimeToInstant } from "@/lib/events";
+import { includeMemberOption, toMemberOption } from "@/lib/member-options";
 
 // Pure tests for the dues core (§7 Stage 6.5 phase 1). No database and no
 // clock — the parser takes text and the matcher takes a roster.
@@ -848,6 +849,71 @@ describe("the payment editor owns the row's compare-and-set token", () => {
     // tests/members.test.ts did.
     expect(editor).not.toMatch(/defaultValue=\{/);
     expect(editor.match(/value=\{values\./g) ?? []).toHaveLength(3);
+  });
+});
+
+describe("the payment editor on a payment recorded by hand (migration 32)", () => {
+  const editor = read(
+    "../app/admin/(shell)/dues/[id]/_components/payment-editor.tsx"
+  );
+  const page = read("../app/admin/(shell)/dues/[id]/page.tsx");
+
+  it("offers 'Nobody yet' only when the page allows unassigning", () => {
+    // savePayment refuses to unlink a hand-entered payment, so offering the
+    // option there would only produce a refusal.
+    expect(editor).toMatch(
+      /\{allowUnassign && \(\s*<option value="">Nobody yet — leave it in the queue<\/option>\s*\)\}/
+    );
+    // And nowhere else unconditionally. (The terms picker's "Undecided" is the
+    // other empty option, and stays: that one is the review axis.)
+    expect(
+      editor.match(/Nobody yet — leave it in the queue/g) ?? []
+    ).toHaveLength(1);
+  });
+
+  it("allows it on an import row, and keeps an import row's list as it was", () => {
+    // `method` is null exactly for an imported payment. A hand-entered row
+    // that somehow credits nobody keeps the empty option too, so the
+    // controlled select never shows a member the row does not hold.
+    expect(page).toContain(
+      "const allowUnassign = method === null || payment.member_id === null;"
+    );
+    expect(page).toMatch(
+      /const editorMembers = allowUnassign\s*\?\s*memberOptions\s*:\s*includeMemberOption\(memberOptions, payment\.members\);/
+    );
+    expect(page).toContain("members={editorMembers}");
+    expect(page).toContain("allowUnassign={allowUnassign}");
+  });
+});
+
+describe("includeMemberOption", () => {
+  const options = [
+    toMemberOption({ id: "a", full_name: "Test Person", eid: "tp1111" }),
+    toMemberOption({ id: "b", full_name: "Fake Member", eid: "fm2222" }),
+  ];
+
+  it("uses the one label format every picker shows", () => {
+    expect(options[0]).toEqual({ id: "a", label: "Test Person (tp1111)" });
+  });
+
+  it("prepends a credited member the list is missing", () => {
+    // The select is controlled: a value matching no option would show, and on
+    // the next save post, the first member listed. With no "Nobody yet" on a
+    // hand-entered payment, that is somebody else, and a terms-only save would
+    // silently reassign the payment.
+    const credited = { id: "z", full_name: "Past Limit", eid: "pl9999" };
+    expect(includeMemberOption(options, credited)).toEqual([
+      { id: "z", label: "Past Limit (pl9999)" },
+      ...options,
+    ]);
+  });
+
+  it("leaves the list alone when the member is already in it, or there is none", () => {
+    expect(
+      includeMemberOption(options, { id: "b", full_name: "Fake Member", eid: "fm2222" })
+    ).toBe(options);
+    expect(includeMemberOption(options, null)).toBe(options);
+    expect(includeMemberOption([], null)).toEqual([]);
   });
 });
 

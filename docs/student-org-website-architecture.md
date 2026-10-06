@@ -2245,7 +2245,7 @@ Spreadsheet-based tracking breaks down at three points: manual event-to-timestam
 Scoping these out keeps v1 shippable. They are candidates for later stages, not omissions:
 
 - Member accounts with passwords
-- **Payment *processing* for dues** — no card details, no bank details, and no money moving through this system at any point. Dues are paid in Venmo and the site *reconciles* what arrived (§7 Stage 6.5, v1.34). The distinction is load-bearing in two other places: §2.2's Vercel Hobby commercial-use clause, and §6's threat-model boundary.
+- **Payment *processing* for dues** — no card details, no bank details, and no money moving through this system at any point. Dues are paid outside the system (Venmo, cash, Zelle) and the site *records* what arrived: Venmo statements are reconciled (§7 Stage 6.5, v1.34), and anything else is recorded by hand (v1.85). The distinction is load-bearing in two other places: §2.2's Vercel Hobby commercial-use clause, and §6's threat-model boundary.
 - Email/SMS notifications
 - Native mobile app
 - Public-facing officer directory or blog/CMS

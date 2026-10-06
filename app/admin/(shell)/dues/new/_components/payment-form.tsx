@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import {
   createPayment,
@@ -87,7 +87,10 @@ export function PaymentForm({
 
   // Reset-during-render on every answer from the server, matching
   // grant-form.tsx, so no stale frame paints. The echo wins: it is what the
-  // officer submitted, and the fields are about to remount with it.
+  // officer submitted, and the fields are about to remount with it. An answer
+  // with no echo (`unauthorized`, `done`) remounts the fields from `fresh`, so
+  // the tracked state goes back to `fresh` too, or the start-term options and
+  // the note's label would describe values the inputs no longer hold.
   const [seenState, setSeenState] = useState(state);
   if (state !== seenState) {
     setSeenState(state);
@@ -102,8 +105,22 @@ export function PaymentForm({
           ? echoed.startTerm
           : null
       );
+    } else {
+      setDate(fresh.paidDate);
+      setMethod(fresh.method);
+      setTermChoice(null);
     }
   }
+
+  // On `done` the form unmounts, and focus would drop to <body>. It goes to the
+  // confirmation's first action instead, so a keyboard or screen-reader user
+  // lands on what just happened. Focus is DOM work, which is what an effect is
+  // for; nothing here sets state.
+  const openPayment = useRef<HTMLAnchorElement>(null);
+  const done = state.status === "done" && !dismissed;
+  useEffect(() => {
+    if (done) openPayment.current?.focus();
+  }, [done]);
 
   function recordAnother() {
     setDismissed(true);
@@ -113,7 +130,6 @@ export function PaymentForm({
     setTermChoice(null);
   }
 
-  const done = state.status === "done" && !dismissed;
   const values = "values" in state ? state.values : fresh;
   const errors = state.status === "invalid" ? state.fieldErrors : {};
 
@@ -131,9 +147,10 @@ export function PaymentForm({
   // holding its text is missed by screen readers (CLAUDE.md, "Accessible
   // controls"). The visible banners below carry no role, so nothing is said
   // twice.
-  const announcement =
+  const invalidCount = Object.keys(errors).length;
+  const message =
     state.status === "invalid"
-      ? "Nothing was recorded. Check the fields marked below."
+      ? `Nothing was recorded. ${invalidCount} field${invalidCount === 1 ? " needs" : "s need"} attention.`
       : done
         ? "Payment recorded."
         : state.status === "stale_member"
@@ -143,10 +160,17 @@ export function PaymentForm({
             : state.status === "unauthorized"
               ? SIGNED_OUT
               : "";
+  // 🪤 A live region speaks only when its text CHANGES, so two identical
+  // invalid submits in a row would be announced once. A trailing no-break
+  // space, flipped on every answer from the server, makes each answer a change
+  // without altering what is read. The region itself is never re-keyed: a
+  // remounted region is a new one, and that is the miss described above.
+  const announcement =
+    message && generation % 2 === 1 ? `${message}\u00a0` : message;
 
   return (
     <div className="max-w-2xl">
-      <p role="status" className="sr-only">
+      <p role="status" aria-atomic="true" className="sr-only">
         {announcement}
       </p>
 
@@ -154,7 +178,11 @@ export function PaymentForm({
         <Banner tone="affirm" as="div">
           <p>Payment recorded. It counts toward the member&apos;s dues for the terms it covers.</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <Link href={`/admin/dues/${state.id}`} className={BUTTON_PRIMARY_SM}>
+            <Link
+              ref={openPayment}
+              href={`/admin/dues/${state.id}`}
+              className={BUTTON_PRIMARY_SM}
+            >
               Open the payment
             </Link>
             <button

@@ -44,11 +44,19 @@ export function PaymentEditor({
   termsCovered,
   termOptions,
   derivedTerm,
+  allowUnassign,
 }: {
   id: string;
   /** The row's CAS token, as the raw PostgREST string. */
   updatedAt: string;
   members: MemberOption[];
+  /**
+   * Whether "Nobody yet" is offered. True for an imported payment, whose payer
+   * may have named the wrong EID. False for one recorded by hand, which
+   * savePayment refuses to unlink (migration 32), and whose page therefore
+   * guarantees the credited member is in `members`.
+   */
+  allowUnassign: boolean;
   memberId: string | null;
   startTerm: string;
   termsCovered: number | null;
@@ -136,10 +144,14 @@ export function PaymentEditor({
             onChange={(e) => set({ memberId: e.target.value })}
             className={selectClass}
           >
-            {/* Clearing the member is legitimate and has to be reachable: a
-                payer who wrote someone else's EID credits the wrong person, and
-                the correction is to unlink it and put it back in the queue. */}
-            <option value="">Nobody yet — leave it in the queue</option>
+            {/* Clearing the member is legitimate and has to be reachable on an
+                imported payment: a payer who wrote someone else's EID credits
+                the wrong person, and the correction is to unlink it and put it
+                back in the queue. Not on a payment recorded by hand, which
+                always credits somebody. */}
+            {allowUnassign && (
+              <option value="">Nobody yet — leave it in the queue</option>
+            )}
             {members.map((member) => (
               <option key={member.id} value={member.id}>
                 {member.label}

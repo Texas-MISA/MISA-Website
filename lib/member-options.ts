@@ -73,13 +73,37 @@ export async function fetchMemberOptions(
     return { kind: "error" };
   }
 
-  return {
-    kind: "ok",
-    options: data.map((member) => ({
-      id: member.id,
-      label: `${member.full_name} (${member.eid})`,
-    })),
-  };
+  return { kind: "ok", options: data.map(toMemberOption) };
+}
+
+/** One picker option, in the one label format every member picker shows. */
+export function toMemberOption(member: {
+  id: string;
+  full_name: string;
+  eid: string;
+}): MemberOption {
+  return { id: member.id, label: `${member.full_name} (${member.eid})` };
+}
+
+/**
+ * `options`, with `member` guaranteed to be among them: prepended if missing,
+ * and the list returned untouched otherwise.
+ *
+ * ⚠️ For a CONTROLLED `<select>` whose current value has to be offered. A value
+ * matching no option makes the browser show the first enabled option instead,
+ * and the next save posts it. The payment editor needs this on a payment
+ * recorded by hand, which has no "nobody" option to fall back to: a credited
+ * member past `MEMBER_SCAN_LIMIT` would otherwise be silently swapped for the
+ * first name on the roster by a save that only meant to change the terms.
+ */
+export function includeMemberOption(
+  options: MemberOption[],
+  member: { id: string; full_name: string; eid: string } | null
+): MemberOption[] {
+  if (member === null || options.some((option) => option.id === member.id)) {
+    return options;
+  }
+  return [toMemberOption(member), ...options];
 }
 
 /**
