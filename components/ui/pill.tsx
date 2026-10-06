@@ -10,6 +10,11 @@
 // 📌 The tones come off the status tokens now, not from raw Tailwind
 // `green-900` / `amber-900` / `black/30`.
 //
+// 📌 `fill` is an opt-in solid variant (officer, 2026-10-05): a saturated status
+// background with white text, used for the pass/fail verdicts in /admin
+// (eligibility Yes/No, month Met/Not met, meeting Attended/Missed). The default
+// stays the muted outline — only those marks ask for the louder treatment.
+//
 // 🪤 `status` is typed as a bare `string` in the callers that map one, and that
 // is deliberate: the attendance column is `text` with a CHECK constraint, and a
 // value this component has never heard of must render as ITSELF rather than
@@ -35,6 +40,17 @@ const TONES = {
 
 export type PillTone = keyof typeof TONES;
 
+// The solid counterpart to the three feedback tones, selected by `fill`. Mirrors
+// the destructive button's hover state (button.tsx), which is already
+// bg-misa-critical + text-white. White on these tokens is ≥4.5:1, since each is
+// ≥4.5:1 on white and contrast is symmetric. A tone with no entry here (neutral,
+// info, onNavy) falls back to its outline, so `fill` is always safe.
+const FILLED_TONES: Partial<Record<PillTone, string>> = {
+  affirm: "border-misa-affirm bg-misa-affirm text-white",
+  caution: "border-misa-caution bg-misa-caution text-white",
+  critical: "border-misa-critical bg-misa-critical text-white",
+};
+
 /**
  * The two documented small-uppercase steps, and no third.
  *
@@ -56,6 +72,9 @@ export type PillProps = {
   children: ReactNode;
   tone?: PillTone;
   size?: PillSize;
+  /** Solid status fill with white text, for the pass/fail verdicts. See
+   * FILLED_TONES — a tone with no filled counterpart stays its outline. */
+  fill?: boolean;
   className?: string;
   title?: string;
 };
@@ -64,13 +83,15 @@ export function Pill({
   children,
   tone = "neutral",
   size = "md",
+  fill = false,
   className = "",
   title,
 }: PillProps) {
+  const toneClasses = (fill && FILLED_TONES[tone]) || TONES[tone];
   return (
     <span
       title={title}
-      className={`inline-flex items-center border leading-none whitespace-nowrap uppercase ${TONES[tone]} ${SIZES[size]} ${className}`.trim()}
+      className={`inline-flex items-center border leading-none whitespace-nowrap uppercase ${toneClasses} ${SIZES[size]} ${className}`.trim()}
     >
       {children}
     </span>

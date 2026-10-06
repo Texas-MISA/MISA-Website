@@ -6,6 +6,16 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## ☑️ Pass/fail verdict pills are solid-filled (officer, 2026-10-05) — ✅ LIVE on `main` 2026-10-05
+
+The project-eligibility **Yes/No** mark, and the member page's **Met/Not met** (months) and **Attended/Missed** (project meetings) marks, now render as a **solid green/red box with white text** instead of the faint 45%-opacity outline they shared. The officer asked for a filled box, not the muted outline — "there isn't much color"; previewed against the exact tokens and approved before shipping. No schema, no migration, no route: a presentational change to one shared primitive plus three call sites.
+
+- **`components/ui/pill.tsx`** gains an opt-in `fill` prop. When set, the three *feedback* tones (`affirm`, `caution`, `critical`) render `bg-misa-* text-white` with a matching border; every other tone, and every pill that does not pass `fill`, is unchanged. Mirrors the destructive button's existing `bg-misa-critical + text-white` hover (`components/ui/button.tsx`). White on these tokens is ≥4.5:1 by the same measurement `DESIGN.md` makes for the tokens *on* white — contrast is symmetric — so AA holds.
+- **The three marks pass `fill` on their pass/fail branches only:** `EligibilityMark` (yes/no) in `app/admin/(shell)/members/_components/eligibility-mark.tsx`, and `MonthResultMark` (met/not_met) + `MeetingResultMark` (attended/missed) in `app/admin/(shell)/members/[id]/page.tsx`. N/A, In progress, Upcoming and the em-dash empty state stay muted — they are not pass/fail. `EligibilityMark` also drives the directory table's Eligibility column, so that fills too.
+- **Docs:** `DESIGN.md` records `fill` as a deliberate louder exception to the outline-only status rule, scoped to pass/fail verdicts in `/admin`. Architecture doc not bumped: no behaviour, schema or § changed.
+- **Verification:** `tsc --noEmit` and `eslint` clean. The Vitest suite needs the local Supabase stack (Docker), unavailable this session; the change is presentational and no test imports the touched files, so none is affected. Approved via a browser preview of the exact `--misa-*` tokens and Pill markup.
+- **Rollback:** Vercel Instant Rollback to the deployment that served `8500700` (the prior `main` HEAD). A code revert is a one-commit revert of the deploy commit — no data, no migration.
+
 ## ☑️ General meetings by checkbox, counted from October (officer, 2026-10-04) — ✅ LIVE on `main` since 2026-10-04 (`65cb0af`); migration 31 went first, minutes earlier
 
 `/admin/members` item 3. Every event gains a **"Count as general meeting"** checkbox, which replaces item 2's temporary Thursday rule. The monthly general-meeting requirement for data-project and client-project members now counts only ticked events, and only from **October 2026**. Project meetings are unchanged and are never cut off. Full record: doc v1.84 (§4.5 has the exact rule) and [`docs/build-log.md`](docs/build-log.md).

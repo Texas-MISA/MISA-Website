@@ -624,6 +624,14 @@ half is worth anything.**
   `text-[11px]` and `text-[0.7rem]` — 11px and 11.2px, two sizes reading as one
   — and the member page's three-state attendance mark at three different
   treatments.
+- ⚠️ **`Pill`'s `fill` prop is a deliberate louder exception** (officer,
+  2026-10-05): a solid `affirm`/`critical` background with white text, used only
+  for the pass/fail verdicts in `/admin` (eligibility Yes/No, month Met/Not met,
+  meeting Attended/Missed) — the officer asked for a filled box, not the muted
+  outline. Everywhere else the status tokens stay outline-only ("feedback,
+  desaturated, not signal lights"). White on these tokens is ≥4.5:1 by the same
+  measurement as the tokens on white. Don't spread `fill` to decorative or
+  category uses.
 - 🪤 **`Banner` takes `as="div"` when it carries block content.** A `<p>` cannot
   contain a `<p>` or a `<ul>`: the parser closes the outer one at the child's
   start tag, so the ground and frame end early and the rest renders bare. That

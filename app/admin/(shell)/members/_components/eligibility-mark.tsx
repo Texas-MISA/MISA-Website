@@ -20,10 +20,10 @@ export function EligibilityMark({ value }: { value: string | null }) {
     return <span className="text-misa-muted">—</span>;
   }
   if (value === "yes") {
-    return <Pill tone="affirm">{formatProjectEligibility(value)}</Pill>;
+    return <Pill tone="affirm" fill>{formatProjectEligibility(value)}</Pill>;
   }
   if (value === "no") {
-    return <Pill tone="critical">{formatProjectEligibility(value)}</Pill>;
+    return <Pill tone="critical" fill>{formatProjectEligibility(value)}</Pill>;
   }
   if (value === "not_applicable") {
     // Muted text, not a pill: N/A is not a fact about how the member is doing,
