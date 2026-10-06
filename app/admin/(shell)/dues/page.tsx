@@ -1,4 +1,4 @@
-import { BUTTON_PRIMARY_SM } from "@/components/ui/button";
+import { BUTTON_PRIMARY_SM, BUTTON_QUIET_SM } from "@/components/ui/button";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -6,6 +6,7 @@ import { requireOfficer } from "@/lib/auth";
 import {
   formatCents,
   isLaterTerm,
+  paymentMethodLabel,
   paymentReviewState,
   termIndex,
 } from "@/lib/dues";
@@ -22,8 +23,9 @@ import { DuesFilters } from "./_components/dues-filters";
 import { DuesTable, type DuesLedgerRow } from "./_components/dues-table";
 
 // The dues ledger (§4.1, §7 Stage 6.5 phase 3). Every payment the import has
-// ever recorded, and — the part that makes this screen worth building — the
-// handful the parser could not resolve.
+// ever recorded, every payment an officer recorded by hand (migration 32), and
+// — the part that makes this screen worth building — the handful the parser
+// could not resolve.
 //
 // The import deliberately decides as little as possible: a note naming nobody,
 // a note naming two members, and an amount matching neither configured price all
@@ -51,7 +53,7 @@ const TERM_SCAN_LIMIT = 1000;
  * string literal, so a concatenation widens it to plain `string` and collapses
  * every field access at once — this has bitten twice already. */
 const LEDGER_COLUMNS =
-  "id, paid_at, amount_cents, note, payer_name, member_id, start_term, terms_covered, covered_terms, voided_at, members(id, full_name)" as const;
+  "id, source, paid_at, amount_cents, note, payer_name, member_id, start_term, terms_covered, covered_terms, voided_at, members(id, full_name)" as const;
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -71,6 +73,7 @@ const REVIEW_OR = "member_id.is.null,terms_covered.is.null" as const;
 
 type RawPayment = {
   id: string;
+  source: string;
   paid_at: string;
   amount_cents: number;
   note: string | null;
@@ -151,6 +154,9 @@ async function fetchLedger(
       paidLabel: formatInstant(row.paid_at),
       amountLabel: formatCents(row.amount_cents),
       payerName: row.payer_name,
+      // Null for an imported payment; "Cash", "Zelle" or "Other" for one an
+      // officer recorded by hand, which has no Venmo payer to name.
+      method: paymentMethodLabel(row.source),
       note: row.note,
       memberId: row.member_id,
       memberName: row.members?.full_name ?? null,
@@ -321,11 +327,16 @@ export default async function AdminDuesPage({
       <PageHeader
         title="Dues"
         action={
-          <Link href="/admin/dues/import" className={BUTTON_PRIMARY_SM}>
-            Import a statement
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/admin/dues/import" className={BUTTON_PRIMARY_SM}>
+              Import a statement
+            </Link>
+            <Link href="/admin/dues/new" className={BUTTON_QUIET_SM}>
+              Record a payment
+            </Link>
+          </div>
         }
-        description="Every payment reconciled from a Venmo statement. A member counts as official for a term when a live payment covers it — nothing here is ticked by hand, and voiding a payment takes that status away again."
+        description="Every payment, whether reconciled from a Venmo statement or recorded by hand for cash, Zelle or another method. A member counts as official for a term when a live payment covers it. No status here is ticked by hand, and voiding a payment takes that status away again."
       />
 
       {/* The number an officer acts on, so it sits in the header rather than

@@ -433,24 +433,37 @@ export const duesVoidSchema = z.object({
  * catches a mistyped year such as `0226`, which would otherwise derive a term
  * like `Spring 226` that no term picker can offer, so the officer would see a
  * term error for a date mistake.
+ *
+ * 🪤 One check that stops at the first failure, not `civilDate` plus two
+ * `.refine()`s. In zod 4 a failed `.regex()` does not stop the refinements after
+ * it, so an empty date came back as "Pick a date", "Pick a date", "Check the
+ * year". `civilDate` itself is left alone: the event forms share it.
  */
-const calendarDate = civilDate
-  .refine((v) => {
-    const [y, m, d] = v.split("-").map(Number);
+const calendarDate = z.string().superRefine((v, ctx) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  if (match) {
+    const [y, m, d] = match.slice(1).map(Number);
     const probe = new Date(Date.UTC(y, m - 1, d));
-    return (
+    if (
       probe.getUTCFullYear() === y &&
       probe.getUTCMonth() === m - 1 &&
       probe.getUTCDate() === d
-    );
-  }, "Pick a date")
-  .refine((v) => Number(v.slice(0, 4)) >= 2000, "Check the year");
+    ) {
+      if (y < 2000) ctx.addIssue({ code: "custom", message: "Check the year" });
+      return;
+    }
+  }
+  ctx.addIssue({ code: "custom", message: "Pick a date" });
+});
 
-/** `HH:MM` on a 24-hour clock. `civilTime` alone accepts `25:99`. */
-const clockTime = civilTime.refine((v) => {
-  const [h, m] = v.split(":").map(Number);
-  return h <= 23 && m <= 59;
-}, "Pick a time");
+/** `HH:MM` on a 24-hour clock, with one message whatever is wrong. `civilTime`
+ * alone accepts `25:99`. */
+const clockTime = z.string().superRefine((v, ctx) => {
+  const match = /^(\d{2}):(\d{2})$/.exec(v);
+  if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) {
+    ctx.addIssue({ code: "custom", message: "Pick a time" });
+  }
+});
 
 /**
  * Dollars as typed, to integer cents. Refused rather than clamped at both ends:

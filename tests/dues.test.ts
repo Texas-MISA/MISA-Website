@@ -4,10 +4,19 @@ import { describe, expect, it } from "vitest";
 
 import type { MemberCandidate } from "@/lib/attendance";
 import {
+  IMPORTED_SOURCE,
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
   foldEid,
   formatCents,
   isLaterTerm,
+  isSummerCivilDate,
+  isSummerTerm,
+  manualPaymentMemberError,
   matchNote,
+  paymentMethodLabel,
+  startTermOptionsForDate,
+  termOfCivilDate,
   nextTerm,
   noteTokens,
   paidThroughTerm,
@@ -27,6 +36,7 @@ import {
   type DuesPrices,
   type RosterEntry,
 } from "@/lib/dues";
+import { centralWallTimeToInstant } from "@/lib/events";
 
 // Pure tests for the dues core (§7 Stage 6.5 phase 1). No database and no
 // clock — the parser takes text and the matcher takes a roster.
@@ -617,6 +627,95 @@ describe("startTermOptions", () => {
   });
 });
 
+describe("the civil-date term helpers (manual entry, migration 32)", () => {
+  // The manual-entry form offers start terms from the date as typed, in the
+  // browser, without Intl. createPayment then checks the posted term against
+  // startTermOptions(paidAt), so the two must offer EXACTLY the same set or the
+  // form offers terms the server refuses.
+  //
+  // Every month of three years, on the first, the fifteenth and the last day,
+  // at three times of day: the May–July and July/August boundaries, the year
+  // boundary and both DST changes all fall inside this.
+  const dates: string[] = [];
+  for (const year of [2025, 2026, 2027]) {
+    for (let month = 1; month <= 12; month++) {
+      const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+      for (const day of [1, 15, last]) {
+        dates.push(
+          `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`
+        );
+      }
+    }
+  }
+
+  it("startTermOptionsForDate agrees with startTermOptions on every month", () => {
+    for (const date of dates) {
+      for (const time of ["00:00", "12:00", "23:59"]) {
+        expect(startTermOptionsForDate(date), `${date} ${time}`).toEqual(
+          startTermOptions(centralWallTimeToInstant(date, time))
+        );
+      }
+    }
+  });
+
+  it("termOfCivilDate and isSummerCivilDate agree with termOf and isSummerTerm", () => {
+    for (const date of dates) {
+      const noon = centralWallTimeToInstant(date, "12:00");
+      expect(termOfCivilDate(date), date).toBe(termOf(noon));
+      expect(isSummerCivilDate(date), date).toBe(isSummerTerm(noon));
+    }
+  });
+
+  it("puts the boundaries where §4.7 does", () => {
+    expect(termOfCivilDate("2026-07-31")).toBe(termOf(centralWallTimeToInstant("2026-07-31", "23:59")));
+    expect(termOfCivilDate("2026-07-31")).not.toBe(termOfCivilDate("2026-08-01"));
+    expect(isSummerCivilDate("2026-04-30")).toBe(false);
+    expect(isSummerCivilDate("2026-05-01")).toBe(true);
+    expect(isSummerCivilDate("2026-07-31")).toBe(true);
+    expect(isSummerCivilDate("2026-08-01")).toBe(false);
+  });
+
+  it("offers nothing for a date that is not one", () => {
+    for (const date of ["", "2026-13-01", "2026-00-10", "2026-7-1", "soon"]) {
+      expect(termOfCivilDate(date), date).toBeNull();
+      expect(startTermOptionsForDate(date), date).toEqual([]);
+      expect(isSummerCivilDate(date), date).toBe(false);
+    }
+  });
+
+  it("appends an included term outside the window, as startTermOptions does", () => {
+    const included = termAtIndex(termIndex(termOfCivilDate("2026-10-05")!)! + 8);
+    expect(startTermOptionsForDate("2026-10-05", included)).toEqual(
+      startTermOptions(centralWallTimeToInstant("2026-10-05", "12:00"), included)
+    );
+  });
+});
+
+describe("how a payment was paid", () => {
+  it("names the method of a payment recorded by hand, and nothing for an import", () => {
+    expect(paymentMethodLabel(IMPORTED_SOURCE)).toBeNull();
+    for (const method of PAYMENT_METHODS) {
+      expect(paymentMethodLabel(method)).toBe(PAYMENT_METHOD_LABELS[method]);
+    }
+    expect(paymentMethodLabel("cash")).toBe("Cash");
+    // The CHECK refuses anything else, but a value is shown rather than hidden.
+    expect(paymentMethodLabel("carrier pigeon")).toBe("carrier pigeon");
+  });
+
+  it("refuses clearing the member of a hand-entered payment, and only that", () => {
+    const someone = "0f8fad5b-d9cb-469f-a165-70867728950e";
+    // An import may be unlinked: that is how a wrong EID in a note is undone.
+    expect(manualPaymentMemberError(IMPORTED_SOURCE, null)).toBeNull();
+    expect(manualPaymentMemberError(IMPORTED_SOURCE, someone)).toBeNull();
+    for (const method of PAYMENT_METHODS) {
+      expect(manualPaymentMemberError(method, null), method).toMatch(
+        /recorded by hand has to credit a member/
+      );
+      expect(manualPaymentMemberError(method, someone), method).toBeNull();
+    }
+  });
+});
+
 describe("rankPaymentSuggestions", () => {
   const candidates: MemberCandidate[] = [
     {
@@ -761,6 +860,9 @@ describe("the phase-3 client components format no dates", () => {
     "../app/admin/(shell)/dues/[id]/_components/payment-editor.tsx",
     "../app/admin/(shell)/dues/[id]/_components/void-payment-form.tsx",
     "../app/admin/(shell)/dues/_components/dues-filters.tsx",
+    // Migration 32: "now" arrives formatted from the page, and the terms come
+    // from the Intl-free civil-date helpers.
+    "../app/admin/(shell)/dues/new/_components/payment-form.tsx",
   ];
 
   for (const path of files) {
@@ -806,5 +908,23 @@ describe("the audit before/after column lists are symmetric", () => {
     // an unbroken literal, so its absence is the failure.
     expect(() => literal("AUDITED_PAYMENT_COLUMNS")).not.toThrow();
     expect(() => literal("PAYMENT_SAVE_COLUMNS")).not.toThrow();
+  });
+});
+
+describe("savePayment and a payment recorded by hand", () => {
+  const actions = read("../app/actions/dues.ts");
+
+  it("refuses to clear the member, judged on the STORED row, before updating", () => {
+    // savePayment is a "use server" export and needs a request context, so the
+    // rule itself is manualPaymentMemberError, tested above. This pins that the
+    // action consults it with the source read from the database rather than
+    // anything the form posted, and does so before the update is sent.
+    const save = actions.slice(
+      actions.indexOf("export async function savePayment"),
+      actions.indexOf("export async function voidPayment")
+    );
+    const call = /manualPaymentMemberError\(\s*before\.source,\s*fields\.memberId\s*\)/;
+    expect(save.search(call)).toBeGreaterThan(-1);
+    expect(save.search(call)).toBeLessThan(save.indexOf(".update("));
   });
 });

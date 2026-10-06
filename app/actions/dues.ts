@@ -8,6 +8,7 @@ import {
   MAX_IMPORT_BYTES,
   MAX_IMPORT_ROWS,
   isSummerTerm,
+  manualPaymentMemberError,
   parseVenmoStatement,
   planPayment,
   startTermOptions,
@@ -556,6 +557,23 @@ export async function savePayment(
     if (!before) return { status: "not_found" };
     if (before.voided_at !== null) return { status: "voided" };
 
+    // A payment recorded by hand must keep crediting somebody. Unlinking is the
+    // correction for an IMPORTED payment whose payer named the wrong EID; a
+    // cash payment from nobody has no payer name for the suggestions to rank.
+    // Read off the stored row, never the form, so a hand-rolled POST is held to
+    // it too.
+    const memberRefusal = manualPaymentMemberError(
+      before.source,
+      fields.memberId
+    );
+    if (memberRefusal) {
+      return {
+        status: "invalid",
+        fieldErrors: { memberId: [memberRefusal] },
+        values,
+      };
+    }
+
     // The other half of the startTerm check, and the half that needs paid_at.
     // The schema proved the string is a well-formed term; this proves it is one
     // of the terms the editor actually offered for THIS payment. Without it the
@@ -909,6 +927,9 @@ export async function createPayment(
     });
 
     revalidatePayment(created.id);
+    // The member's own page lists their payments and says whether they are
+    // official, so it moves too.
+    revalidatePath(`/admin/members/${fields.memberId}`);
     return { status: "done", id: created.id };
   } catch (e) {
     console.error(

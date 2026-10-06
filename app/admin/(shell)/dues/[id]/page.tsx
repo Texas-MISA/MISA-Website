@@ -9,6 +9,7 @@ import { requireOfficer } from "@/lib/auth";
 import {
   formatCents,
   isSummerTerm,
+  paymentMethodLabel,
   paymentReviewState,
   rankPaymentSuggestions,
   startTermOptions,
@@ -41,10 +42,12 @@ export const metadata: Metadata = { title: "Payment" };
 /** ⚠️ Unbroken `as const` literal — PostgREST types the row off the string
  * literal, and a concatenation widens it to plain `string`. */
 const DETAIL_COLUMNS =
-  "id, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, imported_at, voided_at, voided_by, void_reason, updated_at, members(id, full_name, eid)" as const;
+  "id, source, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, imported_at, voided_at, voided_by, void_reason, updated_at, members(id, full_name, eid)" as const;
 
 type Payment = {
   id: string;
+  /** `venmo_import`, or the method of a payment recorded by hand. */
+  source: string;
   /** Null on a payment recorded by hand (migration 32). */
   venmo_txn_id: string | null;
   member_id: string | null;
@@ -153,6 +156,11 @@ export default async function PaymentDetailPage({
   const review = paymentReviewState(payment);
   const voided = payment.voided_at !== null;
   const paidAt = new Date(payment.paid_at);
+  // "Cash", "Zelle" or "Other" for a payment an officer recorded by hand
+  // (migration 32), null for one imported from a Venmo statement. A hand-entered
+  // row has no payer, no parsed EID and no transaction id, so the rows that
+  // describe those are not shown for it rather than shown empty.
+  const method = paymentMethodLabel(payment.source);
 
   const [names, members, suggestions] = await Promise.all([
     fetchOfficerNames(
@@ -213,40 +221,51 @@ export default async function PaymentDetailPage({
               </span>
             )}
           </Row>
-          <Row label="From">
-            {payment.payer_name ?? <Missing />}
-            {payment.payer_handle && (
-              <span className="ml-2 text-misa-muted">
-                {payment.payer_handle}
-              </span>
-            )}
-          </Row>
+          {method !== null ? (
+            <Row label="How it was paid">{method}</Row>
+          ) : (
+            <Row label="From">
+              {payment.payer_name ?? <Missing />}
+              {payment.payer_handle && (
+                <span className="ml-2 text-misa-muted">
+                  {payment.payer_handle}
+                </span>
+              )}
+            </Row>
+          )}
           <Row label="Note">
             {payment.note ? (
-              // Member-supplied text. Rendered as text by React, which escapes
-              // it; the formula-injection concern is the CSV export's, and its
-              // escape lives in lib/export.ts's writer.
+              // Member-supplied text on an imported payment, the recording
+              // officer's on a hand-entered one. Rendered as text by React,
+              // which escapes it; the formula-injection concern is the CSV
+              // export's, and its escape lives in lib/export.ts's writer.
               <span className="break-words">{payment.note}</span>
             ) : (
               <Missing />
             )}
           </Row>
-          <Row label="EID matched">
-            {payment.submitted_eid ? (
-              <span className="font-mono">{payment.submitted_eid}</span>
-            ) : (
-              <span className="text-misa-muted">
-                nothing in the note matched the roster
-              </span>
-            )}
-          </Row>
-          <Row label="Venmo ID">
-            <span className="font-mono text-xs">{payment.venmo_txn_id}</span>
-            <span className="ml-2 text-xs text-misa-muted">
-              re-importing this statement will not duplicate it
-            </span>
-          </Row>
-          <Row label="Imported">
+          {method === null && (
+            <>
+              <Row label="EID matched">
+                {payment.submitted_eid ? (
+                  <span className="font-mono">{payment.submitted_eid}</span>
+                ) : (
+                  <span className="text-misa-muted">
+                    nothing in the note matched the roster
+                  </span>
+                )}
+              </Row>
+              <Row label="Venmo ID">
+                <span className="font-mono text-xs">{payment.venmo_txn_id}</span>
+                <span className="ml-2 text-xs text-misa-muted">
+                  re-importing this statement will not duplicate it
+                </span>
+              </Row>
+            </>
+          )}
+          {/* imported_by and imported_at keep their names on a hand-entered
+              row (migration 32) and mean who recorded it and when. */}
+          <Row label={method !== null ? "Recorded" : "Imported"}>
             {formatInstant(payment.imported_at)} CT by{" "}
             {describeOfficer(names, payment.imported_by)}
           </Row>

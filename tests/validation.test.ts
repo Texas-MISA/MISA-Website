@@ -780,6 +780,34 @@ describe("duesPaymentCreateSchema", () => {
     }
   });
 
+  it("gives an empty or malformed date or time exactly one message", () => {
+    // In zod 4 a failed .regex() does not stop later .refine()s, so the first
+    // version of this schema answered an empty date with "Pick a date", "Pick a
+    // date", "Check the year". The form shows the first, but the list is what a
+    // screen reader or a later caller gets.
+    const messagesFor = (input: Record<string, string>, field: string) => {
+      const result = duesPaymentCreateSchema.safeParse({ ...BASE, ...input });
+      return result.success
+        ? []
+        : result.error.issues
+            .filter((issue) => issue.path[0] === field)
+            .map((issue) => issue.message);
+    };
+    for (const paidDate of ["", "soon", "2026-9-3", "2026-02-31"]) {
+      expect(messagesFor({ paidDate }, "paidDate"), paidDate).toEqual([
+        "Pick a date",
+      ]);
+    }
+    expect(messagesFor({ paidDate: "0226-10-01" }, "paidDate")).toEqual([
+      "Check the year",
+    ]);
+    for (const paidTime of ["", "9:30", "25:00"]) {
+      expect(messagesFor({ paidTime }, "paidTime"), paidTime).toEqual([
+        "Pick a time",
+      ]);
+    }
+  });
+
   it("refuses a time that is not on the clock", () => {
     for (const paidTime of ["25:00", "24:00", "12:60", "9:30", ""]) {
       expect(failingFields({ ...BASE, paidTime }), paidTime).toEqual([

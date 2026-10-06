@@ -11,8 +11,10 @@ import {
   type PlannedPayment,
   type RosterEntry,
 } from "@/lib/dues";
+import { writeAudit } from "@/app/actions/audit";
 import { toCentralFields } from "@/lib/events";
 import { fetchRosterIndex } from "@/lib/roster-index";
+import type { Json } from "@/lib/types/database";
 import { duesPaymentCreateSchema } from "@/lib/validation";
 
 import {
@@ -708,7 +710,20 @@ async function record(memberId: string, form: Record<string, string> = {}) {
       "id, source, venmo_txn_id, import_batch_id, imported_by, amount_cents, note, start_term, covered_terms, updated_at"
     )
     .single();
-  if (data) manualIds.add(data.id);
+  if (data) {
+    manualIds.add(data.id);
+    // And the audit row it writes: one per payment, under dues.recorded, with
+    // the row minus its CAS token as `after` (auditable() in the action).
+    await writeAudit(db, {
+      entityType: "dues_payment",
+      entityId: data.id,
+      actorId: officerId,
+      action: "dues.recorded",
+      after: Object.fromEntries(
+        Object.entries(data).filter(([key]) => key !== "updated_at")
+      ) as Json,
+    });
+  }
   return { data, error };
 }
 
@@ -734,6 +749,19 @@ describe("recording a payment by hand", () => {
       covered_terms: [term],
     });
     expect(await duesPaid(member)).toBe(true);
+
+    // One audit row, naming the method and no transaction id.
+    const { data: audit, error: auditError } = await db
+      .from("admin_audit")
+      .select("action, actor_id, after")
+      .eq("entity_type", "dues_payment")
+      .eq("entity_id", data!.id);
+    expect(auditError).toBeNull();
+    expect(audit).toHaveLength(1);
+    expect(audit![0].action).toBe("dues.recorded");
+    expect(audit![0].actor_id).toBe(officerId);
+    expect(audit![0].after).toMatchObject({ source: "cash", venmo_txn_id: null });
+    expect(audit![0].after).not.toHaveProperty("updated_at");
 
     // And the correction and void paths work on it unchanged. Neither touches
     // source or the two ids, so the provenance CHECK has nothing to object to.

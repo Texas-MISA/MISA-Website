@@ -117,7 +117,34 @@ export function startTermOptions(
   paidAt: Date,
   include: string | null = null
 ): string[] {
-  const base = termIndex(termOf(paidAt));
+  return termWindow(termIndex(termOf(paidAt)), include);
+}
+
+/**
+ * `startTermOptions` for a civil date (`YYYY-MM-DD`) rather than an instant:
+ * what the manual-entry form offers as the officer edits the date field.
+ *
+ * ⚠️ It has to offer EXACTLY the set the server will accept, because
+ * createPayment checks the posted term against
+ * `startTermOptions(paidAt)`. A term offered here and refused there is a form
+ * that cannot be submitted. Both go through `termWindow`, and the date's term
+ * comes from `termOfCivilDate`, whose rule is `termOf`'s. A Central wall time
+ * on a civil date always falls in that date's Central month, so the two agree
+ * whatever the time of day; tests/dues.test.ts checks every month.
+ *
+ * Intl-free and clock-free, so a Client Component can call it on every
+ * keystroke without a hydration diff. An empty or malformed date offers nothing.
+ */
+export function startTermOptionsForDate(
+  date: string,
+  include: string | null = null
+): string[] {
+  const term = termOfCivilDate(date);
+  return termWindow(term === null ? null : termIndex(term), include);
+}
+
+/** One term back and two forward of `base`, plus `include`, in term order. */
+function termWindow(base: number | null, include: string | null): string[] {
   if (base === null) return include ? [include] : [];
 
   const indexes = new Set<number>();
@@ -127,6 +154,36 @@ export function startTermOptions(
   if (extra !== null) indexes.add(extra);
 
   return [...indexes].sort((a, b) => a - b).map(termAtIndex);
+}
+
+/**
+ * The term a civil date (`YYYY-MM-DD`) falls in: `termOf`'s rule, August
+ * onwards is Fall and the rest is Spring, read straight off the month.
+ *
+ * For the manual-entry form, which knows the date as the officer typed it and
+ * must not call Intl in the browser. Null when the string is not a date.
+ */
+export function termOfCivilDate(date: string): string | null {
+  const month = civilMonth(date);
+  if (month === null) return null;
+  return month >= 8 ? `Fall ${date.slice(0, 4)}` : `Spring ${date.slice(0, 4)}`;
+}
+
+/**
+ * `isSummerTerm` for a civil date: May to July, which §4.7 files under Spring.
+ * The manual-entry form warns on it the way the import preview does.
+ */
+export function isSummerCivilDate(date: string): boolean {
+  const month = civilMonth(date);
+  return month !== null && month >= 5 && month <= 7;
+}
+
+/** The month of a `YYYY-MM-DD` string, or null if it is not one. */
+function civilMonth(date: string): number | null {
+  const match = /^\d{4}-(\d{2})-\d{2}$/.exec(date);
+  if (!match) return null;
+  const month = Number(match[1]);
+  return month >= 1 && month <= 12 ? month : null;
 }
 
 /**
@@ -280,6 +337,54 @@ export function termsForAmount(
 export const PAYMENT_METHODS = ["cash", "zelle", "other"] as const;
 
 export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/** `dues_payments.source` on a row that arrived in a statement upload. */
+export const IMPORTED_SOURCE = "venmo_import";
+
+/**
+ * How each method reads on screen. The one place these words live: the form's
+ * method picker, the ledger's and the member page's Payer cell, and the payment
+ * page all read them from here.
+ */
+export const PAYMENT_METHOD_LABELS = {
+  cash: "Cash",
+  zelle: "Zelle",
+  other: "Other",
+} as const satisfies Record<PaymentMethod, string>;
+
+/**
+ * How a payment was paid, for a payment recorded by hand. Null for one that
+ * came from a Venmo statement, whose payer name says who sent it.
+ *
+ * A source outside the list cannot be stored (`dues_payments_source_valid`),
+ * but if one ever were, it is shown as written rather than hidden.
+ */
+export function paymentMethodLabel(source: string): string | null {
+  if (source === IMPORTED_SOURCE) return null;
+  return (PAYMENT_METHODS as readonly string[]).includes(source)
+    ? PAYMENT_METHOD_LABELS[source as PaymentMethod]
+    : source;
+}
+
+/**
+ * Why a correction to a payment recorded by hand cannot clear its member, or
+ * null when it can.
+ *
+ * An imported payment may be unlinked: a payer who wrote someone else's EID
+ * credits the wrong member, and putting the row back in the queue is the
+ * correction. A hand-entered payment has no payer name and no note from the
+ * payer for the suggestions to rank, so a cash payment credited to nobody
+ * would sit in the queue with nothing to resolve it by. The officer who
+ * recorded it knew who paid; a wrong pick is fixed by picking the right
+ * member, or by voiding it.
+ */
+export function manualPaymentMemberError(
+  source: string,
+  memberId: string | null
+): string | null {
+  if (source === IMPORTED_SOURCE || memberId !== null) return null;
+  return "A payment recorded by hand has to credit a member. Pick the right one, or void it.";
+}
 
 /**
  * The largest single payment the manual form accepts: $500.

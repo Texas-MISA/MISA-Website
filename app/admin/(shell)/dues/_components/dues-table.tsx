@@ -17,6 +17,9 @@ export type DuesLedgerRow = {
   paidLabel: string;
   amountLabel: string;
   payerName: string | null;
+  /** "Cash", "Zelle" or "Other" for a payment recorded by hand; null for one
+   * imported from a Venmo statement. */
+  method: string | null;
   note: string | null;
   memberId: string | null;
   memberName: string | null;
@@ -69,8 +72,13 @@ export function DuesTable({
                 {row.paidLabel} CT
               </Link>
             </Td>
+            {/* A payment recorded by hand has no Venmo payer, so the cell says
+                how it was paid instead of showing a dash that reads as missing
+                data. No new column: the officer chose to show the method here
+                and on the payment page (2026-10-05). */}
             <Td>
-              {row.payerName ?? <span className="text-misa-muted">—</span>}
+              {row.method ??
+                row.payerName ?? <span className="text-misa-muted">—</span>}
             </Td>
             <Td>
               {row.memberId && row.memberName ? (

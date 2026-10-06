@@ -8,7 +8,7 @@ import { describeOfficer, fetchOfficerNames } from "@/lib/admin-profiles";
 import { describeMatchReason } from "@/lib/attendance";
 import { normalizeEid } from "@/lib/checkin";
 import { requireOfficer } from "@/lib/auth";
-import { formatCents, paidThroughTerm } from "@/lib/dues";
+import { formatCents, paidThroughTerm, paymentMethodLabel } from "@/lib/dues";
 import { formatCategory, formatDay, formatInstant } from "@/lib/events";
 import { fetchFieldDefinitions } from "@/lib/member-fields";
 import {
@@ -34,6 +34,7 @@ import {
 } from "@/lib/project-requirements";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+import { BUTTON_QUIET_SM } from "@/components/ui/button";
 import { PageHeader, SectionHeading } from "@/components/ui/page-header";
 import { Table, THead, Th, Tr, Td } from "@/components/ui/table";
 import { Pill } from "@/components/ui/pill";
@@ -75,7 +76,7 @@ const TERM_EVENT_COLUMNS =
   "id, title, starts_at, ends_at, points, category" as const;
 
 const DUES_COLUMNS =
-  "id, paid_at, amount_cents, note, payer_name, start_term, terms_covered, covered_terms, voided_at" as const;
+  "id, source, paid_at, amount_cents, note, payer_name, start_term, terms_covered, covered_terms, voided_at" as const;
 
 export default async function MemberDetailPage({
   params,
@@ -622,7 +623,15 @@ export default async function MemberDetailPage({
       </section>
 
       <section className="mt-12">
-        <SectionHeading>Dues</SectionHeading>
+        {/* The action sits on the heading's baseline, as PageHeader's does. It
+            pre-selects this member; the form ignores the parameter unless it
+            names somebody on the roster. */}
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <SectionHeading>Dues</SectionHeading>
+          <Link href={`/admin/dues/new?member=${id}`} className={BUTTON_QUIET_SM}>
+            Record a payment
+          </Link>
+        </div>
 
         {/* The status comes from the view's own boolean rather than being
             re-derived from the payments below, so this page and the directory
@@ -709,10 +718,13 @@ export default async function MemberDetailPage({
                           </span>
                         )}
                       </Td>
+                      {/* The ledger's Payer rule: a payment recorded by hand
+                          shows how it was paid, since it has no Venmo payer. */}
                       <Td>
-                        {row.payer_name ?? (
-                          <span className="text-misa-muted">—</span>
-                        )}
+                        {paymentMethodLabel(row.source) ??
+                          row.payer_name ?? (
+                            <span className="text-misa-muted">—</span>
+                          )}
                       </Td>
                       <Td className="max-w-[18rem] break-words">
                         {row.note ?? <span className="text-misa-muted">—</span>}
