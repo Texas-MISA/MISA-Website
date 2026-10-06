@@ -389,6 +389,25 @@ Every one of these is a NOT NULL or a CHECK written when Venmo was the only
 source, so this needs **one migration** (next unclaimed number; local and remote
 are at 25):
 
+> 🔴 **Correction (2026-10-05, built as migration 32): keep the unique index
+> FULL. Item 1's partial index would have broken the import.** A partial unique
+> index (`where venmo_txn_id is not null`) can be the arbiter of `ON CONFLICT`
+> only when the statement repeats its predicate. PostgREST's `on_conflict` names
+> columns and cannot carry one, so `commitImport`'s
+> `upsert(…, { onConflict: "venmo_txn_id", ignoreDuplicates: true })` would fail
+> with **42P10** ("there is no unique or exclusion constraint matching the ON
+> CONFLICT specification") on every import. That was measured on the local
+> stack. The partial index buys nothing anyway: Postgres treats NULLs as
+> distinct in a unique index by default, so any number of manual rows with a
+> null `venmo_txn_id` coexist under the full index, which still spans voided
+> rows. Migration 32 leaves `dues_payments_txn_idx` exactly as it was and
+> asserts that it is still a full unique index, and `tests/dues-schema.test.ts`
+> pins the upsert with manual rows present. In the same item, `source` is not
+> `'venmo_import' | 'manual'`: the officer chose a method list on 2026-10-05, so
+> it is `'venmo_import' | 'cash' | 'zelle' | 'other'`, with a note that the form
+> requires for Other. There is no manual `venmo`, because a Venmo payment typed
+> in by hand would be counted again when its statement is imported.
+
 1. **`venmo_txn_id text not null`, uniquely indexed.** A cash payment has no
    transaction id. Make the column **nullable**, make the unique index
    **partial** (`where venmo_txn_id is not null`) — which keeps the property

@@ -79,6 +79,9 @@ function formatAuditAction(action: string): string {
     "dues.assigned": "Assigned to a member",
     "dues.updated": "Updated",
     "dues.voided": "Voided",
+    // Migration 32. A payment typed in by hand (cash, Zelle, other) rather than
+    // imported from a statement.
+    "dues.recorded": "Recorded",
     // Stage 6 phase 7a. Like roster.exported these appear in no entity's trail
     // today — a preset has no detail page with an AuditTrail on it — and the
     // labels land with the verbs regardless, because a row written now can never

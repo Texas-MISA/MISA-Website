@@ -1,5 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { PAYMENT_METHODS } from "@/lib/dues";
+
 import {
   anonClient,
   cleanup,
@@ -28,6 +30,8 @@ let officerId = "";
 let memberId = "";
 const batchId = crypto.randomUUID();
 const txnIds: string[] = [];
+/** Manual payments have no transaction id, so they are cleaned up by row id. */
+const manualIds: string[] = [];
 
 function txn(suffix: string): string {
   const id = `t3q-dues-${batchId.slice(0, 8)}-${suffix}`;
@@ -51,6 +55,9 @@ afterAll(async () => {
   // first — which is itself the behaviour the FK exists to produce.
   if (txnIds.length > 0) {
     await db.from("dues_payments").delete().in("venmo_txn_id", txnIds);
+  }
+  if (manualIds.length > 0) {
+    await db.from("dues_payments").delete().in("id", manualIds);
   }
   await cleanup(db, track);
 });
@@ -235,6 +242,178 @@ describe("the constraints", () => {
     // The match is an equality against members.normalized_eid, so two folds
     // that drift would silently stop matching anybody.
     expect(data?.normalized_eid).toBe("rp8571");
+  });
+});
+
+describe("manual payments (migration 32)", () => {
+  // A payment an officer records by hand: cash, Zelle or another method. It
+  // has no Venmo transaction id and arrived in no upload, so both columns are
+  // null, and `source` says which method it was.
+
+  async function insertManual(
+    overrides: Record<string, unknown> = {}
+  ): Promise<{
+    data: { id: string; source: string; venmo_txn_id: string | null } | null;
+    error: { message: string; code: string } | null;
+  }> {
+    const { data, error } = await db
+      .from("dues_payments")
+      .insert({
+        source: "cash",
+        member_id: memberId,
+        paid_at: new Date().toISOString(),
+        amount_cents: 4000,
+        imported_by: officerId,
+        ...overrides,
+      })
+      .select("id, source, venmo_txn_id")
+      .maybeSingle();
+    // Tracked even when a test expected a refusal, so a constraint that fails
+    // to refuse still leaves nothing behind.
+    if (data) manualIds.push(data.id);
+    return {
+      data,
+      error: error ? { message: error.message, code: error.code } : null,
+    };
+  }
+
+  /** One row as commitImport writes it. */
+  function importRow(id: string) {
+    return {
+      venmo_txn_id: id,
+      member_id: memberId,
+      paid_at: new Date().toISOString(),
+      amount_cents: 4000,
+      import_batch_id: batchId,
+      imported_by: officerId,
+    };
+  }
+
+  it("accepts a cash payment with no transaction id and no batch, and two coexist", async () => {
+    // Postgres treats NULLs as distinct in a unique index, so the FULL
+    // dues_payments_txn_idx admits any number of these.
+    const first = await insertManual();
+    const second = await insertManual();
+    expect(first.error).toBeNull();
+    expect(second.error).toBeNull();
+    expect(first.data?.venmo_txn_id).toBeNull();
+    expect(second.data?.venmo_txn_id).toBeNull();
+
+    const { count } = await db
+      .from("dues_payments")
+      .select("id", { count: "exact", head: true })
+      .in("id", [first.data!.id, second.data!.id]);
+    expect(count).toBe(2);
+  });
+
+  it("accepts every method the form offers", async () => {
+    // PAYMENT_METHODS mirrors the CHECK. A method added to one and not the
+    // other is a form that takes a 23514 on save.
+    for (const method of PAYMENT_METHODS) {
+      const { data, error } = await insertManual({ source: method });
+      expect(error, method).toBeNull();
+      expect(data?.source).toBe(method);
+    }
+  });
+
+  it("refuses an imported row missing its transaction id or its batch", async () => {
+    // A 23514 from dues_source_matches_provenance, not a 23502: both columns
+    // are nullable now, so the CHECK is what holds an import to both ids.
+    expect(
+      (await insertPayment({ source: "venmo_import", venmo_txn_id: null })).error
+        ?.code
+    ).toBe("23514");
+    expect((await insertPayment({ venmo_txn_id: null })).error?.code).toBe(
+      "23514"
+    );
+    expect((await insertPayment({ import_batch_id: null })).error?.code).toBe(
+      "23514"
+    );
+  });
+
+  it("⚠️ refuses a manual row carrying a transaction id or a batch", async () => {
+    // A manual row with a Venmo id would sit in the dedupe index and make the
+    // next import of that statement silently skip the real payment.
+    expect(
+      (await insertManual({ venmo_txn_id: txn("manual-with-id") })).error?.code
+    ).toBe("23514");
+    expect(
+      (await insertManual({ import_batch_id: batchId })).error?.code
+    ).toBe("23514");
+  });
+
+  it("refuses an unknown source, a manual venmo included", async () => {
+    for (const source of ["venmo", "cheque", "", "CASH"]) {
+      expect((await insertManual({ source })).error?.code, source).toBe(
+        "23514"
+      );
+    }
+  });
+
+  it("files an insert that names no source as an import", async () => {
+    // The default is what keeps commitImport, which never names `source`,
+    // writing exactly the rows it wrote before migration 32.
+    const id = txn("default-source");
+    expect((await insertPayment({ venmo_txn_id: id })).error).toBeNull();
+
+    const { data } = await db
+      .from("dues_payments")
+      .select("source")
+      .eq("venmo_txn_id", id)
+      .single();
+    expect(data?.source).toBe("venmo_import");
+  });
+
+  it("🔓 the import's upsert still dedupes while manual null-id rows exist", async () => {
+    // The regression guard for migration 32's one deliberate non-change. The
+    // plan proposed making dues_payments_txn_idx PARTIAL (`where venmo_txn_id
+    // is not null`). A partial unique index is the arbiter of ON CONFLICT only
+    // when the statement repeats its predicate, PostgREST's on_conflict cannot,
+    // and so this exact call (commitImport's) would fail with 42P10 on every
+    // import. The index stays full; this proves the call still works with
+    // manual rows present.
+    const manual = [await insertManual(), await insertManual()];
+    for (const row of manual) expect(row.error).toBeNull();
+
+    const a = txn("upsert-a");
+    const b = txn("upsert-b");
+    const c = txn("upsert-c");
+    const upsert = (ids: string[]) =>
+      db
+        .from("dues_payments")
+        .upsert(ids.map(importRow), {
+          onConflict: "venmo_txn_id",
+          ignoreDuplicates: true,
+        })
+        .select("venmo_txn_id");
+
+    const first = await upsert([a, b]);
+    expect(first.error).toBeNull();
+    expect(first.data?.map((r) => r.venmo_txn_id).sort()).toEqual([a, b].sort());
+
+    // Overlapping statement: b is already stored, c is new.
+    const second = await upsert([b, c]);
+    expect(second.error).toBeNull();
+    expect(second.data?.map((r) => r.venmo_txn_id)).toEqual([c]);
+
+    // And an identical one is a complete no-op.
+    const third = await upsert([a, b, c]);
+    expect(third.error).toBeNull();
+    expect(third.data).toEqual([]);
+
+    // The manual rows were neither matched nor touched.
+    const { data: still } = await db
+      .from("dues_payments")
+      .select("id, source, venmo_txn_id")
+      .in(
+        "id",
+        manual.map((row) => row.data!.id)
+      );
+    expect(still).toHaveLength(2);
+    for (const row of still ?? []) {
+      expect(row.source).toBe("cash");
+      expect(row.venmo_txn_id).toBeNull();
+    }
   });
 });
 

@@ -160,6 +160,12 @@ export type AuditAction =
   | "dues.assigned"
   | "dues.updated"
   | "dues.voided"
+  // Migration 32. A payment an officer typed in by hand: cash, Zelle or
+  // another method, never a statement row. "Recorded" rather than "imported"
+  // because no file was involved, and rather than "created" for the reason
+  // dues.imported gives: the money had already arrived, and the officer is
+  // writing down the receipt. `after.source` names the method.
+  | "dues.recorded"
   // Stage 6 phase 7a. A saved directory filter, shared across officers.
   // `preset.deleted` is a real hard delete rather than an archive — nothing is
   // keyed to a preset the way custom-field values are keyed to a definition, so

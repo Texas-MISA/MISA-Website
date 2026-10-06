@@ -263,6 +263,66 @@ export function termsForAmount(
 }
 
 // ---------------------------------------------------------------------------
+// Manual entry (migration 32)
+// ---------------------------------------------------------------------------
+
+/**
+ * How an officer can say a payment arrived when it did not come through a
+ * Venmo statement. Stored in `dues_payments.source`, whose CHECK
+ * (`dues_payments_source_valid`) holds these three plus `venmo_import`. Change
+ * both together, as with `EVENT_CATEGORIES` and `MEMBER_TYPES`.
+ *
+ * 📌 There is deliberately no `venmo` here. A Venmo payment typed in by hand
+ * would be counted again when its statement is imported, and the dedupe could
+ * not catch it: the hand-typed row has no transaction id to collide on. A Venmo
+ * payment waits for its statement.
+ */
+export const PAYMENT_METHODS = ["cash", "zelle", "other"] as const;
+
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
+/**
+ * The largest single payment the manual form accepts: $500.
+ *
+ * A fat-finger guard, not a policy cap, in the same spirit as
+ * `MAX_POINTS_PER_GRANT`. The largest legitimate payment today is
+ * `MAX_TERMS_COVERED` terms at the two-term price, $140, so this leaves room
+ * for price rises while still refusing the likely slip: cents typed into a
+ * dollars field (`4000` for $40.00). It refuses; it never clamps. A wrong amount
+ * under the cap costs little, because on a manual payment the amount decides
+ * nothing. The officer picks the terms it covers.
+ */
+export const MAX_MANUAL_PAYMENT_CENTS = 50_000;
+
+/**
+ * How far ahead of the server's clock a manual payment's time may be.
+ *
+ * The time is typed to the minute, often from a phone, by someone who has
+ * just been handed the money. Rounding up to the next minute or two, or a
+ * phone a little ahead of the server, is not an error worth refusing. A wrong
+ * day, month or year, which is what the future check exists to catch, is far
+ * outside five minutes.
+ */
+export const PAID_AT_FUTURE_GRACE_MS = 5 * 60_000;
+
+/**
+ * Dollars as an officer types them (`40`, `40.5`, `40.00`, `$40`) to cents.
+ *
+ * Null for anything else, including a sign, a thousands comma and a third
+ * decimal place, so the caller can say what shape it wants rather than
+ * guessing. Integer arithmetic only: `parseFloat("40.10") * 100` is
+ * `4009.999…`, the same reason `parseAmountCents` never uses a float.
+ *
+ * Zero parses (as 0). Whether zero is allowed is the caller's rule, not the
+ * parser's.
+ */
+export function parseDollarsToCents(raw: string): number | null {
+  const match = /^\$?\s*(\d{1,7})(?:\.(\d{1,2}))?$/.exec(raw.trim());
+  if (!match) return null;
+  return Number(match[1]) * 100 + Number((match[2] ?? "0").padEnd(2, "0"));
+}
+
+// ---------------------------------------------------------------------------
 // Matching a note to a member
 // ---------------------------------------------------------------------------
 

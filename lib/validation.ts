@@ -2,11 +2,21 @@ import { z } from "zod";
 
 import { MAX_BULK_ASSIGN } from "@/lib/attendance";
 import { normalizeEid } from "@/lib/checkin";
-import { MAX_TERMS_COVERED, termIndex } from "@/lib/dues";
+import {
+  MAX_MANUAL_PAYMENT_CENTS,
+  MAX_TERMS_COVERED,
+  PAID_AT_FUTURE_GRACE_MS,
+  PAYMENT_METHODS,
+  formatCents,
+  parseDollarsToCents,
+  termIndex,
+} from "@/lib/dues";
 import {
   EVENT_CATEGORIES,
   EVENT_STATUSES,
   MAX_SERIES_EVENTS,
+  centralWallTimeToInstant,
+  toCentralFields,
 } from "@/lib/events";
 import {
   FIELD_KEY_PATTERN,
@@ -337,6 +347,38 @@ export const pointVoidSchema = z.object({
 // first saved. Voiding stays separate because it is one-way.
 
 /**
+ * A payment's start term, checked for SHAPE only. Shared by the correction and
+ * the manual entry, so the two cannot disagree about what a term looks like.
+ * Membership of the terms a form offered needs `paid_at`, so each action checks
+ * that half itself against `startTermOptions`.
+ */
+const startTermField = z
+  .string()
+  .trim()
+  // Through termIndex() rather than a regex copied here, so the one place
+  // that knows what a term looks like stays the one place.
+  .refine((v) => termIndex(v) !== null, "Pick a term");
+
+/**
+ * How many terms a payment bought. "" is null, meaning no officer has decided,
+ * which is the review axis itself (migration 19). Shared by the correction and
+ * the manual entry; the bounds mirror the column's CHECK.
+ */
+const termsCoveredField = z
+  .union([
+    z.literal(""),
+    z.coerce
+      .number()
+      .int()
+      .min(1, "A payment covers at least one term")
+      .max(
+        MAX_TERMS_COVERED,
+        `A payment covers at most ${MAX_TERMS_COVERED} terms`
+      ),
+  ])
+  .transform((v) => (v === "" ? null : v));
+
+/**
  * One correction to a payment: who it credits, and what it bought.
  *
  * `memberId` accepting "" is deliberate — an officer must be able to *unlink* a
@@ -358,25 +400,8 @@ export const pointVoidSchema = z.object({
 export const duesPaymentSaveSchema = z.object({
   id: z.uuid(),
   memberId: optionalUuid("member"),
-  startTerm: z
-    .string()
-    .trim()
-    // Through termIndex() rather than a regex copied here, so the one place
-    // that knows what a term looks like stays the one place.
-    .refine((v) => termIndex(v) !== null, "Pick a term"),
-  termsCovered: z
-    .union([
-      z.literal(""),
-      z.coerce
-        .number()
-        .int()
-        .min(1, "A payment covers at least one term")
-        .max(
-          MAX_TERMS_COVERED,
-          `A payment covers at most ${MAX_TERMS_COVERED} terms`
-        ),
-    ])
-    .transform((v) => (v === "" ? null : v)),
+  startTerm: startTermField,
+  termsCovered: termsCoveredField,
   // The compare-and-set anchor, carried as the raw PostgREST string. A JS Date
   // round trip truncates the microseconds and the CAS then never matches,
   // reporting a phantom conflict on every save.
@@ -396,6 +421,160 @@ export const duesVoidSchema = z.object({
     .min(1, "A reason is required")
     .max(500, "Reason is too long"),
 });
+
+// Manual dues entry (migration 32): a payment that did not come through a
+// Venmo statement, recorded by an officer.
+
+/**
+ * A civil date that exists on the calendar.
+ *
+ * `civilDate` checks the shape alone, and `2026-02-31` has the shape:
+ * `centralWallTimeToInstant` would quietly roll it into March. The year floor
+ * catches a mistyped year such as `0226`, which would otherwise derive a term
+ * like `Spring 226` that no term picker can offer, so the officer would see a
+ * term error for a date mistake.
+ */
+const calendarDate = civilDate
+  .refine((v) => {
+    const [y, m, d] = v.split("-").map(Number);
+    const probe = new Date(Date.UTC(y, m - 1, d));
+    return (
+      probe.getUTCFullYear() === y &&
+      probe.getUTCMonth() === m - 1 &&
+      probe.getUTCDate() === d
+    );
+  }, "Pick a date")
+  .refine((v) => Number(v.slice(0, 4)) >= 2000, "Check the year");
+
+/** `HH:MM` on a 24-hour clock. `civilTime` alone accepts `25:99`. */
+const clockTime = civilTime.refine((v) => {
+  const [h, m] = v.split(":").map(Number);
+  return h <= 23 && m <= 59;
+}, "Pick a time");
+
+/**
+ * Dollars as typed, to integer cents. Refused rather than clamped at both ends:
+ * zero is not a payment (`amount_cents > 0`), and a refund is a void with a
+ * reason, never a negative payment.
+ */
+const dollarAmount = z
+  .string()
+  .trim()
+  .transform((raw, ctx) => {
+    if (raw.startsWith("-")) {
+      ctx.addIssue({
+        code: "custom",
+        message: "A payment can't be negative. A refund is a void",
+      });
+      return z.NEVER;
+    }
+    const cents = parseDollarsToCents(raw);
+    if (cents === null) {
+      ctx.addIssue({
+        code: "custom",
+        message: "Enter an amount in dollars, like 40 or 40.00",
+      });
+      return z.NEVER;
+    }
+    if (cents === 0) {
+      ctx.addIssue({
+        code: "custom",
+        message: "The amount must be more than zero",
+      });
+      return z.NEVER;
+    }
+    if (cents > MAX_MANUAL_PAYMENT_CENTS) {
+      ctx.addIssue({
+        code: "custom",
+        message: `That is more than ${formatCents(MAX_MANUAL_PAYMENT_CENTS)}. Check the amount`,
+      });
+      return z.NEVER;
+    }
+    return cents;
+  });
+
+/**
+ * Recording a dues payment by hand: cash, Zelle, or another method.
+ *
+ * It records a PAYMENT, not a status. The output is one `dues_payments` row's
+ * worth of input, and membership goes on being derived from `covered_terms`.
+ *
+ * - `paidDate` and `paidTime` are Central wall time, joined with
+ *   `centralWallTimeToInstant` (never `new Date("…T…")`). The result must not
+ *   be in the future, give or take `PAID_AT_FUTURE_GRACE_MS`. This is the one
+ *   schema here that reads the clock, because "not yet" is a fact about now.
+ * - `startTerm` is checked for shape here. The action checks it against
+ *   `startTermOptions(paidAt)`, the same split `duesPaymentSaveSchema` makes.
+ * - `termsCovered` may be "" (null), as on the correction: a manual payment
+ *   that covers nothing yet waits in the review queue like an imported one.
+ * - `note` is optional, except that **"Other" requires one**. "Other" with no
+ *   word on how the money arrived is a receipt nobody can check later. That is
+ *   a form rule, deliberately not a database CHECK: the method list and what
+ *   counts as explained are both likely to move.
+ */
+export const duesPaymentCreateSchema = z
+  .object({
+    memberId: z.uuid("Pick a member"),
+    amount: dollarAmount,
+    paidDate: calendarDate,
+    paidTime: clockTime,
+    method: z.enum(PAYMENT_METHODS, "Pick how it was paid"),
+    startTerm: startTermField,
+    termsCovered: termsCoveredField,
+    note: optionalText(500, "Note"),
+  })
+  .superRefine(
+    (data, ctx) => {
+      if (data.method === "other" && !data.note) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["note"],
+          message: "Say how it was paid",
+        });
+      }
+    },
+    // Run even when another field failed, so "Other" with no note is reported
+    // in the same round trip as a bad amount rather than one submit later.
+    // Only `method` and `note` are read, and each holds either its parsed
+    // value or the raw string, so a failure elsewhere cannot fake this one.
+    // The guard is for input that is not an object at all.
+    {
+      when: (payload) =>
+        typeof payload.value === "object" && payload.value !== null,
+    }
+  )
+  // A pipe, so this runs only once every field above is valid: it needs a
+  // real date, a real time and a parsed amount.
+  .transform((data, ctx) => {
+    const now = Date.now();
+    const paidAt = centralWallTimeToInstant(data.paidDate, data.paidTime);
+
+    if (paidAt.getTime() > now + PAID_AT_FUTURE_GRACE_MS) {
+      // Point at the field that is wrong. Both strings are `YYYY-MM-DD`, so a
+      // string compare is a date compare here (this is not a term string).
+      const futureDay = data.paidDate > toCentralFields(new Date(now)).date;
+      ctx.addIssue({
+        code: "custom",
+        path: [futureDay ? "paidDate" : "paidTime"],
+        message: futureDay
+          ? "That date is in the future"
+          : "That time is in the future",
+      });
+      return z.NEVER;
+    }
+
+    return {
+      memberId: data.memberId,
+      amountCents: data.amount,
+      paidAt,
+      method: data.method,
+      startTerm: data.startTerm,
+      termsCovered: data.termsCovered,
+      note: data.note,
+    };
+  });
+
+export type DuesPaymentCreateFields = z.infer<typeof duesPaymentCreateSchema>;
 
 // Custom fields (§7 Stage 6 phase 4). Every rule below is also a constraint in
 // migration 18 — deliberately, not redundantly. These schemas give the officer

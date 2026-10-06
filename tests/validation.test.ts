@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_BULK_ASSIGN } from "@/lib/attendance";
-import { MAX_TERMS_COVERED } from "@/lib/dues";
+import {
+  MAX_MANUAL_PAYMENT_CENTS,
+  MAX_TERMS_COVERED,
+  PAYMENT_METHODS,
+} from "@/lib/dues";
+import { centralWallTimeToInstant, toCentralFields } from "@/lib/events";
 import { MAX_FIELD_OPTIONS, MAX_OPTION_LENGTH } from "@/lib/members";
 import { MAX_GRANT_MEMBERS, MAX_POINTS_PER_GRANT } from "@/lib/points";
 import {
   attendanceEditSchema,
   bulkAssignSchema,
   checkinSchema,
+  duesPaymentCreateSchema,
   duesPaymentSaveSchema,
   duesVoidSchema,
   eventSchema,
@@ -608,5 +614,210 @@ describe("duesVoidSchema", () => {
       duesVoidSchema.parse({ id, voidReason: "  Refunded by request  " })
         .voidReason
     ).toBe("Refunded by request");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Manual dues entry (migration 32)
+// ---------------------------------------------------------------------------
+
+describe("duesPaymentCreateSchema", () => {
+  // A past date, so nothing here depends on today except the cases that say so.
+  const BASE = {
+    memberId: "0f8fad5b-d9cb-469f-a165-70867728950e",
+    amount: "40",
+    paidDate: "2026-09-03",
+    paidTime: "18:30",
+    method: "cash",
+    startTerm: "Fall 2026",
+    termsCovered: "1",
+    note: "",
+  };
+
+  /** The fields that carry an error, which is what the form shows them on. */
+  function failingFields(input: Record<string, unknown>): string[] {
+    const result = duesPaymentCreateSchema.safeParse(input);
+    if (result.success) return [];
+    return [...new Set(result.error.issues.map((i) => String(i.path[0])))].sort();
+  }
+
+  /** Today's Central date and wall time, `ms` from now. */
+  function centralAt(ms: number) {
+    return toCentralFields(new Date(Date.now() + ms));
+  }
+
+  it("accepts a cash payment and joins the date and time as Central", () => {
+    const parsed = duesPaymentCreateSchema.parse(BASE);
+    expect(parsed).toEqual({
+      memberId: BASE.memberId,
+      amountCents: 4000,
+      // Never `new Date("2026-09-03T18:30")`, which the server reads as UTC.
+      paidAt: centralWallTimeToInstant("2026-09-03", "18:30"),
+      method: "cash",
+      startTerm: "Fall 2026",
+      termsCovered: 1,
+      // "" is no note, which is null, not an empty string.
+      note: null,
+    });
+  });
+
+  it("converts dollars as typed to integer cents", () => {
+    const cases: [string, number][] = [
+      ["40", 4000],
+      ["40.00", 4000],
+      ["40.5", 4050],
+      ["$70", 7000],
+      ["  12.34  ", 1234],
+      ["0.01", 1],
+      // The float trap: parseFloat("40.10") * 100 is 4009.999…
+      ["40.10", 4010],
+      ["19.99", 1999],
+    ];
+    for (const [amount, cents] of cases) {
+      expect(
+        duesPaymentCreateSchema.parse({ ...BASE, amount }).amountCents,
+        amount
+      ).toBe(cents);
+    }
+  });
+
+  it("refuses zero and negative amounts, mirroring amount_cents > 0", () => {
+    // A refund is a void with a reason, never a negative payment, and a comped
+    // membership (zero) is deliberately out of scope.
+    for (const amount of ["0", "0.00", "$0", "-40", "-0.01", "- 40"]) {
+      expect(failingFields({ ...BASE, amount }), amount).toEqual(["amount"]);
+    }
+  });
+
+  it("refuses an amount that is not dollars", () => {
+    for (const amount of ["", "forty", "40.123", "4,000", "40.", ".50", "40 dollars"]) {
+      expect(failingFields({ ...BASE, amount }), amount).toEqual(["amount"]);
+    }
+  });
+
+  it("refuses more than one payment allows, and accepts the cap itself", () => {
+    const cap = MAX_MANUAL_PAYMENT_CENTS / 100;
+    expect(
+      duesPaymentCreateSchema.parse({ ...BASE, amount: String(cap) }).amountCents
+    ).toBe(MAX_MANUAL_PAYMENT_CENTS);
+    expect(failingFields({ ...BASE, amount: String(cap + 1) })).toEqual([
+      "amount",
+    ]);
+    // The slip the cap exists for: cents typed into a dollars field.
+    expect(failingFields({ ...BASE, amount: "4000" })).toEqual(["amount"]);
+  });
+
+  it("⚠️ requires a note when the method is Other", () => {
+    expect(failingFields({ ...BASE, method: "other" })).toEqual(["note"]);
+    expect(failingFields({ ...BASE, method: "other", note: "   " })).toEqual([
+      "note",
+    ]);
+    expect(
+      duesPaymentCreateSchema.parse({
+        ...BASE,
+        method: "other",
+        note: "  Paid by cheque at the social  ",
+      }).note
+    ).toBe("Paid by cheque at the social");
+  });
+
+  it("reports a missing Other note in the same pass as another error", () => {
+    // Otherwise the officer fixes the amount, submits, and only then learns
+    // the note was required too.
+    expect(
+      failingFields({ ...BASE, method: "other", amount: "forty" })
+    ).toEqual(["amount", "note"]);
+  });
+
+  it("needs no note for cash or Zelle", () => {
+    for (const method of ["cash", "zelle"]) {
+      expect(duesPaymentCreateSchema.parse({ ...BASE, method }).note).toBeNull();
+    }
+  });
+
+  it("refuses a method outside the list, venmo included", () => {
+    // 📌 No manual venmo: a hand-typed Venmo payment would be counted again
+    // when its statement is imported.
+    expect(PAYMENT_METHODS).not.toContain("venmo");
+    for (const method of ["venmo", "venmo_import", "cheque", "", "CASH"]) {
+      expect(failingFields({ ...BASE, method }), method).toEqual(["method"]);
+    }
+  });
+
+  it("refuses a paid time in the future, on the field that is wrong", () => {
+    const twoDaysOn = centralAt(2 * 86_400_000);
+    expect(
+      failingFields({ ...BASE, paidDate: twoDaysOn.date, paidTime: "09:00" })
+    ).toEqual(["paidDate"]);
+
+    // An hour from now is today's date at a later time, unless the hour
+    // crosses midnight, in which case the date is what is wrong.
+    const today = centralAt(0).date;
+    const anHourOn = centralAt(60 * 60_000);
+    expect(
+      failingFields({ ...BASE, paidDate: anHourOn.date, paidTime: anHourOn.time })
+    ).toEqual([anHourOn.date === today ? "paidTime" : "paidDate"]);
+  });
+
+  it("allows a time a minute ahead, inside the clock-skew grace", () => {
+    const soon = centralAt(60_000);
+    expect(
+      duesPaymentCreateSchema.safeParse({
+        ...BASE,
+        paidDate: soon.date,
+        paidTime: soon.time,
+      }).success
+    ).toBe(true);
+  });
+
+  it("refuses a date that is not on the calendar, and a mistyped year", () => {
+    // The regex alone accepts all of these, and centralWallTimeToInstant would
+    // roll 31 February into March without a word.
+    for (const paidDate of ["2026-02-31", "2026-13-01", "2026-00-10", "0226-10-01", "0026-10-01", "2026-9-3"]) {
+      expect(failingFields({ ...BASE, paidDate }), paidDate).toEqual([
+        "paidDate",
+      ]);
+    }
+  });
+
+  it("refuses a time that is not on the clock", () => {
+    for (const paidTime of ["25:00", "24:00", "12:60", "9:30", ""]) {
+      expect(failingFields({ ...BASE, paidTime }), paidTime).toEqual([
+        "paidTime",
+      ]);
+    }
+  });
+
+  it("takes termsCovered as the correction does: '' is null, 1–4 otherwise", () => {
+    expect(
+      duesPaymentCreateSchema.parse({ ...BASE, termsCovered: "" }).termsCovered
+    ).toBeNull();
+    expect(
+      duesPaymentCreateSchema.parse({ ...BASE, termsCovered: "2" }).termsCovered
+    ).toBe(2);
+    for (const termsCovered of ["0", String(MAX_TERMS_COVERED + 1), "1.5"]) {
+      expect(failingFields({ ...BASE, termsCovered }), termsCovered).toEqual([
+        "termsCovered",
+      ]);
+    }
+  });
+
+  it("refuses a term that is not a term, and a member that is not a uuid", () => {
+    for (const startTerm of ["", "Summer 2026", "Fall 26"]) {
+      expect(failingFields({ ...BASE, startTerm }), startTerm).toEqual([
+        "startTerm",
+      ]);
+    }
+    expect(failingFields({ ...BASE, memberId: "" })).toEqual(["memberId"]);
+    expect(failingFields({ ...BASE, memberId: "not-a-uuid" })).toEqual([
+      "memberId",
+    ]);
+  });
+
+  it("refuses an over-long note rather than trimming it to fit", () => {
+    expect(failingFields({ ...BASE, note: "x".repeat(501) })).toEqual(["note"]);
+    expect(
+      duesPaymentCreateSchema.parse({ ...BASE, note: "x".repeat(500) }).note
+    ).toHaveLength(500);
   });
 });

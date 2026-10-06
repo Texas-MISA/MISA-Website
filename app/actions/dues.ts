@@ -17,7 +17,11 @@ import {
 } from "@/lib/dues";
 import { fetchRosterIndex } from "@/lib/roster-index";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { duesPaymentSaveSchema, duesVoidSchema } from "@/lib/validation";
+import {
+  duesPaymentCreateSchema,
+  duesPaymentSaveSchema,
+  duesVoidSchema,
+} from "@/lib/validation";
 
 // Dues import (§7 Stage 6.5 phase 2). Two actions over one CSV: previewImport
 // writes nothing, commitImport re-parses and writes.
@@ -51,7 +55,7 @@ const DIRECTORY = "/admin/members";
  * the string literal, and a concatenation widens it to plain `string`, which
  * collapses every field access at once. */
 const AUDITED_PAYMENT_COLUMNS =
-  "id, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, voided_at, voided_by, void_reason" as const;
+  "id, source, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, voided_at, voided_by, void_reason" as const;
 
 /**
  * The same columns plus `updated_at`, as its own unbroken literal rather than a
@@ -67,7 +71,7 @@ const AUDITED_PAYMENT_COLUMNS =
  * erased the reason.
  */
 const PAYMENT_SAVE_COLUMNS =
-  "id, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, voided_at, voided_by, void_reason, updated_at" as const;
+  "id, source, venmo_txn_id, member_id, paid_at, amount_cents, note, payer_name, payer_handle, submitted_eid, start_term, terms_covered, covered_terms, import_batch_id, imported_by, voided_at, voided_by, void_reason, updated_at" as const;
 
 /** Drop the CAS token before the row becomes an audit before/after. */
 function auditable<T extends { updated_at: string }>(
@@ -212,7 +216,12 @@ async function planImport(
     kind: "ok",
     planned,
     skipped,
-    existing: new Set(seen.map((row) => row.venmo_txn_id)),
+    // The filter is for the type, not the data. venmo_txn_id is nullable since
+    // migration 32 (a manual payment has none), but `.in()` above matches only
+    // the ids it was given, so a null never comes back here.
+    existing: new Set(
+      seen.map((row) => row.venmo_txn_id).filter((id) => id !== null)
+    ),
   };
 }
 
@@ -727,6 +736,186 @@ export async function voidPayment(
       e instanceof Error ? e.message : String(e)
     );
     return { status: "error" };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Recording a payment by hand (migration 32)
+// ---------------------------------------------------------------------------
+//
+// Cash at a meeting, a Zelle transfer, anything that will never appear on a
+// Venmo statement. 📌 It records a PAYMENT, not a status: one dues_payments
+// row, so member_directory derives membership from it exactly as it does from
+// an imported row, and savePayment and voidPayment work on it unchanged.
+//
+// There is no manual "venmo" (see PAYMENT_METHODS in lib/dues.ts): a Venmo
+// payment typed in by hand would be counted again when its statement is
+// imported, and the dedupe could not catch it.
+
+/**
+ * Every field the officer typed, echoed back so React 19's post-action form
+ * reset does not discard them. All eight, because all eight are typed by hand
+ * and losing any of them means typing the receipt again.
+ */
+export type SubmittedPaymentCreateValues = {
+  memberId: string;
+  amount: string;
+  paidDate: string;
+  paidTime: string;
+  method: string;
+  startTerm: string;
+  termsCovered: string;
+  note: string;
+};
+
+type PaymentCreateField = keyof SubmittedPaymentCreateValues;
+
+export type PaymentCreateState =
+  | { status: "idle" }
+  | { status: "unauthorized" }
+  | { status: "error"; values: SubmittedPaymentCreateValues }
+  | {
+      status: "invalid";
+      fieldErrors: Partial<Record<PaymentCreateField, string[]>>;
+      values: SubmittedPaymentCreateValues;
+    }
+  /** The picked member was deleted between the render and the save. */
+  | { status: "stale_member"; values: SubmittedPaymentCreateValues }
+  /** The new payment's id. No redirect: the form decides where to go. */
+  | { status: "done"; id: string };
+
+/** Bounds on what is reflected back, not on what is validated (see below). */
+const PAYMENT_CREATE_ECHO_LIMITS = {
+  memberId: 40,
+  amount: 16,
+  paidDate: 10,
+  paidTime: 8,
+  method: 16,
+  startTerm: 40,
+  termsCovered: 4,
+  note: 1000,
+} as const satisfies Record<PaymentCreateField, number>;
+
+/**
+ * Record a payment that did not come through a Venmo statement.
+ *
+ * One insert and one audit row. There is no compare-and-set, because an insert
+ * has nothing to conflict with, and no redirect, so the officer's form decides
+ * what happens next.
+ *
+ * The row it writes: `source` is the method, `venmo_txn_id` and
+ * `import_batch_id` are null (dues_source_matches_provenance requires exactly
+ * that), the three statement-only fields are null, `start_term` is set
+ * explicitly, and `imported_by` is the officer, which on a manual row means who
+ * recorded it.
+ */
+export async function createPayment(
+  _prev: PaymentCreateState,
+  formData: FormData
+): Promise<PaymentCreateState> {
+  const officer = await getOfficer();
+  if (!officer) return { status: "unauthorized" };
+
+  // ⚠️ Two copies, unlike savePayment's one: the schema reads the RAW values
+  // and only the echo is bounded. Parsing the sliced echo would quietly cut an
+  // over-long note to fit and save text nobody typed; this way it is REFUSED
+  // with its error. The note's echo limit sits above the schema's 500 so the
+  // officer gets back what they typed, to shorten.
+  const input = {} as SubmittedPaymentCreateValues;
+  const values = {} as SubmittedPaymentCreateValues;
+  for (const field of Object.keys(
+    PAYMENT_CREATE_ECHO_LIMITS
+  ) as PaymentCreateField[]) {
+    const raw = formData.get(field);
+    // FormData.get can return a File; anything not a string reads as empty.
+    input[field] = typeof raw === "string" ? raw : "";
+    values[field] = input[field].slice(0, PAYMENT_CREATE_ECHO_LIMITS[field]);
+  }
+
+  const parsed = duesPaymentCreateSchema.safeParse(input);
+  if (!parsed.success) {
+    return {
+      status: "invalid",
+      fieldErrors: fieldErrorsOf<PaymentCreateField>(parsed.error, "memberId"),
+      values,
+    };
+  }
+  const fields = parsed.data;
+
+  // The other half of the startTerm check, the half that needs paid_at, as in
+  // savePayment. The schema proved the string is a well-formed term; this
+  // proves it is one the form could have offered for THIS date. Without it the
+  // form is a way to write an arbitrary term into the column (§4.7). No
+  // `include`: a new row has no stored value to preserve.
+  if (!startTermOptions(fields.paidAt).includes(fields.startTerm)) {
+    return {
+      status: "invalid",
+      fieldErrors: { startTerm: ["Pick one of the terms offered"] },
+      values,
+    };
+  }
+
+  try {
+    const db = createAdminClient();
+
+    const { data: created, error } = await db
+      .from("dues_payments")
+      .insert({
+        source: fields.method,
+        // Null, never a synthesised id: the import's dedupe key must mean
+        // exactly one thing. The full unique index lets any number of null
+        // rows coexist, and the provenance CHECK refuses a manual row that
+        // carries either id.
+        venmo_txn_id: null,
+        import_batch_id: null,
+        member_id: fields.memberId,
+        paid_at: fields.paidAt.toISOString(),
+        amount_cents: fields.amountCents,
+        note: fields.note,
+        // Statement fields. A hand-entered payment has no Venmo payer, and
+        // the member is picked rather than parsed out of a note.
+        payer_name: null,
+        payer_handle: null,
+        submitted_eid: null,
+        // ⚠️ Explicit, as in commitImport. The column default asks
+        // term_of(now()) and cannot see paid_at; the officer picked this from
+        // the terms startTermOptions derived from the payment date.
+        start_term: fields.startTerm,
+        terms_covered: fields.termsCovered,
+        imported_by: officer.userId,
+      })
+      .select(PAYMENT_SAVE_COLUMNS)
+      .single();
+
+    if (error) {
+      // The picked member was deleted while the form was open. The foreign
+      // key is the check, as in grantPoints; a read before the write would be
+      // TOCTOU anyway.
+      if (error.code === "23503" && error.message.includes("member_id")) {
+        return { status: "stale_member", values };
+      }
+      // 23514 is a bug, not a case: every CHECK on the row is mirrored in
+      // duesPaymentCreateSchema or set by this action.
+      console.error("createPayment failed:", error.message);
+      return { status: "error", values };
+    }
+
+    await writeAudit(db, {
+      entityType: "dues_payment",
+      entityId: created.id,
+      actorId: officer.userId,
+      action: "dues.recorded",
+      after: auditable(created),
+    });
+
+    revalidatePayment(created.id);
+    return { status: "done", id: created.id };
+  } catch (e) {
+    console.error(
+      "createPayment failed:",
+      e instanceof Error ? e.message : String(e)
+    );
+    return { status: "error", values };
   }
 }
 

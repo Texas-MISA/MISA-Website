@@ -45,7 +45,8 @@ const DETAIL_COLUMNS =
 
 type Payment = {
   id: string;
-  venmo_txn_id: string;
+  /** Null on a payment recorded by hand (migration 32). */
+  venmo_txn_id: string | null;
   member_id: string | null;
   paid_at: string;
   amount_cents: number;
@@ -56,7 +57,8 @@ type Payment = {
   start_term: string;
   terms_covered: number | null;
   covered_terms: string[] | null;
-  import_batch_id: string;
+  /** Null on a payment recorded by hand (migration 32). */
+  import_batch_id: string | null;
   imported_by: string;
   imported_at: string;
   voided_at: string | null;

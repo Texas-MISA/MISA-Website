@@ -271,7 +271,7 @@ export type Database = {
           amount_cents: number
           covered_terms: string[] | null
           id: string
-          import_batch_id: string
+          import_batch_id: string | null
           imported_at: string
           imported_by: string
           member_id: string | null
@@ -280,11 +280,12 @@ export type Database = {
           paid_at: string
           payer_handle: string | null
           payer_name: string | null
+          source: string
           start_term: string
           submitted_eid: string | null
           terms_covered: number | null
           updated_at: string
-          venmo_txn_id: string
+          venmo_txn_id: string | null
           void_reason: string | null
           voided_at: string | null
           voided_by: string | null
@@ -293,7 +294,7 @@ export type Database = {
           amount_cents: number
           covered_terms?: string[] | null
           id?: string
-          import_batch_id: string
+          import_batch_id?: string | null
           imported_at?: string
           imported_by: string
           member_id?: string | null
@@ -302,11 +303,12 @@ export type Database = {
           paid_at: string
           payer_handle?: string | null
           payer_name?: string | null
+          source?: string
           start_term?: string
           submitted_eid?: string | null
           terms_covered?: number | null
           updated_at?: string
-          venmo_txn_id: string
+          venmo_txn_id?: string | null
           void_reason?: string | null
           voided_at?: string | null
           voided_by?: string | null
@@ -315,7 +317,7 @@ export type Database = {
           amount_cents?: number
           covered_terms?: string[] | null
           id?: string
-          import_batch_id?: string
+          import_batch_id?: string | null
           imported_at?: string
           imported_by?: string
           member_id?: string | null
@@ -324,11 +326,12 @@ export type Database = {
           paid_at?: string
           payer_handle?: string | null
           payer_name?: string | null
+          source?: string
           start_term?: string
           submitted_eid?: string | null
           terms_covered?: number | null
           updated_at?: string
-          venmo_txn_id?: string
+          venmo_txn_id?: string | null
           void_reason?: string | null
           voided_at?: string | null
           voided_by?: string | null

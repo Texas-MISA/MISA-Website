@@ -1,14 +1,19 @@
+import { readFileSync } from "node:fs";
+
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   parseVenmoStatement,
   planPayment,
+  startTermOptions,
   termOf,
   type DuesPrices,
   type PlannedPayment,
   type RosterEntry,
 } from "@/lib/dues";
+import { toCentralFields } from "@/lib/events";
 import { fetchRosterIndex } from "@/lib/roster-index";
+import { duesPaymentCreateSchema } from "@/lib/validation";
 
 import {
   cleanup,
@@ -49,6 +54,8 @@ let amaraEid = "";
 /** Unique per run, so parallel-safe and easy to clean up. */
 const RUN = crypto.randomUUID().slice(0, 8);
 const txnIds = new Set<string>();
+/** Payments recorded by hand have no transaction id; cleaned up by row id. */
+const manualIds = new Set<string>();
 
 function txn(suffix: string): string {
   const id = `t3q-imp-${RUN}-${suffix}`;
@@ -165,6 +172,9 @@ afterAll(async () => {
   // itself the behaviour that foreign key exists to produce.
   if (txnIds.size > 0) {
     await db.from("dues_payments").delete().in("venmo_txn_id", [...txnIds]);
+  }
+  if (manualIds.size > 0) {
+    await db.from("dues_payments").delete().in("id", [...manualIds]);
   }
   await cleanup(db, track);
 });
@@ -645,5 +655,174 @@ describe("assigning and voiding a payment", () => {
     // And it is still voided, not quietly revived.
     const now = await readPayment(first.created[0].id);
     expect(now.voided_at).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Recording a payment by hand (migration 32)
+// ---------------------------------------------------------------------------
+//
+// Same convention as above: createPayment is a "use server" export, so what
+// runs here is the exact sequence it performs. The form's values go through
+// duesPaymentCreateSchema, the start term is checked against
+// startTermOptions(paidAt), and the insert is built from the parsed fields the
+// way the action builds it.
+
+/** createPayment's insert, reproduced. */
+async function record(memberId: string, form: Record<string, string> = {}) {
+  // An hour ago, Central, so the payment is safely in the past and in the
+  // current term except within an hour of a term boundary.
+  const paid = toCentralFields(new Date(Date.now() - 60 * 60_000));
+  const fields = duesPaymentCreateSchema.parse({
+    memberId,
+    amount: "40",
+    paidDate: paid.date,
+    paidTime: paid.time,
+    method: "cash",
+    startTerm: await currentTerm(),
+    termsCovered: "1",
+    note: "",
+    ...form,
+  });
+  // The action's second half of the startTerm check.
+  expect(startTermOptions(fields.paidAt)).toContain(fields.startTerm);
+
+  const { data, error } = await db
+    .from("dues_payments")
+    .insert({
+      source: fields.method,
+      venmo_txn_id: null,
+      import_batch_id: null,
+      member_id: fields.memberId,
+      paid_at: fields.paidAt.toISOString(),
+      amount_cents: fields.amountCents,
+      note: fields.note,
+      payer_name: null,
+      payer_handle: null,
+      submitted_eid: null,
+      start_term: fields.startTerm,
+      terms_covered: fields.termsCovered,
+      imported_by: officerId,
+    })
+    .select(
+      "id, source, venmo_txn_id, import_batch_id, imported_by, amount_cents, note, start_term, covered_terms, updated_at"
+    )
+    .single();
+  if (data) manualIds.add(data.id);
+  return { data, error };
+}
+
+describe("recording a payment by hand", () => {
+  it("counts toward dues_paid_term exactly as an imported payment does", async () => {
+    // 📌 A payment, not a status: member_directory derives membership from
+    // covered_terms, and nothing about the row's source enters into it.
+    const term = await currentTerm();
+    const member = await createTestMember(db, track, testIdentity());
+    expect(await duesPaid(member)).toBe(false);
+
+    const { data, error } = await record(member);
+    expect(error).toBeNull();
+    expect(data).toMatchObject({
+      source: "cash",
+      venmo_txn_id: null,
+      import_batch_id: null,
+      // On a manual row, imported_by means who recorded it.
+      imported_by: officerId,
+      amount_cents: 4000,
+      note: null,
+      start_term: term,
+      covered_terms: [term],
+    });
+    expect(await duesPaid(member)).toBe(true);
+
+    // And the correction and void paths work on it unchanged. Neither touches
+    // source or the two ids, so the provenance CHECK has nothing to object to.
+    const saved = await save(data!.id, data!.updated_at, {
+      member_id: member,
+      start_term: term,
+      terms_covered: 2,
+    });
+    expect(saved?.covered_terms).toHaveLength(2);
+
+    expect(await voidIt(data!.id, "Recorded against the wrong member")).not.toBeNull();
+    expect(await duesPaid(member)).toBe(false);
+  });
+
+  it("keeps the method and the note an Other payment needs", async () => {
+    const member = await createTestMember(db, track, testIdentity());
+    const { data, error } = await record(member, {
+      method: "other",
+      note: "Paid by cheque at the fake-org social",
+    });
+    expect(error).toBeNull();
+    expect(data?.source).toBe("other");
+    expect(data?.note).toBe("Paid by cheque at the fake-org social");
+  });
+
+  it("covers nothing while the terms are undecided, like an odd imported amount", async () => {
+    const member = await createTestMember(db, track, testIdentity());
+    const { data, error } = await record(member, { termsCovered: "" });
+    expect(error).toBeNull();
+    expect(data?.covered_terms).toBeNull();
+    expect(await duesPaid(member)).toBe(false);
+  });
+
+  it("⚠️ a member deleted while the form was open is a 23503 on member_id", async () => {
+    // What createPayment turns into `stale_member`. The foreign key is the
+    // check; nothing reads the member first.
+    const member = await createTestMember(db, track, testIdentity());
+    const { error: deleteError } = await db
+      .from("members")
+      .delete()
+      .eq("id", member);
+    expect(deleteError).toBeNull();
+
+    const { error } = await record(member);
+    expect(error?.code).toBe("23503");
+    expect(error?.message).toContain("member_id");
+  });
+
+  it("🔓 leaves the import working: a statement after a manual entry still dedupes", async () => {
+    await record(rowan);
+    const id = txn("after-manual");
+    const csv = statement([row({ id, note: rowanEid, amount: "+ $40.00" })]);
+    const roster: RosterEntry[] = [
+      { memberId: rowan, normalizedEid: rowanEid.toLowerCase() },
+    ];
+
+    expect((await commit(csv, roster)).created).toHaveLength(1);
+    expect((await commit(csv, roster)).created).toHaveLength(0);
+  });
+});
+
+describe("the audited payment columns", () => {
+  /** A `const NAME = "…" as const` literal from app/actions/dues.ts, split. */
+  function columnList(source: string, name: string): string[] {
+    const match = new RegExp(`const ${name} =\\s*"([^"]+)" as const`).exec(
+      source
+    );
+    if (!match) throw new Error(`${name} not found in app/actions/dues.ts`);
+    return match[1].split(",").map((column) => column.trim());
+  }
+
+  it("select the same columns on both sides of every audit, source included", async () => {
+    // A "use server" file can export only async functions, so the lists are
+    // read off the source. Both sides of an audit before/after must select the
+    // same columns, or the trail invents a change; PAYMENT_SAVE_COLUMNS adds
+    // only the CAS token, which auditable() strips.
+    const source = readFileSync("app/actions/dues.ts", "utf8");
+    const audited = columnList(source, "AUDITED_PAYMENT_COLUMNS");
+    const saved = columnList(source, "PAYMENT_SAVE_COLUMNS");
+
+    expect(saved).toEqual([...audited, "updated_at"]);
+    expect(audited).toContain("source");
+
+    // And the database accepts the list as written. Nothing type-checks a
+    // quoted select string, so a misspelt column is a 42703 at runtime.
+    const { error } = await db
+      .from("dues_payments")
+      .select(saved.join(", "))
+      .limit(1);
+    expect(error).toBeNull();
   });
 });
