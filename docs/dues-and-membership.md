@@ -1,12 +1,14 @@
 # Dues & membership status — Venmo reconciliation
 
-✅ **Manual dues entry is BUILT on `portal-launch` (2026-10-05) and NOT LIVE.**
-An officer records a payment that did not come through Venmo (Cash, Zelle or
-Other) at `/admin/dues/new`. It writes a **payment row**, never a status flag,
-through migration 32 (`manual_dues_entry`), which is **applied locally and not
-to production**. 🔴 **Migration 32 must reach production before the code that
-reads it**, or every dues screen fails with 42703 on `source`. See the *Manual
-dues entry* section below for what was built and what changed from the plan.
+✅ **Manual dues entry is LIVE on `main` since 2026-10-06** (`95c04a7`; built
+2026-10-05). An officer records a payment that did not come through Venmo (Cash,
+Zelle or Other) at `/admin/dues/new`. It writes a **payment row**, never a
+status flag, through migration 32 (`manual_dues_entry`), which **reached
+production at about 01:20 Central on 2026-10-06, minutes before the code**, so
+the dues screens never met the 42703 on `source` that the order guarded
+against. The deploy record and rollback target are at the top of `tasks.md`.
+See the *Manual dues entry* section below for what was built and what changed
+from the plan.
 
 **Status:** ✅ **COMPLETE — all 4 phases.** Phases 1–3 on 2026-08-06 (migration
 19, `lib/dues.ts`, `lib/roster-index.ts`, `app/actions/dues.ts`,
@@ -368,7 +370,7 @@ The detail page reads that member's `dues_payments` rows directly and shows
 what they are paid through — ordered by `termsFrom` semantics, never by a
 string compare.
 
-## ✅ Manual dues entry (BUILT on `portal-launch` 2026-10-05, NOT LIVE; requested 2026-08-15)
+## ✅ Manual dues entry (BUILT 2026-10-05, LIVE on `main` since 2026-10-06; requested 2026-08-15)
 
 A way for an officer to mark a member as having paid when the money did not come
 through the Venmo statement: cash at a meeting, Zelle, a transfer to the wrong
@@ -377,7 +379,8 @@ month.
 
 ### What was built (2026-10-05)
 
-Two steps on `portal-launch`, neither on `main`. The plan below is kept as
+Two steps on `portal-launch`, both on `main` since 2026-10-06 (`95c04a7`,
+with migration 32 pushed to production first). The plan below is kept as
 written, with its stale facts corrected in place and one decision reversed (the
 correction note under the schema heading).
 
@@ -387,9 +390,9 @@ correction note under the schema heading).
   `other`. `dues_source_matches_provenance` requires an imported row to carry
   both ids and a manual row to carry neither. 🔓 **`dues_payments_txn_idx`
   stays a FULL unique index**, and the migration asserts it. `amount_cents > 0`
-  is unchanged, and there is no view change. 🔴 **Applied locally only. It must
-  reach production before the code**, which selects `source` on every dues
-  screen.
+  is unchanged, and there is no view change. ✅ **It reached production before
+  the code** (2026-10-06), as it had to: the code selects `source` on every
+  dues screen.
 - **The method list (officer, 2026-10-05): Cash, Zelle, Other.** There is no
   manual Venmo method: a Venmo payment typed in by hand would be counted again
   when its statement is imported, and the dedupe could not catch it, because

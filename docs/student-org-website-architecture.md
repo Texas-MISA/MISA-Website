@@ -1,12 +1,12 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
 **Version:** 1.85
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and production's schema and code are in sync at `…000031` as of 2026-10-04.** 🏗️ **Manual dues entry (v1.85) is built on `portal-launch` and NOT live: migration 32 is applied locally only, and must reach production before its code.** ✅ **Migration 30 (member type and project eligibility, v1.83) reached production on 2026-10-03, a day ahead of the code that reads it, which went live on 2026-10-04** as `55cb81e` with v1.82's column picker. Both steps were checked by rendered response. ✅ **Migration 31 (the "Count as general meeting" checkbox and the October 2026 start, v1.84) reached production on 2026-10-04, minutes ahead of its code, which went live the same afternoon as `65cb0af`.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and production's schema and code are in sync at `…000032` as of 2026-10-06.** ✅ **Manual dues entry (v1.85) is LIVE: migration 32 reached production on 2026-10-06, minutes ahead of its code, which went live as `95c04a7`.** ✅ **Migration 30 (member type and project eligibility, v1.83) reached production on 2026-10-03, a day ahead of the code that reads it, which went live on 2026-10-04** as `55cb81e` with v1.82's column picker. Both steps were checked by rendered response. ✅ **Migration 31 (the "Count as general meeting" checkbox and the October 2026 start, v1.84) reached production on 2026-10-04, minutes ahead of its code, which went live the same afternoon as `65cb0af`.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
 **Last updated:** October 2026
 
 > **v1.85: an officer can record a dues payment that did not come through Venmo: Cash, Zelle or Other.**
 >
-> Built 2026-10-05 on `portal-launch` in two steps (`fa1724e`, then the screens), and **NOT live**. Requested 2026-08-15 (v1.64); the method list and where it shows are officer decisions of 2026-10-05. Full record: `docs/dues-and-membership.md` (*Manual dues entry*) and `docs/build-log.md`.
+> Built 2026-10-05 on `portal-launch` in two steps (`fa1724e`, then the screens), and **live on `main` since 2026-10-06** (`95c04a7`). Migration 32 was applied locally, then to production minutes ahead of the code. Requested 2026-08-15 (v1.64); the method list and where it shows are officer decisions of 2026-10-05. Full record: `docs/dues-and-membership.md` (*Manual dues entry*) and `docs/build-log.md`.
 >
 > - 📌 **It records a PAYMENT, not a status.** One `dues_payments` row, so `member_directory.dues_paid_term` derives membership from it exactly as from an imported row, and the edit, void and audit paths apply unchanged.
 > - **Migration 32 (`manual_dues_entry`)**: `venmo_txn_id` and `import_batch_id` become nullable, and a `source` column says where the row came from: `venmo_import` (the default) or the method an officer picked, `cash`, `zelle` or `other`. **`dues_source_matches_provenance`** requires an imported row to carry both ids and a manual row neither. `amount_cents > 0` is unchanged, so a comped membership stays out of scope. No view changes.
@@ -15,7 +15,7 @@
 > - **`/admin/dues/new`** (§5) records one: member, amount, date and time paid (Central), method, start term, terms covered, and a note that is **required for Other**. The start term is checked against `startTermOptions(paidAt)` (§4.7), and the form offers that same set from the date as typed. Entry points: the ledger, and the member page's Dues section.
 > - **Where it shows (officer): the payment page and the ledger, no new column.** The ledger's and the member page's Payer cell show the method; the payment page shows *How it was paid* and *Recorded … by*, and hides the Venmo-only rows.
 > - **A hand-entered payment always credits a member**: `savePayment` refuses to clear it, since there is no payer name for the suggestions to rank.
-> - 🔴 **DEPLOY ORDER: migration 32 BEFORE the code.** The code selects `source` on every dues screen, so without 32 they fail with 42703. The reverse is harmless: older code never names `source`, and its inserts take the default.
+> - 🔴 **DEPLOY ORDER: migration 32 BEFORE the code.** *(Done 2026-10-06: 32 reached production at about 01:20 Central and the code at 01:22; `tasks.md` and the build log have the record.)* The code selects `source` on every dues screen, so without 32 they fail with 42703. The reverse is harmless: older code never names `source`, and its inserts take the default.
 
 > **v1.84: an officer ticks which events count as general meetings, and the monthly requirement starts in October 2026.**
 >
@@ -3447,7 +3447,7 @@ $$;
                        their page's Dues section. No Venmo method: a Venmo
                        payment comes in through /import, and typing it here
                        too would count it twice
-                       (migration 32, v1.85; built on portal-launch, NOT live)
+                       (migration 32, v1.85; live 2026-10-06)
 /admin/attendance      Review queue — all submissions, filterable by status
 /admin/attendance/new  Officer manual entry — the recovery path for a member the
                        check-in form refused                    (Stage 5 phase 3)
