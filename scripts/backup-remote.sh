@@ -17,33 +17,51 @@
 # --- What a backup holds ---------------------------------------------------
 #
 # roles.sql       custom database roles (Supabase's restore guide takes all three)
-# schema.sql      every table, view, function, policy and grant the remote has
+# schema.sql      the project's own schemas: every table, view, function, policy
+#                 and grant it defines. Supabase's managed schemas come with any
+#                 new project. (To be confirmed on the first real run.)
 # data.sql        every row in public, auth and storage, as COPY blocks
 # counts.txt      exact row counts read just before the dump, which the script
 #                 checks data.sql against, and a restore can be checked against
 # migrations.txt  the remote's migration history: which repo commit's
 #                 supabase/migrations/ matches schema.sql
+# backup.log      the CLI's own output, for when a step fails. In a normal run
+#                 it holds host and user names, never a password.
 #
-# LEFT OUT of data.sql: auth's live sessions, refresh tokens and one-time
-# tokens (password-reset and invite links), with the MFA challenge and flow
-# state tied to them, and auth's sign-in log, which holds IP addresses. A
-# stolen backup therefore holds no credential that is live today. The cost is
-# that after a restore every officer signs in again; nothing else is lost.
-# Officer accounts themselves (auth.users, auth.identities) ARE kept, password
-# hashes included, because a restore without them locks every officer out.
+# A run that did not finish, for any reason, leaves an `INCOMPLETE` file in its
+# folder. Never restore from a folder that has one.
 #
-# 🔓 Read-only. pg_dump never writes to the database it reads.
+# LEFT OUT of data.sql: auth's sessions, refresh tokens, one-time-token index,
+# MFA challenges and AMR claims, PKCE flow state, and its sign-in log, which
+# holds IP addresses. After a restore every officer signs in again; nothing
+# else is lost. What a stolen backup DOES hold: every officer's password hash,
+# any TOTP secret in auth.mfa_factors, and, in auth.users's own token columns,
+# any password-reset, invite or confirmation link still unused when the backup
+# ran, live until it expires (an hour by default).
+#
+# 🔓 Changes no club data: pg_dump only reads, and nothing here writes to a
+# table. It is NOT strictly read-only on the server, though. With no database
+# password in the environment, the CLI has Supabase (re)create a temporary
+# login role, cli_login_postgres, whose password expires within minutes. The
+# role stays listed in pg_roles afterwards, as it does after every `db push`;
+# leave it, the next run recreates it. And if this machine is already banned
+# from the connection pooler, the CLI lifts EVERY network ban on the project
+# after its third failed attempt.
 #
 # 🔴 THE OUTPUT IS REAL CLUB DATA: every member's EID and email, every dues
 # payment, and the officers' password hashes. THIS REPOSITORY IS PUBLIC, so
-# the script refuses any output directory inside it. Keep backups somewhere
-# private (not a shared or public cloud folder), and delete old ones you no
-# longer need.
+# the script refuses any output directory inside it, or inside any other git
+# working tree. Keep backups somewhere private (not a shared or public cloud
+# folder), and delete old ones you no longer need.
 #
 # Needs Docker Desktop running: the CLI runs pg_dump inside a container. Needs
-# no database password: the CLI signs in with a temporary login role.
+# no database password: the CLI has Supabase create a temporary login role
+# (above).
 #
 # --- Restoring -------------------------------------------------------------
+#
+# ⚠️ UNTESTED. tasks.md §Backups step 3 replaces these commands with ones that
+# worked. Until then, do not follow the second recipe in an emergency.
 #
 # Into a NEW project (lost or deleted project, or a handoff), per Supabase's
 # migration guide, with the new project's connection string in $DB_URL:
@@ -53,6 +71,10 @@
 #        --command 'SET session_replication_role = replica' \
 #        --file data.sql --dbname "$DB_URL"
 #
+# Then record the migration history, which data.sql does not carry:
+# `npx supabase migration repair --status applied <version>` for every version
+# in migrations.txt, against the NEW project, before any `db push`.
+#
 # Into the SAME project after rows were lost, do not run data.sql whole: it
 # would collide with every row still there. Load it into the local stack first
 # (`npx supabase db reset`, then the psql line above against
@@ -60,8 +82,15 @@
 # missing, and copy back only that. Do it before officers write more rows.
 set -euo pipefail
 
+# Debug output would carry connection details into backup.log.
+[ -z "${SUPABASE_DEBUG:-}" ] || { echo "unset SUPABASE_DEBUG first: debug output would go into backup.log" >&2; exit 1; }
+
 REPO=$(cd "$(dirname "$0")/.." && pwd -P)
 OUT_ROOT=${1:-${MISA_BACKUP_DIR:-$HOME/misa-backups}}
+
+# The auth tables left out of data.sql. ONE list, used by the dump's -x and by
+# the verify step, so the two cannot drift.
+EXCLUDED_TABLES="auth.sessions,auth.refresh_tokens,auth.one_time_tokens,auth.mfa_amr_claims,auth.mfa_challenges,auth.flow_state,auth.audit_log_entries"
 
 # Path checks go through Python because Git Bash hands Windows programs
 # C:/... while it prints /c/..., so a string prefix test compares two
@@ -98,6 +127,21 @@ mkdir -p "$OUT_ROOT"
 OUT="$OUT_ROOT/misa-$STAMP"
 mkdir "$OUT" || { echo "$OUT already exists; wait a minute and run again" >&2; exit 1; }
 
+# A second guard, on the folder as git sees it: this catches what the Python
+# check above cannot, such as the repository reached through a UNC loopback
+# share (//localhost/C$/...), and any other clone. Checked before INCOMPLETE is
+# written, so the folder is still empty and rmdir succeeds.
+if git -C "$OUT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  rmdir "$OUT"
+  echo "refusing: $OUT is inside a git working tree" >&2
+  exit 1
+fi
+
+# The folder is marked INCOMPLETE from the start, and the marker comes off only
+# after verify passes. So a run that stops for ANY reason (a failed step,
+# Ctrl-C, a closed window) leaves it, not only one the ERR trap sees.
+touch "$OUT/INCOMPLETE"
+
 echo
 echo "  Backing up project $REF"
 echo "  into $OUT"
@@ -106,11 +150,12 @@ echo
 # Every CLI step's output goes to backup.log, so a failure can say why.
 LOG="$OUT/backup.log"
 
-# A failed run leaves a folder that looks like a backup and is not one, so
-# mark it rather than delete it: whatever did get written may still help.
-trap 'touch "$OUT/INCOMPLETE"; echo "FAILED"; echo; tail -n 15 "$LOG" 2>/dev/null | sed "s/^/    /" >&2; echo; echo "  $OUT is incomplete and marked INCOMPLETE." >&2' ERR
+trap 'echo "FAILED"; echo; tail -n 15 "$LOG" 2>/dev/null | sed "s/^/    /" >&2; echo; echo "  $OUT is incomplete and marked INCOMPLETE." >&2' ERR
 
 step() { printf '  %-26s ' "$1"; }
+
+# Which CLI made this backup, for whoever restores it.
+npx supabase --version >>"$LOG" 2>&1
 
 # 🪤 `db query` reads only the FIRST LINE of its SQL, so this stays one line.
 # It counts every base table in public by name rather than from a list, so a
@@ -126,7 +171,9 @@ python -c '
 import sys, json
 s = sys.stdin.read()
 try:
-    d = json.loads(s[s.index("{"):])
+    # raw_decode stops at the end of the JSON value, so stderr the CLI prints
+    # after it does not break the parse.
+    d, _ = json.JSONDecoder().raw_decode(s, s.index("{"))
 except ValueError:
     sys.exit("count query returned no JSON (is the project paused?)")
 if d.get("_tag") == "Error" or "rows" not in d:
@@ -150,16 +197,18 @@ echo "ok"
 
 step "data"
 npx supabase db dump --linked --data-only --use-copy -f "$OUT/data.sql" \
-  -x auth.sessions,auth.refresh_tokens,auth.one_time_tokens,auth.mfa_amr_claims,auth.mfa_challenges,auth.flow_state,auth.audit_log_entries \
+  -x "$EXCLUDED_TABLES" \
   </dev/null >>"$LOG" 2>&1
 echo "ok"
 
 # An exit code of 0 is not a backup. Count the rows data.sql actually carries
 # for every table counts.txt names, and compare.
 step "verify"
-python - "$OUT/counts.txt" "$OUT/data.sql" "$OUT/schema.sql" <<'PY'
-import re, sys
-counts_path, data_path, schema_path = sys.argv[1:4]
+python - "$OUT/counts.txt" "$OUT/data.sql" "$OUT/schema.sql" \
+         "$OUT/migrations.txt" "$OUT/roles.sql" "$EXCLUDED_TABLES" <<'PY'
+import os, re, sys
+counts_path, data_path, schema_path, migrations_path, roles_path, excluded = sys.argv[1:7]
+excluded = set(excluded.split(","))
 
 expected = {}
 for line in open(counts_path, encoding="utf-8"):
@@ -167,6 +216,11 @@ for line in open(counts_path, encoding="utf-8"):
     expected[t] = int(n)
 if "public.members" not in expected:
     sys.exit("counts.txt has no public.members row")
+
+if not re.search(r"\b\d{14}\b", open(migrations_path, encoding="utf-8").read()):
+    sys.exit("migrations.txt names no migration version")
+if os.path.getsize(roles_path) == 0:
+    sys.exit("roles.sql is empty")
 
 found, table = {}, None
 copy = re.compile(r'^COPY "([^"]+)"\."([^"]+)"')
@@ -188,6 +242,10 @@ for line in open(data_path, encoding="utf-8"):
         t = f"{m[1]}.{m[2]}"
         found[t] = found.get(t, 0) + 1
 
+leaked = sorted(excluded & found.keys())
+if leaked:
+    sys.exit("data.sql holds tables that must be left out: " + ", ".join(leaked))
+
 if "create table" not in open(schema_path, encoding="utf-8").read().lower():
     sys.exit("schema.sql holds no CREATE TABLE")
 
@@ -207,10 +265,11 @@ for d in drift:
     print(f"    note: {d} (rows written during the backup)")
 PY
 
+rm -f "$OUT/INCOMPLETE"
 trap - ERR
 
 echo
-echo "  Backed up:"
+echo "  Row counts at the start of the backup:"
 awk -F'\t' '$1 ~ /^public\.(members|events|attendance|point_adjustments|dues_payments|admin_audit)$/ || $1 == "auth.users" { printf "    %-26s %s\n", $1, $2 }' "$OUT/counts.txt"
 echo
 du -sh "$OUT" | awk '{ print "  " $1 " in " $2 }'

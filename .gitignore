@@ -112,6 +112,10 @@ skills-lock.json
 # if no slot points at it yet.
 pictures/
 
+# Production backups (scripts/backup-remote.sh) hold real EIDs and emails; the script refuses this repo, and this catches one copied in by hand.
+misa-backups/
+misa-20*Z/
+
 # Personal, non-project files that happen to sit in this working directory.
 # The repository is PUBLIC and history is not takeable-back, so keep them out
 # of reach of a broad `git add -A`. Better still, keep them outside the repo.
