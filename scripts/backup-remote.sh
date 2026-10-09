@@ -50,8 +50,8 @@
 #
 # 🔴 THE OUTPUT IS REAL CLUB DATA: every member's EID and email, every dues
 # payment, and the officers' password hashes. THIS REPOSITORY IS PUBLIC, so
-# the script refuses any output directory inside it, or inside any other git
-# working tree. Keep backups somewhere private (not a shared or public cloud
+# the script refuses any output directory inside it, or (when git is
+# installed) inside any other git working tree. Keep backups somewhere private (not a shared or public cloud
 # folder), and delete old ones you no longer need.
 #
 # Needs Docker Desktop running: the CLI runs pg_dump inside a container. Needs
@@ -131,7 +131,10 @@ mkdir "$OUT" || { echo "$OUT already exists; wait a minute and run again" >&2; e
 # check above cannot, such as the repository reached through a UNC loopback
 # share (//localhost/C$/...), and any other clone. Checked before INCOMPLETE is
 # written, so the folder is still empty and rmdir succeeds.
-if git -C "$OUT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+# safe.directory='*' so a repository git calls "dubious ownership" (owned by
+# another user) is refused too, rather than read as "not a work tree". With no
+# git installed, the command fails and this check is skipped.
+if git -c safe.directory='*' -C "$OUT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   rmdir "$OUT"
   echo "refusing: $OUT is inside a git working tree" >&2
   exit 1
@@ -208,7 +211,7 @@ python - "$OUT/counts.txt" "$OUT/data.sql" "$OUT/schema.sql" \
          "$OUT/migrations.txt" "$OUT/roles.sql" "$EXCLUDED_TABLES" <<'PY'
 import os, re, sys
 counts_path, data_path, schema_path, migrations_path, roles_path, excluded = sys.argv[1:7]
-excluded = set(excluded.split(","))
+excluded = {t.strip() for t in excluded.split(",") if t.strip()}
 
 expected = {}
 for line in open(counts_path, encoding="utf-8"):

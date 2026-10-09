@@ -23,7 +23,7 @@ The stopgap is **`scripts/backup-remote.sh`** (written 2026-10-09 on `portal-lau
 
 **To do, in this order:**
 
-1. ✅ **Review the script.** Done 2026-10-09: changes requested, all fixed in the commit after `973e9aa`. It found that an interrupted run left no `INCOMPLETE` marker (the marker is now written first and removed only after verify passes); that "read-only" hid the temporary `cli_login_postgres` login role and the CLI lifting every pooler network ban after three failures; that the header overstated what a stolen backup lacks (password hashes, TOTP secrets and unused reset or invite links in `auth.users` are in it); and that the same-project restore recipe cannot work as written (now marked UNTESTED). It checked that:
+1. ✅ **Review the script.** Done 2026-10-09: changes requested, all fixed in the commit after `973e9aa`. It found that an interrupted run left no `INCOMPLETE` marker (the marker is now written first and removed only after verify passes); that "read-only" hid the temporary `cli_login_postgres` login role and the CLI lifting every pooler network ban after three failures; that the header overstated what a stolen backup lacks (password hashes, TOTP secrets and unused reset or invite links in `auth.users` are in it); and that the same-project restore recipe cannot work as written (now marked UNTESTED). It checked whether:
    - it only reads from production;
    - the in-repo refusal cannot be got round (a symlink, a relative path, another drive letter);
    - the seven `auth` tables it leaves out (`-x`) are exactly the ones that are safe to lose. In particular, `auth.mfa_amr_claims` points at `auth.sessions`, and the identities and users that are kept must restore without them;
