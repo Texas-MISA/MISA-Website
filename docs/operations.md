@@ -65,6 +65,17 @@ A push to `main` is a production deploy of https://www.txmisa.org, and `tasks.md
 - 🪤 **A browser that has visited the site cannot test the bare domain.** Chrome autocompletes `txmisa.org` to `www.txmisa.org` from history, then hides `www.` in the address bar, so a dead apex looks fine. On 2026-09-30 the apex had no A record, yet it "worked" in the officer's browser. Pointing that same Chrome at exactly `https://txmisa.org/` showed Chrome's error page. Test with `curl -sI https://txmisa.org/attend`, or click into the address bar to see the full URL.
 - 📌 **A docs-only commit to `main` is still a production build.** It needs the same event check, and the live deployment can be a docs commit ahead of the commit the docs name.
 
+## Backups
+
+🔴 **Supabase keeps NO backups of this project.** It is on the Free plan, where `npx supabase backups list --project-ref gbxypeofjnhrhotlhyzs` returns `"backups":[]` and `"pitr_enabled":false` (checked 2026-10-09). Daily backups start at Pro ($25/month, 7 days kept), which is the officers' call. Until then, `bash scripts/backup-remote.sh [output-dir]` is the only copy of the club's data that exists anywhere else.
+
+- **When to run it:** before anything that writes to production in bulk (a migration push, a roster import, a merge, a dues import), and weekly during the semester. It is read-only and takes about a minute.
+- **What it writes:** one `misa-<UTC time>/` folder per run, under `$MISA_BACKUP_DIR` or `~/misa-backups`, holding `roles.sql`, `schema.sql`, `data.sql`, `counts.txt` and `migrations.txt`. It then counts the rows `data.sql` carries for each table and fails if a table that should hold rows is empty. A failed run leaves an `INCOMPLETE` file in its folder.
+- 🔴 **The output is real club data**, every EID and email plus the officers' password hashes. The script refuses any folder inside the repository, which is public. Keep backups somewhere private, and delete ones you no longer need.
+- 📌 **Live auth sessions and tokens are left out** (sessions, refresh tokens, password-reset and invite tokens, and auth's sign-in log with its IP addresses), so a stolen backup holds no live credential. After a restore, every officer signs in again.
+- 🪤 **It needs Docker Desktop running**, because the CLI runs `pg_dump` inside a container. It needs no database password: the CLI signs in with a temporary login role.
+- **Restoring:** the script's header has both cases. A new project takes the three files in one `psql --single-transaction` run. Rows lost from the live project are recovered through the local stack, never by running `data.sql` against production, where it would collide with every row still there.
+
 ## Check-in location verification (migration 28)
 
 **`CHECKIN_ORIGIN_PEPPER` must be set wherever check-ins are recorded.** Any long

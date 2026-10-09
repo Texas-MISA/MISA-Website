@@ -73,6 +73,9 @@ bash scripts/seed-remote.sh --force     # ...even if the project has a real offi
 bash scripts/wipe-remote.sh             # EMPTY the remote's club data, keeping officer access
                                         # and the officer-turnover audit trail. NOT seed-remote:
                                         # that one re-inserts the fabricated fixtures
+bash scripts/backup-remote.sh [dir]     # BACK UP production to a folder outside the repo
+                                        # (needs Docker). The Free plan keeps NO backups of
+                                        # its own; see docs/operations.md §Backups
 
 # 🪤 When the Supabase CLI will not run but the containers are fine, talk to
 # Postgres directly. This takes MULTI-LINE SQL and heredocs, unlike `db query`,

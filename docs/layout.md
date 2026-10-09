@@ -322,6 +322,12 @@ scripts/wipe-remote.sh  EMPTIES the linked project's club data — the "testing 
                         checkin_throttle alone. Its header accounts for all
                         thirteen public tables, and that accounting is the
                         invariant
+scripts/backup-remote.sh  BACKS UP the linked project (read-only) to a folder
+                        OUTSIDE the repo, which it refuses to write inside. The
+                        Free plan keeps no backups, so this is the only copy.
+                        Checks data.sql's row counts against a live count, and
+                        leaves auth sessions and tokens out. Its header holds
+                        the restore steps
 scripts/organise-pictures.mjs  sorts the officers LOCAL picture library into one
                         folder per page; unnamed files pool into gallery/. Moves,
                         never overwrites — the directory is gitignored, so there
