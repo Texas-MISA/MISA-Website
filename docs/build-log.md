@@ -7,6 +7,12 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+💾 **Backups proven, 2026-10-09: production's first backup was taken and restored** (`scripts/backup-remote.sh`, on `portal-launch`). Supabase's Free plan keeps none, so this is the only copy there is.
+
+  - **Dump:** the officer ran it from a terminal at `57ae0e6`. Every step printed `ok`, verify passed, and it came to 422K. **Restore:** it was loaded into the local stack, set up as a new empty project, in one transaction, and all 15 counted tables matched `counts.txt` exactly. That needed two departures from Supabase's guide: a `GRANT SET ON PARAMETER` that `postgres` is refused, and empty `COPY` blocks naming auth and storage tables or columns the local services lack. The tested commands are in the script's header. Untested: a hosted target, and recovering lost rows into the same project.
+  - 🪤 **What `supabase db query` prints depends on whether the CLI thinks an AI agent is running it** (CLI 2.120.0, `--agent` auto). An agent gets a JSON envelope; a terminal gets a box-drawn table unless it passes `--output-format json`. Every agent-run test saw JSON, so the officer's first run, at about 18:19 UTC, stopped safely at the count step. That step now passes `--agent=no --output-format json` and checks the exit code as well as the JSON.
+  - 🔓 **`INCOMPLETE` is inverted:** it is written as soon as the folder exists and removed only after verify passes, because an ERR trap never sees Ctrl-C or a closed window. The script's review found that gap.
+
 💵 **Manual dues entry, built 2026-10-05 on `portal-launch`, and live on `main` since 2026-10-06 (`95c04a7`).** An officer records a Cash, Zelle or Other payment at `/admin/dues/new`. It writes one `dues_payments` row, never a status flag, so dues status keeps deriving from `covered_terms`. Requested 2026-08-15 (doc v1.64), built as doc v1.85 in two steps: step 1 `fa1724e` (migration 32, `createPayment`, schema and tests), then the screens, the review's fixes and these records.
 
   - 🔓 **The trap the plan walked into: a PARTIAL unique index breaks the import.** The plan said to make `dues_payments_txn_idx` partial (`where venmo_txn_id is not null`). A partial unique index can be the `ON CONFLICT` arbiter only when the statement repeats its predicate, and PostgREST's `on_conflict` names columns only, so `commitImport`'s `upsert(…, { onConflict: "venmo_txn_id", ignoreDuplicates: true })` would have failed with **42P10** on every statement.

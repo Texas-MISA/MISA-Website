@@ -19,7 +19,8 @@
 # roles.sql       custom database roles (Supabase's restore guide takes all three)
 # schema.sql      the project's own schemas: every table, view, function, policy
 #                 and grant it defines. Supabase's managed schemas come with any
-#                 new project. (To be confirmed on the first real run.)
+#                 new project. (Confirmed 2026-10-09: it loaded cleanly into
+#                 an empty project.)
 # data.sql        every row in public, auth and storage, as COPY blocks
 # counts.txt      exact row counts read just before the dump, which the script
 #                 checks data.sql against, and a restore can be checked against
@@ -51,8 +52,8 @@
 # 🔴 THE OUTPUT IS REAL CLUB DATA: every member's EID and email, every dues
 # payment, and the officers' password hashes. THIS REPOSITORY IS PUBLIC, so
 # the script refuses any output directory inside it, or (when git is
-# installed) inside any other git working tree. Keep backups somewhere private (not a shared or public cloud
-# folder), and delete old ones you no longer need.
+# installed) inside any other git working tree. Keep backups somewhere private
+# (not a shared or public cloud folder), and delete old ones you no longer need.
 #
 # Needs Docker Desktop running: the CLI runs pg_dump inside a container. Needs
 # no database password: the CLI has Supabase create a temporary login role
@@ -60,26 +61,65 @@
 #
 # --- Restoring -------------------------------------------------------------
 #
-# ⚠️ UNTESTED. tasks.md §Backups step 3 replaces these commands with ones that
-# worked. Until then, do not follow the second recipe in an emergency.
+# ✅ TESTED 2026-10-09: the first production backup restored into the local
+# stack, set up as a new empty project, and every table's row count matched
+# counts.txt. What ran is the docker exec form below. The host-psql form feeds
+# psql the same stream but has not been run, and no restore into a hosted
+# project has been tried.
 #
-# Into a NEW project (lost or deleted project, or a handoff), per Supabase's
-# migration guide, with the new project's connection string in $DB_URL:
+# Into a NEW, EMPTY project (lost or deleted project, or a handoff). Empty
+# means Supabase's own schemas and roles exist and nothing of ours does. It is
+# ONE transaction, so a failure leaves the target as it was. From inside the
+# backup folder:
 #
-#   psql --single-transaction --variable ON_ERROR_STOP=1 \
-#        --file roles.sql --file schema.sql \
-#        --command 'SET session_replication_role = replica' \
-#        --file data.sql --dbname "$DB_URL"
+#   DROP_EMPTY='BEGIN { e = sprintf("%c.", 92) } /^COPY "/ && !b { b = $0 ORS; n = 0; next } b { b = b $0 ORS; if ($0 == e) { if (n) printf "%s", b; b = "" } else n++; next } { print }'
+#   { sed '/^GRANT SET ON PARAMETER /d' roles.sql
+#     cat schema.sql
+#     printf '\nSET session_replication_role = replica;\n'
+#     awk "$DROP_EMPTY" data.sql
+#   } | docker exec -i supabase_db_MISA-Website psql -U postgres -d postgres \
+#         -v ON_ERROR_STOP=1 --single-transaction -f -
 #
-# Then record the migration history, which data.sql does not carry:
-# `npx supabase migration repair --status applied <version>` for every version
-# in migrations.txt, against the NEW project, before any `db push`.
+# That pipe ends in the LOCAL stack. For a hosted project, with a host psql
+# and the new project's connection string in $DB_URL, end it in
+# `psql "$DB_URL" -v ON_ERROR_STOP=1 --single-transaction -f -` instead.
+# (The awk has no backslash in it on purpose: Git Bash mangled "\\." on the
+# way to awk. Its output was checked byte-identical to the stream that loaded.)
 #
-# Into the SAME project after rows were lost, do not run data.sql whole: it
-# would collide with every row still there. Load it into the local stack first
-# (`npx supabase db reset`, then the psql line above against
-# postgresql://postgres:postgres@127.0.0.1:54322/postgres), find what is
-# missing, and copy back only that. Do it before officers write more rows.
+# Two departures from Supabase's migration guide, both found on 2026-10-09:
+# - roles.sql's `GRANT SET ON PARAMETER log_min_messages` line is dropped.
+#   postgres is not a superuser and is refused it, and a fresh project already
+#   holds that grant. The rest of roles.sql matched a fresh project's defaults.
+# - Every EMPTY COPY block in data.sql is dropped (the awk). An empty block
+#   loads nothing, but it still names its table and columns, and the target's
+#   auth and storage services need not be the source's version: locally, four
+#   auth tables and four storage columns were missing, and postgres may not
+#   write storage.buckets_vectors. A block WITH rows that fails still stops the
+#   whole load, and only then is version drift a real problem.
+#
+# To make the LOCAL stack a new empty project: set `enabled = false` under both
+# [db.migrations] and [db.seed] in supabase/config.toml, then
+# `npx supabase stop --no-backup` and `npx supabase start`. (`db reset` is no
+# good: it re-runs the migrations and the seed, so nothing is empty.)
+#
+# Then check the restore. Count every table with COUNT_SQL (below) and compare
+# with counts.txt: every number must match. Then record the migration history,
+# which data.sql does not carry, before any `db push`:
+# `npx supabase migration repair --status applied <every version in
+# migrations.txt>`, with --local or against the new project. (Tested --local:
+# all 33 versions then matched.)
+#
+# Into the SAME project after rows were lost: never run data.sql against it,
+# because every surviving row would collide. Restore into the local stack as
+# above (the tested part), compare it table by table with production by id,
+# and copy back only the missing rows, before officers write more. UNTESTED:
+# the comparison and the copy-back. Nothing in the repo does them yet.
+#
+# 🔴 While the local stack holds real data: no dev server, no browser, no
+# screenshots, no `npm test`. Afterwards, put config.toml back exactly, run
+# `npx supabase stop --no-backup` and `npx supabase start` to return to the
+# seed, and re-create your local officer with scripts/create-officer.mjs
+# --local, because the stop wiped it.
 set -euo pipefail
 
 # Debug output would carry connection details into backup.log.
