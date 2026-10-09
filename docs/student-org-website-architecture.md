@@ -1086,7 +1086,7 @@
 >
 > - **The linked project was reset to the seed** with the officer's explicit
 >   authorisation. The "real member" v1.28 built its argument on
->   (`Christian A Gonzales / cag7284`) was their own test check-in; the database
+>   was their own test check-in; the database
 >   is due another reset when the term begins. Production now matches the seed
 >   exactly — 32 members / 15 events / 202 present / 29 leaderboard rows — with
 >   `current_term` unpinned and `current_term()` answering Fall 2026, the same as
@@ -1661,7 +1661,7 @@
 >
 > - **`seed.sql` guards itself against wiping a database whose `auth.users`
 >   holds a real account, and the linked project trips that guard.** It has a
->   real officer *and* a real member: `Christian A Gonzales / cag7284`,
+>   real officer *and* a real member,
 >   self-registered through the live check-in form. A full re-seed would have
 >   destroyed a real person's row. **Do not work around that guard**; do what
 >   migration 17 does instead — a targeted, idempotent backfill keyed so it can

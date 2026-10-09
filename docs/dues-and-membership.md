@@ -245,7 +245,7 @@ token that **is** some member's normalized EID. Exactly one distinct member
 across all tokens → linked.
 
 This deliberately avoids guessing at EID *shape*. The schema has never
-constrained it — real EIDs run `rp8571`, `cag7284`, `mp8570` with no fixed
+constrained it — real EIDs are letters followed by digits, with no fixed
 letter or digit count — and a regex that tried would either miss real EIDs or
 match ordinary words. Matching against the roster instead is exact by
 construction and needs no maintenance when UT changes its format.

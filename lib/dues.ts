@@ -516,7 +516,7 @@ export type NoteMatch =
  * Find the member a payment note names.
  *
  * 🪤 **There is deliberately no EID regex here.** The schema has never
- * constrained EID shape — real ones run `rp8571`, `cag7284`, `mp8570` with no
+ * constrained EID shape — real ones are letters followed by digits, with no
  * fixed letter or digit count — so a pattern that tried to recognise "an
  * EID-looking token" would either miss real EIDs or match ordinary words like
  * "dues". Tokenizing and testing each token against the roster is exact by
