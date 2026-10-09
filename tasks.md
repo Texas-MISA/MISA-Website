@@ -6,6 +6,21 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
+## 🚀 Backup script and docs — ✅ LIVE on `main` since 2026-10-09 (`44f0ca3`), no migration
+
+`main` was fast-forwarded to `44f0ca3` (officer: "merge 44f0ca3", after reviewing `portal-launch` at that commit). It carries `scripts/backup-remote.sh`, docs, a `.gitignore` entry and one comment in `lib/dues.ts`. No page changes.
+
+- **Before the push:**
+  - `origin/portal-launch` was `44f0ca3`, and `origin/main` was `95c04a7`, an ancestor of it. The tree was clean apart from untracked `.claude/`.
+  - `git diff origin/main 44f0ca3 -- supabase/migrations/` was empty. **No migration**; local and remote stay in sync through 32.
+  - Production's database clock read **14:05 Central**, and `open_event_at(now())` was null, so no window was open.
+  - 💾 **Backup: none was taken for this deploy, by the officer's decision.** He relied on his run of about 18:27 UTC the same day (`~/misa-backups/misa-2026-10-09T1827Z`), which passed verify and a full restore test (the Backups section below).
+  - The live deployment was `dpl_23qejw6iN3GzbkpH7BfuY9wq21hU`, which is `95c04a7`.
+- **The push, about 14:06 Central.** `git push origin portal-launch:main` fast-forwarded `95c04a7..44f0ca3`, with no force, confirmed with `git ls-remote origin refs/heads/main`.
+- **The deployment:** **`dpl_Dv8D4M8ieiQg2Krc4nzYP7D8wd5h`** (`https://misa-website-js5akz830-txmisa-jds-projects.vercel.app`), created 14:06:37 CDT, Ready in under a minute. `vercel inspect www.txmisa.org` names it, and the `www`, `misa-website-txmisa-jds-projects` and `misa-website-git-main-…` aliases point to it. `vercel inspect` shows no SHA, so the link to `44f0ca3` is inferred: it is the only production deployment since the push, and it holds the `git-main` alias.
+- **Checked by rendered response:** `/`, `/about`, `/officers`, `/gallery`, `/contact`, `/portal`, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` and `/admin/login` answered 200, each with exactly one `<h1>` (its own), and with no "Something went wrong" or "Couldn't load". `/admin/members` answered 307 to `/admin/login?next=…`.
+- 🪤 **Rollback:** Vercel Instant Rollback to `dpl_23qejw6iN3GzbkpH7BfuY9wq21hU` (`95c04a7`). There is no schema change.
+
 ## 💾 Backups: Supabase keeps NONE, so `scripts/backup-remote.sh` makes them, and it is PROVEN (dump and restore, 2026-10-09)
 
 🔴 **Supabase keeps no backups of this project.** It is on the Free plan: on 2026-10-09, `npx supabase backups list --project-ref gbxypeofjnhrhotlhyzs` returned `"backups":[]` and `"pitr_enabled":false`. A bad migration, a mistaken `wipe-remote.sh` or an officer error has nothing to restore from, and production held **69 members, 229 attendance rows, 78 dues payments, 331 audit rows and 11 officer accounts** that day. Daily backups start at Pro ($25/month, 7 days kept), which is the officers' call.
