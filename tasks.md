@@ -46,6 +46,21 @@ The stopgap is **`scripts/backup-remote.sh`** (written 2026-10-09 on `portal-lau
    - ✅ Decide where backups live: the script's default, `~/misa-backups` on the officer's own computer (officer, 2026-10-09). Written into `docs/operations.md` §Backups.
    - ✅ Decide who runs it weekly during the semester: any officer, on their own computer (officer, 2026-10-09). Written into `docs/operations.md` §Backups.
 
+⬜ **Open: the same `db query` output trap is still in `scripts/wipe-remote.sh` and `scripts/seed-remote.sh`** (found 2026-10-09; recorded, not fixed, by the officer's choice).
+- **The problem.** Neither script passes an output flag, and under CLI 2.120.0 in a terminal `db query` prints a box-drawn table. So:
+  - the "currently holds" counts shown before the confirmation prompt print **blank** (their `sed` expects JSON);
+  - the `"_tag":"Error"` grep in each statement loop never fires;
+  - the Python error printer can't parse the output, so only its `head` fallback shows anything.
+  - A rejected query still stops each script, through the exit code. The JSON half of the check, which their own comment says matters because the CLI can exit 0 on a rejected query, is what no longer works.
+- **The intended fix.**
+  - Add `--agent=no --output-format json` to every `db query` call in both scripts.
+  - Use one parser per file, in two modes. **Counts** needs exit 0 and exactly one row (a bare array, or the agent envelope's `rows`); anything else aborts **before** the confirmation prompt, because a destructive script must not ask for confirmation without showing what it is about to destroy. **Statement** needs exit 0 plus either JSON or a bare command tag.
+  - A JSON error object fails whatever the exit code. Keep the existing error printer and its `head` fallback.
+- 🪤 **Two traps found while designing it, against the local stack:**
+  - **A successful statement prints a bare command tag, not JSON, even with `--output-format json`**: `DELETE 0` for a delete, `DO` for a `do` block. A "no JSON means failure" rule would fail every successful step.
+  - **`--local` rejects several statements in one call** ("cannot insert multiple commands into a prepared statement"), while `--linked`, which goes through the Management API, accepts them. The audit step of the wipe and every seed chunk send several statements, so what `--linked` prints on their success cannot be tested locally. The fix should treat any unrecognised success output as FAILED. That fails safe, since both scripts can be re-run.
+- **Why it was not done.** The repository's `main-gate` hook denies any command that names either script, including an edit (2026-10-09). The officer chose to record the problem rather than change the hook or edit the scripts by hand. Neither script should be run against production while it holds real club data anyway.
+
 ## 💵 Manual dues entry: record a Cash, Zelle or Other payment (officer, 2026-10-05) — ✅ LIVE on `main` since 2026-10-06 (`95c04a7`); migration 32 went first, minutes earlier
 
 An officer can now record a dues payment that did not come through a Venmo statement, at **`/admin/dues/new`**. It writes one `dues_payments` row, never a status flag, so the member's dues status keeps deriving from `covered_terms` exactly as for an imported payment. Requested 2026-08-15; built in two steps on 2026-10-05: **step 1 `fa1724e`** (migration 32, `createPayment`, the schema, tests) and **step 2** (the screens, two review fixes, these records). Full record: doc v1.85, [`docs/dues-and-membership.md`](docs/dues-and-membership.md) (*Manual dues entry*) and [`docs/build-log.md`](docs/build-log.md).
