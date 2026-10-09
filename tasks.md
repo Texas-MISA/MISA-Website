@@ -6,7 +6,7 @@ Short-horizon working list. The full plan lives in [`docs/student-org-website-ar
 
 ---
 
-## 💾 Backups: production has NONE, and `scripts/backup-remote.sh` is written but NOT yet run (2026-10-09)
+## 💾 Backups: production has NONE, and `scripts/backup-remote.sh` is written but has NOT yet made a backup (2026-10-09)
 
 🔴 **Supabase keeps no backups of this project.** It is on the Free plan: on 2026-10-09, `npx supabase backups list --project-ref gbxypeofjnhrhotlhyzs` returned `"backups":[]` and `"pitr_enabled":false`. A bad migration, a mistaken `wipe-remote.sh` or an officer error has nothing to restore from, and production held **69 members, 229 attendance rows, 78 dues payments, 331 audit rows and 11 officer accounts** that day. Daily backups start at Pro ($25/month, 7 days kept), which is the officers' call.
 
@@ -19,6 +19,7 @@ The stopgap is **`scripts/backup-remote.sh`** (written 2026-10-09 on `portal-lau
   - The verify step, run on hand-made files, passes a complete dump, notes a one-row drift, and fails a dump missing a table.
   - Its row-count query ran on production and returned all 13 `public` tables plus `auth.users` and `auth.identities`.
   - After the review fixes, a copy outside the repo with every `npx supabase` call replaced by a stub: a normal run removes `INCOMPLETE` and prints the summary; a failed data step, and a `SIGINT` mid data step, both leave `INCOMPLETE` and print no summary; verify fails an empty `migrations.txt` and a `COPY` block for `auth.sessions`; an output folder inside another git clone is refused and removed; `SUPABASE_DEBUG` set stops it before any folder is made.
+  - ✅ **The count query, confirmed against the LOCAL stack with CLI 2.120.0's real output** (2026-10-09, after the first real run failed): with `--agent=no --output-format json` it prints a bare JSON array (`[{"n": …, "t": "schema.table"}, …]`) on stdout and its "Connecting…" line on stderr. The parsed `counts.txt` matched a direct `psql` count, and the parser refused the real error output (exit 1 with `{"_tag":"Error",…}`), the plain-text error, the table, an empty result, and valid JSON with a non-zero exit. The stub copy, emitting those captured shapes, ran clean and failed closed on a rejected query.
 - ⬜ **Not tested: a real dump, and any restore.** Until both pass, this is a script, not a backup.
 
 **To do, in this order:**
@@ -28,7 +29,7 @@ The stopgap is **`scripts/backup-remote.sh`** (written 2026-10-09 on `portal-lau
    - the in-repo refusal cannot be got round (a symlink, a relative path, another drive letter);
    - the seven `auth` tables it leaves out (`-x`) are exactly the ones that are safe to lose. In particular, `auth.mfa_amr_claims` points at `auth.sessions`, and the identities and users that are kept must restore without them;
    - a failed step always leaves `INCOMPLETE` and never prints a success summary.
-2. ⬜ **First real run, against production.** Start Docker Desktop, then run `bash scripts/backup-remote.sh`. It changes no club data and takes no lock a check-in waits on, so no check-in window needs to be closed. Check that:
+2. ⬜ **First real run, against production.** 🔶 **Tried 2026-10-09, about 18:19 UTC, and it failed SAFELY at the first step:** CLI 2.120.0, run from a terminal, printed a box-drawn TABLE instead of JSON, so the count step stopped with "no JSON", left `INCOMPLETE`, printed no summary, and dumped nothing. The query itself had succeeded. The cause: `db query`'s output depends on whether the CLI thinks an AI agent is running it, so the agent-run tests above had always seen JSON. ✅ **Fixed:** the count step now passes `--agent=no --output-format json` and checks the exit code as well as the JSON. Re-run it. Start Docker Desktop, then run `bash scripts/backup-remote.sh`. It changes no club data and takes no lock a check-in waits on, so no check-in window needs to be closed. Check that:
    - every step prints `ok`, and the folder holds no `INCOMPLETE`;
    - `counts.txt` agrees with a fresh count;
    - `data.sql` has a `COPY` block for every `public` table, and none for `auth.sessions`, `auth.refresh_tokens` or `auth.one_time_tokens`;

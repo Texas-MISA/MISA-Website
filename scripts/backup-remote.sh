@@ -166,24 +166,47 @@ npx supabase --version >>"$LOG" 2>&1
 COUNT_SQL="select table_schema || '.' || table_name as t, (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint as n from information_schema.tables where table_type = 'BASE TABLE' and (table_schema = 'public' or (table_schema = 'auth' and table_name in ('users','identities'))) order by 1;"
 
 step "row counts"
-# 🪤 The CLI can exit 0 on a rejected query, so the JSON is checked too, as in
-# the other two remote scripts.
-raw=$(npx supabase db query --linked "$COUNT_SQL" </dev/null 2>&1) || true
+# 🪤 Ask for JSON, and say this is not an agent. The shape `db query` prints
+# depends on whether the CLI thinks an AI agent is running it (CLI 2.120.0):
+#   in a terminal       a box-drawn TABLE, unless --output-format json, which
+#                       gives a bare array: [{"n": 4, "t": "auth.users"}, ...]
+#   under an agent      {"boundary": ..., "rows": [...], "warning": ...},
+#                       whatever the flag
+#   a rejected query    exit 1, and {"_tag":"Error","error":{...}} with the
+#                       flag (plain text without it, in a terminal)
+# The first real run, 2026-10-09, got the table and stopped here. Both flags
+# are passed so every run gets the bare array; the parser still takes the
+# agent envelope. The exit code and the JSON are BOTH checked, and anything
+# else fails closed. stdout only: the CLI's "Connecting..." goes to the log.
+rc=0
+raw=$(npx supabase db query --linked --agent=no --output-format json "$COUNT_SQL" </dev/null 2>>"$LOG") || rc=$?
 printf '%s\n' "$raw" >>"$LOG"
 python -c '
 import sys, json
-s = sys.stdin.read()
+rc, s = int(sys.argv[1]), sys.stdin.read()
+where = "exit code %d; see backup.log" % rc
+starts = [i for i in (s.find("["), s.find("{")) if i >= 0]
+if not starts:
+    sys.exit("count query returned no JSON row set (" + where + ")")
 try:
-    # raw_decode stops at the end of the JSON value, so stderr the CLI prints
+    # raw_decode stops at the end of the JSON value, so anything printed
     # after it does not break the parse.
-    d, _ = json.JSONDecoder().raw_decode(s, s.index("{"))
+    d, _ = json.JSONDecoder().raw_decode(s, min(starts))
 except ValueError:
-    sys.exit("count query returned no JSON (is the project paused?)")
-if d.get("_tag") == "Error" or "rows" not in d:
-    sys.exit("count query failed: " + str(d.get("error", d))[:400])
-for r in d["rows"]:
-    print(r["t"] + "\t" + str(r["n"]))
-' <<<"$raw" >"$OUT/counts.txt"
+    sys.exit("count query returned no JSON row set (" + where + ")")
+if isinstance(d, dict):
+    if d.get("_tag") == "Error" or "error" in d:
+        sys.exit("count query failed: " + str(d.get("error", d))[:400])
+    d = d.get("rows")
+if rc != 0:
+    sys.exit("count query failed (" + where + ")")
+if not isinstance(d, list) or not d:
+    sys.exit("count query returned no JSON row set (" + where + ")")
+for r in d:
+    if not isinstance(r, dict) or "t" not in r or "n" not in r:
+        sys.exit("count query returned an unexpected row: " + str(r)[:200])
+    print(str(r["t"]) + "\t" + str(int(r["n"])))
+' "$rc" <<<"$raw" >"$OUT/counts.txt"
 echo "ok"
 
 step "migration history"
