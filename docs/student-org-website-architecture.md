@@ -4189,8 +4189,8 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              <dialog>; the full photo or video mounts only
                              while it is open), bingo-refresher.tsx
                              (router.refresh() every 10 s, only while the tab
-                             is visible, never with a proof open) and
-                             tile-label.ts (the tile label both share)
+                             is visible, never with a proof open or offline)
+                             and tile-label.ts (the tile label both share)
     /officer-invite/[token]/page.tsx
                              migration 24 — redeem an officer invitation.
                              Unauthenticated and OUTSIDE /admin on purpose:

@@ -23,9 +23,11 @@ import { Section } from "@/components/ui/section";
 // 📌 **Rows, not a three-up card grid.** Three equal cards side by side is the
 // feature-row tell `design-taste-frontend` bans, and at `sm` a third of the
 // column is too narrow for "My Attendance" at the Title size. Rows also keep
-// the narrow single column the three member pages themselves use. (Two rows
-// from 2026-10-03, while My Attendance is unlisted — see `DESTINATIONS` — and
-// three again since 2026-10-11, when House Bingo joined.)
+// the narrow single column that check-in, the leaderboard and My Attendance
+// use; House Bingo, the fourth member page, runs at page width so its four
+// cards can sit two by two. (Two rows from 2026-10-03, while My Attendance is
+// unlisted — see `DESTINATIONS` — and three again since 2026-10-11, when
+// House Bingo joined.)
 //
 // 🔓 **Every button is formatted the SAME — one skin, one width (officer,
 // 2026-09-18).** Check In was first built as the lone primary with the other

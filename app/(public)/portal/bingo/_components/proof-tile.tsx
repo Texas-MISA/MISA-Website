@@ -2,7 +2,7 @@
 
 import { Check, Play } from "lucide-react";
 import Image from "next/image";
-import { useId, useRef, useState } from "react";
+import { useId, useRef, useState, type MouseEvent } from "react";
 
 import type { MarkKind } from "@/lib/bingo";
 
@@ -23,7 +23,8 @@ import { TILE_LABEL } from "./tile-label";
 //
 // 🪤 A native <dialog> opened with showModal(), which supplies the modal
 // behaviour itself: the page behind goes inert, Tab stays inside, and Esc
-// closes it. Two consequences for the markup. The dialog element carries NO
+// closes it. A tap on the backdrop closes it as well (handleDialogClick). Two
+// consequences for the markup. The dialog element carries NO
 // display utility, because author CSS beats the user agent's
 // `dialog:not([open]) { display: none }` and a closed dialog would render in
 // the grid; its layout is on the inner <div>. And it needs `m-auto`, because
@@ -74,7 +75,28 @@ export function ProofTile({
     dialog.showModal();
   }
 
-  // The dialog's `close` event, however it closed: Close, Esc, or the browser.
+  // A tap on the backdrop closes the dialog, as members expect of a modal on a
+  // phone. The dialog draws no padding of its own (preflight zeroes it) and
+  // the inner <div> fills it, so a click whose target is the <dialog> itself
+  // missed the content: it is the backdrop, or the dialog's own scrollbar when
+  // a short window makes it scroll, and the box test tells those two apart. A
+  // click on the photo, the video's controls or the heading targets them, not
+  // the dialog. close() fires the `close` event, so handleClose runs exactly
+  // as it does for the Close button.
+  function handleDialogClick(event: MouseEvent<HTMLDialogElement>) {
+    const dialog = event.currentTarget;
+    if (event.target !== dialog) return;
+    const box = dialog.getBoundingClientRect();
+    const inside =
+      event.clientX >= box.left &&
+      event.clientX <= box.right &&
+      event.clientY >= box.top &&
+      event.clientY <= box.bottom;
+    if (!inside) dialog.close();
+  }
+
+  // The dialog's `close` event, however it closed: Close, Esc, the backdrop,
+  // or the browser.
   function handleClose() {
     videoRef.current?.pause();
     setShowing(false);
@@ -93,9 +115,13 @@ export function ProofTile({
         // The visible activity plus the sr-only state. Not the picture's alt,
         // which would say the activity twice.
         aria-labelledby={`${nameId} ${stateId}`}
-        // `relative` and the focus z-index so the focus ring, which sits 2px
-        // outside the tile, is drawn over the neighbouring tiles, not under.
-        className="group relative flex h-full w-full cursor-pointer flex-col bg-misa-blue text-white focus-visible:z-10"
+        // 🔓 A TWO-TONE focus ring. The global ring alone is a navy outline
+        // 2px out (globals.css), and it measured 1.00:1 wherever it crossed
+        // the navy free centre or a neighbour's navy band, which 7, 11, 13
+        // and 17 always border. The white ring fills that 2px gap, so one tone
+        // or the other shows against whatever the tile touches. `relative` and
+        // the focus z-index draw both over the neighbouring tiles, not under.
+        className="group relative flex h-full w-full cursor-pointer flex-col bg-misa-blue text-white focus-visible:z-10 focus-visible:ring-2 focus-visible:ring-white"
       >
         <span className="relative block min-h-8 flex-1 overflow-hidden bg-misa-panel sm:min-h-12">
           {thumbUrl !== null ? (
@@ -136,6 +162,7 @@ export function ProofTile({
         data-bingo-proof=""
         aria-labelledby={headingId}
         onClose={handleClose}
+        onClick={handleDialogClick}
         className="m-auto w-[calc(100%_-_2rem)] max-w-3xl overscroll-contain bg-white text-foreground shadow-overlay backdrop:bg-misa-blue-dark/70"
       >
         <div className="p-4 sm:p-6">

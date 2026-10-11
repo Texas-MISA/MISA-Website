@@ -235,6 +235,46 @@ describe("the proof tile", () => {
     expect(dialogClass).not.toMatch(/(^|\s)(flex|grid|block|inline-block|inline-flex)(\s|$)/);
   });
 
+  it("🔓 draws a two-tone focus ring: white inside the global navy outline", () => {
+    // The navy outline alone measured 1.00:1 where it crossed the navy free
+    // centre or a neighbour's navy band. The white ring fills the outline's
+    // offset, so one tone or the other shows on every edge, and the z-index
+    // draws both over the neighbouring tiles.
+    const tileClass =
+      /<button\s+ref=\{tileRef\}[\s\S]*?className="([^"]*)"/.exec(source)?.[1] ?? "";
+    for (const token of [
+      "relative",
+      "focus-visible:z-10",
+      "focus-visible:ring-2",
+      "focus-visible:ring-white",
+    ]) {
+      expect(tileClass.split(/\s+/), token).toContain(token);
+    }
+    // ring-2 is 2px, which only fills the gap while the global outline sits
+    // exactly 2px out. Change one and the other must move with it.
+    const globals = readFileSync("app/globals.css", "utf8");
+    expect(globals).toMatch(
+      /:focus-visible \{\s*outline: 2px solid var\(--misa-blue\);\s*outline-offset: 2px;\s*\}/
+    );
+  });
+
+  it("closes on a backdrop click, through the same close path as Close", () => {
+    expect(source).toMatch(
+      /<dialog[\s\S]*?onClose=\{handleClose\}\s*onClick=\{handleDialogClick\}/
+    );
+    const handler =
+      /function handleDialogClick\([\s\S]*?\n {2}\}/.exec(source)?.[0] ?? "";
+    // Only a click on the dialog itself: the photo, the video's controls and
+    // the heading are its children and never close it...
+    expect(handler).toContain("if (event.target !== dialog) return;");
+    // ...and only outside its box, so its own scrollbar does not either.
+    expect(handler).toContain("const box = dialog.getBoundingClientRect();");
+    expect(handler).toMatch(/if \(!inside\) dialog\.close\(\);/);
+    // close() fires `close`, so the video pauses, the media unmounts and focus
+    // returns to the tile, as for the Close button.
+    expect(handler).not.toContain("setShowing");
+  });
+
   it("names the done state in more than colour: a check glyph and sr-only text", () => {
     expect(source).toContain("<Check aria-hidden");
     expect(source).toMatch(/<span id=\{stateId\} className="sr-only">\s*, \{houseName\}, done\s*<\/span>/);
