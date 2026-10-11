@@ -656,7 +656,15 @@ export type RecordPhotoInput = {
 export type PrepareVideoInput = {
   house: House;
   position: number;
-  /** The file's type as the browser reports it. */
+  /**
+   * The File's own type, `file.type`, as the browser reports it.
+   *
+   * 🪤 It must be that, not a type chosen anywhere else. Given a File or Blob,
+   * uploadToSignedUrl sends FormData and IGNORES its contentType option, so the
+   * stored object carries `file.type` whatever the call says. The path's
+   * extension is minted from this value, and recordBingoVideo refuses an object
+   * whose stored type is not its extension's.
+   */
   contentType: string;
   /** The file's size in bytes. */
   size: number;
@@ -842,12 +850,13 @@ export async function prepareBingoVideoUpload(
  * with the same compare-and-set as a photo.
  *
  * When it does not record, cleanup depends on why. A stale page, a refused
- * write, a failed poster upload, or a stored object of the wrong size or type
- * deletes the video, but only if no mark points at it (a double-submitted
+ * write, a failed poster upload, or a stored size or type that is PRESENT AND
+ * WRONG deletes the video, but only if no mark points at it (a double-submitted
  * record whose twin already won has its video in the winner's row), along with
- * any poster this request uploaded. Anything else (a bad path, a bad poster,
- * nothing uploaded, a failed read) deletes nothing; an abandoned video is the
- * sweep's to collect.
+ * any poster this request uploaded. Anything else deletes nothing: a bad path,
+ * a bad poster, nothing uploaded, a failed read, or an info() answer missing
+ * its size or type, which is an error rather than evidence against the upload.
+ * An abandoned video is the sweep's to collect.
  */
 export async function recordBingoVideo(
   db: Client,
@@ -875,14 +884,27 @@ export async function recordBingoVideo(
       console.error("bingo video info failed:", object.error.message);
       return { status: "error" };
     }
-    // The bucket refuses both on upload, so these fire only if its settings
-    // ever drift from migration 33's.
-    const size = object.data.size;
-    if (typeof size !== "number" || size <= 0 || size > MAX_VIDEO_BYTES) {
+    // 🪤 storage-js camel-cases the server's JSON and checks nothing, and the
+    // Storage server sends `size` and `content_type` as null when it has no
+    // value for them. A missing value says nothing about the upload, so it is
+    // an error that deletes NOTHING: the officer can try again, and the sweep
+    // collects the video if they give up.
+    const { size, contentType } = object.data;
+    if (typeof size !== "number" || typeof contentType !== "string") {
+      console.error(
+        `bingo video info for ${input.videoPath} lacks a size or a type:`,
+        `size ${String(size)}, type ${String(contentType)}`
+      );
+      return { status: "error" };
+    }
+    // Present and wrong is another matter: the object can never be recorded,
+    // so it goes. The bucket refuses both on upload, so these fire only if its
+    // settings ever drift from migration 33's (or, for size, on an empty file).
+    if (size <= 0 || size > MAX_VIDEO_BYTES) {
       await discardVideo(db, input.videoPath);
       return invalid("video_size");
     }
-    if (object.data.contentType !== parsed.contentType) {
+    if (contentType !== parsed.contentType) {
       await discardVideo(db, input.videoPath);
       return invalid("video_type");
     }

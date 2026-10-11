@@ -55,6 +55,30 @@ export const SEEDED_ACTIVITIES: ReadonlyMap<number, string> = new Map([
 ]);
 
 /**
+ * One line of SQL that puts the local board's text back to migration 33's,
+ * built from SEEDED_ACTIVITIES so the two cannot disagree.
+ */
+export const RESTORE_BOARD_SQL =
+  "update public.bingo_squares s set activity = v.activity from (values " +
+  [...SEEDED_ACTIVITIES]
+    .map(([position, activity]) => `(${position}, '${activity.replace(/'/g, "''")}')`)
+    .join(", ") +
+  ") as v(position, activity) where s.position = v.position;";
+
+/**
+ * What a seeded-board assertion says when it fails, which is what a local
+ * browser walkthrough that renamed a square does to it.
+ *
+ * 🪤 psql inside the LOCAL database container, never `npx supabase db query`:
+ * that one targets the remote unless told --local, and this would rename
+ * production's board.
+ */
+export const RESTORE_BOARD_HINT =
+  "The local board's text differs from migration 33's seed (renamed in a walkthrough?). " +
+  "Put it back, LOCAL ONLY: docker exec -i supabase_db_MISA-Website psql -U postgres -d postgres -c " +
+  `"${RESTORE_BOARD_SQL}"`;
+
+/**
  * Bytes that pass isJpeg (FF D8 FF) and end with the EOI marker. Not a
  * decodable picture, and nothing here needs one: the server checks the
  * signature and the size, and never decodes.

@@ -56,6 +56,7 @@ import {
   cleanupBingo,
   insertMark,
   newBingoTracker,
+  RESTORE_BOARD_HINT,
   SEEDED_ACTIVITIES,
   squaresByPosition,
 } from "./bingo-fixtures";
@@ -319,19 +320,68 @@ describe("the audit column lists", () => {
   });
 });
 
+/** Source with its comments removed, so prose that happens to read like an
+ * import is not counted as one. A `//` after a colon is kept: it is a URL. */
+function withoutComments(source: string): string {
+  return source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:])\/\/.*$/gm, "$1");
+}
+
+/**
+ * Every module a source file imports or re-exports, however the statement is
+ * wrapped: `from "x"` (static imports and re-exports, across any number of
+ * lines), `import "x"`, `import("x")` and `require("x")`.
+ */
+function moduleSpecifiers(source: string): string[] {
+  const code = withoutComments(source);
+  const found = [
+    ...code.matchAll(/\bfrom\s+["']([^"']+)["']/g),
+    ...code.matchAll(/^\s*import\s+["']([^"']+)["']/gm),
+    ...code.matchAll(/\bimport\s*\(\s*["']([^"']+)["']/g),
+    ...code.matchAll(/\brequire\s*\(\s*["']([^"']+)["']/g),
+  ].map((m) => m[1]);
+  return [...new Set(found)].sort();
+}
+
+/** The modules a source file imports for their VALUES: everything except an
+ * `import type` statement. */
+function valueImports(source: string): string[] {
+  const code = withoutComments(source);
+  const found = [
+    ...code.matchAll(/\bimport\s+(?!type\b)[^;'"]*?\bfrom\s+["']([^"']+)["']/g),
+    ...code.matchAll(/^\s*import\s+["']([^"']+)["']/gm),
+  ].map((m) => m[1]);
+  return [...new Set(found)].sort();
+}
+
 describe("the module stays importable from the browser", () => {
+  it("finds an import however it is written", () => {
+    // Guards the guard: the old single-line pattern missed a wrapped import,
+    // which is exactly how a formatter would write a long one.
+    expect(moduleSpecifiers('import {\n  createAdminClient,\n} from "@/lib/supabase/admin";')).toEqual(
+      ["@/lib/supabase/admin"]
+    );
+    expect(moduleSpecifiers("import 'server-only';")).toEqual(["server-only"]);
+    expect(moduleSpecifiers('export { x } from "./y";')).toEqual(["./y"]);
+    expect(moduleSpecifiers('const h = await import("next/headers");')).toEqual(["next/headers"]);
+    expect(moduleSpecifiers('const c = require("node:crypto");')).toEqual(["node:crypto"]);
+    expect(moduleSpecifiers('// says from "nowhere"\nimport a from "b";')).toEqual(["b"]);
+    expect(valueImports('import type {\n  X,\n} from "a";\nimport { y } from "b";')).toEqual(["b"]);
+  });
+
   it("imports nothing server-only", () => {
     // The officer upload component imports the constants and the resizer
     // arithmetic from here, in the browser.
     const source = readFileSync("lib/bingo.ts", "utf8");
-    const imports = [...source.matchAll(/^import .* from "([^"]+)";$/gm)].map((m) => m[1]);
-    expect(imports.sort()).toEqual(["@/lib/members", "@/lib/types/database", "@supabase/supabase-js"]);
-    expect(source).not.toMatch(/import\s+"server-only"/);
-    // Both supabase-js and the generated types are type-only imports.
-    expect(source).toMatch(/^import type \{ SupabaseClient \} from "@supabase\/supabase-js";$/m);
-    expect(source).toMatch(/^import type \{ Database \} from "@\/lib\/types\/database";$/m);
-    // lib/members.ts, the one runtime import, imports nothing at all.
-    expect(readFileSync("lib/members.ts", "utf8")).not.toMatch(/^import /m);
+    expect(moduleSpecifiers(source)).toEqual([
+      "@/lib/members",
+      "@/lib/types/database",
+      "@supabase/supabase-js",
+    ]);
+    // Of those, supabase-js and the generated types are type-only, so the one
+    // runtime import is lib/members.ts...
+    expect(valueImports(source)).toEqual(["@/lib/members"]);
+    // ...which imports nothing at all.
+    expect(moduleSpecifiers(readFileSync("lib/members.ts", "utf8"))).toEqual([]);
   });
 });
 
@@ -443,14 +493,16 @@ describe("the migration these source assertions read", () => {
 describe("the seeded board", () => {
   it("holds the 24 activities at their positions, exactly as the card reads", async () => {
     // Reads the stack as the migration left it. A square renamed in a local
-    // walkthrough fails here: reset the stack.
+    // walkthrough fails here, and the message prints the one line of SQL that
+    // puts the board back.
     const squares = await squaresByPosition(db);
     expect(squares.size).toBe(24);
-    expect(new Map([...squares].map(([position, row]) => [position, row.activity]))).toEqual(
-      SEEDED_ACTIVITIES
-    );
+    expect(
+      new Map([...squares].map(([position, row]) => [position, row.activity])),
+      RESTORE_BOARD_HINT
+    ).toEqual(SEEDED_ACTIVITIES);
     // A straight apostrophe, as the officer's card has it.
-    expect(squares.get(24)?.activity).toBe("Midnight McDonald's");
+    expect(squares.get(24)?.activity, RESTORE_BOARD_HINT).toBe("Midnight McDonald's");
     expect(squares.has(FREE_POSITION)).toBe(false);
   });
 });
@@ -583,6 +635,26 @@ describe("bingo_marks constraints", () => {
     expect(error?.code).toBe(UNIQUE_VIOLATION);
   });
 
+  it("never lets two marks share one thumbnail, though any number may have none", async () => {
+    const first = await claimFreeSquare(db, track);
+    const second = await claimFreeSquare(db, track);
+    const mark = await insertMark(db, first);
+    const { error } = await db.from("bingo_marks").insert({
+      house: second.house,
+      square_id: second.squareId,
+      kind: "photo",
+      media_path: `test/${crypto.randomUUID()}.jpg`,
+      thumb_path: mark.thumb_path,
+    });
+    expect(error?.code).toBe(UNIQUE_VIOLATION);
+
+    // NULLs are distinct in a unique index: two videos without a poster are
+    // two rows, not a collision. insertMark throws if either is refused.
+    const third = await claimFreeSquare(db, track);
+    await insertMark(db, second, { kind: "video", thumbPath: null });
+    await insertMark(db, third, { kind: "video", thumbPath: null });
+  });
+
   it("refuses to delete a square that a house has completed (RESTRICT)", async () => {
     const claim = await claimFreeSquare(db, track);
     await insertMark(db, claim);
@@ -655,9 +727,10 @@ describe("readBingoBoard", () => {
     if (result.kind !== "ok") return;
 
     expect(result.board.squares.map((square) => square.position)).toEqual([...ACTIVITY_POSITIONS]);
-    expect(result.board.squares.map((square) => square.activity)).toEqual([
-      ...SEEDED_ACTIVITIES.values(),
-    ]);
+    expect(
+      result.board.squares.map((square) => square.activity),
+      RESTORE_BOARD_HINT
+    ).toEqual([...SEEDED_ACTIVITIES.values()]);
 
     const mark = result.board.marks.find((m) => m.id === fixture.id);
     expect(mark).toEqual({

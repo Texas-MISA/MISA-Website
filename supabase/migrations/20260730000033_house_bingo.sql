@@ -188,8 +188,11 @@ create table public.bingo_marks (
   media_path  text not null unique,
 
   -- The small image a card shows: a photo's thumbnail, or a video's poster
-  -- frame, both in bingo-photos. A video may have none.
-  thumb_path  text,
+  -- frame, both in bingo-photos. A video may have none. Unique for media_path's
+  -- reason: two marks sharing a thumbnail would delete each other's picture on
+  -- removal. NULLs are distinct in a unique index, so any number of videos
+  -- without a poster coexist.
+  thumb_path  text unique,
 
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now(),
@@ -225,7 +228,8 @@ comment on column public.bingo_marks.media_path is
 
 comment on column public.bingo_marks.thumb_path is
   'In bingo-photos: the photo''s thumbnail, or the video''s poster frame. Null '
-  'only for a video with no poster (bingo_marks_photo_has_thumb).';
+  'only for a video with no poster (bingo_marks_photo_has_thumb). Unique, like '
+  'media_path, so no two marks share one file.';
 
 -- ---------------------------------------------------------------------------
 -- 3. The two Storage buckets
@@ -276,6 +280,11 @@ alter table public.admin_audit
 -- change. The audit check is read from its definition rather than probed with
 -- an insert, because even a rolled-back insert spends an admin_audit id, and a
 -- gap in an append-only log's ids reads like a deleted row.
+--
+-- 🔓 The last check is the header's central claim: storage.objects carries NO
+-- policy, so with RLS on, no API role can list or write a bucket. Storage was
+-- unused before this migration, so a policy found there was added by hand,
+-- and that is a reason to stop and find out why rather than to carry on.
 do $$
 declare
   positions smallint[];
@@ -284,6 +293,7 @@ declare
   photos_ok boolean;
   videos_ok boolean;
   audit_check text;
+  object_policies int;
 begin
   select count(*), array_agg(s.position order by s.position)
     into squares, positions
@@ -341,6 +351,19 @@ begin
     raise exception
       'admin_audit_entity_type_check does not accept bingo_square and '
       'bingo_mark: %', audit_check;
+  end if;
+
+  select count(*)
+    into object_policies
+    from pg_policies p
+   where p.schemaname = 'storage'
+     and p.tablename = 'objects';
+
+  if object_policies <> 0 then
+    raise exception
+      'storage.objects must carry NO policy, so that no API role can list or '
+      'write a bucket; it carries %. Find out who added them and why before '
+      'applying this migration', object_policies;
   end if;
 end
 $$;

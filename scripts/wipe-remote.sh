@@ -12,10 +12,7 @@
 #           seed.officer account.
 #
 #           bingo_marks is every house's completed squares (migration 33). The
-#           audit step's delete takes its rows with the rest, and the
-#           bingo_square rename rows too, although the squares themselves stay:
-#           the board keeps the text it has, and loses the record of who
-#           renamed it.
+#           audit step's delete takes their 'bingo_mark' rows with the rest.
 #
 #           🪤 SQL CANNOT DELETE A STORED FILE. The photos and videos behind the
 #           marks stay in the bingo-photos and bingo-videos Storage buckets
@@ -34,7 +31,11 @@
 #           the admin_audit rows whose entity_type is 'officer_invite' or
 #           'officer' — the record of who was granted access and by whom. That
 #           trail is append-only and is not test data, so wiping it would
-#           destroy the only evidence of how the current officers got in.
+#           destroy the only evidence of how the current officers got in;
+#           the admin_audit rows whose entity_type is 'bingo_square' — the
+#           bingo board's rename history. The board survives the wipe (see
+#           UNTOUCHED), so the record of who gave its squares their current
+#           text survives with it, by the same logic as the officer rows.
 #
 # UNTOUCHED app_settings. current_term is CONFIGURATION, not data: a wipe that
 #           silently unpinned a term an officer had deliberately set would be
@@ -91,7 +92,7 @@ npx supabase db query --linked \
 echo
 echo "      SURVIVES: officer sign-ins, officer_invites, the admin_audit rows"
 echo "                about invites and officer access, and the bingo board's"
-echo "                24 activities."
+echo "                24 activities with their rename history."
 echo "      GONE:     every member, event, attendance row, point adjustment,"
 echo "                dues payment, custom field, saved view and completed"
 echo "                bingo square. No undo."
@@ -116,9 +117,9 @@ events|delete from events;
 saved filter presets|delete from member_filter_presets;
 custom field definitions|delete from member_field_definitions;
 members|delete from members;
-audit rows about test data|alter table admin_audit disable trigger admin_audit_no_delete; delete from admin_audit where entity_type not in ('officer_invite','officer'); alter table admin_audit enable trigger admin_audit_no_delete;
+audit rows about test data|alter table admin_audit disable trigger admin_audit_no_delete; delete from admin_audit where entity_type not in ('officer_invite','officer','bingo_square'); alter table admin_audit enable trigger admin_audit_no_delete;
 fabricated seed officer|delete from auth.users where id = '00000000-0000-4000-8000-5eed00000001'::uuid;
-verify|do $$ declare n int; begin select (select count(*) from members)+(select count(*) from events)+(select count(*) from attendance)+(select count(*) from point_adjustments)+(select count(*) from dues_payments)+(select count(*) from member_field_definitions)+(select count(*) from member_filter_presets)+(select count(*) from checkin_origin)+(select count(*) from bingo_marks) into n; if n <> 0 then raise exception 'wipe incomplete: % club rows remain', n; end if; if exists (select 1 from admin_audit where entity_type not in ('officer_invite','officer')) then raise exception 'admin_audit still holds test-data rows'; end if; if not exists (select 1 from admin_profiles) then raise exception 'no officer profile survives - refusing to report success'; end if; if exists (select 1 from auth.users where id = '00000000-0000-4000-8000-5eed00000001') then raise exception 'seed officer survived the wipe'; end if; if not exists (select 1 from pg_trigger where tgname = 'admin_audit_no_delete' and tgenabled <> 'D') then raise exception 'admin_audit_no_delete was left DISABLED'; end if; end $$;
+verify|do $$ declare n int; begin select (select count(*) from members)+(select count(*) from events)+(select count(*) from attendance)+(select count(*) from point_adjustments)+(select count(*) from dues_payments)+(select count(*) from member_field_definitions)+(select count(*) from member_filter_presets)+(select count(*) from checkin_origin)+(select count(*) from bingo_marks) into n; if n <> 0 then raise exception 'wipe incomplete: % club rows remain', n; end if; if exists (select 1 from admin_audit where entity_type not in ('officer_invite','officer','bingo_square')) then raise exception 'admin_audit still holds test-data rows'; end if; if not exists (select 1 from admin_profiles) then raise exception 'no officer profile survives - refusing to report success'; end if; if exists (select 1 from auth.users where id = '00000000-0000-4000-8000-5eed00000001') then raise exception 'seed officer survived the wipe'; end if; if not exists (select 1 from pg_trigger where tgname = 'admin_audit_no_delete' and tgenabled <> 'D') then raise exception 'admin_audit_no_delete was left DISABLED'; end if; end $$;
 PLAN
 
 for step in "${STEPS[@]}"; do

@@ -3,7 +3,7 @@
 --
 -- DESTRUCTIVE: wipes members, events, attendance, point_adjustments,
 -- dues_payments, member_field_definitions, member_filter_presets,
--- officer_invites and admin_audit before inserting. The guard below refuses to run if auth.users
+-- officer_invites, bingo_marks and admin_audit before inserting. The guard below refuses to run if auth.users
 -- contains any account other than the seed officer, which is the signal that
 -- you are pointed at something real.
 --
@@ -23,6 +23,17 @@
 -- request behind them, and inventing digests would put fake evidence about
 -- fake people into a public repository for no gain.
 --
+-- `bingo_marks` (migration 33, every house's completed squares) is wiped, and
+-- the seed inserts none: a mark stands for a photo or video in Storage, and
+-- this file cannot put one there. `bingo_squares` is deliberately NOT wiped.
+-- It is the board, not club data: migration 33 seeds its 24 activities, and
+-- nothing in this file or the app can recreate them.
+--
+-- 🪤 SQL cannot empty a Storage bucket. A re-seed leaves every photo and video
+-- uploaded to bingo-photos and bingo-videos where it was, and on a remote
+-- project each one stays reachable at its public URL. Empty both buckets in
+-- the dashboard (Storage) when that matters.
+--
 -- Every identity here is fabricated. Emails use example.edu (RFC 2606
 -- reserved, can never resolve) and EIDs are synthetic. Never replace
 -- this with a real roster export — this repository is public.
@@ -39,6 +50,10 @@ begin
   end if;
 end $$;
 
+-- bingo_marks, added with migration 33. Nothing references it, so its place
+-- in this order is free. The bingo_squares rows it references are kept on
+-- purpose (see the header), and the assert block checks this wipe worked.
+delete from bingo_marks;
 delete from point_adjustments;
 delete from attendance;
 -- ⚠️ Before members, and not optional. dues_payments.member_id is ON DELETE
@@ -519,7 +534,7 @@ do $$
 declare
   n_members int; n_events int; n_present int; n_pending int; n_rejected int;
   n_adjust int; n_audit int; n_board int; n_fields int; n_presets int;
-  n_manual int; n_invites int;
+  n_manual int; n_invites int; n_marks int;
 begin
   select count(*) into n_members from members;
   select count(*) into n_events  from events;
@@ -550,6 +565,10 @@ begin
   -- LIVE CREDENTIAL rather than stale data, which is why it is asserted rather
   -- than assumed.
   select count(*) into n_invites from officer_invites;
+  -- Added 2026-10-10 with migration 33. The seed ships no bingo marks, so this
+  -- is purely a wipe check, the same as n_invites: a surviving mark would show
+  -- a completed square on the portal that nothing in the seed accounts for.
+  select count(*) into n_marks from bingo_marks;
 
   if n_members <> 32 then raise exception 'seed: expected 32 members, got %', n_members; end if;
   if n_events  <> 15 then raise exception 'seed: expected 15 events, got %', n_events; end if;
@@ -563,4 +582,5 @@ begin
   if n_presets <> 0 then raise exception 'seed: expected 0 saved views, got %', n_presets; end if;
   if n_manual  <> 1 then raise exception 'seed: expected 1 admin_manual attendance row (Zane Okonkwo at the Awards Banquet), got %', n_manual; end if;
   if n_invites <> 0 then raise exception 'seed: expected 0 officer invites, got % — the wipe is not clearing officer_invites, and a surviving invite is a live credential', n_invites; end if;
+  if n_marks <> 0 then raise exception 'seed: expected 0 bingo marks, got % — the wipe is not clearing bingo_marks', n_marks; end if;
 end $$;

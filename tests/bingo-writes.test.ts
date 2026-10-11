@@ -60,12 +60,18 @@ const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
  * for real (a CHECK, or the unique index), which is the one moment no race can
  * reach deterministically: after the core's uploads, before its row. The core
  * takes its client as a parameter for exactly this; nothing is mocked.
+ *
+ * 🪤 `writes()` counts the writes it altered, and every caller asserts exactly
+ * one. A status of "error" alone would also come back from a regression that
+ * fails BEFORE the write, and the test would pass without the cleanup it is
+ * about ever running.
  */
 function perturbMarkWrites(
   client: Client,
   change: (values: Record<string, unknown>) => Record<string, unknown>
-): Client {
-  return new Proxy(client, {
+): { client: Client; writes: () => number } {
+  let writes = 0;
+  const perturbed = new Proxy(client, {
     get(target, prop) {
       if (prop === "from") {
         return (relation: string) => {
@@ -78,8 +84,10 @@ function perturbMarkWrites(
                   values: unknown,
                   options?: unknown
                 ) => unknown;
-                return (values: Record<string, unknown>, options?: unknown) =>
-                  write.call(inner, change(values), options);
+                return (values: Record<string, unknown>, options?: unknown) => {
+                  writes++;
+                  return write.call(inner, change(values), options);
+                };
               }
               const value = Reflect.get(inner, key, inner);
               return typeof value === "function" ? value.bind(inner) : value;
@@ -91,6 +99,98 @@ function perturbMarkWrites(
       return typeof value === "function" ? value.bind(target) : value;
     },
   });
+  return { client: perturbed, writes: () => writes };
+}
+
+type FileApi = ReturnType<Client["storage"]["from"]>;
+
+/**
+ * The real client, except that each `storage.from(bucket)` hands its file API
+ * to `wrap` first, which may replace a method. Every other call, and every
+ * bucket `wrap` passes through, reaches the real Storage API.
+ */
+function withStorage(client: Client, wrap: (bucket: string, api: FileApi) => FileApi): Client {
+  return new Proxy(client, {
+    get(target, prop) {
+      if (prop === "storage") {
+        const storage = target.storage;
+        return new Proxy(storage, {
+          get(inner, key) {
+            if (key === "from") return (bucket: string) => wrap(bucket, inner.from(bucket));
+            const value = Reflect.get(inner, key, inner);
+            return typeof value === "function" ? value.bind(inner) : value;
+          },
+        });
+      }
+      const value = Reflect.get(target, prop, target);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
+function replaceMethod<K extends keyof FileApi>(
+  api: FileApi,
+  key: K,
+  replacement: FileApi[K]
+): FileApi {
+  return new Proxy(api, {
+    get(inner, prop) {
+      if (prop === key) return replacement;
+      const value = Reflect.get(inner, prop, inner);
+      return typeof value === "function" ? value.bind(inner) : value;
+    },
+  });
+}
+
+/** What a Storage error looks like to the cores: they read only `message`,
+ * `status` and `statusCode`. */
+function injectedStorageError(what: string) {
+  return Object.assign(new Error(`injected ${what} failure`), {
+    name: "StorageApiError",
+    status: 500,
+    statusCode: "500",
+  });
+}
+
+/**
+ * Every remove() in these buckets fails, as a Storage outage would. `attempts`
+ * records what the core TRIED to delete, as `<bucket>/<path>`, so a test can
+ * tell "reported as an orphan" from "never tried".
+ */
+function failingRemoves(client: Client, buckets: readonly string[]) {
+  const attempts: string[] = [];
+  const faulty = withStorage(client, (bucket, api) =>
+    buckets.includes(bucket)
+      ? replaceMethod(api, "remove", (async (paths: string[]) => {
+          attempts.push(...paths.map((path) => `${bucket}/${path}`));
+          return { data: null, error: injectedStorageError("remove") };
+        }) as unknown as FileApi["remove"])
+      : api
+  );
+  return { client: faulty, attempts };
+}
+
+/**
+ * info() in the video bucket answers without `field`: dropped from the
+ * object, or null, which is what the Storage server sends when it has no
+ * value (`size: … ?? null`). storage-js passes either straight through.
+ */
+function infoWithout(client: Client, field: "size" | "contentType", as: "dropped" | "null") {
+  let calls = 0;
+  const faulty = withStorage(client, (bucket, api) =>
+    bucket === VIDEO_BUCKET
+      ? replaceMethod(api, "info", (async (path: string) => {
+          calls++;
+          const real = await api.info(path);
+          if (real.error) return real;
+          const data: Record<string, unknown> = { ...real.data };
+          if (as === "dropped") delete data[field];
+          else data[field] = null;
+          return { data, error: null };
+        }) as unknown as FileApi["info"])
+      : api
+  );
+  return { client: faulty, calls: () => calls };
 }
 
 async function markOn(claim: ClaimedSquare) {
@@ -261,9 +361,11 @@ describe("recordBingoPhoto", () => {
     const claim = await claimFreeSquare(db, track);
     // 'X' fails bingo_marks_house_valid, AFTER both files are uploaded.
     const refusing = perturbMarkWrites(db, (values) => ({ ...values, house: "X" }));
-    expect(await recordBingoPhoto(refusing, photoInput(claim, null))).toEqual({
+    expect(await recordBingoPhoto(refusing.client, photoInput(claim, null))).toEqual({
       status: "error",
     });
+    // The error came from the write itself, not from anything before it.
+    expect(refusing.writes()).toBe(1);
     expect(await markOn(claim)).toBeNull();
     expect(await filesIn(db, PHOTO_BUCKET, claim.house, claim.position)).toEqual([]);
   });
@@ -276,9 +378,11 @@ describe("recordBingoPhoto", () => {
     await insertMark(db, taken);
     const racing = perturbMarkWrites(db, (values) => ({ ...values, square_id: taken.squareId }));
 
-    expect(await recordBingoPhoto(racing, photoInput(claim, null))).toEqual({
+    expect(await recordBingoPhoto(racing.client, photoInput(claim, null))).toEqual({
       status: "conflict",
     });
+    // The conflict came from the insert's 23505, not from the pre-check.
+    expect(racing.writes()).toBe(1);
     expect(await markOn(claim)).toBeNull();
     expect(await filesIn(db, PHOTO_BUCKET, claim.house, claim.position)).toEqual([]);
   });
@@ -289,9 +393,10 @@ describe("recordBingoPhoto", () => {
     if (first.status !== "added") throw new Error(first.status);
 
     const refusing = perturbMarkWrites(db, (values) => ({ ...values, kind: "audio" }));
-    expect(await recordBingoPhoto(refusing, photoInput(claim, first.updatedAt))).toEqual({
+    expect(await recordBingoPhoto(refusing.client, photoInput(claim, first.updatedAt))).toEqual({
       status: "error",
     });
+    expect(refusing.writes()).toBe(1);
     expect((await markOn(claim))!.media_path).toBe(first.after.media_path);
     expect(await filesIn(db, PHOTO_BUCKET, claim.house, claim.position)).toEqual(
       [first.after.media_path, first.after.thumb_path].sort()
@@ -597,6 +702,40 @@ describe("recordBingoVideo", () => {
     expect(await fileExists(db, VIDEO_BUCKET, path)).toBe(false);
   });
 
+  it.each([
+    ["size", "dropped"],
+    ["size", "null"],
+    ["contentType", "dropped"],
+    ["contentType", "null"],
+  ] as const)(
+    "is an error that deletes NOTHING when info() has no %s (%s)",
+    async (field, as) => {
+      // 🐛 Review of dda956c: a missing size deleted the upload as video_size,
+      // and a missing type as video_type. An absent value is not evidence
+      // that the video is bad; the officer must be able to try again.
+      const claim = await claimFreeSquare(db, track);
+      const path = await uploadVideo(claim);
+      const input = {
+        house: claim.house,
+        position: claim.position,
+        expectedUpdatedAt: null,
+        videoPath: path,
+        poster: fakeJpeg(128),
+      };
+      const thin = infoWithout(db, field, as);
+
+      expect(await recordBingoVideo(thin.client, input)).toEqual({ status: "error" });
+      expect(thin.calls()).toBe(1);
+      expect(await fileExists(db, VIDEO_BUCKET, path)).toBe(true);
+      expect(await markOn(claim)).toBeNull();
+      // It stopped before the poster, too.
+      expect(await filesIn(db, PHOTO_BUCKET, claim.house, claim.position)).toEqual([]);
+
+      // ...so once info() answers in full, the same upload records.
+      expect((await recordBingoVideo(db, input)).status).toBe("added");
+    }
+  );
+
   it("is a conflict on a stale token, and deletes the unrecorded video", async () => {
     const claim = await claimFreeSquare(db, track);
     const existing = await insertMark(db, claim);
@@ -693,7 +832,7 @@ describe("recordBingoVideo", () => {
     const refusing = perturbMarkWrites(db, (values) => ({ ...values, house: "X" }));
 
     expect(
-      await recordBingoVideo(refusing, {
+      await recordBingoVideo(refusing.client, {
         house: claim.house,
         position: claim.position,
         expectedUpdatedAt: null,
@@ -701,6 +840,7 @@ describe("recordBingoVideo", () => {
         poster: fakeJpeg(128),
       })
     ).toEqual({ status: "error" });
+    expect(refusing.writes()).toBe(1);
     expect(await markOn(claim)).toBeNull();
     expect(await fileExists(db, VIDEO_BUCKET, path)).toBe(false);
     expect(await filesIn(db, PHOTO_BUCKET, claim.house, claim.position)).toEqual([]);
@@ -823,6 +963,99 @@ describe("removeBingoProof", () => {
     expect(await removeBingoProof(db, { markId: "not-a-uuid", expectedUpdatedAt: "x" })).toEqual({
       status: "not_found",
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("a file Storage will not delete", () => {
+  // 📌 orphanPaths is what task 2 writes into the audit note, as
+  // "<bucket>/<path>", so an officer can find the file in the dashboard. The
+  // database write has already happened when the delete fails, so the status
+  // must still say so: the row is the truth, and the file is only a cost.
+
+  it("is reported after a photo replace, which still succeeds", async () => {
+    const claim = await claimFreeSquare(db, track);
+    const first = await recordBingoPhoto(db, photoInput(claim, null));
+    if (first.status !== "added") throw new Error(first.status);
+
+    const stuck = failingRemoves(db, [PHOTO_BUCKET]);
+    const second = await recordBingoPhoto(stuck.client, photoInput(claim, first.updatedAt));
+    expect(second.status).toBe("replaced");
+    if (second.status !== "replaced") return;
+
+    const old = [
+      `${PHOTO_BUCKET}/${first.after.media_path}`,
+      `${PHOTO_BUCKET}/${first.after.thumb_path}`,
+    ].sort();
+    expect([...second.orphanPaths].sort()).toEqual(old);
+    expect([...stuck.attempts].sort()).toEqual(old);
+    // The new photo is recorded, and the old files are where orphanPaths says.
+    expect((await markOn(claim))!.media_path).toBe(second.after.media_path);
+    expect(await fileExists(db, PHOTO_BUCKET, first.after.media_path)).toBe(true);
+    expect(await fileExists(db, PHOTO_BUCKET, first.after.thumb_path!)).toBe(true);
+  });
+
+  it("is reported after a video replace, each file under its own bucket", async () => {
+    // A video with a poster, replaced by another. Only the video bucket fails,
+    // so the old video is the one orphan and the old poster really goes.
+    const claim = await claimFreeSquare(db, track);
+    const firstPath = await uploadVideo(claim);
+    const first = await recordBingoVideo(db, {
+      house: claim.house,
+      position: claim.position,
+      expectedUpdatedAt: null,
+      videoPath: firstPath,
+      poster: fakeJpeg(128),
+    });
+    if (first.status !== "added") throw new Error(first.status);
+    const secondPath = await uploadVideo(claim);
+
+    const stuck = failingRemoves(db, [VIDEO_BUCKET]);
+    const second = await recordBingoVideo(stuck.client, {
+      house: claim.house,
+      position: claim.position,
+      expectedUpdatedAt: first.updatedAt,
+      videoPath: secondPath,
+      poster: fakeJpeg(128),
+    });
+    expect(second.status).toBe("replaced");
+    if (second.status !== "replaced") return;
+
+    expect(second.orphanPaths).toEqual([`${VIDEO_BUCKET}/${firstPath}`]);
+    expect(stuck.attempts).toEqual([`${VIDEO_BUCKET}/${firstPath}`]);
+    expect((await markOn(claim))!.media_path).toBe(secondPath);
+    expect(await fileExists(db, VIDEO_BUCKET, firstPath)).toBe(true);
+    expect(await fileExists(db, PHOTO_BUCKET, first.after.thumb_path!)).toBe(false);
+  });
+
+  it("is reported after a remove, which still removes the mark", async () => {
+    const claim = await claimFreeSquare(db, track);
+    const path = await uploadVideo(claim);
+    const added = await recordBingoVideo(db, {
+      house: claim.house,
+      position: claim.position,
+      expectedUpdatedAt: null,
+      videoPath: path,
+      poster: fakeJpeg(128),
+    });
+    if (added.status !== "added") throw new Error(added.status);
+
+    const stuck = failingRemoves(db, [PHOTO_BUCKET, VIDEO_BUCKET]);
+    const removed = await removeBingoProof(stuck.client, {
+      markId: added.markId,
+      expectedUpdatedAt: added.updatedAt,
+    });
+    expect(removed.status).toBe("removed");
+    if (removed.status !== "removed") return;
+
+    const both = [`${PHOTO_BUCKET}/${added.after.thumb_path}`, `${VIDEO_BUCKET}/${path}`].sort();
+    expect([...removed.orphanPaths].sort()).toEqual(both);
+    expect([...stuck.attempts].sort()).toEqual(both);
+    expect(removed.before).toEqual(added.after);
+    expect(await markOn(claim)).toBeNull();
+    expect(await fileExists(db, VIDEO_BUCKET, path)).toBe(true);
+    expect(await fileExists(db, PHOTO_BUCKET, added.after.thumb_path!)).toBe(true);
   });
 });
 
