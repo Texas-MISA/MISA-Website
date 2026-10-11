@@ -24,21 +24,22 @@ import { Section } from "@/components/ui/section";
 // feature-row tell `design-taste-frontend` bans, and at `sm` a third of the
 // column is too narrow for "My Attendance" at the Title size. Rows also keep
 // the narrow single column the three member pages themselves use. (Two rows
-// since 2026-10-03, while My Attendance is unlisted — see `DESTINATIONS`.)
+// from 2026-10-03, while My Attendance is unlisted — see `DESTINATIONS` — and
+// three again since 2026-10-11, when House Bingo joined.)
 //
-// 🔓 **All three buttons are formatted the SAME — one skin, one width
-// (officer, 2026-09-18).** Check In was first built as the lone primary with
-// the other two in outline, on the argument that check-in is the one done
-// against a clock; the officer overruled that. Check-in now lives only inside
-// the portal, so this page is its door, and no tool here outranks another.
-// The width is fixed rather than fitted so the three buttons line up as one
-// column; it is sized to the longest label, "Leaderboard" (139.5px natural at
-// this size, so 160px). Re-measure before lengthening a label.
+// 🔓 **Every button is formatted the SAME — one skin, one width (officer,
+// 2026-09-18).** Check In was first built as the lone primary with the other
+// two in outline, on the argument that check-in is the one done against a
+// clock; the officer overruled that. Check-in now lives only inside the
+// portal, so this page is its door, and no tool here outranks another.
+// The width is fixed rather than fitted so the buttons line up as one column;
+// it is sized to the longest label, "Leaderboard" (139.5px natural at this
+// size, so 160px). "Bingo" is shorter. Re-measure before lengthening a label.
 //
 // 🔓 **robots is per page, and must never move to a portal layout.** The hub,
-// /portal/leaderboard and /portal/lookup are noindex; /portal/attend is
-// indexable, as /attend always was. A layout-level robots would silently
-// de-index the check-in page.
+// /portal/leaderboard, /portal/lookup and /portal/bingo are noindex;
+// /portal/attend is indexable, as /attend always was. A layout-level robots
+// would silently de-index the check-in page.
 //
 // 🪤 This page sits on the grey page ground, where `--misa-muted` measures
 // 4.33:1 and fails AA — so the officer line uses `--misa-secondary`, which is
@@ -47,7 +48,7 @@ import { Section } from "@/components/ui/section";
 
 export const metadata: Metadata = {
   title: "Member Portal",
-  description: "Check in, or see the standings.",
+  description: "Check in, see the standings, or follow house bingo.",
   robots: { index: false, follow: false },
 };
 
@@ -68,6 +69,12 @@ const DESTINATIONS = [
     title: "Points Leaderboard",
     body: "Current-term standings for MISA members.",
     action: "Leaderboard",
+  },
+  {
+    href: "/portal/bingo",
+    title: "House Bingo",
+    body: "All four house bingo cards, and how far along each house is.",
+    action: "Bingo",
   },
   // ✂️ "My Attendance" (/portal/lookup) is UNLISTED as of 2026-10-03 (officer,
   // until it has been reworked). The route still resolves; nothing links it.

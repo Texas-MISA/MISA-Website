@@ -3346,14 +3346,28 @@ $$;
                        page and no Contact nav item, and puts the About FAQ
                        band and the footer address in its place. Still in the
                        mobile sheet, which stacks and has no wordmark to clear
-/portal                Member portal hub — links to the three member tools and
-                       to officer sign-in. Static, robots noindex. The header's
-                       one navy MEMBER PORTAL button opens it, and it is the
-                       only way in to check-in from the site (officer): nothing
-                       outside /portal links /portal/attend (portal phase 1)
+/portal                Member portal hub — links to check-in, the leaderboard
+                       and house bingo (My Attendance is unlisted since
+                       2026-10-03), and to officer sign-in. Static, robots
+                       noindex. The header's one navy MEMBER PORTAL button
+                       opens it, and it is the only way in to check-in from
+                       the site (officer): nothing outside /portal links
+                       /portal/attend (portal phase 1)
 /portal/attend         Public check-in form
 /portal/leaderboard    Public standings
 /portal/lookup         Member self-service attendance history
+/portal/bingo          House bingo — all four houses' cards (one shared card of
+                       24 activities, the free centre showing the house) and
+                       each house's progress, "N of 24", in the fixed order M,
+                       I, S, A, never sorted. A done square opens its proof,
+                       the photo or the video, in a dialog; the grid loads
+                       only thumbnails. force-dynamic, robots noindex. A
+                       SERVICE-ROLE read: both tables are deny-all and anon
+                       gets zero rows, which readBingoBoard calls an error.
+                       Nothing about members or officers leaves the server. A
+                       client refresher calls router.refresh() every 10 s,
+                       only while the tab is visible, so an officer's proof
+                       shows within about 10 s             (migration 33)
 /attend                308 → /portal/attend      (member portal phase 1, v1.81)
 /leaderboard           308 → /portal/leaderboard
 /lookup                308 → /portal/lookup
@@ -4168,6 +4182,15 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              The three moved under /portal in v1.81 (they were
                              /attend, /leaderboard, /lookup — now permanent
                              redirects in next.config.ts, never deleted)
+    /portal/bingo/page.tsx   migration 33 — house bingo for members: the
+                             standings and all four cards. Service-role read,
+                             force-dynamic, noindex. _components:
+                             proof-tile.tsx (a done square and its native
+                             <dialog>; the full photo or video mounts only
+                             while it is open), bingo-refresher.tsx
+                             (router.refresh() every 10 s, only while the tab
+                             is visible, never with a proof open) and
+                             tile-label.ts (the tile label both share)
     /officer-invite/[token]/page.tsx
                              migration 24 — redeem an officer invitation.
                              Unauthenticated and OUTSIDE /admin on purpose:
@@ -4612,7 +4635,9 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              parseVideoPath, which refuses any other square's
                              path. readBingoBoard is a discriminated result and
                              an ERROR unless all 24 squares came back, since
-                             deny-all RLS answers anon with zero rows. The write
+                             deny-all RLS answers anon with zero rows.
+                             houseStandings gives /portal/bingo the houses'
+                             progress in HOUSES order, never sorted. The write
                              cores (photo, video, remove, rename) take the
                              service role, never throw, compare-and-set on the
                              raw updated_at and return the audit's before/after.

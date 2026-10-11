@@ -10,9 +10,21 @@ app/(public)/           landing, /about, /gallery, /officers, /projects, /contac
                         /officer-invite/[token], and portal/: the member portal
                         hub plus /portal/attend, /portal/leaderboard and
                         /portal/lookup (moved there 2026-09-18; the old paths
-                        are permanent redirects in next.config.ts). No
-                        portal/layout.tsx — robots stays per page, because
-                        /portal/attend is indexable and the other three are not.
+                        are permanent redirects in next.config.ts), and
+                        /portal/bingo (migration 33). No portal/layout.tsx —
+                        robots stays per page, because /portal/attend is
+                        indexable and the other four are not.
+                        portal/bingo/ is house bingo for members: the standings
+                        and all four cards, read with the SERVICE ROLE (both
+                        tables are deny-all), force-dynamic and noindex. Its
+                        _components are proof-tile.tsx (a done square and its
+                        native <dialog>; the full photo or video mounts only
+                        while it is open), bingo-refresher.tsx
+                        (router.refresh() every 10 s, only while the tab is
+                        visible, never with a proof open or offline) and
+                        tile-label.ts (the tile label class both share). 🪤 No
+                        data-reveal anywhere in it: a refresh keeps the
+                        pathname, so the observer never rescans.
                         layout.tsx holds the shared header/footer, mounts
                         RevealObserver once, and 🔓 since 2026-08-19 carries the
                         PUBLIC PAGE GROUND — `bg-misa-panel` on <main>, a flat
@@ -316,7 +328,9 @@ lib/
                         and parseVideoPath, which refuses any other square's
                         path. readBingoBoard returns a discriminated result and
                         is an ERROR unless all 24 squares came back: deny-all
-                        RLS answers anon with zero rows. The write cores (photo,
+                        RLS answers anon with zero rows. houseStandings gives
+                        /portal/bingo the houses' progress in HOUSES order,
+                        never sorted. The write cores (photo,
                         video, remove, rename) take the service role, never
                         throw, compare-and-set on the raw updated_at, and return
                         the audit's before/after. 🔓 The browser's ONE write is a

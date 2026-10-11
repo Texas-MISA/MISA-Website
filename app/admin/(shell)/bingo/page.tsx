@@ -62,7 +62,18 @@ export default async function BingoBoardPage({
     <div>
       <PageHeader
         title="House bingo"
-        description="Members see all four cards at /portal/bingo."
+        description={
+          <>
+            Members see all four cards at{" "}
+            <Link
+              href="/portal/bingo"
+              className="text-misa-blue underline underline-offset-4 hover:text-misa-blue-dark"
+            >
+              /portal/bingo
+            </Link>
+            .
+          </>
+        }
       />
 
       {result.kind === "error" ? (

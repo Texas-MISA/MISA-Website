@@ -737,6 +737,21 @@ export function houseProgress(board: BingoBoard, house: House): number {
   return done.size;
 }
 
+/** One house's line in the standings: how many of its squares are done. */
+export type HouseStanding = { house: House; done: number };
+
+/**
+ * Every house's progress, in HOUSES order (M, I, S, A), for the member portal's
+ * standings.
+ *
+ * 📌 NEVER sorted by progress. The score is just "N of 24" (user's decision,
+ * 2026-10-10), so the list is not a ranking, and a list that reordered itself
+ * on a refresh would move a house's line out from under the member reading it.
+ */
+export function houseStandings(board: BingoBoard): HouseStanding[] {
+  return HOUSES.map((house) => ({ house, done: houseProgress(board, house) }));
+}
+
 // ---------------------------------------------------------------------------
 // The write cores
 // ---------------------------------------------------------------------------
