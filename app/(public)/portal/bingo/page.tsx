@@ -92,11 +92,9 @@ export default async function HouseBingoPage() {
 
   return (
     <>
-      {/* 1. LAYOUT FAMILY: Page hero. Static framing, so its reveal is safe. */}
-      <PageHero
-        title="House Bingo"
-        subhead="Every house plays the same card. Open a done square to see its proof."
-      />
+      {/* 1. LAYOUT FAMILY: Page hero. Static framing, so its reveal is safe.
+          No subhead, like the hub's (user, 2026-10-11). */}
+      <PageHero title="House Bingo" />
 
       {/* 2. LAYOUT FAMILY: The board. */}
       <Section padTop="sm" padBottom="md" width="page">

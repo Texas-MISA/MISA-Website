@@ -97,6 +97,7 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
     - A video is stored byte for byte, so a phone's recording location, where the camera saved one, is public with it. Only photos lose their metadata.
     - A backup holds the bingo rows and the `storage.objects` rows but none of the files, and the tested restore ran before Storage held anything.
     - Abandoned videos are swept per square, only when that square next gets a video.
+  - **Changed after the browser pass, 2026-10-11, at the user's request:** the hero's subhead is gone, so `/portal/bingo`'s hero is the title alone, as on the hub.
 
 💾 **Backups proven, 2026-10-09: production's first backup was taken and restored** (`scripts/backup-remote.sh`, on `portal-launch`). Supabase's Free plan keeps none, so this is the only copy there is.
 
