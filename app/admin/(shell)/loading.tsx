@@ -14,8 +14,10 @@
 // 2. It converts a `notFound()` 404 into a 200. Streaming commits to 200 OK the
 //    moment a fallback renders, and the status cannot change afterwards; Next
 //    injects <meta name="robots" content="noindex"> into the streamed HTML
-//    instead. Our six detail pages all `await` their query before calling
-//    notFound(), so they will stream and they will be 200s.
+//    instead. Our seven detail pages all `await` before calling notFound(),
+//    so they will stream and they will be 200s: six await their query, and
+//    bingo/[house]/[position] (migration 33) awaits requireOfficer() and its
+//    params, then refuses a square spelled any other way.
 //
 //    Accepted knowingly: every admin route already carries robots noindex from
 //    app/admin/(shell)/layout.tsx, nothing consumes these as an API, and the

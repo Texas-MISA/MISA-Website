@@ -3472,8 +3472,16 @@ $$;
                        resized, stored with the service role, or a video the
                        browser uploaded itself with a signed token, the ONE
                        client-side write (user's decision, 2026-10-10).
-                       getOfficer() 403, a same-origin check, and a 4 MiB
-                       Content-Length cap before the body is read
+                       getOfficer() 403; then a host check, Next's own Server
+                       Action comparison (Origin's host against the first
+                       x-forwarded-host value, else Host; a missing, "null" or
+                       unparseable Origin is refused); then a 4 MiB cap on the
+                       body: a declared Content-Length over it is refused before
+                       the handler reads anything, and the body is counted as
+                       it arrives either way, so a missing header neither
+                       refuses nor admits anything. Next buffers a proxied body
+                       to its end before the handler runs, so the cap saves the
+                       parse, not the upload
 /admin/officers        Officer turnover — invite by link, withdraw an invitation,
                        remove access, grant it to an account that already exists.
                        Replaces scripts/create-officer.mjs for everyday use; the

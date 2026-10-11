@@ -75,40 +75,57 @@ describe("the upload Route Handler", () => {
     expect(source).not.toContain("requireOfficer");
   });
 
-  it("🔓 refuses a request whose Origin is not its own, before reading anything", () => {
-    expect(post).toContain('request.headers.get("origin")');
+  it("🔓 refuses a request whose Origin is not its own host, before reading anything", () => {
+    // The comparison lives in isSameOriginRequest (lib/bingo.ts), tested in
+    // tests/bingo-upload.test.ts; this pins that the route asks it.
     expect(post).toMatch(
-      /origin === null \|\| origin !== new URL\(request\.url\)\.origin\s*\)\s*\{\s*return reply\(\{ status: "forbidden" \}, 403\);/
+      /if \(!isSameOriginRequest\(request\.headers\)\) \{\s*return reply\(\{ status: "forbidden" \}, 403\);/
+    );
+    // 🪤 Headers only. request.url is the server's own idea of its origin, and
+    // on a self-hosted or wrongly configured server it is not the browser's.
+    expect(source).not.toContain("request.url");
+  });
+
+  it("refuses a declared length over the cap before the body is read", () => {
+    expect(post).toMatch(
+      /if \(\s*!declaredLengthWithin\(\s*request\.headers\.get\("content-length"\),\s*MAX_UPLOAD_REQUEST_BYTES\s*\)\s*\)\s*\{\s*return reply\(\{ status: "too_large" \}, 413\);/
     );
   });
 
-  it("caps Content-Length before the body is read", () => {
-    // proxy.ts matches this path, and Next silently truncates a proxied body
-    // past proxyClientMaxBodySize; reading first would parse a cut-off form.
-    expect(post).toMatch(/request\.headers\.get\("content-length"\)/);
-    expect(post).toMatch(/declared === null \|\|/);
-    expect(post).toMatch(/Number\(declared\) > MAX_UPLOAD_REQUEST_BYTES/);
-    expect(post).toContain('reply({ status: "too_large" }, 413)');
+  it("counts the body as it arrives, whether or not a length was declared", () => {
+    // A missing Content-Length must not fail the upload, and a body past the
+    // cap is refused at the chunk that crosses it.
+    expect(post).toContain(
+      "const body = await readBodyWithin(request.body, MAX_UPLOAD_REQUEST_BYTES);"
+    );
+    expect(post).toContain('if (body.kind === "too_large") return reply({ status: "too_large" }, 413);');
+    expect(post).toContain('if (body.kind === "unreadable") return reply({ status: "invalid" }, 400);');
+    // The body is read once, by the counter. request.formData() would read it
+    // again, uncounted, or find it already used.
+    expect(source).not.toContain("request.formData()");
+    expect(source).not.toContain("request.arrayBuffer()");
   });
 
-  it("checks in order: officer, origin, length, then the body", () => {
+  it("checks in order: officer, origin, declared length, the counted body, then the parse", () => {
     const at = (needle: string) => {
       const index = post.indexOf(needle);
       expect(index, needle).toBeGreaterThan(-1);
       return index;
     };
     const officer = at("await getOfficer()");
-    const origin = at('request.headers.get("origin")');
-    const length = at('request.headers.get("content-length")');
-    const body = at("await request.formData()");
+    const origin = at("isSameOriginRequest(request.headers)");
+    const declared = at("declaredLengthWithin(");
+    const counted = at("await readBodyWithin(");
+    const parsed = at("new Response(body.bytes");
     expect(officer).toBeLessThan(origin);
-    expect(origin).toBeLessThan(length);
-    expect(length).toBeLessThan(body);
+    expect(origin).toBeLessThan(declared);
+    expect(declared).toBeLessThan(counted);
+    expect(counted).toBeLessThan(parsed);
   });
 
-  it("answers a body it cannot parse with 400, and validates with the shared schema", () => {
+  it("parses the counted bytes with the request's Content-Type, 400 when they are not a form", () => {
     expect(post).toMatch(
-      /try \{\s*form = await request\.formData\(\);\s*\} catch \{\s*return reply\(\{ status: "invalid" \}, 400\);/
+      /try \{\s*form = await new Response\(body\.bytes, \{\s*headers: \{ "content-type": request\.headers\.get\("content-type"\) \?\? "" \},\s*\}\)\.formData\(\);\s*\} catch \{\s*return reply\(\{ status: "invalid" \}, 400\);/
     );
     expect(post).toContain("bingoUploadSchema.safeParse(");
   });
@@ -437,6 +454,22 @@ describe("the one browser write", () => {
         file
       ).toEqual([]);
     }
+  });
+
+  it("createBrowserClient appears in exactly one source file: lib/supabase/client.ts", () => {
+    // The "use client" scan above would miss a plain helper module that built
+    // a second browser client. And @supabase/ssr's browser client is a
+    // tab-wide singleton, so the FIRST caller's options win: a second call
+    // site anywhere could hand the proof form a client that carries the
+    // officer's session.
+    const callers = files.filter((file) =>
+      /\bcreateBrowserClient\b/.test(
+        readFileSync(file, "utf8")
+          .replace(/^\s*\/\/.*$/gm, "")
+          .replace(/\/\*[\s\S]*?\*\//g, "")
+      )
+    );
+    expect(callers).toEqual([BROWSER_CLIENT]);
   });
 
   it("the browser client is sessionless: the anon key, never the officer's token", () => {

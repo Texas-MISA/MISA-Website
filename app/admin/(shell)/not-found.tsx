@@ -2,10 +2,10 @@ import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 
 // The admin 404 (Stage 8 phase 3). The single highest-value file of the phase:
-// it covers all six `notFound()` call sites at once — members/[id],
-// events/[id], attendance/[id], dues/[id], points/[id] and
-// members/fields/[id] — and renders INSIDE the shell, so an officer who
-// followed a stale link keeps the nav and has a way back.
+// it covers all seven `notFound()` call sites at once — members/[id],
+// events/[id], attendance/[id], dues/[id], points/[id], members/fields/[id]
+// and bingo/[house]/[position] (migration 33) — and renders INSIDE the shell,
+// so an officer who followed a stale link keeps the nav and has a way back.
 //
 // Before this file, every one of those fell through to Next's built-in 404
 // inside the root layout: no nav, no links, no indication which section they

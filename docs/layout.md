@@ -77,8 +77,11 @@ app/admin/(shell)/      authed chrome + dashboard, events/, attendance/, points/
                         with proof-panel.tsx (preview, Replace, two-click
                         Remove), proof-form.tsx (the uploader — lib/supabase/
                         client.ts's ONE importer) and rename-form.tsx.
-                        upload/route.ts records proof: getOfficer() 403, a
-                        same-origin check, a Content-Length cap before reading.
+                        upload/route.ts records proof: getOfficer() 403, a host
+                        check (Origin against x-forwarded-host or Host, as Next
+                        checks a Server Action), and a 4 MiB body cap counted
+                        as the body arrives, a declared length over it refused
+                        first. Both gates are pure helpers in lib/bingo.ts.
                         dues/new/ is manual dues entry (migration 32): page.tsx
                         formats Central "now" and the prices, and
                         _components/payment-form.tsx is the client form, whose

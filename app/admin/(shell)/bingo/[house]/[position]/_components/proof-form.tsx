@@ -14,18 +14,17 @@ import {
   type PrepareVideoUploadResult,
 } from "@/app/actions/bingo";
 import {
-  isVideoContentType,
   MAX_PHOTO_BYTES,
   MAX_THUMB_BYTES,
   MAX_VIDEO_BYTES,
   PHOTO_CONTENT_TYPE,
   PHOTO_LONG_EDGE,
+  proofKindOf,
   scaledDimensions,
   THUMB_LONG_EDGE,
   UPLOAD_CACHE_CONTROL,
   VIDEO_BUCKET,
-  VIDEO_CONTENT_TYPES,
-  VIDEO_EXTENSIONS,
+  withVideoType,
   type BingoInvalidReason,
 } from "@/lib/bingo";
 import { createClient } from "@/lib/supabase/client";
@@ -77,9 +76,6 @@ const RETRY_QUALITY_DROP = 0.2;
 /** Where the poster frame is taken from, and how long to try. */
 const POSTER_AT_SECONDS = 0.5;
 const POSTER_TIMEOUT_MS = 5000;
-
-/** Extensions read as a photo when the browser reports no type at all. */
-const PHOTO_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
 
 type Step = "preparing" | "uploading" | "saving";
 
@@ -197,7 +193,7 @@ export function ProofForm({
     const target: Target = { house, position, expectedUpdatedAt };
     let outcome: Outcome;
     try {
-      const kind = kindOf(file);
+      const kind = proofKindOf(file);
       outcome =
         kind === "photo"
           ? await sendPhoto(file, target, setStep)
@@ -474,19 +470,6 @@ async function sendVideo(
 }
 
 /**
- * The file with a type the bucket takes, or null. A browser that reports no
- * type gets one from the extension, re-wrapped into a new File because that
- * type is what Storage will record.
- */
-function withVideoType(file: File): File | null {
-  if (isVideoContentType(file.type)) return file;
-  if (file.type !== "") return null;
-  const extension = extensionOf(file.name);
-  const type = VIDEO_CONTENT_TYPES.find((t) => VIDEO_EXTENSIONS[t] === extension);
-  return type === undefined ? null : new File([file], file.name, { type });
-}
-
-/**
  * One frame, about half a second in, as a THUMB_LONG_EDGE JPEG — or null.
  *
  * Best effort and bounded: a video this browser cannot decode (HEVC in Chrome
@@ -661,21 +644,4 @@ function reasonMessage(reason: unknown): string | null {
     Object.prototype.hasOwnProperty.call(REASON_MESSAGES, reason)
     ? REASON_MESSAGES[reason as BingoInvalidReason]
     : null;
-}
-
-function kindOf(file: File): "photo" | "video" | null {
-  if (file.type.startsWith("image/")) return "photo";
-  if (file.type.startsWith("video/")) return "video";
-  if (file.type !== "") return null;
-  const extension = extensionOf(file.name);
-  if (PHOTO_EXTENSIONS.has(extension)) return "photo";
-  if (VIDEO_CONTENT_TYPES.some((type) => VIDEO_EXTENSIONS[type] === extension)) {
-    return "video";
-  }
-  return null;
-}
-
-function extensionOf(name: string): string {
-  const dot = name.lastIndexOf(".");
-  return dot === -1 ? "" : name.slice(dot + 1).toLowerCase();
 }

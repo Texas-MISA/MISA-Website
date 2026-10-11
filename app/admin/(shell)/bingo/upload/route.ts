@@ -3,8 +3,11 @@ import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/app/actions/audit";
 import { getOfficer } from "@/lib/auth";
 import {
+  declaredLengthWithin,
   houseSlug,
+  isSameOriginRequest,
   MAX_UPLOAD_REQUEST_BYTES,
+  readBodyWithin,
   recordBingoPhoto,
   recordBingoVideo,
   type BingoInvalidReason,
@@ -29,7 +32,7 @@ import { bingoUploadSchema } from "@/lib/validation";
 //
 //   200 added | replaced (with updatedAt)   400 invalid (with reason when the
 //   403 unauthorized | forbidden                 write core refused a value)
-//   413 too_large                           409 conflict      500 error
+//   413 too_large (declared or counted)     409 conflict      500 error
 //
 // ⚠️ It opens with getOfficer() and returns 403, NEVER requireOfficer() — the
 // same rule app/admin/(shell)/members/export/route.ts records: a redirect to
@@ -44,16 +47,37 @@ import { bingoUploadSchema } from "@/lib/validation";
 // signed-in user with no admin_profiles row, and what survives a matcher
 // change. Both are required; neither substitutes for the other.
 //
-// 🔓 A SAME-ORIGIN CHECK, because the framework makes none here. Server
-// Actions compare Origin with Host for us; a Route Handler acting on a cookie
-// session does not. SameSite=Lax on the session cookie already keeps it off a
-// cross-site POST, so this is the second check, and the one that does not rest
-// on a cookie attribute. A browser always sends Origin on a POST.
+// 🔓 A SAME-ORIGIN CHECK, because the framework makes none here. Next checks
+// Origin before every Server Action; it does not for a Route Handler acting
+// on a cookie session. SameSite=Lax on the session cookie already keeps it off
+// a cross-site POST, so this is the second check, and the one that does not
+// rest on a cookie attribute.
 //
-// 🪤 Locally, request.url's origin is the dev server's own
-// (http://localhost:3000), whatever host the browser used, so a page opened at
-// http://127.0.0.1:3000 is refused as forbidden. On Vercel it is built from the
-// Host header and matches.
+// It rests on headers, never on request.url, and is Next's own comparison:
+// Origin's host against the first x-forwarded-host value, else Host
+// (isSameOriginRequest in lib/bingo.ts, which cites the Next source). This app
+// sets no serverActions.allowedOrigins, so it accepts what the site's Server
+// Actions accept, except a request with no Origin at all, which Next lets
+// through and this refuses. Next's server fills a missing x-forwarded-host from
+// Host (base-server.js), so locally localhost, 127.0.0.1 and a LAN address
+// all pass.
+//
+// 📌 THE BODY IS COUNTED, NOT TRUSTED. A Content-Length that is malformed or
+// over MAX_UPLOAD_REQUEST_BYTES is refused before this handler reads a byte,
+// but a MISSING one is no reason to refuse: nothing in this repository shows
+// whether it survives every hop to this function. Either way the body is then
+// read through readBodyWithin, which stops at the cap. The cap (4 MiB) sits
+// under proxyClientMaxBodySize (10 MB by default): proxy.ts matches this path,
+// and Next buffers a proxied body only that far and silently truncates past
+// it, so a truncated body is refused as too large before it could ever parse
+// as a complete one.
+//
+// 🪤 That buffering also means the early refusal saves the parse, not the
+// upload. Next hands this handler the request only once the proxied body has
+// ENDED (getCloneableBody's finalize() in next/dist/server/body-streams.js),
+// so a client that declares 5 MiB and stalls gets no answer until it sends
+// the rest or its connection times out, and a client that sends 5 MiB has
+// sent all of it before the 413. Seen on the dev server, 2026-10-11.
 
 // getOfficer reads cookies, so this could never be static anyway. Stated so
 // a change to Route Handler caching cannot quietly make it so.
@@ -85,28 +109,34 @@ export async function POST(request: Request): Promise<Response> {
   const officer = await getOfficer();
   if (!officer) return reply({ status: "unauthorized" }, 403);
 
-  const origin = request.headers.get("origin");
-  if (origin === null || origin !== new URL(request.url).origin) {
+  if (!isSameOriginRequest(request.headers)) {
     return reply({ status: "forbidden" }, 403);
   }
 
-  // 📌 Refused BEFORE the body is read. proxy.ts matches this path, and Next
-  // buffers a proxied request body only up to proxyClientMaxBodySize (10 MB by
-  // default), silently truncating past it. MAX_UPLOAD_REQUEST_BYTES (4 MiB)
-  // sits under both that and Vercel's 4.5 MB function limit, and a request
-  // within the photo and thumbnail caps always fits inside it.
-  const declared = request.headers.get("content-length");
+  // A declared length over the cap is refused before this handler reads a
+  // byte. Then the body is counted as it arrives, whatever was declared; see
+  // the header.
+  // MAX_UPLOAD_REQUEST_BYTES also sits under Vercel's 4.5 MB function limit,
+  // and a request within the photo and thumbnail caps always fits inside it.
   if (
-    declared === null ||
-    !/^\d+$/.test(declared) ||
-    Number(declared) > MAX_UPLOAD_REQUEST_BYTES
+    !declaredLengthWithin(
+      request.headers.get("content-length"),
+      MAX_UPLOAD_REQUEST_BYTES
+    )
   ) {
     return reply({ status: "too_large" }, 413);
   }
+  const body = await readBodyWithin(request.body, MAX_UPLOAD_REQUEST_BYTES);
+  if (body.kind === "too_large") return reply({ status: "too_large" }, 413);
+  if (body.kind === "unreadable") return reply({ status: "invalid" }, 400);
 
+  // The counted bytes, parsed as the multipart body they claim to be: the
+  // request's own Content-Type carries the boundary.
   let form: FormData;
   try {
-    form = await request.formData();
+    form = await new Response(body.bytes, {
+      headers: { "content-type": request.headers.get("content-type") ?? "" },
+    }).formData();
   } catch {
     return reply({ status: "invalid" }, 400);
   }

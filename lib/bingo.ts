@@ -268,6 +268,159 @@ export function boardRows<T>(cells: readonly T[]): T[][] {
 }
 
 // ---------------------------------------------------------------------------
+// The uploader's file decisions
+// ---------------------------------------------------------------------------
+//
+// Run in the browser by the proof form, on the file the officer chose, before
+// anything is sent.
+
+/**
+ * Extensions read as a photo when the browser reports no type at all. HEIC is
+ * one: whether it opens is the browser's decoder's to say (Safari can, Chrome
+ * cannot), and the form words a failed decode itself.
+ */
+const PHOTO_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "heic", "heif"]);
+
+/** A file name's extension, lowercased, without the dot: `"IMG_1.MOV"` →
+ * `"mov"`. Only what follows the LAST dot, and `""` when there is no dot. */
+export function fileExtension(name: string): string {
+  const dot = name.lastIndexOf(".");
+  return dot === -1 ? "" : name.slice(dot + 1).toLowerCase();
+}
+
+/**
+ * Whether a chosen file is a photo or a video, or neither. The browser's type
+ * decides when there is one, and a type that is neither image nor video is
+ * refused. With no type at all, which some pickers report, the extension
+ * decides.
+ */
+export function proofKindOf(file: File): MarkKind | null {
+  if (file.type.startsWith("image/")) return "photo";
+  if (file.type.startsWith("video/")) return "video";
+  if (file.type !== "") return null;
+  const extension = fileExtension(file.name);
+  if (PHOTO_EXTENSIONS.has(extension)) return "photo";
+  if (VIDEO_CONTENT_TYPES.some((type) => VIDEO_EXTENSIONS[type] === extension)) {
+    return "video";
+  }
+  return null;
+}
+
+/**
+ * The file with a type VIDEO_BUCKET takes, or null when it has none.
+ *
+ * A browser that reports no type gets one from the extension, re-wrapped into
+ * a NEW File, because that type is what Storage records: uploadToSignedUrl
+ * sends a File as FormData and ignores its own contentType option. Any other
+ * reported type (video/x-m4v, image/heic) is refused, never overridden.
+ */
+export function withVideoType(file: File): File | null {
+  if (isVideoContentType(file.type)) return file;
+  if (file.type !== "") return null;
+  const extension = fileExtension(file.name);
+  const type = VIDEO_CONTENT_TYPES.find((t) => VIDEO_EXTENSIONS[t] === extension);
+  return type === undefined ? null : new File([file], file.name, { type });
+}
+
+// ---------------------------------------------------------------------------
+// The upload request
+// ---------------------------------------------------------------------------
+//
+// The two gates /admin/bingo/upload puts in front of the write cores, kept
+// pure so they can be tested without a request context.
+
+/**
+ * The host a same-origin check holds Origin against: the first
+ * comma-separated value of x-forwarded-host, trimmed, or else Host. The order
+ * Next's own Server Action check uses (parseHostHeader in
+ * next/dist/server/app-render/action-handler.js).
+ */
+function requestHost(headers: Headers): string | null {
+  const forwarded = headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  return forwarded ? forwarded : headers.get("host");
+}
+
+/**
+ * True when the request's Origin names the host it was sent to.
+ *
+ * The comparison Next makes before it runs any Server Action: Origin's host
+ * against requestHost(). This app sets no serverActions.allowedOrigins, so the
+ * two accept the same requests, with one difference: a MISSING Origin, which
+ * Next lets through with a warning, is refused here, along with the literal
+ * "null" (an opaque origin) and anything that is not a URL. Every browser
+ * sends Origin on a POST, and the proof form is this route's only caller.
+ */
+export function isSameOriginRequest(headers: Headers): boolean {
+  const origin = headers.get("origin");
+  if (origin === null || origin === "null") return false;
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host;
+  } catch {
+    return false;
+  }
+  const host = requestHost(headers);
+  return host !== null && host !== "" && originHost === host;
+}
+
+/**
+ * Whether a Content-Length header lets the request in: absent, since the body
+ * is counted as it arrives anyway (readBodyWithin), or a plain decimal integer
+ * no greater than `cap`. A malformed value is refused rather than ignored: no
+ * well-behaved client sends one.
+ */
+export function declaredLengthWithin(value: string | null, cap: number): boolean {
+  if (value === null) return true;
+  return /^\d+$/.test(value) && Number(value) <= cap;
+}
+
+export type BodyRead =
+  | { kind: "ok"; bytes: Uint8Array<ArrayBuffer> }
+  /** More than the cap arrived. Reading stopped there. */
+  | { kind: "too_large" }
+  /** The stream failed part-way, as when the connection drops. */
+  | { kind: "unreadable" };
+
+/**
+ * Read a request body, giving up the moment it passes `cap` bytes.
+ *
+ * It counts what actually ARRIVES, so neither a missing Content-Length nor a
+ * false one gets a bigger body past the cap. It keeps nothing past the cap
+ * either: the reader is cancelled at the chunk that crossed it. (Upstream,
+ * Next may already hold the whole body; the route's header says why.)
+ */
+export async function readBodyWithin(
+  body: ReadableStream<Uint8Array> | null,
+  cap: number
+): Promise<BodyRead> {
+  if (body === null) return { kind: "ok", bytes: new Uint8Array(0) };
+  const reader = body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > cap) {
+        reader.cancel().catch(() => {});
+        return { kind: "too_large" };
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return { kind: "unreadable" };
+  }
+  const bytes = new Uint8Array(total);
+  let at = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, at);
+    at += chunk.byteLength;
+  }
+  return { kind: "ok", bytes };
+}
+
+// ---------------------------------------------------------------------------
 // Storage paths
 // ---------------------------------------------------------------------------
 //
