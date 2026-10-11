@@ -1223,7 +1223,12 @@ with no EXIF. A VIDEO uploads byte for byte, so whatever the phone wrote into it
 metadata, a recording location included where the camera saved one, is public
 with it. The server re-encodes neither kind: it checks a photo's sizes and JPEG
 signature only, so the EXIF guarantee holds for the proof form's path, not for
-a hand-built request from an officer's session. Open in `tasks.md`.
+a hand-built request from an officer's session.
+
+✅ **Accepted by the officers, 2026-10-11.** The user's words: "The video
+locations are fine as is, officers are aware and okay with it." It is an
+accepted risk, not an open decision, so nothing strips a video's metadata.
+`tasks.md` has the record.
 
 ### The free centre is never stored, and "done" is a row
 

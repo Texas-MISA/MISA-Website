@@ -69,7 +69,7 @@ A push to `main` is a production deploy of https://www.txmisa.org, and `tasks.md
 
 ### House bingo (`portal-launch`, migration 33): the deploy order
 
-Written 2026-10-11, before the deploy. 🔴 **Migration 33 goes to production BEFORE the code.** `/admin/bingo`, its square page and `/portal/bingo` read `bingo_squares` and `bingo_marks`, and against a database without them they fail with 42P01. The reverse is harmless: no older code names either table, and the widened audit CHECK only accepts more. Each step waits on the user's word, and moving `main` waits on a brief that opens with their approval line and names the commit they reviewed.
+Written 2026-10-11, before the deploy. ✅ **Carried out on 2026-10-11:** steps 1 to 6 passed, and step 7 waits on the officers. The record is in `tasks.md`, under *House bingo*. 🔴 **Migration 33 goes to production BEFORE the code.** `/admin/bingo`, its square page and `/portal/bingo` read `bingo_squares` and `bingo_marks`, and against a database without them they fail with 42P01. The reverse is harmless: no older code names either table, and the widened audit CHECK only accepts more. Each step waits on the user's word, and moving `main` waits on a brief that opens with their approval line and names the commit they reviewed.
 
 1. **Back up production** with `bash scripts/backup-remote.sh`, and stop if its folder holds `INCOMPLETE`. (It holds no media, but there is none to hold until the first upload: §Backups below.)
 2. **Check that no check-in window is open**, with the one-line clock query above: `open_now` must be empty. A deploy during an event strands every member mid-check-in.
