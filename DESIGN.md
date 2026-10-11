@@ -66,8 +66,10 @@ planned. Every value here was read off the running application on 2026-08-19.
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
 | `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3 is NEXT** (officer, 2026-09-18: the UI redesign of the member portal and every page in it). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure. |
-| `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows, each with one navy button of one fixed width, all formatted the same (officer); no muted ink on the grey ground. The header's MEMBER PORTAL button is the site's one way in. Phase 3 owns the member area's real design and may re-compose it. |
+| `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows, each with one navy button of one fixed width, all formatted the same (officer); no muted ink on the grey ground. The header's MEMBER PORTAL button is the site's one way in. Phase 3 owns the member area's real design and may re-compose it. *(Three rows: Event Check-In, Points Leaderboard and, since 2026-10-11 on `portal-launch`, House Bingo.)* |
+| `/portal/bingo` (house bingo for members, migration 33; built 2026-10-11 on `portal-launch`, not live) | 🧩 **Shared primitives only, and ⏳ NOT YET REBUILT: phase 3 owns its design** and may re-compose it. Two layout families, declared at the top of the page: PageHero, then one `<Section>` holding the card's rule, the standings on one white `Panel` (a decorative navy bar per house on a 15% navy track), and four 5×5 cards, two by two from `lg`. Each card is one shared-rule plate (`gap-px` over the hairline, never a border per tile), its rows at least as tall as a column is wide. The free centre is a navy cell; an open square is plain text on white; a done square is a navy button, the thumbnail above a solid navy band, opening a native `<dialog>` (the elevation table's `shadow-overlay`). No `--misa-muted` anywhere: copy on the grey ground uses `--misa-secondary`, and the tiles and standings sit on white. Two departures, both recorded below: the **tile label** (*Typography*) and the **two-tone focus ring** (*Accessibility*). |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
+| `/admin/bingo`, `/admin/bingo/[house]/[position]` (migration 33; built 2026-10-10/11 on `portal-launch`, not live) | ✅ **The v2 officer vocabulary, no new primitive**: `PageHeader`, `SectionHeading`, `Panel`, `Pill`, `Banner`, `Field` and `buttonClass`; the rename form is a `<form>` in a `bg-white` frame, because `Panel` does not forward `action`. The board is one house's card at a time behind a four-way house switcher (navy when selected), drawn as a shared-rule plate that becomes one column in reading order below `sm`, where officers on phones find squares with a thumb. The free centre is a navy cell. "Not done" uses `--misa-secondary`, because a cell turns Vellum on hover. The square page is one column that works at 390px. |
 
 🪤 **The grounds already changed site-wide, ahead of the rebuilds.** Every public
 page sits on the v2 page ground today, so a page can be un-rebuilt and still not
@@ -178,10 +180,11 @@ side the surface is `Panel` (or a `bg-white` frame where a `<form>` needs its ow
 `action`, which `Panel` does not forward), and the shell owns the ground.
 
 🔓 **`PageHero` moved from a flat `bg-misa-blue` to `ground="field"` in phase 2**,
-so the site has ONE navy hero treatment rather than two. ⚠️ **Nine pages render
+so the site has ONE navy hero treatment rather than two. ⚠️ **Ten pages render
 it** — the five phase-2 pages plus `/attend`, `/lookup` and `/leaderboard`, which
-are phase 3, and the `/portal` hub that has linked those three since 2026-09-18
-(they live under `/portal` now). The phase-3 three inherit any change to it and
+are phase 3, the `/portal` hub that has linked those three since 2026-09-18
+(they live under `/portal` now), and `/portal/bingo` (migration 33, on
+`portal-launch`), which phase 3 also owns. The phase-3 three inherit any change to it and
 were measured at the phase-2 gate rather than assumed. Its dead `size="home"` and `tagline` props were deleted.
 🔓 **It is CENTRED as of 2026-08-23 (officer), reversing phase 2's
 left-alignment.** Phase 2 left-aligned it because §4.3's anti-centre bias binds
@@ -252,6 +255,15 @@ does not get added; a fifth step is a change to this list.
 | `shadow-overlay` | Menus, popovers, dialogs. Things that genuinely float. |
 | `shadow-sticky` | A bar pinned over scrolling content, proving content passes underneath |
 
+- 📌 **`shadow-overlay`'s first call site is the house bingo proof dialog**
+  (`app/(public)/portal/bingo/_components/proof-tile.tsx`, 2026-10-11, on
+  `portal-launch`): a native `<dialog>` opened with `showModal()`, square-cornered,
+  over a `misa-blue-dark/70` backdrop. It is the site's only modal. Two markup
+  traps it records in its own header: the `<dialog>` carries no display
+  utility, because author CSS beats the user agent's
+  `dialog:not([open]) { display: none }`, and it needs `m-auto`, because
+  Tailwind's preflight zeroes the auto margins that centre a modal. Phase 3 owns
+  its look.
 - 🪤 **Shadows are tinted to the background hue, never black.** All four are navy
   at low alpha. `rgba(0,0,0,…)` anywhere in this codebase is a bug.
 - 🪤 **A shadow tinted to the ground composites to nothing on a ground of that
@@ -396,6 +408,21 @@ must be re-measured.
   copy-length one.
 - 📌 **Monospace means an identifier**, and only in `/admin`. An EID is
   transcribed by hand off a phone screen; monospace separates `l` from `1`.
+- 📌 **The house bingo tile label is the display face's smallest use on the
+  site, and it is off the ramp on purpose** (`/portal/bingo`, 2026-10-11; the
+  class is `TILE_LABEL` in `app/(public)/portal/bingo/_components/tile-label.ts`).
+  Barlow Condensed, weight 500, leading 1.15: **12px on a phone, 14px from
+  `sm`**, shared by an open square's text and a done square's band. On a phone
+  the tile is the constraint: at 390 a tile is 69px wide, and in Barlow at 11px
+  "Underground" and "Monochrome" measure 63px and broke mid-word. In Barlow
+  Condensed at 12px they measure 54px, and with the 2px side padding the tiles
+  use on a phone they fit down to a 360px screen. `hyphens: auto` was tried and
+  is not relied on, because a browser without the dictionary breaks with no
+  hyphen at all. `wrap-anywhere` stays as the last resort for a long renamed
+  activity, which wraps and is never truncated. The only other 12px use of the
+  display face is the officer card's uppercase "LinkedIn →", which is switched
+  off (`SHOW_OFFICER_LINKEDIN`); every other use is 13px or larger. Phase 3 owns
+  the page and may re-set it.
 
 ---
 
@@ -698,6 +725,15 @@ Real photographs are live on the home page **locally only**.
 - **Treatment spec** (duotone: `grayscale(1) contrast(1.05)` plus a navy
   `mix-blend-mode: color` overlay) lives in the handoff README. Not currently
   applied.
+- 📌 **House bingo's proof photos are NOT this pipeline** (migration 33, on
+  `portal-launch`). Officers upload them at runtime to public Supabase Storage
+  buckets, through `/admin/bingo`, and they never enter git or
+  `scripts/build-photos.mjs`. The browser resizes each to at most 2048 px on the
+  long edge, with a 480 px thumbnail, and re-encodes it as JPEG, which drops its
+  EXIF and GPS; a video is stored as it was recorded. Unlike a committed
+  photograph, an officer can take one down (Remove), though a cached copy can
+  be served for up to an hour. They render through `next/image` with
+  `unoptimized`, and only the thumbnail loads on the grid.
 
 ---
 
@@ -706,6 +742,18 @@ Real photographs are live on the home page **locally only**.
 - **A focus ring must be visible on every ground it can land on.** Today that is
   the `.on-navy` flip to white. **Any new ground answers this in the same
   commit.** A navy ring on a navy field is not subtle — it is no indicator.
+  - 🔓 **A control that touches navy needs a TWO-TONE ring** (house bingo's done
+    tiles, 2026-10-11). The global ring is a 2px navy outline 2px out
+    (`app/globals.css`), and on `/portal/bingo` it measured **1.00:1** wherever
+    it crossed the navy free centre (which squares 7, 11, 13 and 17 always
+    border) or a neighbouring tile's navy band. A done tile therefore adds
+    `focus-visible:ring-2 focus-visible:ring-white`, a 2px white ring that fills
+    the outline's offset, so one tone or the other shows on every edge, and
+    `relative` with `focus-visible:z-10` draws both over the neighbouring tiles
+    rather than under them. It is a ring utility, not an arbitrary shadow, so it
+    is no fifth elevation step. `tests/portal-bingo.test.ts` pins the classes
+    and the global outline's 2px offset they depend on. `.on-navy` answers a
+    navy *ground*; this answers a control whose *neighbours* may be navy.
 - **Contrast is measured per pairing, on the ground the text actually sits on,
   compositing any alpha.** Annotation Grey passed everywhere until a field's
   ground changed under it.

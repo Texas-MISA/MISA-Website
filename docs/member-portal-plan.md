@@ -1,8 +1,8 @@
 # Member portal plan
 
 > ✅ **PHASE 1 BUILT on `portal-phase-1` (2026-09-18), verified locally.** 🚀 **It ships ALONE, ahead of the redesign, from `portal-launch` (2026-09-29):** `main` plus a `--no-ff` merge of `portal-phase-1` (`ef07b47`), with lint, build and 1,097 tests green. ✅ **LIVE on `main` since 2026-09-30 (`b273977`)**, pushed on a day with no event and verified on production. See [Phase 1 record](#phase-1-record-2026-09-18) at the end of the phase. Written 2026-09-18. **Rollback point:** `699fd3d` (deployment `dpl_CNadYLpanZVtUEZAkBpi4mLyVs83`), production until 2026-09-30. 🔴 **Not the tag `pre-portal-2026-09-18` (`ce5bda7`)**: `main` gained the partner-logo swap on 2026-09-20, and rolling back to the tag would take that down too.
-> **Current goal: phase 1 only.** Phases 2–4 (houses and bingo) are **on hold** until the officer has more information about how the house system works.
-> ⏭️ **NEXT TASK now that phase 1 is live (officer, 2026-09-18): a UI redesign of the portal and every page in it** — the hub, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup`. That is v2 phase 3 in [`frontend-redesign-v2-plan.md`](frontend-redesign-v2-plan.md), widened to the hub. It is presentation only, and it owns the `--misa-muted` AA fix. Phase 1 deliberately built the hub from shared primitives so as not to pre-empt it.
+> 🏗️ **Phases 2–4 are BUILT as house bingo on `portal-launch` (2026-10-10/11), re-scoped by the user's decisions of 2026-10-10, and NOT live.** They await the user's review; then migration 33 goes to production before the code. Not built, by the user's decision: assigning members to houses, and terms. See [Phases 2–4, as built](#phases-24-as-built-house-bingo-2026-10-1011). *(Until 2026-10-10 they were on hold until the officer had more information about how the house system works.)*
+> ⏭️ **NEXT TASK now that phase 1 is live (officer, 2026-09-18): a UI redesign of the portal and every page in it** — the hub, `/portal/attend`, `/portal/leaderboard`, `/portal/lookup`, and now `/portal/bingo`. That is v2 phase 3 in [`frontend-redesign-v2-plan.md`](frontend-redesign-v2-plan.md), widened to the hub. It is presentation only, and it owns the `--misa-muted` AA fix. Phase 1 deliberately built the hub from shared primitives so as not to pre-empt it, and the bingo page is built the same way.
 
 ## Goal
 Group every member-facing tool under `txmisa.org/portal`. Members don't need an account for any of it. The marketing site keeps its current routes, and **`/admin` stays exactly where it is.**
@@ -152,16 +152,24 @@ Built on `portal-phase-1`, cut from `ce5bda7`. Every commit is lint-, build- and
 
 ---
 
-## Later phases (ON HOLD — waiting on the house system details)
-2. **Houses data.** New migration(s): houses, member↔house assignment, bingo cards and squares, and marks. Deny-all RLS with no anon grant. Add the tables to `wipe-remote.sh`, regenerate the types, and push the migration **before** the code that reads it.
-3. **Officer editing.** Screens under `app/admin/(shell)/houses`. Each action starts with `getOfficer()` and writes an `admin_audit` row.
-4. **Member view.** `/portal/houses` reads server-side and polls. No EID or email reaches the page. Polled squares never carry `data-reveal`.
+## Phases 2–4, as built: house bingo (2026-10-10/11)
 
-### Open questions for phase 2
-- What goes in a square? Are cards the same for every house or different per house?
-- When does a card reset: per term, per event, or by hand?
-- Are house assignments per term? Is a member ever in no house, or in two?
-- What does the member view show: all houses side by side, or one house at a time?
+> 🏗️ **BUILT on `portal-launch`, NOT live.** Seven commits, `dda956c` to `d21b8d0`, in three tasks, each reviewed and fixed before the next. **Next:** the user's review, then the deploy order in [`operations.md`](operations.md) (a backup, no open check-in window, migration 33 to production, and only then `main`). Doc v1.86; the record is in [`build-log.md`](build-log.md) and [`../tasks.md`](../tasks.md).
+
+**The user's request (2026-10-10):** each MISA house (M, I, S, A) completes activities. The member portal shows all the houses' bingo cards and how complete each is, and for each completed spot an officer uploads a picture or video on an `/admin` page, which updates the card on the portal.
+
+**The open questions this section used to carry, answered by the user on 2026-10-10:**
+- *What goes in a square, and are the cards the same for every house?* One activity per square, and **the same 24 activities in the same spots for all four houses**; only the centre letter differs. A completed square holds one photo or one uploaded video as proof. Officers can rename an activity; the rename is audited and applies to all four cards.
+- *When does a card reset?* **Never: one card, with no terms.**
+- *Are house assignments per term?* **There are none.** Assigning members to houses is out of scope, so no table links a member to a house.
+- *All houses side by side, or one at a time?* **All four side by side for members**; officers work on one house's card at a time.
+
+**Where the build departed from the plan that stood here:**
+- **Phase 2, the data.** Migration 33 (`house_bingo`) adds `bingo_squares` (the 24 activities, seeded by the migration; position 12, the free centre, is never stored) and `bingo_marks` (one row per house per completed square), both deny-all with no anon grant. There is no houses table, since the four houses are a CHECK list mirrored by `HOUSES` in `lib/bingo.ts`, and no member↔house table. It also creates two public Storage buckets for the proof, which the plan did not foresee, and widens the audit CHECK. `scripts/wipe-remote.sh` places both tables, `lib/types/database.ts` was hand-ported, and the migration must reach production **before** the code, as planned.
+- **Phase 3, officer editing.** The screens are at `/admin/bingo` (one house's card, switched by `?house=`) and `/admin/bingo/[house]/[position]` (add, replace or remove the proof, and rename the activity), not under `houses`. Each action opens with `getOfficer()`, and every change writes an `admin_audit` row, as planned. Minting a video upload token writes none, because it changes no club data. 🔓 **The one exception to "all writes go through the server" lives here** (user's decision, 2026-10-10): a video's bytes go from the officer's browser straight to Storage, with a signed token minted by an officer-only Server Action for one path. Photos go through a Route Handler.
+- **Phase 4, the member view.** It is `/portal/bingo`, not `/portal/houses`. It reads on the server with the service role and polls with `router.refresh()` every 10 s while the tab is visible, skipping while a proof dialog is open or the browser is offline. No EID or email reaches the page, nothing that refreshes carries `data-reveal`, and the page is noindex. The hub gained a third row, *House Bingo*.
+
+**Not built, and why:** assigning members to houses and terms (both the user's decision), any score beyond "N of 24", and the page's visual design, which belongs to v2 phase 3.
 
 ## Invariants to carry over (all phases)
 - The leaderboard stays `force-dynamic` and noindex; never `revalidatePath` on it.

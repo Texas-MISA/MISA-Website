@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Wipe the linked project's CLUB DATA, keeping officer access and the
-# officer-turnover trail. This is the "we are done testing, real data starts
+# Wipe the linked project's CLUB DATA, keeping officer access, the
+# officer-turnover trail, and the bingo board with its rename history (the
+# 'bingo_square' audit rows). SQL cannot delete a stored file, so empty the
+# bingo-photos and bingo-videos buckets in the dashboard (Storage) after it
+# runs. This is the "we are done testing, real data starts
 # now" button, and it is the opposite of scripts/seed-remote.sh: that one
 # replaces the database with fabricated fixtures, this one empties it.
 #

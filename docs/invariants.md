@@ -10,6 +10,7 @@ Decisions the architecture doc argues for at length, with the evidence that prod
 These are decisions the architecture doc argues for at length. Don't quietly reverse one — if a change needs to, raise it and update the doc.
 
 - **All writes go through Server Actions or Route Handlers.** The browser holds only the anon key, and RLS policies are written assuming the anon role is hostile. Never ship a client-side write; never expose the service role key to the client. The service-role client exists **only** in `lib/supabase/admin.ts`, guarded by `server-only`; anon-capable reads belong on `lib/supabase/server.ts` so RLS stays exercised. (§3, §6)
+  - 🔓 **ONE approved exception, since migration 33 (user's decision, 2026-10-10): a house bingo video's bytes**, uploaded from the officer's browser to Storage with a signed token that an officer-only Server Action minted for one path. It is the only one, and *House bingo* at the end of this file is why and how it is contained. ⚠️ `CLAUDE.md`'s short form does not name it yet; that edit is the user's (`tasks.md`).
 - **The duplicate rule is three checks, not one** (v1.18): the `(event_id, normalized_student_id)` partial unique index (23505), an app check on `(event_id, member_id)` after member resolution (same member via two raw IDs), and an app check for a prior pending orphan within the grace window (the index ignores `event_id is null`). A pending orphan never blocks a new event-resolved submission; rejected rows never block re-entry.
 - **`ORPHAN_WINDOW_HOURS` lives in `lib/checkin.ts` and is always passed explicitly** to `nearby_events()`; the SQL `default 48` is for ad-hoc SQL only. (§9 #7)
 - **Nothing that resolves to a known member is ever dropped on the floor.** A check-in from someone the roster recognizes is always stored — as `pending` if it matches no open event, for an officer to resolve. A member who showed up and got no credit is the failure mode that erodes trust in the whole system. (§4.2)
@@ -143,7 +144,8 @@ These are decisions the architecture doc argues for at length. Don't quietly rev
 - **Error boundaries use `unstable_retry`, not `reset`** (Next 16.2), because `reset()` re-renders without re-fetching and cannot recover a Server Component error. They render `error.digest`: production replaces a Server Component's message with a generic one, so the digest is the only thing an officer can quote.
 - 🔓 **A grant to `authenticated` is a grant to the public whenever signup is open.** `authenticated` is a PostgREST role that any valid user JWT carries — it does not mean "an officer". Officer-ness is an `admin_profiles` row checked in `lib/auth.ts`, which is *application* code PostgREST never runs. `member_directory` was granted to that role for two stages while `disable_signup` was false, exposing every member's name, EID and email to anyone who signed up (fixed, migration 22). **No API role holds any grant on `member_directory`** — the service-role client is the only reader, and it bypasses grants entirely. This is migration 15's lesson one role over: checking `anon` proves nothing about `authenticated`.
 - 🔓 **RLS covers SELECT/INSERT/UPDATE/DELETE and NOTHING else, so TRUNCATE needs a grant or a trigger.** `grant all` includes it, and `admin_audit`'s append-only triggers are BEFORE UPDATE and BEFORE DELETE — so the one statement that wipes the log slipped past both controls. anon/authenticated now hold `select` only, plus a statement-level `before truncate` trigger on `admin_audit`. **Never restore a blanket `grant all` to an API role**, and if you must, the trigger is what still stands.
-- ⚠️ **Deny-all with no policies is the END STATE, not a placeholder.** Stage 8 resolved "write every RLS policy" as "prove the empty set is correct": everything reads through the service role, and `lib/supabase/client.ts` has zero importers. Adding a policy for a role nothing exercises is untested attack surface — if you find yourself writing one, ask what will read through it first.
+- ⚠️ **Deny-all with no policies is the END STATE, not a placeholder.** Stage 8 resolved "write every RLS policy" as "prove the empty set is correct": everything reads through the service role, and `lib/supabase/client.ts` had zero importers. Adding a policy for a role nothing exercises is untested attack surface — if you find yourself writing one, ask what will read through it first.
+  - 📌 **Still true after migration 33, which gave the browser client ONE importer** (the bingo proof form, for the one video upload). A signed upload token authorises its one object with no policy anywhere: `storage.objects` carries none, and the migration refuses to apply if it finds one. So the empty set still holds for every table and both buckets, apart from `events_public_read`. See *House bingo* below.
 - ⚠️ **`force row level security` is deliberately absent.** It subjects the table *owner* to RLS, and migrations and `seed.sql` run as `postgres`, which owns every table — the seed's wipe block would break. The consequence to know: the owner bypasses RLS everywhere, so every "no client role can write X" claim is about API roles, not about whoever holds the database password.
 - 🪤 **A security test that probes with an empty payload proves nothing.** `insert({})` trips NOT NULL before permission is ever consulted, so "an error came back" passes through a wide-open grant. Assert `42501` specifically — both legitimate refusals (missing grant, RLS denial) use it, while `23502` means the permission gate let you through. And re-read as service role: a write that "failed" still has to be checked against the table.
 - 🪤 **`term_index()` is not a validator.** `term_index('Autumn 2026')` = 4052 = `term_index('Spring 2026')` — anything not literally `Fall` is filed as Spring, so it returns a plausible wrong answer rather than null. Validate a term's *shape* (`^(Spring|Fall) [0-9]{4}$`); never use `term_index(x) is not null` as a check.
@@ -902,3 +904,338 @@ another. Each row owns its compare-and-set token and every inline cell's state,
 so with the inline type select that was a real hazard rather than a console
 warning. `member-table.tsx` keys rows `${row.id}:${row.term}`, which is unique
 on the view.
+
+---
+
+## House bingo (added 2026-10-11, migration 33)
+
+The design is in §3, §4.1 and §6 of the architecture doc (v1.86). `CLAUDE.md`
+does not carry a short form of these rules yet: that edit is the user's, and
+`tasks.md` lists it. What follows is why each rule has the shape it has, and
+what was measured. Built on `portal-launch` (`dda956c` to `d21b8d0`); not on
+`main` when this was written.
+
+### The one client-side write, and why it exists
+
+🔓 **A house bingo video's bytes are the only thing this codebase writes from
+the browser** (the user's decision, 2026-10-10). The reason is size. A video may
+be 50 MiB (`MAX_VIDEO_BYTES`), a Vercel function's request body stops at 4.5 MB,
+and a Server Action's body is capped at 1 MB. A photo does fit through the
+server once the browser has resized it: the photo route caps its whole request
+at 4 MiB (`MAX_UPLOAD_REQUEST_BYTES`), under Vercel's limit and above a full
+photo plus its thumbnail (3 MiB and 300 KiB). So photos go through
+`POST /admin/bingo/upload` and only videos go direct.
+
+How the exception is contained, step by step:
+
+1. `prepareBingoVideoUpload` (`app/actions/bingo.ts`) opens with
+   `getOfficer()`. It refuses a type that is not `video/mp4` or
+   `video/quicktime`, and a size over 50 MiB, before it sweeps or mints
+   anything.
+2. The core sweeps the square's abandoned uploads, then mints a signed upload
+   token with the service role for ONE fresh path,
+   `<house>/<position>/<uuid>.<ext>`, without upsert. Minting writes no audit
+   row, because it changes no club data.
+3. The token is measured, not assumed (`tests/bingo-storage.test.ts`): it is
+   refused for any other path, and it cannot overwrite the object it created.
+   Its lifetime measured 7200 s on the local stack, the two hours the hosted
+   project documents. The test holds it to no more than `ORPHAN_AGE_MS`, the
+   sweep's two hours, because that inequality is what makes a sweep final: by
+   the time an upload is old enough to delete, the token that named its path
+   has expired and cannot fill it again.
+4. The bucket enforces the type and the 50 MiB limit on the upload itself.
+5. The Route Handler records the video only after checking it again. The path
+   comes back from the browser, so it is untrusted: `parseVideoPath` accepts
+   only exactly what `videoPath()` builds for THIS house and position. Then
+   `info()` must report an object within 50 MiB whose stored type is its
+   extension's.
+6. When it does not record, a video is deleted only if no mark holds it
+   (`discardVideo`), so a double-submitted record whose twin already won keeps
+   its video.
+
+🪤 **The stored type is the File's own `file.type`, whatever the call says.**
+Given a File, `uploadToSignedUrl` sends FormData and ignores its own
+`contentType` option. So the path's extension is minted from `file.type`
+(`PrepareVideoInput.contentType` says so), and `withVideoType` re-wraps a file
+the browser reported with no type into a NEW, typed File before the path is
+minted. That makes the record step's type check a live path rather than a
+backstop: the bucket takes either type at either extension, so a file the
+browser calls `video/quicktime`, uploaded to an `.mp4` path, passes the bucket
+and is refused there.
+
+🐛 **`info()` with a missing value used to delete valid videos** (task 1's
+review, fixed in `34c6297`). storage-js camel-cases the server's JSON and checks
+nothing, and the Storage server sends `size` and `content_type` as null when it
+has no value for them. A null size was deleting the upload as `video_size`, and
+a missing type as `video_type`. Now a size that is not a number, or a type that
+is not a string, is an error that deletes nothing: the officer can try again,
+and the sweep collects the video if they give up. Only a value that is present
+and wrong (a size of 0 or over the cap, a type unlike the extension's) discards
+it. The tests drop and null each field, and check that the same upload records
+once `info()` answers in full.
+
+⚠️ **One race is accepted.** Two copies of one record request in flight
+together, where one fails for a transient reason before its twin has written:
+its check finds no mark yet and deletes a video the twin is about to record. The
+result is a mark whose video is gone, which the officer sees and replaces.
+
+📌 **Pinned by `tests/bingo-admin.test.ts` ("the one browser write"):**
+`lib/supabase/client.ts` has exactly one importer, the proof form; no other
+client component reaches for a Supabase client of its own; `createBrowserClient`
+appears in exactly one source file; and the proof form uploads only to the
+signed path, and only a video. A second browser write is a new decision for the
+user, never a reuse of this client.
+
+### The browser client is sessionless
+
+🔓 `lib/supabase/client.ts` passes `persistSession`, `autoRefreshToken` and
+`detectSessionInUrl` as false. Without them, `@supabase/ssr`'s browser client
+reads the officer's session out of the auth cookies, which are not HttpOnly,
+sends the officer's access token in place of the anon key, and starts
+refreshing that session from the browser. The refresh is a second client-side
+write, to Auth, racing the refresh `proxy.ts` makes on every request. With the
+three options off, the client is the anon key and nothing more, and the signed
+token alone authorises the upload.
+
+📌 **An accepted deviation.** Task 2's brief allowed a comment-only change to
+that file; the implementer changed the options, said so in the report, and the
+review accepted it. `tests/bingo-admin.test.ts` pins the three options.
+
+### Public buckets, and no policy on `storage.objects`, ever
+
+The buckets are **public** because members see every card on a no-login page:
+the proof is meant to be seen, and any holder of an object's URL can fetch it.
+What keeps that from being a gallery anyone can browse is three things: every
+path carries a fresh random uuid; no API role can list a bucket; and
+`/portal/bingo` is noindex, because a search engine's copy of the page would
+outlive a photo an officer removed.
+
+🔓 **There is no policy on `storage.objects`, for any role, and there must never
+be one.** With RLS on and no policy, the API roles can do nothing in either
+bucket. `tests/bingo-storage.test.ts` checks anon and a signed-in non-officer
+against both buckets on OUTCOMES, re-reading each refused write with the service
+role, because a storage call can return an empty success while doing nothing.
+Neither can list a bucket that holds objects, upload without a token, mint a
+token, or delete, move or overwrite an object. Migration 33's closing block
+refuses to apply if `storage.objects` carries any policy. Storage was unused
+before it, so a policy there was added by hand, which is a reason to stop and
+find out why. That check was proved by adding a probe policy inside a
+rolled-back transaction: the block raised.
+
+📌 **The buckets are migration rows, not `config.toml` entries.** A
+`config.toml` bucket reaches a database only when somebody runs
+`supabase seed buckets` against it, and a schema diff never captures
+`storage.buckets` rows, so the migration is the one place both databases get
+them from with no manual step. `on conflict do nothing` keeps a re-run harmless,
+and the closing block refuses to finish if a bucket that already existed carries
+different settings.
+
+⚠️ **A removed file can outlive its removal by an hour.** The origin deletes it
+at once, but every upload sets `cacheControl: 3600`, so a CDN or browser holding
+a copy keeps serving it until that runs out. Every upload gets a fresh uuid, so a
+replaced file's URL dies with it rather than serving the new picture under a URL
+a cache already holds.
+
+🪤 **SQL cannot delete a stored file.** Deleting a `bingo_marks` row leaves its
+objects in the bucket, so `lib/bingo.ts` deletes them through the Storage API
+after a replace or a removal. Any it could not delete are named in that audit
+row's note (`Files not deleted: <bucket>/<path>`); after a failed record they
+are only in the server log. `scripts/wipe-remote.sh` and `seed.sql` both say the
+buckets must be emptied in the dashboard.
+
+### Every write compares and sets on the raw `updated_at`
+
+The general rule (carry `updated_at` as the raw PostgREST string, because a JS
+`Date` round trip truncates microseconds and the compare then never matches)
+applies to every bingo write:
+
+- **Replacing proof** updates the mark only while its `updated_at` still
+  matches; zero rows back is a conflict.
+- **Removing proof** is a compare-and-set DELETE keyed the same way. When it
+  deletes nothing, a re-read tells a replace (conflict) from a removal by
+  someone else (`not_found`).
+- **Renaming** updates the square only while its token matches. The same text
+  writes nothing and answers `unchanged`, but only with a current token: a
+  stale one is a conflict, because handing a stale screen the live token would
+  let its next save pass over an edit it never saw (the rule
+  `app/actions/members.ts` records).
+- **Adding proof** has no row to key on, so it is an insert raced by
+  `bingo_marks_house_square_idx`, and a 23505 is a conflict. The form posts
+  `expectedUpdatedAt` as `""` for "the page showed no mark", since a form
+  cannot post null, and the schema requires the field, so every request says
+  which state of the square it was made against.
+
+📌 The mark is compared against the page **before** anything is uploaded, so a
+stale screen costs no upload; the write itself is still the compare-and-set.
+Both sides of every audit row select the same columns (`AUDITED_MARK_COLUMNS`,
+`AUDITED_SQUARE_COLUMNS`), and `updated_at` is stripped from both snapshots, so
+an audit never shows a timestamp change.
+
+### The board is read with the service role, and an empty board is an error
+
+🪤 **Both tables are deny-all, and RLS answers the anon key with ZERO rows and no
+error.** A board read through the wrong client would come back as a perfectly
+well-formed empty board, every house at "0 of 24". So `readBingoBoard` returns a
+discriminated result and calls anything other than exactly the 24 activity
+positions, in order, an error. All three bingo pages, the member one included,
+read with `createAdminClient()` and render `ReadError` for an error, never an
+empty card: a board that failed to load is not a board with nothing done, and an
+officer reading it as one would re-add proof that is already there.
+
+✅ **Measured:** `tests/security.test.ts` writes a mark, then confirms anon and a
+signed-in non-officer read zero rows from both tables while the service role
+sees the mark and the 24 squares. `tests/portal-bingo.test.ts` pins the member
+page's service-role read and its error branch.
+
+📌 What the read returns names no member and no officer. Who added a mark lives
+in `admin_audit` and never leaves the server through it, and the member page's
+client components receive plain strings, because every URL is built on the
+server. 🔓 **Never "fix" an empty board by reading with the anon client or
+granting anon `select` on either table.**
+
+### `/portal/bingo` is force-dynamic, and nothing revalidates it
+
+There is no `revalidatePath("/portal/bingo")` anywhere, on purpose. The two write
+paths, `app/actions/bingo.ts` and `/admin/bingo/upload`, revalidate `/admin`
+paths only, and `force-dynamic` means they never need to: every request reads
+the board afresh, at a cost of two small reads (24 squares, at most 96 marks).
+⚠️ If the page ever becomes a cache, both write paths need a revalidation for it
+in the same commit; the page's comment says so. `tests/portal-bingo.test.ts`
+asserts `force-dynamic` and that the page source names no `revalidate`.
+
+An open page catches up through `BingoRefresher`, which calls `router.refresh()`
+every 10 s, re-rendering the Server Components so every read stays on the
+server. Polling rather than Supabase Realtime, so no table needs an anon grant.
+Three conditions, each for a reason:
+
+- 📌 **Only while the tab is visible.** A hidden tab polls nothing; showing it
+  again refreshes once and restarts the clock.
+- 🪤 **Never while a proof dialog is open** (`dialog[data-bingo-proof][open]`).
+  A refresh re-renders the tile that owns the dialog, and the member may be
+  watching its video. Measured: a mark added with a dialog open held for 14 s
+  and appeared 1.4 s after it closed.
+- 🪤 **Never while the browser says it is offline.** In Next 16 a refresh whose
+  fetch fails is not a quiet no-op: the router falls back to a full browser
+  reload (`ppr-navigations.js`), which, with no connection, puts the browser's
+  error page in place of the board. ⚠️ A fetch that fails while `navigator.onLine` is still
+  true reloads the page all the same; that is open in `tasks.md`.
+
+### Nothing a refresh can change carries `data-reveal`
+
+🪤 The scroll-reveal observer scans once per pathname, and `router.refresh()`
+keeps the pathname, so a node that mounts on a refresh would sit at
+`opacity: 0` for good. Neither the standings, the cards nor any tile carries
+the attribute; only `PageHero`'s own static framing reveals.
+`tests/portal-bingo.test.ts` asserts that none of the page's four files puts
+`data-reveal` on anything. This is the general rule against `data-reveal` on a
+node that mounts after first paint, met on a page whose whole body re-renders
+every ten seconds.
+
+### The upload route checks the host from headers, never from `request.url`
+
+🔓 **Next checks Origin before every Server Action and makes no such check for a
+Route Handler**, and this one acts on a cookie session. So it makes Next's own
+comparison itself (`isSameOriginRequest` in `lib/bingo.ts`): Origin's host
+against the first comma-separated, trimmed `x-forwarded-host` value, else
+`Host`, in the order `parseHostHeader` uses in
+`next/dist/server/app-render/action-handler.js`. The app sets no
+`serverActions.allowedOrigins`, so the route accepts what the site's Server
+Actions accept, with one difference: a MISSING Origin, which Next lets through
+with a warning, is refused, along with the literal `null` and anything that is
+not a URL. SameSite=Lax on the session cookie already keeps it off a cross-site
+POST; this is the check that does not rest on a cookie attribute.
+
+🐛 **The first build compared Origin with `request.url`, and it might have
+refused every upload on production** (task 2's review, fixed in `3513bfc`). On
+Vercel, `request.url`'s origin is the public one only if `trustHostHeader` was
+set at build time and the launcher passes no hostname or port, and nothing in
+the tree shows either. It would still have passed every local test.
+
+✅ **Measured on a dev server pinned local:** a photo posted from `localhost`
+and from `127.0.0.1` both answered 200, because Next fills a missing
+`x-forwarded-host` from `Host` (`base-server.js`); a foreign, missing, `null` or
+unparseable Origin answered 403. `tests/bingo-upload.test.ts` covers the helper,
+and `tests/bingo-admin.test.ts` pins the route's order: officer, origin, declared
+length, the counted body, then the parse. 🪤 Next 16's dev server blocks its own
+`/_next/*` resources for any origin but `localhost` (the trap the build log
+records with phase 4's five accessibility findings), so a browser walkthrough of
+the uploader runs at `localhost` even though the route accepts `127.0.0.1`.
+
+⚠️ **The first real upload on production is the only end-to-end check of the
+headers Vercel sends.** A preview cannot stand in: it writes to production's
+database and buckets, and sits behind Vercel's login.
+
+### The body is counted, never trusted
+
+🐛 The first build refused a request with no `Content-Length` as "too large",
+and trusted a present one. Nothing in the repository shows whether the header
+survives every hop to the function, and a false one would get a bigger body
+past the check. Since `3513bfc` (task 2's review):
+
+- `declaredLengthWithin` refuses a malformed value, or one over 4 MiB, with 413
+  before the handler reads a byte, and lets an absent one through;
+- `readBodyWithin` then counts what actually arrives and cancels the reader at
+  the chunk that crosses 4 MiB, so neither a missing header nor a false one gets
+  a bigger body past the cap;
+- the counted bytes are parsed with the request's own `Content-Type`.
+
+📌 **The cap's three bounds.** 4 MiB is under Vercel's 4.5 MB; it is above a
+full photo plus its thumbnail, so a request within both caps always fits; and it
+is under `proxyClientMaxBodySize`, the 10 MB to which Next buffers a body for
+`proxy.ts`, which matches this path, and past which Next silently truncates. A
+truncated body is therefore refused as too large before it could parse as a
+complete one.
+
+🪤 **The early 413 saves the parse, not the transfer.** Seen on the dev server
+and confirmed in `getCloneableBody`'s `finalize()` in
+`next/dist/server/body-streams.js`: Next hands the handler the request only once
+the proxied body has ENDED. A client that declares 5 MiB and stalls gets no
+answer until it sends the rest or its connection times out, and one that sends
+5 MiB has sent all of it before the 413. ✅ Measured live: a chunked body under
+the cap answered 200, one over it 413, and a declared length over the cap 413.
+
+### A backup holds the bingo rows and none of the files
+
+🔴 `scripts/backup-remote.sh` dumps the database: roles, schema, and the rows of
+`public`, `auth` and `storage`. Storage's FILES live outside Postgres, so no
+backup holds a photo or a video. A restore into a new project brings back
+`bingo_squares`, `bingo_marks`, both `storage.buckets` rows and one
+`storage.objects` row per stored file, each naming a file the new project does
+not have. The cards would count every mark as done, and every picture and video
+would fail to load.
+
+🪤 **The tested restore (2026-10-09) ran before Storage held anything.** The
+local stack lacked four storage columns that production's dump named, and the
+load succeeded because the blocks naming them were empty and the recipe drops
+empty blocks. Once bingo holds proof, the `storage.buckets` and
+`storage.objects` blocks carry rows and are loaded, and a block with rows that
+names a column the target lacks stops the whole one-transaction load. Whether
+either of those two tables is among the ones that differ is untested. The
+script's verify step counts `public` and two `auth` tables, never `storage`.
+`docs/operations.md` §Backups says what a restore brings back; backing up the
+files is open in `tasks.md`.
+
+### A video is published as it was recorded
+
+⚠️ The uploader re-encodes a PHOTO on a canvas, which drops its EXIF, GPS
+included. The synthetic `tests/fixtures/bingo/test-pattern-rotated.jpg` carries
+EXIF orientation 6 and a fake GPS block, and the walkthrough stored it upright
+with no EXIF. A VIDEO uploads byte for byte, so whatever the phone wrote into its
+metadata, a recording location included where the camera saved one, is public
+with it. The server re-encodes neither kind: it checks a photo's sizes and JPEG
+signature only, so the EXIF guarantee holds for the proof form's path, not for
+a hand-built request from an officer's session. Open in `tasks.md`.
+
+### The free centre is never stored, and "done" is a row
+
+📌 Position 12 has no row, so nothing can mark, rename or count it: the square
+page answers `notFound()` for it, and `houseCard` places it in the grid itself.
+A square is done for a house exactly when a `bingo_marks` row exists for it, and
+removing the proof deletes that row, so no flag can disagree with whether proof
+exists.
+The consequence to know: the `bingo_mark.removed` audit row's `before` is the
+only record of what a removed proof was, and the square page shows a mark's
+history only while the mark exists, so a removed proof's history is reachable
+only by SQL until `/admin/audit` is built. `HOUSES` in `lib/bingo.ts` mirrors
+`bingo_marks_house_valid`; change both together, as with `EVENT_CATEGORIES` and
+`MEMBER_TYPES`.

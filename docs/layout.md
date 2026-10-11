@@ -334,7 +334,18 @@ lib/
                         video, remove, rename) take the service role, never
                         throw, compare-and-set on the raw updated_at, and return
                         the audit's before/after. 🔓 The browser's ONE write is a
-                        video, through a signed token for one path. No
+                        video, through a signed token for one path. The upload
+                        route's two gates are pure helpers here:
+                        isSameOriginRequest (Next's Server Action host
+                        comparison: Origin's host against the first
+                        x-forwarded-host value, else Host; never request.url)
+                        and declaredLengthWithin with readBodyWithin (a declared
+                        Content-Length over the cap refused, then the body
+                        counted as it arrives). So are the uploader's file
+                        decisions: fileExtension, proofKindOf (photo, video or
+                        neither) and withVideoType (an untyped .mp4/.mov
+                        re-wrapped in a typed File, because Storage records the
+                        File's own type). No
                         server-only import: the upload component imports it
   validation.ts         zod schemas
   utils.ts              `cn()` — clsx + tailwind-merge, created by `shadcn init`
@@ -359,18 +370,24 @@ scripts/create-officer.mjs  officer bootstrap / password reset / revoke
 scripts/wipe-remote.sh  EMPTIES the linked project's club data — the "testing is
                         over, real data starts now" button, and the OPPOSITE of
                         seed-remote.sh rather than a mode of it. Keeps officer
-                        sign-ins, officer_invites, and the admin_audit rows about
-                        invites and officer access; leaves app_settings,
-                        checkin_throttle and the bingo board (bingo_squares)
-                        alone. Its header accounts for all fifteen public
-                        tables, and that accounting is the invariant. It cannot
-                        empty the bingo Storage buckets, and says so
+                        sign-ins, officer_invites, the admin_audit rows about
+                        invites and officer access, and the 'bingo_square'
+                        audit rows (the board's rename history, kept because
+                        the board is); deletes bingo_marks with the rest;
+                        leaves app_settings, checkin_throttle and the bingo
+                        board (bingo_squares) alone. Its header accounts for
+                        all fifteen public tables, and that accounting is the
+                        invariant. It cannot empty the bingo Storage buckets,
+                        and says so at both ends: empty them in the dashboard
 scripts/backup-remote.sh  BACKS UP the linked project (changes no club data) to a
                         folder OUTSIDE the repo, which it refuses to write inside. The
                         Free plan keeps no backups, so this is the only copy.
                         Checks data.sql's row counts against a live count, and
                         leaves auth sessions and tokens out. Its header holds
-                        the restore steps
+                        the restore steps. 🔴 It dumps the database only, never
+                        the bingo photos and videos in Storage, though data.sql
+                        carries their storage.objects rows (docs/operations.md
+                        §Backups)
 scripts/organise-pictures.mjs  sorts the officers LOCAL picture library into one
                         folder per page; unnamed files pool into gallery/. Moves,
                         never overwrites — the directory is gitignored, so there

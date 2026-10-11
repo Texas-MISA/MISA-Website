@@ -7,6 +7,63 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🎯 **House bingo, built 2026-10-10/11 on `portal-launch` (doc v1.86, migration 33). NOT on `main`: it awaits the user's review, and migration 33 must reach production before the code.** Each house (M, I, S, A) works through one shared card of 24 activities. An officer records one photo or video as proof of a completed square at `/admin/bingo`, and members watch all four cards at `/portal/bingo`. Seven commits in three tasks, each reviewed and fixed before the next. The user's decisions of 2026-10-10: the same 24 activities in the same spots on all four cards; one card with no terms; an audited rename that changes all four cards; uploaded video files as video proof; and one approved exception to "all writes go through the server", for a video's bytes. Out of scope: assigning members to houses, terms, any score beyond "N of 24", and the v2 phase 3 redesign.
+
+  - **What shipped.**
+    - **Migration 33 (`house_bingo`, task 1, `dda956c`).**
+      - `bingo_squares` holds 24 rows, positions 0–24 except the free centre 12, which is never stored.
+      - `bingo_marks` is unique on (house, square). The row exists exactly when proof does, so removing proof deletes it.
+      - Both are deny-all with the `set_updated_at` trigger.
+      - Public buckets `bingo-photos` (image/jpeg, 5 MiB) and `bingo-videos` (mp4 and quicktime, 50 MiB) are created by the migration, as rows.
+      - The audit CHECK gains `bingo_square` and `bingo_mark`, and `AuditEntityType` moved in the same commit.
+      - A closing assertion block covers the 24 positions, both buckets' settings, the widened CHECK and, since the review, zero policies on `storage.objects`.
+    - **`lib/bingo.ts`.**
+      - The vocabulary, the caps and the storage paths: one fresh uuid per upload, under `<house>/<position>/`.
+      - `readBingoBoard`, a discriminated result that is an error unless exactly the 24 positions come back, because deny-all RLS answers anon with zero rows.
+      - Five write cores that take the service role, never throw, compare-and-set on the raw `updated_at`, and return the audit's before and after: photo, video prepare, video record, remove and rename.
+      - The upload gates `isSameOriginRequest`, `declaredLengthWithin` and `readBodyWithin`; the file typing `fileExtension`, `proofKindOf` and `withVideoType`; and `houseStandings`, which is never sorted.
+      - No server-only import, because the uploader imports it in the browser.
+    - **The officer side (task 2, `a4217d8`; synthetic test media `25c1a42`).**
+      - `/admin/bingo` shows one house's card at a time behind a house switcher, and becomes one column below `sm`.
+      - `/admin/bingo/[house]/[position]` adds or replaces the proof, removes it with a two-click control that names its blast radius, renames the activity, and shows two `AuditTrail`s, the mark's and the square's.
+      - `POST /admin/bingo/upload` checks in order: `getOfficer()` (403), then the host check (403), then a declared length over 4 MiB (413), then the counted body (413), then the parse (400). It records photos and videos and writes `bingo_mark.added` or `.replaced`.
+      - `app/actions/bingo.ts` holds `prepareBingoVideoUpload` (no audit row), `renameBingoActivity` and `removeBingoProof`.
+      - The client uploader resizes a photo in the browser to a JPEG of at most 2048 px, with a thumbnail of at most 480 px, which strips EXIF and GPS. It checks a video's type and size, takes a best-effort poster frame within five seconds, and uploads with `uploadToSignedUrl`.
+      - `lib/supabase/client.ts` is SESSIONLESS, and its one importer is the proof form, guarded by tests.
+      - "Bingo" sits in the admin nav after Dues.
+    - **The member side (task 3, `d6539e7`).**
+      - `/portal/bingo` is force-dynamic and noindex, with a service-role read. It shows the card's rule verbatim, the standings in the fixed order M, I, S, A, and four 5×5 cards.
+      - A done tile opens a native `<dialog>` holding the full photo, or a video with `preload="none"` and no `type`. The grid loads thumbnails only.
+      - A 10 s `router.refresh()` runs while the tab is visible, and is skipped while a dialog is open or the browser is offline.
+      - The hub `/portal` gains a third row, "House Bingo", whose action is "Bingo".
+  - **What the reviews found, and the fixes.**
+    - **Task 1 (`34c6297`):**
+      - 🐛 `recordBingoVideo` deleted valid videos when `info()` answered without a size or a type. storage-js checks nothing, and the Storage server sends both as null when it has none. Now a missing value is an error that deletes nothing; only a value present and wrong discards the video.
+      - `seed.sql` did not account for `bingo_marks`. It now wipes the table and asserts zero.
+      - The orphan-delete failure paths had no tests. A Storage fault injector now makes `remove()` fail on a photo replace, a video replace and a removal, and each still reports its outcome, with the exact `<bucket>/<path>` leftovers the audit note uses.
+      - `thumb_path` was made unique, for `media_path`'s reason: two marks sharing a file would delete each other's.
+      - The no-storage-policies assertion was added, and proved by adding a probe policy inside a rolled-back transaction.
+    - **Task 2 (`3513bfc`):**
+      - 🔴 **The host check compared Origin against `request.url`.** On Vercel, that origin is the public one only if `trustHostHeader` was set at build time, so it might have refused every upload on production while passing every local test. It now makes Next's own Server Action host comparison: Origin's host against the first `x-forwarded-host` value, else `Host`.
+      - A missing `Content-Length` was refused as "too large". Now the body is counted as it arrives, whatever was declared.
+      - The file-typing helpers moved from the form into `lib/bingo.ts`, with tests (`tests/bingo-upload.test.ts`, 31 cases).
+      - A test now asserts that `createBrowserClient` appears in exactly one source file.
+      - ✅ **Accepted deviation:** the sessionless browser client. The brief allowed only a comment in that file, but without the options `@supabase/ssr` would have sent the officer's token in place of the anon key and refreshed it from the browser.
+      - **Found in testing:** Next buffers a proxied body to its end before running the handler (`body-streams.js`), so the early 413 saves the parse, not the transfer. And Next 16's dev server blocks its own `/_next/*` resources for any origin but `localhost`, the trap recorded with phase 4's five accessibility findings below, so browser walkthroughs run at `localhost`.
+    - **Task 3 (`d21b8d0`):**
+      - ♿ A done tile's focus ring was only the global navy outline, and it measured **1.00:1** where it crossed the navy free centre or a neighbour's navy band. It is now two-tone: a white ring fills the outline's 2px offset.
+      - A click on the dialog's backdrop now closes it, through the same path as Close: the video pauses, the media unmounts, and focus returns to the tile.
+      - ✅ **Accepted deviations:**
+        - Tile labels are Barlow Condensed at 12px on a phone and 14px from `sm`. In Barlow at 11px, "Underground" and "Monochrome" measure 63px and broke mid-word in a phone's tiles; `hyphens: auto` was tried and is not relied on.
+        - The offline skip, because in Next 16 a failed `router.refresh()` hard-reloads the page.
+        - A polite live region on the standings.
+  - **Verified along the way, on a dev server pinned local with a fake test officer.** A headless Chrome walkthrough uploaded the 12 MP photo, stored at 2048×1536 with no EXIF, and the EXIF-rotated one, stored upright with its fake GPS gone. It also recorded an MP4 and a MOV, each with a poster. The route answered 200 from `localhost` and `127.0.0.1`, 403 for a foreign, missing, `null` or unparseable Origin, and 413 for an over-cap body, chunked or declared. A photo and a video recorded in `/admin` appeared on an open member page after 6 to 9 s, and a mark added while a dialog was open appeared 1.4 s after it closed. The member page showed no horizontal overflow at 360, 390, 800, 1024 or 1280 px, and the officer pages none at 390, 1024, 1280 or 1646 px. All marks were removed through the UI.
+  - **Checks:** 1,599/1,599 across 47 files at `d21b8d0`, with lint, `tsc` and the build clean, as that commit reports. The docs pass that wrote this entry ran no tests, because a browser tester held the local stack. ⏳ The full browser pass is not recorded yet.
+  - 📌 **Found by the docs pass, recorded rather than fixed** (`tasks.md` has each with a trigger):
+    - A video is stored byte for byte, so a phone's recording location, where the camera saved one, is public with it. Only photos lose their metadata.
+    - A backup holds the bingo rows and the `storage.objects` rows but none of the files, and the tested restore ran before Storage held anything.
+    - Abandoned videos are swept per square, only when that square next gets a video.
+
 💾 **Backups proven, 2026-10-09: production's first backup was taken and restored** (`scripts/backup-remote.sh`, on `portal-launch`). Supabase's Free plan keeps none, so this is the only copy there is.
 
   - **Dump:** the officer ran it from a terminal at `57ae0e6`. Every step printed `ok`, verify passed, and it came to 422K. **Restore:** it was loaded into the local stack, set up as a new empty project, in one transaction, and all 15 counted tables matched `counts.txt` exactly. That needed two departures from Supabase's guide: a `GRANT SET ON PARAMETER` that `postgres` is refused, and empty `COPY` blocks naming auth and storage tables or columns the local services lack. The tested commands are in the script's header. Untested: a hosted target, and recovering lost rows into the same project.

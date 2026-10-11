@@ -1,8 +1,27 @@
 # Student Organization Website — Architecture & Staged Build Plan
 
-**Version:** 1.85
-**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and production's schema and code are in sync at `…000032` as of 2026-10-06.** ✅ **Manual dues entry (v1.85) is LIVE: migration 32 reached production on 2026-10-06, minutes ahead of its code, which went live as `95c04a7`.** ✅ **Migration 30 (member type and project eligibility, v1.83) reached production on 2026-10-03, a day ahead of the code that reads it, which went live on 2026-10-04** as `55cb81e` with v1.82's column picker. Both steps were checked by rendered response. ✅ **Migration 31 (the "Count as general meeting" checkbox and the October 2026 start, v1.84) reached production on 2026-10-04, minutes ahead of its code, which went live the same afternoon as `65cb0af`.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
+**Version:** 1.86
+**Status:** Stages 0–5 complete. **Stages 6, 6.5, 7 and 8 — ✅ COMPLETE.** 🚀 **Stage 9 (launch) is IN PROGRESS — production was cleared of the seed on 2026-08-19, and production's schema and code are in sync at `…000032` as of 2026-10-06.** 🏗️ **House bingo (v1.86) is BUILT on `portal-launch` and NOT live: migration 33 is on the local stack only, and it must reach production before the code.** ✅ **Manual dues entry (v1.85) is LIVE: migration 32 reached production on 2026-10-06, minutes ahead of its code, which went live as `95c04a7`.** ✅ **Migration 30 (member type and project eligibility, v1.83) reached production on 2026-10-03, a day ahead of the code that reads it, which went live on 2026-10-04** as `55cb81e` with v1.82's column picker. Both steps were checked by rendered response. ✅ **Migration 31 (the "Count as general meeting" checkbox and the October 2026 start, v1.84) reached production on 2026-10-04, minutes ahead of its code, which went live the same afternoon as `65cb0af`.** 🏗️ A **v2 visual redesign is part-built — phases 0, 1, 2 and 4 are COMPLETE AND LIVE; phase 5 outstanding.** ✅ **Member portal phase 1 (`/portal`) is LIVE — on `main` since 2026-09-30.** ⏭️ **Next task (officer, 2026-09-18): the UI redesign of the member portal and every page in it — v2 phase 3, un-deferred and widened to the hub.**
 **Last updated:** October 2026
+
+> **v1.86: house bingo. The four houses (M, I, S, A) each work through one shared card of 24 activities, an officer records one photo or video as proof of each completed square, and members watch all four cards at `/portal/bingo`.**
+>
+> The user's request and decisions, 2026-10-10. Built 2026-10-10/11 on `portal-launch` in three tasks, each reviewed and fixed before the next (`dda956c` to `d21b8d0`). **Not on `main`:** it awaits the user's review, and migration 33 must reach production first. Full record: `docs/build-log.md`, `tasks.md`, and `docs/invariants.md` (*House bingo*).
+>
+> - 📌 **One card for all four houses**: the same 24 activities in the same positions, row-major 0–24 on a 5×5 grid. Position 12 is the free centre: it shows the house letter and is never stored, so nothing can mark, rename or count it. **One card, no terms**: there is no `term` column, and changing that is a new decision and a new migration. The score is "N of 24" and nothing more. The standings are always listed M, I, S, A, never sorted, so they are not a ranking.
+> - **Migration 33 (`house_bingo`, §4.1)**:
+>   - `bingo_squares` holds the 24 activities, seeded from the officer's card. Officers rename them; nothing adds or deletes one.
+>   - `bingo_marks` holds one row per (house, square) that is done. The row exists exactly when proof exists, and removing the proof deletes it, so "done" is never a flag that could disagree with whether proof exists.
+>   - Two **public** Storage buckets are created as rows: `bingo-photos` (image/jpeg, 5 MiB) and `bingo-videos` (video/mp4 and video/quicktime, 50 MiB).
+>   - The `admin_audit` entity-type CHECK gains `bingo_square` and `bingo_mark`.
+>   - An assertion block checks the 24 positions, both buckets' settings, the widened CHECK, and that `storage.objects` carries **no policy**.
+> - **A rename** is audited (`bingo_square.renamed`) and changes all four cards at once. Every house's proof stays with the square, because a mark belongs to the square, not to its text.
+> - 🔓 **The one exception to "all writes go through Server Actions or Route Handlers" (user's decision, 2026-10-10).** A video's bytes go from the officer's browser straight to Supabase Storage, with a signed upload token that the officer-only Server Action `prepareBingoVideoUpload` mints for one fresh path. The reason is size: a video may be 50 MiB, and a Vercel function's request body stops at 4.5 MB. Photos still go through the server: the browser resizes them, and `POST /admin/bingo/upload` stores them with the service role. That Route Handler records both kinds, and it checks a video's object before it does (§3, §6).
+> - 🔓 **`lib/supabase/client.ts` is now SESSIONLESS, and it has one importer**, the proof form. Otherwise `@supabase/ssr` would send the officer's session in place of the anon key and refresh it from the browser, which would be a second client-side write (§6).
+> - **Routes (§5)**: `/portal/bingo` for members; `/admin/bingo`, `/admin/bingo/[house]/[position]` and `POST /admin/bingo/upload` for officers. The `/portal` hub gains a third row, *House Bingo*, and the admin nav lists Bingo after Dues.
+> - **Capacity (§2.2)**: Storage and egress are the first Supabase quotas this site can plausibly reach, and on the Free plan a restricted project can answer every API request with 402, check-in included.
+> - **Left out (user)**: assigning members to houses, terms, any score beyond "N of 24", and the visual design, which stays v2 phase 3's (§7).
+> - 🔴 **DEPLOY ORDER: migration 33 BEFORE the code.** The pages that read the two tables fail with 42P01 against a database without them. The reverse order is harmless: no older code names them, and the widened CHECK only accepts more. `docs/operations.md` has the steps. 🪤 The migration file changed after its first push (`dda956c` to `34c6297`, which added `thumb_path`'s unique constraint and the no-policy assertion), so a local stack that applied the first version needs `npx supabase db reset --local`.
 
 > **v1.85: an officer can record a dues payment that did not come through Venmo: Cash, Zelle or Other.**
 >
@@ -2276,7 +2295,7 @@ Scoping these out keeps v1 shippable. They are candidates for later stages, not 
 | Service | Tier | Relevant limits | Projected usage |
 |---|---|---|---|
 | Vercel | Hobby (free) | 100 GB bandwidth/mo | Well under |
-| Supabase | Free | 500 MB database, 50k MAU | Well under — a few hundred members and a few thousand attendance rows per year is a few MB |
+| Supabase | Free | 500 MB database, 50k MAU; since v1.86 also 1 GB file storage, 50 MB per file, and 5 GB egress plus 5 GB cached egress a month (see *Storage and egress* below) | Database: well under — a few hundred members and a few thousand attendance rows per year is a few MB. **Storage and egress: NOT necessarily under**, because of house bingo's videos |
 | Domain | Optional | — | ~$12/year |
 
 **Note on the Supabase free tier:** projects pause after a period of inactivity and need a manual resume from the dashboard. For an org with events during the semester this is rarely an issue, but plan a wake-up check before the first meeting of each semester. This is the single most likely operational surprise.
@@ -2308,6 +2327,20 @@ Two already-recorded items that this scenario makes concrete rather than hypothe
 **One non-technical limit worth knowing:** Vercel Hobby prohibits commercial use. A student org is fine, and stays fine right up until the site **handles** dues, ticketing, or sponsorship — at which point the constraint is the plan's terms, not any of the numbers above.
 
 **Stage 6.5 walks up to that line without crossing it, and it is worth being precise about why** (v1.34). Recording that a payment arrived is not handling a payment. No card or bank details enter the system, no money moves through it, and there is no checkout: dues are paid outside it (Venmo, cash, Zelle), and the site reconciles a Venmo CSV statement, or an officer records a payment by hand (v1.85), after the fact. The clause bites the day this site takes a payment — a Stripe button, a ticketing flow — not the day it reads a spreadsheet about one. Keep the distinction in mind if in-app payment ever gets proposed (§7 Stage 10 lists it as deliberately out of scope); that proposal is a plan change as much as a feature.
+
+#### Storage and egress for house bingo (v1.86)
+
+The worst case above reached no service quota. House bingo can, because it is the first feature that stores and serves media. The Supabase Free plan's limits, as recorded on 2026-10-10 from Supabase's published plan limits (**re-check them on the organization's usage page before relying on them**, as the worst-case table says of Vercel's):
+
+| Limit | What house bingo puts against it |
+|---|---|
+| **File storage, 1 GB** | Four cards hold at most 96 proofs. A photo is at most 3 MiB and its thumbnail at most 300 KiB (`MAX_PHOTO_BYTES`, `MAX_THUMB_BYTES`), so 96 photos at their caps come to about 330 MB, which fits. **A video may be 50 MiB, so about 20 of them fill the quota.** Videos, not photos, decide this. |
+| **50 MB per file** | `bingo-videos` caps an object at 50 MiB, which is where this limit sits; `MAX_VIDEO_BYTES` and the uploader enforce the same figure before anything is sent. |
+| **Egress, 5 GB plus 5 GB cached, a month, shared across the organization** | Each view of four full cards loads at most 96 thumbnails, each capped at 300 KiB (a ceiling; a 480 px JPEG is usually far smaller). The full photo or video loads only when a member opens it, and a video has `preload="none"`, so nothing downloads until play. Every upload sets `cacheControl: 3600`, so a browser that fetched a thumbnail in the last hour serves it from its own cache. ⚠️ **One 50 MiB video played about a hundred times is on the order of a month's allowance.** |
+
+🔴 **There is no overage billing on the Free plan.** An organization that goes over a quota can be restricted, and a restricted project answers API requests with **402**. Everything here shares one project, so that would take down check-in and the officer screens with the bingo page. Daily backups and more storage start at Pro (`tasks.md` carries the plan decision, which is the officers'). Leftover files count against the quota too: an abandoned video is swept from its square's folder only when somebody next asks to upload a video to that same square, two hours or more later, and a file Storage refused to delete stays until someone removes it by hand (§6, `tasks.md`).
+
+📌 **Image transformations are Pro-only** (`supabase/config.toml` says so beside the commented-out setting), so nothing resizes on the server. The officer's browser makes both sizes before upload, a JPEG of at most 2048 px on the long edge and a thumbnail of at most 480 px, and every `next/image` showing proof is `unoptimized`, because the files are already sized and Supabase Storage serves them, not Next. That also means `next.config.ts` needs no `remotePatterns`.
 
 ### 2.6 Function region
 
@@ -2412,18 +2445,24 @@ The Stage 9 handoff guide should amount to: §2.4 filled in, the vault handed ov
    Public visitor ────▶│  Next.js on Vercel          │
    Member         ────▶│  ├── Server Components      │
    Officer        ────▶│  ├── Server Actions         │
-                       │  └── Route Handlers         │
-                       └──────────────┬──────────────┘
-                                      │
-                       ┌──────────────┴──────────────┐
-                       │  Supabase                   │
-                       │  ├── Postgres + RLS         │
-                       │  ├── Auth (admins only)     │
-                       │  └── Views & SQL functions  │
-                       └─────────────────────────────┘
+      │                │  └── Route Handlers         │
+      │                └──────────────┬──────────────┘
+      │                               │
+      │                ┌──────────────┴──────────────┐
+      │                │  Supabase                   │
+      │                │  ├── Postgres + RLS         │
+      │                │  ├── Auth (admins only)     │
+      │                │  ├── Views & SQL functions  │
+      └───────────────▶│  └── Storage: 2 public      │
+   a bingo video only, │      buckets (bingo media)  │
+   with a signed token └─────────────────────────────┘
 ```
 
 **Key architectural decision:** all writes go through Server Actions or Route Handlers using the service role or an authenticated session — never from the browser with elevated keys. The browser only ever holds the anon key, and the anon key's permissions are defined by RLS policies that assume it is hostile.
+
+🔓 **One exception, since migration 33 (v1.86, the user's decision of 2026-10-10): a house bingo video's bytes.** An officer's browser uploads them straight to Supabase Storage, because a video may be 50 MiB and a Vercel function's request body stops at 4.5 MB. Even then the browser holds no elevated key. The officer-only Server Action `prepareBingoVideoUpload` mints a signed upload token with the service role for ONE fresh path, without upsert, and the browser uploads that one object with the anon key and the token. Recording the video as proof is still a Route Handler's job (`POST /admin/bingo/upload`), and it checks the object first. Photos never take this route: the browser resizes them and posts them to the same Route Handler, which stores them with the service role. Nothing else in the codebase writes from the browser, and `lib/supabase/client.ts` has exactly one importer, the proof form (§6).
+
+**Storage** joined the stack with the same migration: two public buckets holding bingo proof, created by the migration as rows. Members' browsers fetch the photos and videos from Supabase's public URLs, which is a read of a public object rather than an API call; the page that links them is rendered on the server with the service role, which builds every URL. No API role holds any policy on `storage.objects` (§6).
 
 ---
 
@@ -2749,8 +2788,9 @@ create index dues_payments_review_idx on dues_payments (imported_at desc)
 create table admin_audit (
   id          bigserial primary key,
   -- ⚠️ Widened by migrations 14 ('roster'), 18 ('member_field'), 19
-  -- ('dues_payment') and 20 ('member_preset'). `AuditEntityType` in
-  -- app/actions/audit.ts is the TypeScript mirror and has drifted from this
+  -- ('dues_payment'), 20 ('member_preset'), 23 ('archive'), 24 ('officer',
+  -- 'officer_invite') and 33 ('bingo_square', 'bingo_mark'). `AuditEntityType`
+  -- in app/actions/audit.ts is the TypeScript mirror and has drifted from this
   -- list TWICE — treat widening the check and widening the union as one edit.
   -- admin_audit is append-only (P0001 on UPDATE and DELETE alike), so a row
   -- filed under a wrong type can never be corrected.
@@ -2758,7 +2798,9 @@ create table admin_audit (
                 check (entity_type in ('attendance','event','member',
                                        'point_adjustment','roster',
                                        'member_field','dues_payment',
-                                       'member_preset')),
+                                       'member_preset','archive',
+                                       'officer','officer_invite',
+                                       'bingo_square','bingo_mark')),
   entity_id   uuid not null,
   actor_id    uuid not null references auth.users(id),
   acted_at    timestamptz not null default now(),
@@ -2864,7 +2906,75 @@ create table member_filter_presets (
 );
 create unique index member_filter_presets_name_idx
   on member_filter_presets (lower(name));
+
+-- House bingo (migration 33, v1.86). One board of 24 activities shared by all
+-- four houses (M, I, S, A), numbered row-major 0–24 on a 5×5 grid. Position 12
+-- is the free centre: it shows the house letter and is NEVER stored. No term
+-- column: one standing card (user, 2026-10-10). Both tables are deny-all and
+-- carry the set_updated_at trigger; the portal reads them with the service role.
+create table bingo_squares (
+  id          uuid primary key default gen_random_uuid(),
+  position    smallint not null unique
+                constraint bingo_squares_position_valid
+                check (position between 0 and 24 and position <> 12),
+  -- Seeded by the migration from the officer's card. Officers rename it, and
+  -- the rename shows on all four cards (audited as bingo_square.renamed).
+  -- Nothing in the app adds or deletes a row. lib/bingo.ts counts the length
+  -- in code points, as char_length does.
+  activity    text not null
+                constraint bingo_squares_activity_trimmed
+                check (activity = btrim(activity))
+                constraint bingo_squares_activity_length
+                check (char_length(activity) between 1 and 60),
+  created_at  timestamptz not null default now(),
+  -- The rename's compare-and-set token, carried as the raw PostgREST string.
+  updated_at  timestamptz not null default now()
+);
+
+-- One row per (house, square) that is DONE. The row exists exactly when proof
+-- exists: removing the proof deletes the row, so "done" is never a flag that
+-- could disagree with whether proof exists. Who added it is in admin_audit
+-- (bingo_mark.added / .replaced / .removed), never on this row.
+create table bingo_marks (
+  id          uuid primary key default gen_random_uuid(),
+  -- lib/bingo.ts HOUSES mirrors this list; change both together.
+  house       text not null
+                constraint bingo_marks_house_valid
+                check (house in ('M','I','S','A')),
+  square_id   uuid not null references bingo_squares(id) on delete restrict,
+  kind        text not null
+                constraint bingo_marks_kind_valid
+                check (kind in ('photo','video')),
+  -- The proof: a photo's full JPEG in bingo-photos, or the video in
+  -- bingo-videos, at <house, lowercased>/<position>/<uuid>.<ext>. Unique, so
+  -- two marks can never share a file and delete each other's on removal.
+  media_path  text not null unique,
+  -- A photo's thumbnail or a video's poster frame, in bingo-photos. Unique for
+  -- the same reason; NULLs are distinct, so posterless videos coexist.
+  thumb_path  text unique,
+  created_at  timestamptz not null default now(),
+  -- The replace and remove compare-and-set token.
+  updated_at  timestamptz not null default now(),
+  constraint bingo_marks_photo_has_thumb
+    check (kind = 'video' or thumb_path is not null)
+);
+-- At most one mark per house per square. A second officer adding proof to a
+-- square that was just completed collides here (23505), reported as a conflict.
+create unique index bingo_marks_house_square_idx
+  on bingo_marks (house, square_id);
+
+-- The two PUBLIC buckets, created by the migration as rows rather than in
+-- config.toml, which reaches a database only through a manual step. The
+-- migration's closing block asserts these settings, and that storage.objects
+-- carries NO policy: no API role can list or write either bucket (§6).
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values
+  ('bingo-photos', 'bingo-photos', true,  5242880, array['image/jpeg']),
+  ('bingo-videos', 'bingo-videos', true, 52428800, array['video/mp4','video/quicktime'])
+on conflict (id) do nothing;
 ```
+
+📌 **House bingo's files are not in the database.** SQL cannot delete a stored object, so deleting a `bingo_marks` row leaves its files in the bucket: `lib/bingo.ts` deletes them through the Storage API after every replace and remove, and names any that would not go in the audit row's note. `scripts/wipe-remote.sh` and `seed.sql` both say the buckets must be emptied in the dashboard. A database backup holds the buckets' and objects' rows but none of the files (`docs/operations.md` §Backups).
 
 📌 **`checkin_throttle` (migration 11) is deliberately not shown.** It is IP-keyed
 rate-limit state with a ten-minute window rather than domain data — which is also why
@@ -3527,7 +3637,7 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 
 | Concern | Mitigation |
 |---|---|
-| Anon key over-permission | RLS: anon role can `select` only from `leaderboard` and published `events`. All writes go through Server Actions. ✅ **Proven exhaustively in Stage 8**, not reasoned about: `tests/security.test.ts` sweeps every declared table × select/insert/update/delete × anon **and** authenticated, re-reading each write probe as service role to confirm nothing moved. |
+| Anon key over-permission | RLS: anon role can `select` only from `leaderboard` and published `events`. All writes go through Server Actions. ✅ **Proven exhaustively in Stage 8**, not reasoned about: `tests/security.test.ts` sweeps every declared table × select/insert/update/delete × anon **and** authenticated, re-reading each write probe as service role to confirm nothing moved. 🔓 **One exception since v1.86: a house bingo video's bytes**, which an officer's browser uploads to Storage. The anon key grants nothing there; a signed token minted for one path does (the bingo rows below). The sweep names `bingo_squares` and `bingo_marks`, and a dedicated case writes a mark first and confirms neither role reads a row of either table. |
 | A signed-in non-officer reads the roster | 🔓 **This was live, and Stage 8 phase 1 closed it (migration 22).** `member_directory` carries every member's name, EID and email; migration 15 revoked it from `anon` and **granted it to `authenticated`** on the understanding that `authenticated` means "an officer". It does not — it is the role any holder of a valid user JWT gets, and `disable_signup` was `false` on production, so it was one confirmed email away for anyone. What distinguishes an officer is an `admin_profiles` row, and **that check lives in `lib/auth.ts`, in the application; PostgREST never runs it.** Reproduced on the local stack before the fix (a signed-up user with no profile read back a real EID), then revoked. Nothing read the view that way — every module touching member data uses the service-role client. ⚠️ The general lesson, which is migration 15's lesson one role over: **a grant to `authenticated` is a grant to the public whenever signup is open.** |
 | `grant all` includes TRUNCATE, which RLS cannot restrain | 🔓 Found in Stage 8's audit. RLS covers SELECT/INSERT/UPDATE/DELETE and **nothing else**, and `admin_audit`'s append-only triggers are `before update` and `before delete` — so TRUNCATE slipped past both while migration 12 handed it to `anon` with `all privileges`. Not reachable (PostgREST exposes no TRUNCATE verb and the API roles are NOLOGIN), but migration 12's stated doctrine — "granting anon DML changes nothing, RLS is the boundary" — **is false for exactly this verb**, on exactly the table where it matters most. Migration 22 narrows anon/authenticated to `select` and adds a statement-level `before truncate` trigger behind that, because a grant can be re-widened by a later migration and a trigger has to be dropped on purpose. |
 | Officer-only views underneath the public board (migration 30) | `member_project_meetings` and `member_general_meeting_months` list every member beside every meeting they missed, and they sit **under** `member_directory`, which `leaderboard` is defined over. 🔓 **The rule is expressed as views, not functions, because Postgres checks the two differently:** EXECUTE on a function referenced inside a view is checked against the **caller** (which is why anon holds EXECUTE on `current_term()`), while a **relation** referenced inside a view is checked as the view's **owner**. A helper function inside `member_directory` would therefore need an anon grant or would turn the public board into a 42501. **Anything `member_directory` consumes must stay a view, or a function anon may execute.** Both views revoke anon and authenticated in the migration, and `tests/security.test.ts` names both and asserts a 42501 for anon and for a signed-in non-officer. ✅ **Measured on the local stack, 2026-10-03:** neither view's ACL has an entry for anon or authenticated (only `postgres` and `service_role`); as anon, `leaderboard` returned its 29 rows while both views answered *permission denied*; and `EXPLAIN (verbose)` on `leaderboard` shows `member_type` and `project_eligibility` pruned to `NULL::text`, so the board never evaluates them. Nothing relies on that pruning. 🪤 **Supabase's security advisor flags these two owner-rights views**, exactly as it flags `member_directory` and `leaderboard`. That is intentional: `security_invoker` would run every read as the caller, and the caller of the public board is anon. 🪤 **A new function must `revoke execute … from public`**, not only from anon and authenticated: a function is executable by PUBLIC by default. Migration 29's `member_terms()` revoked the two roles and not PUBLIC, so anon can still execute it (`proacl` holds `=X/postgres`). It returns only term names; the fix is open in `tasks.md`. 📌 **Migration 31 (v1.84) gave `member_general_meeting_months` a read of `app_settings.general_meetings_from`, made as a relation for exactly this reason.** It runs as the view's owner, and `app_settings` stays deny-all to every API role. The migration re-issues the view's revokes, although a `create or replace` keeps its privileges, so a later drop-and-create copied from it cannot leave them out. ✅ **Re-measured on the local stack, 2026-10-04:** the view's ACL still lists only `postgres` and `service_role`. As anon, `leaderboard` reads while the view answers 42501. `leaderboard`'s verbose plan never touches either eligibility view, the new events column or `app_settings` (`project_eligibility` is pruned). |
@@ -3548,7 +3658,11 @@ The public check-in form is the main attack surface: it accepts unauthenticated 
 | Payment notes are member-supplied text | The note is written by the payer, so it is attacker-chosen in exactly the way member names are (see the formula-injection row above), and it reaches both the officer's screen and any export that includes it. Same mitigation, same writer: escape it in `lib/export.ts`'s CSV path, render it as text and never as markup. A note can also *name another member's EID* — that is a reconciliation hazard rather than an injection one, and it is why matching requires exactly one resolving token and queues anything ambiguous. |
 | `/lookup` reveals dues status | ✅ **Built, Stage 7 phase 2.** The member self-service page shows the member their own dues status, which widens the accepted "is this EID on the roster" oracle (see the row above) to "has this person paid". **Materially more sensitive than roster membership**, and accepted only because `/lookup` requires EID **and** matching email — a stricter gate than the check-in oracle, which needs the EID alone. Do not relax that gate, and do not add dues status to any surface reachable with the EID alone, `/leaderboard` included (§9 #1, #12). The two rows near the top of this table are what make the gate real rather than nominal: one query with both predicates, and one indistinguishable failure. |
 | Orphan submissions used to fabricate attendance | Check-ins are only accepted within 48 hours of a published event; everything outside that is refused, not queued |
-| Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. **Verified July 2026** — check it by response behaviour rather than by the dashboard label: the production alias must return `200` while a per-deployment URL returns `302` to `vercel.com/sso-api`. If both return `200`, protection is Disabled and every preview is publicly writable. |
+| Preview deployments writing to the production database | Vercel previews inherit production env vars, so every PR preview is a second, public check-in form pointed at the real Supabase project. Keep Vercel Deployment Protection at **Standard Protection**: production public, previews gated. Revisit if previews ever get their own Supabase project. **Verified July 2026** — check it by response behaviour rather than by the dashboard label: the production alias must return `200` while a per-deployment URL returns `302` to `vercel.com/sso-api`. If both return `200`, protection is Disabled and every preview is publicly writable. ⚠️ **Since migration 33 a preview also writes to production's STORAGE.** A photo or video recorded on a preview lands in the live `bingo-photos` or `bingo-videos` bucket, at a public URL, and its mark shows on the live member page. |
+| House bingo's proof is public by link (migration 33) | Members see every card on a no-login page, so both buckets are **public**: anyone holding an object's URL can fetch it, by design. What stops that becoming a browsable gallery: every path carries a fresh random uuid (`m/7/<uuid>.jpg`); no API role can list a bucket (the next row); and `/portal/bingo` is noindex, because a search engine's copy would outlive a photo an officer removed. ⚠️ **A copied URL keeps working until its file is deleted, and a removed or replaced file can still be served from a CDN or browser cache for up to an hour**: every upload sets `cacheControl: 3600` (`UPLOAD_CACHE_CONTROL`), while the origin deletes the file at once. A file Storage refuses to delete is named in that replace's or removal's audit note, and stays public until someone removes it by hand. ⚠️ **Photos are re-encoded in the officer's browser, which drops EXIF and GPS; videos are stored byte for byte.** Whatever a phone wrote into a video's metadata, a recording location included where the camera saved one, is published with it. The server re-encodes neither: it checks a photo's size and JPEG signature only, so the EXIF guarantee holds for the proof form, not for a hand-built officer request. Nothing about members or officers reaches the page: who added a mark is in `admin_audit` alone. |
+| No policy on `storage.objects`, ever (migration 33) | With RLS on and no policy, anon and a signed-in non-officer can neither list, upload to, mint a token for, delete, move nor overwrite anything in either bucket. `tests/bingo-storage.test.ts` asserts each one on outcomes, re-reading with the service role, because a storage call can return an empty success while doing nothing. Every write is authorised by officer-only server code: a photo by the Route Handler with the service role, a video by a token the service role minted. 🔓 **A policy would open the buckets to every role it names**, so migration 33's closing block refuses to apply if `storage.objects` carries any: Storage was unused before it, and a policy found there was added by hand. Deny-all stays the end state (§7 Stage 8); the token is not a policy. |
+| The one browser write: a video, with a signed upload token (user's decision, 2026-10-10) | `prepareBingoVideoUpload` opens with `getOfficer()`, sweeps the square's abandoned uploads, and mints a token with the service role for ONE fresh path in that square's folder, without upsert. It writes no audit row, since it changes no club data. On the local stack the token's lifetime measured 7200 s, two hours, which is what the hosted project documents, and `tests/bingo-storage.test.ts` holds it to no more than the sweep's two hours. The same file shows that the token is refused for any other path and cannot overwrite the object it created, that the bucket refuses a type it does not take, and that the bucket's limit is 50 MiB. The browser uploads through `lib/supabase/client.ts`, which is 🔓 **sessionless** (`persistSession`, `autoRefreshToken` and `detectSessionInUrl` off): otherwise `@supabase/ssr` would read the officer's session out of the auth cookies, which are not HttpOnly, send that token in place of the anon key, and refresh it from the browser, a second client-side write racing `proxy.ts`. The Route Handler then records the video only after `parseVideoPath` accepts the path for this house and square, and `info()` reports an object within 50 MiB whose stored type matches its extension. A missing size or type in that answer is an error that deletes nothing; a size or type present and wrong deletes the video, unless a mark holds it. `tests/bingo-admin.test.ts` pins the client's one importer and its options. |
+| `POST /admin/bingo/upload`: a Route Handler acting on a cookie session (migration 33) | Route Handlers run no layout, so it opens with `getOfficer()` and answers 403; `proxy.ts` redirects a request with no session before it arrives, which is a convenience, not the boundary. 🔓 **Next checks Origin before every Server Action and makes no such check for a Route Handler**, so this one makes Next's own comparison itself (`isSameOriginRequest`): Origin's host against the first comma-separated `x-forwarded-host` value, else `Host`. It reads headers and never `request.url`, whose origin on Vercel is the public one only if `trustHostHeader` was set at build time, so a check against it might have refused every upload on production. A missing Origin, the literal `null` and anything that is not a URL are refused, where Next lets a missing Origin through. SameSite=Lax on the session cookie already keeps it off a cross-site POST; this is the check that does not rest on a cookie attribute. 📌 **The body is counted, not trusted.** A malformed `Content-Length`, or one over 4 MiB (`MAX_UPLOAD_REQUEST_BYTES`), is refused with 413 before a byte is read; a missing one is allowed; either way `readBodyWithin` stops at 4 MiB. That sits under Vercel's 4.5 MB and under the 10 MB Next buffers a proxied body to (`proxyClientMaxBodySize`), so a body Next truncated is refused before it could parse as complete. 🪤 Next passes the handler the request only once the proxied body has ended, so the early 413 saves the parse, not the transfer. Then the core checks every value again: sizes, the JPEG signature, the video path. |
 | Bulk roster import brings PII *in* (Stage 6 phase 7b) | The mirror of the export row, and the file is the same shape: a spreadsheet of names, emails and EIDs. 🔓 **It is never persisted** — the client reads it with `FileReader` and holds the text in component state between the preview and the commit, so no staging table and no temp file ever holds it. The import is **create-only**: a row matching an existing member on `normalized_eid` *or* `lower(email)` is shown and skipped, so a stale spreadsheet cannot overwrite a correction an officer made. One `member.imported` audit row per member created. |
 | A merge permanently deletes a member row (Stage 6 phase 8) | The only destructive operation in the officer UI, and the one place where getting the wrong row costs data rather than a correction. Mitigated by preview-and-confirm, a two-click commit, suggestions that are never preselected and a floor tuned to refuse "same name, nothing else". The deleted row's own `admin_audit` history becomes **unreachable** — entity_id points at nothing and there is no page for a member that does not exist — so the single `member.merged` row written against the *survivor* carries the loser's name, EID and **id**, and is the only surviving record. ⚠️ `point_adjustments.member_id` is `on delete cascade`, so the delete is guarded by a re-count that refuses unless every referencing table is empty; see §7 Stage 6 phase 8. |
 | Admin privilege escalation | ⚠️ **This row was rewritten by migration 24, because its original sentence stopped being the whole truth.** It read: *"`admin_profiles` is not writable by any client role; officers are added via the Supabase dashboard or a seeded SQL script"*. Both halves are still literally true — no API role holds a write grant, and the service-role client behind `lib/auth.ts` is still the only writer — but the property they were shorthand for, **"becoming an officer requires somebody holding the service key"**, is what the invite flow deliberately ends. A valid, unexpired, unclaimed row in `officer_invites` is now a **capability**: whoever holds the matching token can mint an officer account without an existing session. That trade is recorded and argued in §9 #13; what contains it is that the capability is **narrow** (the **role** is always pinned by the inviter and read off the stored row, never off the redeemer's form; the **email** is pinned the same way *whenever the inviter supplied one* — ⚠️ **migration 25 made that optional**, and an invite with no address is a bearer credential redeemable by anyone holding the link into any mailbox they control, which is why the create screen says so before the officer chooses), **short-lived** (72 hours), **single-use** (a conditional `UPDATE` claims it, so two people opening one link cannot both get in), **revocable** (any officer, instantly), and **attributable** (two `admin_audit` rows, under `officer_invite` and `officer`). 🔓 **The token itself is never stored** — only its SHA-256 — so a database backup, an open Studio tab or any future screen listing invites holds nothing redeemable. The residual risk is the link in transit: an officer who sends it to the wrong person has granted officer access to the wrong person, which is why the screen says so plainly and why the window is short. |
@@ -3951,7 +4065,7 @@ Three phases, each merged to `main` on completion.
 
 **🔓 What phase 1 actually found, and why the first bullet does not mean what it says**
 
-- **"Write every RLS policy" resolved to "prove the empty set is correct".** The live schema has 11 tables, all RLS-enabled, and exactly **one** policy (`events_public_read`). That is already right: 33 modules read through the service-role client, four touch the anon client, and `lib/supabase/client.ts` — the browser client — has **zero importers**, so the app makes no client-side Supabase call at all. Policies for roles nothing exercises would be untested by construction and pure added surface. What was missing was the proof and tighter grants, and that is what phase 1 built.
+- **"Write every RLS policy" resolved to "prove the empty set is correct".** The live schema has 11 tables, all RLS-enabled, and exactly **one** policy (`events_public_read`). That is already right: 33 modules read through the service-role client, four touch the anon client, and `lib/supabase/client.ts` — the browser client — had **zero importers**, so the app made no client-side Supabase call at all. *(True at Stage 8. Since migration 33 (v1.86) the browser client has exactly one importer, the house bingo proof form, for the one client-side write: a video's bytes, uploaded to Storage with a signed token minted for one path. The token needs no policy, so the empty set is still the end state, and `storage.objects` carries none (§6).)* Policies for roles nothing exercises would be untested by construction and pure added surface. What was missing was the proof and tighter grants, and that is what phase 1 built.
 - 🔓 **A signed-in non-officer could read the whole roster.** See §6's row; migration 15's defect one role over, live on production, closed by migration 22.
 - 🔓 **`grant all` includes TRUNCATE and RLS cannot restrain it.** Also §6. This is what turned the grant narrowing from defence-in-depth into a fix.
 - 🪤 **The proof matrix was vacuous on its first draft, and only breaking it on purpose showed that.** Probing `insert({})` and asserting "an error came back" passes even with full permission, because a thin payload trips NOT NULL first. Measured: no grant → `42501`; grant without a policy → `42501`; grant **plus** policy with `{}` → `23502`; grant plus policy with a real payload → **201 Created**. The test now asserts `42501` specifically, and was re-run against a deliberately opened hole to confirm it goes red.
@@ -4005,6 +4119,34 @@ Three phases, each merged to `main` on completion.
 
 ---
 
+### House bingo (migration 33) — 🏗️ built 2026-10-10/11 on `portal-launch`, NOT live (v1.86)
+**Goal:** Each of the four houses (M, I, S, A) works through one bingo card of activities, officers record proof of each completed square, and members can watch every house's card fill in.
+
+This is the member portal plan's phases 2–4 (`docs/member-portal-plan.md`), which were on hold until the house system was clear, re-scoped by the user's decisions of 2026-10-10:
+
+- the same 24 activities in the same spots on all four cards; only the centre letter differs;
+- one card, with no terms;
+- officers can rename an activity; the rename is audited and applies to all four cards;
+- proof is one photo or one uploaded video file per completed square;
+- a video's bytes go from the browser straight to Storage with a signed upload token, which an officer-only Server Action mints for one fresh path. That is the one exception to §3's rule; photos still go through the server.
+
+Built in three tasks, each reviewed and fixed before the next:
+
+| Task | Scope | Commits |
+|---|---|---|
+| 1 | Migration 33 (§4.1) and `lib/bingo.ts`: the vocabulary, the storage paths, the board read and five write cores. The wipe script's and the seed's accounting | `dda956c`, review fixes `34c6297` |
+| 2 | The officer side: `/admin/bingo`, `/admin/bingo/[house]/[position]`, `POST /admin/bingo/upload`, `app/actions/bingo.ts`, the browser uploader, and the sessionless browser client | `a4217d8` (synthetic test media `25c1a42`), review fixes `3513bfc` |
+| 3 | The member side: `/portal/bingo`, and the hub's third row | `d6539e7`, review fixes `d21b8d0` |
+
+- **The board** is a discriminated read (`readBingoBoard`) that is an error unless exactly the 24 activity positions come back. Both tables are deny-all, and RLS answers the anon key with zero rows and no error, so every reader uses the service role (§6).
+- **Every write is a compare-and-set** on the row's raw `updated_at` string, and adding a mark is an insert raced by the `(house, square_id)` unique index, whose 23505 reads as a conflict. The cores never throw, and they hand back the audit's `before` and `after`: `bingo_mark.added`, `.replaced` and `.removed`, and `bingo_square.renamed`.
+- **The member page** is `force-dynamic`, noindex, and read on the server. A client refresher calls `router.refresh()` every 10 s while the tab is visible, and skips while a proof dialog is open or the browser is offline. Nothing on it carries `data-reveal`.
+- **Left out on purpose (user):** assigning members to houses, terms, any score beyond "N of 24", and the visual design. The member page is built from shared primitives only, and its design belongs to v2 phase 3 (`docs/frontend-redesign-v2-plan.md`). See Stage 10.
+
+**Exit criteria:** an officer records proof in `/admin/bingo`, and a member page left open shows it within about ten seconds, with that house's count moving and the proof opening in a dialog. ✅ **Met on the local stack** (2026-10-11, dev server pinned local): a photo and a video recorded in `/admin` appeared on an open member page after 6 to 9 s, and a mark added while a dialog was open appeared 1.4 s after it closed. ⬜ **Not yet on production**: the user reviews the branch, then migration 33 goes first (`docs/operations.md`). Real phones, Safari and iOS above all, are unverified (`tasks.md`).
+
+---
+
 ### Stage 10 — Post-v1 Backlog
 Not commitments — a parking lot, roughly ordered by value per unit of effort.
 
@@ -4030,6 +4172,14 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 - **Ticking "Count as general meeting" in bulk** for selected events. Today it is one event at a time, or one box for a whole new series.
 - **A "general meetings only" filter on `/admin/events`.** Today the list marks a ticked event with a pill and filters by term, status and category only.
 
+**Left out of house bingo (migration 33, v1.86) on purpose, by the user:**
+
+- **Assigning members to houses.** No table links a member to a house, so the cards are about houses, never about people, and nothing on the portal names a member.
+- **Terms.** One standing card per house. A card per semester would be a new decision and a new migration, never a `term` column quietly added to `bingo_marks`.
+- **Scoring beyond "N of 24".** No lines, no bingo detection and no ranking: the standings list the houses in a fixed order.
+- **The member page's real design**, which is v2 phase 3's.
+- **A cross-entity audit screen.** A removed proof's history is readable only in SQL until `/admin/audit` exists (§5, NOT BUILT), because the square page shows a mark's trail only while the mark exists.
+
 **"Dues tracking and payment status" was on this list and is now Stage 6.5** (v1.34). What remains deliberately out of scope, and should stay on this list rather than creeping into 6.5:
 
 - **In-app payment.** A checkout button is not a bigger version of what 6.5 builds — it is a different system with card data, a processor, refunds, and chargebacks in it, and it converts §1.3's non-goal and §2.2's Vercel Hobby clause from "does not apply" to "applies". Proposing it is a hosting-plan decision as much as a feature request.
@@ -4044,6 +4194,7 @@ Not commitments — a parking lot, roughly ordered by value per unit of effort.
 | Risk | Likelihood | Impact | Mitigation |
 |---|---|---|---|
 | Supabase free-tier project pauses between semesters | Medium | Medium | Calendar reminder to wake the project before the first event of each term |
+| House bingo media exhausts the Free plan's Storage or egress quota (v1.86) | Medium | High | About twenty 50 MiB videos fill the 1 GB of Storage, and a restricted project can answer every API request with 402, check-in included (§2.2). Thumbnails only on the grid, videos with `preload="none"`, an hour's cache on every upload. Watch the organization's usage page after uploads; the Pro plan decision is the officers' and is open in `tasks.md` |
 | Members check in without attending | Medium | Low | Accepted for v1; per-event codes in Stage 10 |
 | Schema change needed after UI is built | Medium | Medium | Invest in Stage 1; seed realistic data early to surface modeling gaps |
 | Overlapping events create ambiguous matching | Low | High | Constraint at publish time; explicit test coverage in Stage 3 |
@@ -4642,8 +4793,20 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              service role, never throw, compare-and-set on the
                              raw updated_at and return the audit's before/after.
                              🔓 The browser's ONE write is a video, through a
-                             signed token for one path. No server-only import:
-                             the upload component imports it in the browser
+                             signed token for one path. The upload route's two
+                             gates are pure helpers here: isSameOriginRequest
+                             (Next's Server Action host comparison: Origin's
+                             host against the first x-forwarded-host value,
+                             else Host; never request.url), and
+                             declaredLengthWithin with readBodyWithin (a
+                             declared Content-Length over the cap refused, then
+                             the body counted as it arrives). So are the
+                             uploader's file decisions: fileExtension,
+                             proofKindOf (photo, video or neither) and
+                             withVideoType (an untyped .mp4/.mov re-wrapped in
+                             a typed File, because Storage records the File's
+                             own type). No server-only import: the upload
+                             component imports it in the browser
 /supabase
   /migrations                versioned SQL
   seed.sql
