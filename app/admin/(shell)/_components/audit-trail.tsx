@@ -89,6 +89,12 @@ function formatAuditAction(action: string): string {
     "preset.created": "Saved",
     "preset.updated": "Updated",
     "preset.deleted": "Deleted",
+    // Migration 33, house bingo. A mark's trail reads on its square's page,
+    // the square's beside it.
+    "bingo_mark.added": "Proof added",
+    "bingo_mark.replaced": "Proof replaced",
+    "bingo_mark.removed": "Proof removed",
+    "bingo_square.renamed": "Renamed",
   };
   return LABELS[action] ?? action;
 }
@@ -124,17 +130,26 @@ async function fetchTrail(
 export async function AuditTrail({
   entityType,
   entityId,
+  emptyMessage,
 }: {
   // Mirrors AuditEntityType in app/actions/audit.ts, minus 'roster' — an export
   // receipt is not an entity anyone can open a page for.
   entityType:
     | "attendance"
+    | "bingo_mark"
+    | "bingo_square"
     | "dues_payment"
     | "event"
     | "member"
     | "member_field"
     | "point_adjustment";
   entityId: string;
+  /**
+   * What an empty trail says. The default is written for the records a member
+   * can also touch, and its sentence about check-ins means nothing on, say, a
+   * bingo square, which only an officer ever changes.
+   */
+  emptyMessage?: string;
 }) {
   const result = await fetchTrail(entityType, entityId);
 
@@ -149,8 +164,8 @@ export async function AuditTrail({
   if (result.rows.length === 0) {
     return (
       <Notice>
-        No officer has changed this record yet. Check-ins submitted through the
-        public form write no audit row — there is no acting officer to record.
+        {emptyMessage ??
+          "No officer has changed this record yet. Check-ins submitted through the public form write no audit row — there is no acting officer to record."}
       </Notice>
     );
   }

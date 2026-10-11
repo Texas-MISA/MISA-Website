@@ -898,8 +898,13 @@ export async function recordBingoVideo(
       return { status: "error" };
     }
     // Present and wrong is another matter: the object can never be recorded,
-    // so it goes. The bucket refuses both on upload, so these fire only if its
-    // settings ever drift from migration 33's (or, for size, on an empty file).
+    // so it goes. The bucket refuses an oversized upload, so the size check
+    // fires only if its limit ever drifts from migration 33's, or on an empty
+    // file. The type check is a live path, not a backstop: the bucket takes
+    // either video type at either extension, and the stored type is the
+    // File's own `file.type` (uploadToSignedUrl ignores its contentType
+    // option), so a file the browser calls video/quicktime, uploaded to an
+    // `.mp4` path, passes the bucket and is refused here.
     if (size <= 0 || size > MAX_VIDEO_BYTES) {
       await discardVideo(db, input.videoPath);
       return invalid("video_size");

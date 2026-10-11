@@ -24,6 +24,9 @@ const NAV = [
   // /admin/dues/* path — which is what we want here, unlike the members/fields
   // case where a second entry would have lit two.
   { href: "/admin/dues", label: "Dues", ready: true },
+  // House bingo (migration 33): the four cards, and each square's proof. The
+  // `startsWith` check keeps it underlined on /admin/bingo/m/7 as well.
+  { href: "/admin/bingo", label: "Bingo", ready: true },
   // Officer turnover (migration 24). Its own entry rather than a link from
   // somewhere: "who can get into this system" is not a sub-question of any
   // other screen, and an officer looking for it will look in the nav.

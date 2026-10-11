@@ -68,9 +68,17 @@ app/admin/login/        officer sign-in — deliberately OUTSIDE the (shell) gro
                         whose layout calls requireOfficer()
 app/admin/(shell)/      authed chrome + dashboard, events/, attendance/, points/,
                         members/ (+ [id], fields/, presets/, import, merge, and
-                        export/route.ts), dues/ (+ [id], import/, new/),
-                        officers/; later audit/. Route groups don't appear in
+                        export/route.ts), dues/ (+ [id], import/, new/), bingo/
+                        (+ [house]/[position], upload/route.ts), officers/;
+                        later audit/. Route groups don't appear in
                         URLs, so §5's route table is unchanged.
+                        bingo/ is house bingo (migration 33): page.tsx is one
+                        house's card (?house=), [house]/[position]/ one square,
+                        with proof-panel.tsx (preview, Replace, two-click
+                        Remove), proof-form.tsx (the uploader — lib/supabase/
+                        client.ts's ONE importer) and rename-form.tsx.
+                        upload/route.ts records proof: getOfficer() 403, a
+                        same-origin check, a Content-Length cap before reading.
                         dues/new/ is manual dues entry (migration 32): page.tsx
                         formats Central "now" and the prices, and
                         _components/payment-form.tsx is the client form, whose
@@ -147,11 +155,15 @@ app/actions/
                         display preference in the officer's browser, not club data
   events.ts             event mutations
   auth.ts               sign in / sign out
+  bingo.ts              prepareBingoVideoUpload (the signed token for the one
+                        browser write; NO audit row, it changes no club data),
+                        renameBingoActivity, removeBingoProof (migration 33)
   audit.ts              shared admin_audit writer — no "use server", see Invariants
 lib/
   auth.ts               getOfficer / requireOfficer — the authorization boundary
-  supabase/             server.ts (anon), client.ts (browser, zero importers),
-                        admin.ts (service role, `server-only`-guarded)
+  supabase/             server.ts (anon), client.ts (browser, sessionless anon
+                        key; ONE importer, the bingo proof form), admin.ts
+                        (service role, `server-only`-guarded)
   types/database.ts     generated — do not hand-edit. ⚠️ Except that migration 30's
                         and 31's additions WERE hand-ported: CLI 2.119.0's output
                         drifts from this file in unrelated ways. Generate into a

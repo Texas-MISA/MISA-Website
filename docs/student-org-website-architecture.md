@@ -3456,6 +3456,24 @@ $$;
                        as CSV or .xlsx, plus the resolution columns the queue
                        never displays                           (Stage 8 phase 2)
 /admin/attendance/[id] Submission detail: raw form data, suggestions, override actions
+/admin/bingo           House bingo — one house's card at a time, switched by
+                       ?house=m|i|s|a (anything else shows M), with each
+                       house's progress out of 24. Every activity cell opens
+                       its square; the free centre is not a link
+                                                                (migration 33)
+/admin/bingo/[house]/[position]
+                       One square of one house's card: add, replace or remove
+                       its proof (one photo or one video), rename the activity
+                       on all four cards, and the history of both. Any other
+                       spelling of the house or position, and the free centre
+                       12, calls notFound() (the shell's Not found page, with
+                       the 200 that (shell)/loading.tsx commits to)
+/admin/bingo/upload    Route Handler — records proof: a photo the browser has
+                       resized, stored with the service role, or a video the
+                       browser uploaded itself with a signed token, the ONE
+                       client-side write (user's decision, 2026-10-10).
+                       getOfficer() 403, a same-origin check, and a 4 MiB
+                       Content-Length cap before the body is read
 /admin/officers        Officer turnover — invite by link, withdraw an invitation,
                        remove access, grant it to an account that already exists.
                        Replaces scripts/create-officer.mjs for everyday use; the
@@ -4201,6 +4219,15 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              component holds the CSV text between the preview
                              step and the commit step, so nothing is staged
                              server-side
+      /bingo/...             migration 33 — house bingo. page.tsx is one
+                             house's card (?house=); [house]/[position]/ is one
+                             square, whose _components are proof-panel.tsx (the
+                             preview, Replace, and a two-click Remove),
+                             proof-form.tsx (the uploader, and the ONE importer
+                             of lib/supabase/client.ts) and rename-form.tsx.
+                             /upload/route.ts records proof; a Route Handler,
+                             because a resized photo can be over a Server
+                             Action's 1 MB body
       /officers/...          migration 24 — officer turnover. Current officers,
                              outstanding invitations, and accounts that exist
                              without access. Replaces create-officer.mjs for
@@ -4274,11 +4301,19 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              display preference in the officer's own browser
                              is not club data, and the export it shapes is
                              audited where it leaves
+    bingo.ts                 migration 33 — prepareBingoVideoUpload (mints the
+                             signed token for the one browser write; writes NO
+                             admin_audit row, since it changes no club data),
+                             renameBingoActivity and removeBingoProof. A photo,
+                             and a video's record step, go through
+                             /admin/bingo/upload instead
     audit.ts                 shared admin_audit writer (no "use server")
 /lib
   supabase/
     server.ts                anon server client
-    client.ts                browser client
+    client.ts                browser client: SESSIONLESS, the anon key and
+                             nothing else. One importer, the bingo proof form,
+                             for the one browser write (migration 33)
     admin.ts                 service-role client, `server-only`-guarded —
                              the only place it is constructed (§6)
   types/database.ts          generated types. ⚠️ Migration 30's and 31's

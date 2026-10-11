@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 import { MAX_BULK_ASSIGN } from "@/lib/attendance";
+import {
+  MAX_ACTIVITY_LENGTH,
+  normalizeActivity,
+  parseActivityPosition,
+  parseHouseParam,
+} from "@/lib/bingo";
 import { normalizeEid } from "@/lib/checkin";
 import {
   MAX_MANUAL_PAYMENT_CENTS,
@@ -947,4 +953,123 @@ export const openInviteEmailSchema = z.object({
     .max(254, "Email is too long")
     .pipe(z.email("Enter a valid email address"))
     .transform((value) => value.toLowerCase()),
+});
+
+// ---------------------------------------------------------------------------
+// House bingo (migration 33)
+// ---------------------------------------------------------------------------
+//
+// These turn what a form, a URL or a client call carries into the shapes
+// lib/bingo.ts's write cores take. The cores judge every VALUE again (sizes,
+// JPEG signatures, a video path against its square), so these check shape and
+// the two things a core cannot take raw: a house letter and a position.
+
+/** A house as a URL or a form carries it: the lowercase slug, `m` → `M`. */
+const bingoHouse = z.string().transform((value, ctx) => {
+  const house = parseHouseParam(value);
+  if (house === null) {
+    ctx.addIssue({ code: "custom", message: "Pick one of the four houses" });
+    return z.NEVER;
+  }
+  return house;
+});
+
+/** An activity position, 0–24 except the free centre, in its one spelling:
+ * `"7"` from a form, or `7` from a client call. */
+const bingoPosition = z
+  .union([z.string(), z.number()])
+  .transform((value, ctx) => {
+    const position = parseActivityPosition(value);
+    if (position === null) {
+      ctx.addIssue({ code: "custom", message: "Pick one of the 24 squares" });
+      return z.NEVER;
+    }
+    return position;
+  });
+
+/**
+ * A compare-and-set token: the raw PostgREST `updated_at` string the page
+ * rendered, never a Date round trip (which truncates microseconds). Bounded
+ * only so a hand-rolled request cannot post a novel; a real one is 32
+ * characters.
+ */
+const bingoToken = z.string().max(64);
+
+/**
+ * One request to /admin/bingo/upload, as its FormData carries it.
+ *
+ * `expectedUpdatedAt` is REQUIRED and may be empty: "" says the page showed
+ * the square not done, and recordBingoPhoto / recordBingoVideo read it as
+ * null. A missing field is refused rather than defaulted, so every request
+ * says which state of the square it was made against.
+ *
+ * The files are checked only for being files. Their sizes and JPEG signatures
+ * are the core's to judge, because it answers with the specific reason
+ * (`photo_size`, `thumb_type`…) that the uploader turns into a sentence.
+ */
+export const bingoUploadSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("photo"),
+    house: bingoHouse,
+    position: bingoPosition,
+    expectedUpdatedAt: bingoToken,
+    photo: z.file(),
+    thumb: z.file(),
+  }),
+  z.object({
+    kind: z.literal("video"),
+    house: bingoHouse,
+    position: bingoPosition,
+    expectedUpdatedAt: bingoToken,
+    /** As prepareBingoVideoUpload returned it. parseVideoPath checks it
+     * against this house and square; this only bounds it. */
+    videoPath: z.string().min(1).max(200),
+    /** Best effort: a browser that cannot decode the video sends none. */
+    poster: z.file().optional(),
+  }),
+]);
+
+export type BingoUploadFields = z.infer<typeof bingoUploadSchema>;
+
+/**
+ * Asking for a video upload token. The type and the size are the core's to
+ * judge (it refuses with `video_type` and `video_size`); this checks that they
+ * are a string and a finite number.
+ */
+export const bingoVideoPrepareSchema = z.object({
+  house: bingoHouse,
+  position: bingoPosition,
+  contentType: z.string().max(100),
+  size: z.number(),
+});
+
+/**
+ * Renaming an activity. The text goes through normalizeActivity, the one rule
+ * the core and the CHECK agree on; the messages only say which part of that
+ * rule the text broke.
+ */
+export const bingoRenameSchema = z.object({
+  squareId: z.uuid(),
+  activity: z.string().transform((value, ctx) => {
+    const activity = normalizeActivity(value);
+    if (activity !== null) return activity;
+    const length = [...value.trim()].length;
+    ctx.addIssue({
+      code: "custom",
+      message:
+        length === 0
+          ? "Name the activity"
+          : length > MAX_ACTIVITY_LENGTH
+            ? `Keep the name to ${MAX_ACTIVITY_LENGTH} characters`
+            : "Take the tab or control character out of the name",
+    });
+    return z.NEVER;
+  }),
+  expectedUpdatedAt: bingoToken.min(1),
+});
+
+/** Removing one house's proof for one square. */
+export const bingoRemoveSchema = z.object({
+  markId: z.uuid(),
+  expectedUpdatedAt: bingoToken.min(1),
 });
