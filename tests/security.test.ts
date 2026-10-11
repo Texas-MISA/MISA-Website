@@ -2,6 +2,11 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
+import {
+  claimFreeSquare,
+  cleanupBingo,
+  newBingoTracker,
+} from "./bingo-fixtures";
 import { anonClient, signInAsOutsider, testClient } from "./helpers";
 
 // What an unauthenticated visitor can reach, checked with the anon key rather
@@ -313,6 +318,9 @@ describe.each(ROLES)("$label cannot write to any table", ({ client }) => {
     expect(tables).toContain("dues_payments");
     expect(tables.length).toBeGreaterThanOrEqual(12);
     expect(tables).toContain("checkin_origin");
+    // Migration 33's two, named so the sweep provably reaches them.
+    expect(tables).toContain("bingo_squares");
+    expect(tables).toContain("bingo_marks");
     // The dropped table is filtered out, and that filtering is deliberate.
     expect(declaredTables()).toContain("_stage0_check");
     expect(tables).not.toContain("_stage0_check");
@@ -467,6 +475,51 @@ describe.each(ROLES)("$label cannot touch checkin_origin", ({ client }) => {
       expect((visible ?? []).length).toBe(1);
     } finally {
       await db.from("checkin_origin").delete().eq("attendance_id", host!.id);
+    }
+  });
+});
+
+describe.each(ROLES)("$label cannot read the bingo board's tables", ({ client }) => {
+  // 🪤 The generic "can read only `events`" probe above proves something only
+  // for a table that HOLDS rows. bingo_squares does: migration 33 seeds its 24.
+  // bingo_marks does not: a fresh stack has no completed square, so the probe
+  // would assert "you cannot see" against an empty table forever. So this
+  // writes its own fixture, the checkin_origin way.
+  //
+  // The portal shows every card to anyone, but by reading on the SERVER with
+  // the service role. Neither table is the public's to read directly.
+  it("reads no rows from either, though a mark exists", async () => {
+    const db = testClient();
+    const track = newBingoTracker();
+    const claim = await claimFreeSquare(db, track);
+    try {
+      const { error: seedError } = await db.from("bingo_marks").insert({
+        house: claim.house,
+        square_id: claim.squareId,
+        kind: "video",
+        media_path: `security-test/${crypto.randomUUID()}.mp4`,
+      });
+      expect(seedError).toBeNull();
+
+      const role = await client();
+      const marks = await role.from("bingo_marks").select("*");
+      expect(marks.data ?? []).toEqual([]);
+      const squares = await role.from("bingo_squares").select("*");
+      expect(squares.data ?? []).toEqual([]);
+
+      // Guards the guard: both really hold rows, as the service role.
+      const { data: visible } = await db
+        .from("bingo_marks")
+        .select("id")
+        .eq("house", claim.house)
+        .eq("square_id", claim.squareId);
+      expect((visible ?? []).length).toBe(1);
+      const { count } = await db
+        .from("bingo_squares")
+        .select("id", { count: "exact", head: true });
+      expect(count).toBe(24);
+    } finally {
+      await cleanupBingo(db, track);
     }
   });
 });

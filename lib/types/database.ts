@@ -219,6 +219,71 @@ export type Database = {
           },
         ]
       }
+      bingo_marks: {
+        Row: {
+          created_at: string
+          house: string
+          id: string
+          kind: string
+          media_path: string
+          square_id: string
+          thumb_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          house: string
+          id?: string
+          kind: string
+          media_path: string
+          square_id: string
+          thumb_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          house?: string
+          id?: string
+          kind?: string
+          media_path?: string
+          square_id?: string
+          thumb_path?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bingo_marks_square_id_fkey"
+            columns: ["square_id"]
+            isOneToOne: false
+            referencedRelation: "bingo_squares"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bingo_squares: {
+        Row: {
+          activity: string
+          created_at: string
+          id: string
+          position: number
+          updated_at: string
+        }
+        Insert: {
+          activity: string
+          created_at?: string
+          id?: string
+          position: number
+          updated_at?: string
+        }
+        Update: {
+          activity?: string
+          created_at?: string
+          id?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       checkin_origin: {
         Row: {
           attendance_id: string

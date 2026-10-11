@@ -60,10 +60,17 @@ type Client = SupabaseClient<Database>;
  * `officer_invites.id`. Collapsing them would make entity_id sometimes a person
  * and sometimes a link, and "everything that happened to this officer" would
  * come back with rows about an invite.
+ *
+ * `bingo_square` and `bingo_mark` (migration 33) are two types for the same
+ * reason again: a square is a `bingo_squares` row (an activity, renamed for all
+ * four houses at once) and a mark is a `bingo_marks` row (one house's proof).
+ * The SQL check and this union moved in the same commit.
  */
 export type AuditEntityType =
   | "archive"
   | "attendance"
+  | "bingo_mark"
+  | "bingo_square"
   | "dues_payment"
   | "event"
   | "member"
@@ -195,7 +202,18 @@ export type AuditAction =
   // who did what (scripts/create-officer.mjs:130-134).
   | "officer.access_granted"
   | "officer.access_revoked"
-  | "officer.access_restored";
+  | "officer.access_restored"
+  // Migration 33 — house bingo. A rename is filed against the SQUARE, because
+  // the activity is shared by all four cards and one rename changes them all.
+  | "bingo_square.renamed"
+  // One house's proof for one square, filed against the MARK. "Replaced"
+  // rather than "updated": the officer swapped one photo or video for
+  // another, and before/after name both files. "Removed" deletes the row,
+  // so, like event.deleted, it names a row that no longer exists, and its
+  // `before` is the only record of what the proof was.
+  | "bingo_mark.added"
+  | "bingo_mark.replaced"
+  | "bingo_mark.removed";
 
 export type AuditEntry = {
   entityType: AuditEntityType;

@@ -7,8 +7,20 @@
 # --- What goes, what stays -------------------------------------------------
 #
 # DELETED   members, events, attendance, point_adjustments, dues_payments,
-#           member_field_definitions, member_filter_presets, the admin_audit
-#           rows about any of those, and the fabricated seed.officer account.
+#           member_field_definitions, member_filter_presets, bingo_marks, the
+#           admin_audit rows about any of those, and the fabricated
+#           seed.officer account.
+#
+#           bingo_marks is every house's completed squares (migration 33). The
+#           audit step's delete takes its rows with the rest, and the
+#           bingo_square rename rows too, although the squares themselves stay:
+#           the board keeps the text it has, and loses the record of who
+#           renamed it.
+#
+#           🪤 SQL CANNOT DELETE A STORED FILE. The photos and videos behind the
+#           marks stay in the bingo-photos and bingo-videos Storage buckets
+#           after this runs, and the script says so at the end: empty both in
+#           the dashboard (Storage).
 #
 #           checkin_origin, which has no delete of its own: its PK is an
 #           attendance_id ON DELETE CASCADE, so it empties with attendance.
@@ -34,7 +46,12 @@
 #           same call seed.sql makes — it is not seed data and it expires on
 #           its own.
 #
-# 📌 That accounts for all thirteen tables in `public`. Keep it that way: per the
+#           bingo_squares. The house-bingo BOARD, not club data: its 24
+#           activities were seeded by migration 33, and nothing in the app can
+#           recreate them, because officers can only rename a square, never add
+#           one. bingo_marks references it ON DELETE RESTRICT.
+#
+# 📌 That accounts for all fifteen tables in `public`. Keep it that way: per the
 # rule seed.sql's wipe list carries, a table missing from this accounting is
 # drift nobody can see. Any migration adding a table has to decide which of the
 # four groups above it lands in.
@@ -53,6 +70,9 @@
 #
 # Delete order is FK order, not preference. dues_payments.member_id is
 # ON DELETE RESTRICT, so it must precede members or the members delete raises.
+# bingo_marks goes FIRST: nothing references it, and on a project that
+# predates migration 33 that step fails before anything has been deleted,
+# rather than halfway through.
 set -euo pipefail
 
 SEED_OFFICER='00000000-0000-4000-8000-5eed00000001'
@@ -69,10 +89,12 @@ npx supabase db query --linked \
   "select (select count(*) from members) members, (select count(*) from events) events, (select count(*) from attendance) attendance, (select count(*) from point_adjustments) adjustments, (select count(*) from dues_payments) dues, (select count(*) from member_field_definitions) field_defs, (select count(*) from admin_audit) audit_rows, (select count(*) from admin_profiles) officers, (select coalesce(current_term, '(unpinned, derived: ' || current_term() || ')') from app_settings) current_term;" \
   </dev/null 2>/dev/null | sed -n -e '/"boundary"/d' -e '/"warning"/d' -e '/"rows"/d' -e 's/^ *"\([a-z_]*\)": *\(.*\)$/        \1 = \2/p' | sed 's/,$//' || true
 echo
-echo "      SURVIVES: officer sign-ins, officer_invites, and the admin_audit"
-echo "                rows about invites and officer access."
+echo "      SURVIVES: officer sign-ins, officer_invites, the admin_audit rows"
+echo "                about invites and officer access, and the bingo board's"
+echo "                24 activities."
 echo "      GONE:     every member, event, attendance row, point adjustment,"
-echo "                dues payment, custom field and saved view. No undo."
+echo "                dues payment, custom field, saved view and completed"
+echo "                bingo square. No undo."
 printf "      Type the project ref to continue: "
 read -r CONFIRM
 [ "$CONFIRM" = "$REF" ] || { echo "      mismatch — nothing was changed."; exit 1; }
@@ -86,6 +108,7 @@ while IFS= read -r line; do
   case "$line" in \#*) continue ;; esac
   STEPS+=("$line")
 done <<'PLAN'
+bingo marks|delete from bingo_marks;
 point adjustments|delete from point_adjustments;
 attendance|delete from attendance;
 dues payments|delete from dues_payments;
@@ -95,7 +118,7 @@ custom field definitions|delete from member_field_definitions;
 members|delete from members;
 audit rows about test data|alter table admin_audit disable trigger admin_audit_no_delete; delete from admin_audit where entity_type not in ('officer_invite','officer'); alter table admin_audit enable trigger admin_audit_no_delete;
 fabricated seed officer|delete from auth.users where id = '00000000-0000-4000-8000-5eed00000001'::uuid;
-verify|do $$ declare n int; begin select (select count(*) from members)+(select count(*) from events)+(select count(*) from attendance)+(select count(*) from point_adjustments)+(select count(*) from dues_payments)+(select count(*) from member_field_definitions)+(select count(*) from member_filter_presets)+(select count(*) from checkin_origin) into n; if n <> 0 then raise exception 'wipe incomplete: % club rows remain', n; end if; if exists (select 1 from admin_audit where entity_type not in ('officer_invite','officer')) then raise exception 'admin_audit still holds test-data rows'; end if; if not exists (select 1 from admin_profiles) then raise exception 'no officer profile survives - refusing to report success'; end if; if exists (select 1 from auth.users where id = '00000000-0000-4000-8000-5eed00000001') then raise exception 'seed officer survived the wipe'; end if; if not exists (select 1 from pg_trigger where tgname = 'admin_audit_no_delete' and tgenabled <> 'D') then raise exception 'admin_audit_no_delete was left DISABLED'; end if; end $$;
+verify|do $$ declare n int; begin select (select count(*) from members)+(select count(*) from events)+(select count(*) from attendance)+(select count(*) from point_adjustments)+(select count(*) from dues_payments)+(select count(*) from member_field_definitions)+(select count(*) from member_filter_presets)+(select count(*) from checkin_origin)+(select count(*) from bingo_marks) into n; if n <> 0 then raise exception 'wipe incomplete: % club rows remain', n; end if; if exists (select 1 from admin_audit where entity_type not in ('officer_invite','officer')) then raise exception 'admin_audit still holds test-data rows'; end if; if not exists (select 1 from admin_profiles) then raise exception 'no officer profile survives - refusing to report success'; end if; if exists (select 1 from auth.users where id = '00000000-0000-4000-8000-5eed00000001') then raise exception 'seed officer survived the wipe'; end if; if not exists (select 1 from pg_trigger where tgname = 'admin_audit_no_delete' and tgenabled <> 'D') then raise exception 'admin_audit_no_delete was left DISABLED'; end if; end $$;
 PLAN
 
 for step in "${STEPS[@]}"; do
@@ -118,4 +141,9 @@ echo "  wiped. what remains:"
 npx supabase db query --linked \
   "select (select count(*) from members) members, (select count(*) from events) events, (select count(*) from attendance) attendance, (select count(*) from dues_payments) dues, (select count(*) from admin_audit) audit_rows, (select count(*) from officer_invites) invites, (select count(*) from admin_profiles) officers, (select coalesce(current_term, '(unpinned, derived: ' || current_term() || ')') from app_settings) current_term;" \
   </dev/null 2>/dev/null | sed -n -e '/"boundary"/d' -e '/"warning"/d' -e '/"rows"/d' -e 's/^ *"\([a-z_]*\)": *\(.*\)$/        \1 = \2/p' | sed 's/,$//' || true
+echo
+echo "  ⚠️  NOT DONE BY THIS SCRIPT: the bingo photos and videos are still stored"
+echo "      in the bingo-photos and bingo-videos buckets. SQL cannot delete a"
+echo "      stored file. Empty both in the Supabase dashboard (Storage) before"
+echo "      real data starts, or every old upload stays at its public URL."
 echo

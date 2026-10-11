@@ -294,6 +294,19 @@ lib/
                         unjoinable across events is the feature. ⚠️ Imports
                         node:crypto, so it must never reach a Client Component;
                         resolveCheckin takes a FACTORY for exactly that reason
+  bingo.ts              house bingo (migration 33): HOUSES (mirrors the CHECK —
+                        change both together), the free centre (12, never
+                        stored), the two public buckets and their caps, the
+                        storage paths (m/7/<uuid>…, one fresh uuid per upload)
+                        and parseVideoPath, which refuses any other square's
+                        path. readBingoBoard returns a discriminated result and
+                        is an ERROR unless all 24 squares came back: deny-all
+                        RLS answers anon with zero rows. The write cores (photo,
+                        video, remove, rename) take the service role, never
+                        throw, compare-and-set on the raw updated_at, and return
+                        the audit's before/after. 🔓 The browser's ONE write is a
+                        video, through a signed token for one path. No
+                        server-only import: the upload component imports it
   validation.ts         zod schemas
   utils.ts              `cn()` — clsx + tailwind-merge, created by `shadcn init`
                         and required by every shadcn component. ⚠️ It is NOT a
@@ -318,10 +331,11 @@ scripts/wipe-remote.sh  EMPTIES the linked project's club data — the "testing 
                         over, real data starts now" button, and the OPPOSITE of
                         seed-remote.sh rather than a mode of it. Keeps officer
                         sign-ins, officer_invites, and the admin_audit rows about
-                        invites and officer access; leaves app_settings and
-                        checkin_throttle alone. Its header accounts for all
-                        thirteen public tables, and that accounting is the
-                        invariant
+                        invites and officer access; leaves app_settings,
+                        checkin_throttle and the bingo board (bingo_squares)
+                        alone. Its header accounts for all fifteen public
+                        tables, and that accounting is the invariant. It cannot
+                        empty the bingo Storage buckets, and says so
 scripts/backup-remote.sh  BACKS UP the linked project (changes no club data) to a
                         folder OUTSIDE the repo, which it refuses to write inside. The
                         Free plan keeps no backups, so this is the only copy.

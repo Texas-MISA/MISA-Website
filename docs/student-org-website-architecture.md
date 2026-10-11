@@ -4562,6 +4562,20 @@ One decision, and it earns a place here on #12's bar: a calculated column now pa
                              no answer, so the survivor keeps its type unless
                              it is General; two real types keep the survivor's
                              and report the duplicate's as dropped
+  bingo.ts                   house bingo (migration 33): HOUSES (mirrors the
+                             CHECK), the free centre (12, never stored), the
+                             two public buckets and their caps, the storage
+                             paths (one fresh uuid per upload) and
+                             parseVideoPath, which refuses any other square's
+                             path. readBingoBoard is a discriminated result and
+                             an ERROR unless all 24 squares came back, since
+                             deny-all RLS answers anon with zero rows. The write
+                             cores (photo, video, remove, rename) take the
+                             service role, never throw, compare-and-set on the
+                             raw updated_at and return the audit's before/after.
+                             🔓 The browser's ONE write is a video, through a
+                             signed token for one path. No server-only import:
+                             the upload component imports it in the browser
 /supabase
   /migrations                versioned SQL
   seed.sql
