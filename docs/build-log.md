@@ -58,7 +58,41 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
         - The offline skip, because in Next 16 a failed `router.refresh()` hard-reloads the page.
         - A polite live region on the standings.
   - **Verified along the way, on a dev server pinned local with a fake test officer.** A headless Chrome walkthrough uploaded the 12 MP photo, stored at 2048×1536 with no EXIF, and the EXIF-rotated one, stored upright with its fake GPS gone. It also recorded an MP4 and a MOV, each with a poster. The route answered 200 from `localhost` and `127.0.0.1`, 403 for a foreign, missing, `null` or unparseable Origin, and 413 for an over-cap body, chunked or declared. A photo and a video recorded in `/admin` appeared on an open member page after 6 to 9 s, and a mark added while a dialog was open appeared 1.4 s after it closed. The member page showed no horizontal overflow at 360, 390, 800, 1024 or 1280 px, and the officer pages none at 390, 1024, 1280 or 1646 px. All marks were removed through the UI.
-  - **Checks:** 1,599/1,599 across 47 files at `d21b8d0`, with lint, `tsc` and the build clean, as that commit reports. The docs pass that wrote this entry ran no tests, because a browser tester held the local stack. ⏳ The full browser pass is not recorded yet.
+  - **Checks:** 1,599/1,599 across 47 files at `d21b8d0`, with lint, `tsc` and the build clean, as that commit reports. ✅ **Re-run after the docs pass, on 2026-10-11 at `674e648`** (docs only on top of `d21b8d0`): `npm test` passed **1,599/1,599 across 47 files** in 38 s, `npx tsc --noEmit` was clean, and `npm run lint` reported no errors. The local stack held 0 marks and 0 bingo objects afterwards.
+  - ✅ **The browser pass, 2026-10-11: PASS.** Tested at `d21b8d0` (the docs pass changed no code) at `http://localhost:3000`, with the banner reading `Environments: .env.development.local, .env.local`, signed in as a local test officer.
+    - **Officer side, at 1280 px:**
+      - The board was right throughout: the nav order, the 24 activities in order, "0 of 24 done", and the switcher's `?house=` with `aria-current`.
+      - A 12 MP photo was stored at 2048×1536 with a thumbnail. Replacing it with the EXIF-rotated fixture stored it upright at 900×1200, and neither the full image nor its 360×480 thumbnail carries EXIF, an APP1 segment or GPS. The old objects were deleted.
+      - An MP4 was stored as `video/mp4` with a poster, and a MOV as `video/quicktime`. Both play.
+      - A `.txt`, a 51 MiB `.mp4` and a fake `.heic` were each refused before any network request, with clear messages.
+      - A rename showed on all four cards and on the member page, and "Study Session" was restored exactly.
+      - The two-step Remove names its blast radius, "Keep it" changes nothing, and removing deleted the files.
+      - Each mutation wrote exactly one `admin_audit` row: added, replaced, renamed and removed.
+      - In the member's browser every `/admin` URL landed on `/admin/login`, and a cookieless POST to `/admin/bingo/upload` got a 307 to the login page.
+    - **Member side, at 393 and 360 px:**
+      - The hub's three buttons are identical. `/portal/bingo` shows the rule verbatim and the standings in order, matching the database, and no word breaks mid-letter.
+      - The photo dialog closes by Close or by a tap on the backdrop, and not by a tap on the photo. The video plays, pauses, and unmounts on close.
+      - A new mark appeared without a reload in 2.8 s, with the tab visible.
+      - `noindex` is present. The cookieless HTML holds none of the 32 seeded members' EIDs or emails, and none of the officers' emails; its only email address is the club's public one.
+      - Only `-thumb` and `-poster` files load before a dialog opens. The full photo loads when its dialog opens, and the MP4 by a range request on play.
+      - Neither `/portal` nor `/portal/bingo` scrolls sideways at either width.
+    - **Keyboard, at 1280 px:** the tile beside the free centre shows the two-tone ring on all four edges. Enter opens the dialog with focus on Close, and Esc returns focus to the tile.
+    - **Afterwards** the local stack was back to 0 marks and 0 objects, with the activity names exactly as seeded.
+    - **Not exercised in the browser, and where each is covered instead:**
+      - **A failed board read.** `readBingoBoard` returns an error through the anon key (`tests/bingo.test.ts`), and all three pages' error branches are pinned by source assertions. Never rendered.
+      - **Two officers on one square.** The cores' conflict paths are integration-tested in `tests/bingo-writes.test.ts`: a stale token, a mark that appeared or vanished, two concurrent adds, a racing 23505, two concurrent records of one upload, and a stale removal or rename. The route's 409 is pinned by source. The uploader's sentence for it was never shown.
+      - **Session expiry mid-upload.** The server side was exercised: the tester's cookieless 307, and the task-2 walkthrough's 307 for an unsigned POST and 403 for a signed-in non-officer. ⚠️ **The uploader's own session-expired messages are covered by no test and no walkthrough.**
+      - **Photo↔video replacement.** Both directions are integration-tested, each checking that the old kind's files left their bucket.
+      - **Rename validation.** `normalizeActivity`, `bingoRenameSchema`, the two CHECKs and `renameBingoActivity`'s refusals are all tested. The browser saw only a valid rename.
+      - **Not-found square URLs.** The house and position parsers are unit-tested, and the square page's `notFound()` is pinned by a source assertion. Never requested.
+      - **The refresher's pauses.** The visibility, dialog-open and offline checks are pinned by source assertions. The task-3 walkthrough watched the dialog pause live: a mark held for 14 s and appeared 1.4 s after the dialog closed. The hidden and offline pauses were never exercised.
+      - **The officer pages at phone width.** The task-2 walkthrough found no horizontal overflow at 390 px; this pass ran the officer side at 1280 only.
+    - **What it found** (`tasks.md` has each, with a trigger):
+      - Low, already tracked: a removed proof's history disappears from the square page. Confirmed.
+      - Low, cosmetic, new: on a phone, a done tile whose label wraps to three lines ("MISA Promotional Video", for one) stretches its grid row to 81.4 px against 69.4 px at 393, and its thumbnail shrinks to a 63×32 px strip. Names stay readable. Phase 3's redesign owns the fix.
+      - Nit: the accessible names carry a stray space before the comma. A done tile reads "House Dinner , M House, done", because `aria-labelledby` joins its two spans with a space, and a dialog heading reads "House Dinner , M House".
+      - Nit, dev only: Next logs a Largest Contentful Paint warning for a poster thumbnail on `/admin/bingo`, suggesting `loading="eager"`.
+      - 🐛 **Outside bingo, and pre-existing: on `/admin` at 1280 px the header's wordmark is navy on the navy header, so it is invisible.** `a { color: var(--misa-blue) }` in `app/globals.css`'s base layer (from `3b56593`, 2026-08-14) colours the `<Link href="/admin">` that wraps the wordmark in `app/admin/(shell)/_components/admin-nav.tsx`. That link carries no colour of its own, so the rule beats the header's inherited `text-white`, and the wordmark is a `currentColor` mask. `git log 44f0ca3..HEAD` shows no commit on this branch touching `app/globals.css`, `components/ui/wordmark.tsx` or `app/admin/(shell)/layout.tsx`, and the branch's one change to `admin-nav.tsx` adds the Bingo nav entry.
   - 📌 **Found by the docs pass, recorded rather than fixed** (`tasks.md` has each with a trigger):
     - A video is stored byte for byte, so a phone's recording location, where the camera saved one, is public with it. Only photos lose their metadata.
     - A backup holds the bingo rows and the `storage.objects` rows but none of the files, and the tested restore ran before Storage held anything.
