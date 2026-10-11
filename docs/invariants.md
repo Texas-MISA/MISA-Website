@@ -10,7 +10,7 @@ Decisions the architecture doc argues for at length, with the evidence that prod
 These are decisions the architecture doc argues for at length. Don't quietly reverse one — if a change needs to, raise it and update the doc.
 
 - **All writes go through Server Actions or Route Handlers.** The browser holds only the anon key, and RLS policies are written assuming the anon role is hostile. Never ship a client-side write; never expose the service role key to the client. The service-role client exists **only** in `lib/supabase/admin.ts`, guarded by `server-only`; anon-capable reads belong on `lib/supabase/server.ts` so RLS stays exercised. (§3, §6)
-  - 🔓 **ONE approved exception, since migration 33 (user's decision, 2026-10-10): a house bingo video's bytes**, uploaded from the officer's browser to Storage with a signed token that an officer-only Server Action minted for one path. It is the only one, and *House bingo* at the end of this file is why and how it is contained. ⚠️ `CLAUDE.md`'s short form does not name it yet; that edit is the user's (`tasks.md`).
+  - 🔓 **ONE approved exception, since migration 33 (user's decision, 2026-10-10): a house bingo video's bytes**, uploaded from the officer's browser to Storage with a signed token that an officer-only Server Action minted for one path. It is the only one, and *House bingo* at the end of this file is why and how it is contained. `CLAUDE.md`'s short form names it (2026-10-11).
 - **The duplicate rule is three checks, not one** (v1.18): the `(event_id, normalized_student_id)` partial unique index (23505), an app check on `(event_id, member_id)` after member resolution (same member via two raw IDs), and an app check for a prior pending orphan within the grace window (the index ignores `event_id is null`). A pending orphan never blocks a new event-resolved submission; rejected rows never block re-entry.
 - **`ORPHAN_WINDOW_HOURS` lives in `lib/checkin.ts` and is always passed explicitly** to `nearby_events()`; the SQL `default 48` is for ad-hoc SQL only. (§9 #7)
 - **Nothing that resolves to a known member is ever dropped on the floor.** A check-in from someone the roster recognizes is always stored — as `pending` if it matches no open event, for an officer to resolve. A member who showed up and got no credit is the failure mode that erodes trust in the whole system. (§4.2)
@@ -909,9 +909,8 @@ on the view.
 
 ## House bingo (added 2026-10-11, migration 33)
 
-The design is in §3, §4.1 and §6 of the architecture doc (v1.86). `CLAUDE.md`
-does not carry a short form of these rules yet: that edit is the user's, and
-`tasks.md` lists it. What follows is why each rule has the shape it has, and
+The design is in §3, §4.1 and §6 of the architecture doc (v1.86). The short
+form is in `CLAUDE.md` (added 2026-10-11). What follows is why each rule has the shape it has, and
 what was measured. Built on `portal-launch` (`dda956c` to `d21b8d0`); not on
 `main` when this was written.
 
