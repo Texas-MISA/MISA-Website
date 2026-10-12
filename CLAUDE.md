@@ -61,7 +61,7 @@ npm run lint                # eslint (flat config in eslint.config.mjs)
 npm test                    # all tests (needs: Docker Desktop up, npx supabase start)
 npm run test:watch
 npx vitest run tests/checkin.test.ts -t "<test name>"
-npm run test:ui             # Playwright + axe on every public route and design surface (local stack; not in npm test)
+npm run test:ui             # Playwright + axe on home, the five content pages, /admin/login, the 404 and every registered surface (none yet, so no portal page), plus lookup's and attend's states (local stack; not in npm test)
 ```
 
 ```bash

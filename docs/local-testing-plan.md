@@ -86,8 +86,10 @@ videos from a walkthrough stay in the local buckets after a re-seed.
 `npm test` covers the cores and the boundary; these are the things a test cannot
 see. 📌 **`npm run test:ui` (2026-09-18) now automates the mechanical half of passes
 1, 2 and 9** — axe at WCAG 2.2 AA, 360px overflow and JS-off reveals on every public
-and portal route, plus lookup's result and miss and check-in's field errors, miss and
-both first-timer confirmations. What stays here is what axe cannot judge. One sitting each, in this order — later rows depend on earlier writes.
+route (home, the five content pages, `/admin/login` and the 404) plus every registered
+surface. None is registered yet, so no portal page's first render is checked. It also
+covers lookup's result and miss and check-in's field errors, miss and both first-timer
+confirmations. What stays here is what axe cannot judge. One sitting each, in this order — later rows depend on earlier writes.
 
 | # | Area | Route | Exercise | What it proves |
 |---|---|---|---|---|

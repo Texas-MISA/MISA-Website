@@ -85,11 +85,14 @@ Confirmed and shipped:
 - Member-facing, no accounts, all inside the member portal: `/portal` (the hub),
   `/portal/attend` (EID check-in), `/portal/leaderboard` (public, deliberately
   not indexed), `/portal/lookup` (a member's own history and dues status behind
-  the EID alone — the officer's recorded decision of 2026-08-25, not drift).
+  the EID alone — the officer's recorded decision of 2026-08-25, not drift),
+  `/portal/bingo` (house bingo: all four houses' cards, each with its "N of 24"
+  and the proof behind each done square, to watch only, not indexed).
   The old `/attend`, `/leaderboard` and `/lookup` are permanent redirects.
 - Officer-facing `/admin`: events, attendance queue and review, points ledger,
   member directory with custom fields and exports, dues import and review,
-  officer invites.
+  officer invites, and house bingo at `/admin/bingo` (one photo or video of
+  proof per completed square, and renaming an activity on all four cards).
 
 Durable constraints future work must preserve:
 

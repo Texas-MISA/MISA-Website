@@ -1,6 +1,6 @@
 ---
 name: design-brief
-description: Start the redesign of a MISA design surface — steps 1–3 of the design pipeline (DESIGN.md §Design toolkit). Runs impeccable's shape interview and writes the surface brief impeccable itself loads, has frontend-design propose two concepts for the lead to adopt or reject, and cites ui-ux-pro-max lookups as evidence, leaving receipts for each. Use before ANY visual change to a registered surface (the brief guard hook refuses edits until the brief exists), or when asked to start or brief a page redesign such as /portal.
+description: Start design work on any MISA page, new or existing — steps 1–3 of the design pipeline (DESIGN.md §Design toolkit). Runs impeccable's shape interview and writes the surface brief impeccable itself loads, has frontend-design propose two concepts for the lead to adopt or reject, and cites ui-ux-pro-max lookups as evidence, leaving receipts for each. Every page goes through it (officer, 2026-10-12). Use it before creating ANY new page; before the first edit of ANY existing page that has no brief yet, whether public, portal or /admin (registering the page arms the brief guard hook, which then refuses edits until the brief exists); and when asked to start or brief a page redesign such as /portal. Not for a components/ui primitive, which is not a page.
 ---
 
 # /design-brief <surface>
@@ -36,7 +36,7 @@ what turns the brief guard on for its files.
 4. Persist it as impeccable's surface brief, so every later impeccable command
    loads it:
    `node .claude/skills/impeccable/scripts/surface-brief.mjs write route:<route> <body-file> <each surface file>`
-   and confirm it landed at the registry's `brief` path.
+   and confirm it landed where `surface-brief.mjs path route:<route>` says.
 
 ## Step 2 — Diverge (owner: frontend-design)
 Invoke `frontend-design` with the brief and DESIGN.md's grounds, palette, type
@@ -70,3 +70,17 @@ fails an adopted lookup nobody cites.
    receipts as missing; that is correct until `/design-gate`.
 5. Commit the brief, the registry change and the two receipts together, then
    show the officer the brief and the two concepts before building.
+
+**For a new page**, which has no files yet and so no registry entry
+(`DESIGN.md` §Design toolkit, *A new page, step by step*):
+- **Skip step 3, and leave the registry out of step 5's commit**, which holds
+  the brief and the two receipts only. `tests/design-receipts.test.ts` fails a
+  registered surface whose files do not exist.
+- **Step 4 checks nothing for an unregistered surface, so check the brief
+  directly**, from the repo root:
+  `node -e "import('./scripts/design/receipts.mjs').then(m => console.log(m.checkBrief({ mode: 'operate', brief: '.impeccable/surfaces/<slug>.md' })))"`
+  where `mode` is the brief's own (`operate` or `persuade`) and `<slug>.md` is
+  the file `surface-brief.mjs path route:<route>` names, written with forward
+  slashes. It prints `[]` when the brief passes, and otherwise what to fix.
+- **Then continue with DESIGN.md's new-page steps:** register the surface just
+  before writing its first file, and commit the entry with those files.

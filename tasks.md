@@ -23,7 +23,7 @@ Officer, 2026-10-12: merge the toolkit from `design-tools`, not the stale `desig
   - three hooks in the tracked `.claude/settings.json`;
   - the empty registry and the templates in `docs/design/`, and the brief guard and receipt checker in `scripts/design/`;
   - three vitest files, and Playwright + axe (`npm run test:ui`);
-  - impeccable's config, baseline and refreshed sidecar under `.impeccable/`, and `f0cb15a`'s `PRODUCT.md` correction.
+  - impeccable's config, baseline and refreshed sidecar under `.impeccable/`, and the `PRODUCT.md` correction, `47931d5` on this branch (`f0cb15a` on `design-toolkit`).
   - Its history: cut from `design-toolkit` at `f0cb15a`, plus the LF pin `77d2c56`, with the registry left empty on purpose (2026-09-30, in the build log).
 - ⚠️ **What every Claude Code session in this repo now gets:**
   - **The brief guard**, a PreToolUse hook on Edit, Write and MultiEdit. It allows every edit while nothing is registered, and refuses an edit to a registered page's files until that page has a brief. Re-checked on the merged tree: exit 0 with the real registry; in a scratch project, exit 2 for a registered page with no brief, then exit 0 once the brief existed.
@@ -37,6 +37,8 @@ Officer, 2026-10-12: merge the toolkit from `design-tools`, not the stale `desig
   - **`npm test`: 1,636/1,636 across 50 files.** That is this branch's 1,599 across 47 plus the toolkit's 37 across 3.
   - **The detector finds nothing in `app/` or `components/`**, including everything built here since the toolkit forked: house bingo, manual dues entry, the directory's columns and member types. It was not a vacuous pass: a copy of the bingo directory with one planted `border-l-4` was flagged. So `.impeccable/baseline.json` stays `[]`, and there is **no baseline debt**.
   - **`npm run test:ui`: 27 pass and 3 fail, the 3 known phase-3 failures.** It ran against a dev server it started on :3100, whose banner read `Environments: .env.development.local, .env.local`, so it used the local stack. `/portal/lookup`'s member result fails `definition-list`, and both first-timer confirmations on `/portal/attend` fail `color-contrast`, the known `--misa-muted`. Afterwards no server was left running, and no `TEST ui-gate` event was left on the local stack.
+- 🔍 **Review round 1 at `790ec02`: changes requested, no blockers, all fixed in the commit after it.** The reviewer confirmed the merge itself: its parents, nothing lost from either side, the `main-gate` move and every count. The fixes: `/design-brief`'s Close gained a branch for a new page, which checks the brief directly with `checkBrief`, and its description now triggers on every page; `test:ui`'s coverage is stated exactly (no portal page's first render is checked while nothing is registered); the registry's comment; house bingo in `PRODUCT.md`; `47931d5` cited for the `PRODUCT.md` correction; and two new limits in `DESIGN.md` (nothing registers a page on its first edit, and the guard's paths are case-sensitive on Windows).
+  - ❔ **Seen once, not reproduced:** one of the reviewer's `test:ui` runs, right after a build and with `DEBUG=pw:webserver`, went 24 passed and 6 failed. Every `/portal` page answered 404, and the six state tests timed out. The rerun was 27/3.
 - 🪤 **Line endings.** `scripts/design/*.mjs` must be LF, which `.gitattributes` enforces, and the merge checked them out LF here (`git ls-files --eol`). If vitest fails to load the receipt checker with *SyntaxError: Invalid or unexpected token*, delete `scripts/design/*.mjs` and run `git checkout -- scripts/design`. Count CRs with node: Git Bash's `grep -c $'\r'` counted every line as CRLF here.
 - ⬜ **Open:**
   - 🧭 **The toolkit reaches `main` with `portal-launch`'s next ship, only on the officer's word.** It changes no page, but a push to `main` is a production build, so it goes after an event and never during one.
@@ -538,7 +540,7 @@ The portal-redesign branch (54 commits not on `main`; tip `4b1ba13`, plus the co
 - 🔴 **Don't build on it.** Don't continue the Portal Rebuild there, don't merge `main` into it, and don't run its handoff prompts (`docs/handoff-portal-rebuild-rounds-4-7.md`, `docs/handoff-finish-portal-rebuild.md`): they predate this decision. The branch's own `CLAUDE.md`, `tasks.md` and both prompts now open with the same notice.
 - **What survives elsewhere:**
   - the design toolkit, on `design-tools` (tools only), merged into `portal-launch` on 2026-10-12 and not yet on `main` (top of this file);
-  - the `PRODUCT.md` correction (`f0cb15a`), which came with it;
+  - the `PRODUCT.md` correction, which came with it as `47931d5` (`f0cb15a` on `design-toolkit`);
   - the `Claude outputs/` ignore rule (`f14aec1`), on `main` as `21ef98c`.
 - ⬜ **Decide before deleting it, because nothing else carries these:**
   - `b01dc6a` raises the MEMBER PORTAL button to 48px on phones. It cherry-picks cleanly.
