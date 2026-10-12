@@ -20,6 +20,15 @@
         ],
         "createdAt": "2026-08-23T16:50:46.485Z",
         "reason": "False positive: the two hits are CSS mask-image url() references to /misa-logo.png in .wordmark, not <img> src attributes. The asset exists at public/misa-logo.png (480x251, verified rendering navy on the public header and white on the admin login)."
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "tests/design-detector.test.ts"
+        ],
+        "createdAt": "2026-09-19T18:13:34.838Z",
+        "reason": "Intentional test fixture, not UI: tests/design-detector.test.ts plants border-l-4 into a temp .tsx to prove the detector finds anti-patterns and that its exit 2 is read rather than thrown. The planted file itself is written to the OS temp dir, which this ignore does not cover, so the test still exercises the rule. Decided by Claude during the design-toolkit review, 2026-09-19; not user-confirmed."
       }
     ]
   }

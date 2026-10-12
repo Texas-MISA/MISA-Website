@@ -1,0 +1,12 @@
+# 🪤 These two are ES modules with a `#!/usr/bin/env node` shebang, and
+# `tests/design-receipts.test.ts` IMPORTS `receipts.mjs` directly. With
+# `core.autocrlf=true` and no rule here, every checkout re-materialises them
+# with CRLF, and vitest 4 cannot parse `#!...\r\n` — it fails the file to LOAD
+# with `SyntaxError: Invalid or unexpected token`, so the design toolkit's own
+# enforcement test silently contributes ZERO tests instead of failing loudly.
+#
+# Found 2026-09-20: two branch switches by a parallel worker re-checked-out
+# receipts.mjs as CRLF and `npm test` went 41 files/1142 tests -> 40 files/1118
+# with the toolkit's checker no longer running at all. A green suite that is
+# missing its gatekeeper is the exact failure this project keeps recording.
+scripts/design/*.mjs text eol=lf

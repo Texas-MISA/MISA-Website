@@ -84,7 +84,10 @@ videos from a walkthrough stay in the local buckets after a re-seed.
 ## The passes
 
 `npm test` covers the cores and the boundary; these are the things a test cannot
-see. One sitting each, in this order — later rows depend on earlier writes.
+see. 📌 **`npm run test:ui` (2026-09-18) now automates the mechanical half of passes
+1, 2 and 9** — axe at WCAG 2.2 AA, 360px overflow and JS-off reveals on every public
+and portal route, plus lookup's result and miss and check-in's field errors, miss and
+both first-timer confirmations. What stays here is what axe cannot judge. One sitting each, in this order — later rows depend on earlier writes.
 
 | # | Area | Route | Exercise | What it proves |
 |---|---|---|---|---|
@@ -96,7 +99,7 @@ see. One sitting each, in this order — later rows depend on earlier writes.
 | 6 | Export | `/admin/members/export` | CSV, xlsx and clipboard of the same filter; open the xlsx in Excel | No repair prompt; the formula guard fires on text and not on `bonus_points`; one audit row per export; the file's header row is the table's columns, in the table's order |
 | 7 | Dues | `/admin/dues`, `/dues/import`, `/dues/new`, `/dues/[id]` | Import `docs/VenmoStatement_August_2026.csv`, then import it again. On `/dues/new`, record a Cash payment and a "Decide later" Zelle payment; on a payment's page, save the editor twice without touching it; void one. Then import the statement twice more with the manual rows present | The txn-id dedupe, still holding with manual rows present; a summer row flagged, not rewritten; one row per payment, and Paid derived from the payment (the "Decide later" one covers nothing); the editor keeping its values after Save, so the untouched second Save changes nothing; a hand-entered row never unlinked |
 | 8 | Officer turnover | `/admin/officers`, `/officer-invite/[token]` | Mint pinned + open invites; redeem one; expire one; try self-revocation | Claim-before-create, single use, refusal to lock the team out |
-| 9 | Member-facing | `/portal`, `/portal/leaderboard`, `/portal/lookup` (the old paths 308 here) | EID alone, email alone, both; a term with no completed events | The conjunction gate, one message for every miss, `—` for a null rate |
+| 9 | Member-facing | `/portal`, `/portal/leaderboard`, `/portal/lookup` (the old paths 308 here) | A known EID, a typo'd EID; a term with no completed events | The EID-alone gate (officer, 2026-08-25 — it was EID **and** email), one message for every miss, `—` for a null rate |
 | 10 | House bingo (migration 33) | `/admin/bingo`, `/admin/bingo/[house]/[position]`, `/portal/bingo` (and its row on `/portal`) | Browse at `localhost`, not `127.0.0.1`. Upload the synthetic files in `tests/fixtures/bingo/`: the 12 MP JPEG, the EXIF-rotated JPEG with its fake GPS block, the MP4 and the MOV. Replace one proof, remove one, and rename an activity. Keep `/portal/bingo` open in a second window while you do, open a proof dialog while another officer tab records proof, and switch that window's tab away and back. Repeat one save from a stale second officer tab. Tab through the member cards, and use 360 and 390 px widths. Afterwards remove every mark through the UI and rename the square back | The photo is stored at most 2048 px with no EXIF and upright; each video records with a poster and plays, MOV included; replaced and removed files leave the bucket; the stale tab is refused with "Someone else just changed this square"; the member page shows proof within about ten seconds, holds still while a dialog is open, and catches up on becoming visible; every focused tile shows its ring on every edge; no horizontal overflow; four cards at "0 of 24" again at the end |
 
 ⚠️ **Pass 1 is the one with the most to find**, because `/about`, `/projects`,

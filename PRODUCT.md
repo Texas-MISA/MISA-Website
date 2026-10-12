@@ -21,7 +21,7 @@ Two other audiences are served and are not the tiebreaker:
 
 - **Members**, who check in at an event on their own phone during its first
   minutes and occasionally look up their own standing. They have no accounts —
-  identity is an EID plus a matching email.
+  identity is their UT EID. Everything member-facing lives under `/portal`.
 - **Officers** (a team of ~13, elected annually), who run events, the attendance
   queue, the points ledger, the member roster and dues from `/admin` on a laptop.
 
@@ -82,17 +82,19 @@ Confirmed and shipped:
 
 - Public pages: home, `/about`, `/projects`, `/gallery`, `/officers`.
   `/contact` is routed but deliberately unlinked from the desktop nav.
-- Member-facing, no accounts: `/attend` (EID check-in), `/leaderboard` (public,
-  deliberately not indexed), `/lookup` (a member's own history behind an EID
-  **and** matching email).
+- Member-facing, no accounts, all inside the member portal: `/portal` (the hub),
+  `/portal/attend` (EID check-in), `/portal/leaderboard` (public, deliberately
+  not indexed), `/portal/lookup` (a member's own history and dues status behind
+  the EID alone — the officer's recorded decision of 2026-08-25, not drift).
+  The old `/attend`, `/leaderboard` and `/lookup` are permanent redirects.
 - Officer-facing `/admin`: events, attendance queue and review, points ledger,
   member directory with custom fields and exports, dues import and review,
   officer invites.
 
 Durable constraints future work must preserve:
 
-- **Members have no accounts and will not get them in v1.** Identity is EID plus
-  matching email. Any design that assumes a logged-in member is wrong.
+- **Members have no accounts and will not get them in v1.** Identity is the UT
+  EID. Any design that assumes a logged-in member is wrong.
 - **Officer turnover is annual.** The next maintainer has not seen this codebase
   and may not be technical. Legibility outranks cleverness, and nothing may
   depend on a specific person's account.

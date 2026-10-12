@@ -1,0 +1,4 @@
+{
+  "$comment": "The design surface registry (DESIGN.md §Design toolkit). The brief guard hook, tests/design-receipts.test.ts, tests/ui and /design-brief + /design-gate all read this one file. Registering a surface is how its redesign starts: from then on its files cannot be edited until `brief` exists. `brief` is impeccable's surface brief for the first route (surface-brief.mjs path route:<route>), so the lead loads it on every command. status: 'legacy' (registered, not yet through the pipeline), 'in-progress' (brief must be complete), 'rebuilt' (every receipt must pass).",
+  "surfaces": {}
+}
