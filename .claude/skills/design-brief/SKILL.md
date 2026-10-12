@@ -76,8 +76,9 @@ fails an adopted lookup nobody cites.
 - **Skip step 3, and leave the registry out of step 5's commit**, which holds
   the brief and the two receipts only. `tests/design-receipts.test.ts` fails a
   registered surface whose files do not exist.
-- **Step 4 checks nothing for an unregistered surface, so check the brief
-  directly**, from the repo root:
+- **Replace step 4 with a direct check of the brief**, because for an
+  unregistered surface its vitest half checks nothing and its CLI half refuses
+  the name (exit 1, "not in docs/design/surfaces.json"). From the repo root:
   `node -e "import('./scripts/design/receipts.mjs').then(m => console.log(m.checkBrief({ mode: 'operate', brief: '.impeccable/surfaces/<slug>.md' })))"`
   where `mode` is the brief's own (`operate` or `persuade`) and `<slug>.md` is
   the file `surface-brief.mjs path route:<route>` names, written with forward
