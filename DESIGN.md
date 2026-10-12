@@ -1,7 +1,7 @@
 ---
 name: Texas MISA
 description: A navy-and-white institutional drawing set, now with depth — a drawn navy field, a flat grey page, and white surfaces lifted off it. Square structure, softened plates, hairline rules.
-version: 2.1
+version: 2.2
 status: Written from what phase 1 of the v2 redesign actually shipped (2026-08-19). Sections marked NOT YET REBUILT describe surfaces still running the v1 system.
 colors:
   drafting-navy: "#16305c"
@@ -65,7 +65,7 @@ planned. Every value here was read off the running application on 2026-08-19.
 |---|---|
 | Home page, site header, site footer | ✅ **v2.** Everything below describes it. |
 | `/about`, `/projects`, `/gallery`, `/officers`, `/contact` | ✅ **v2** (phase 2, 2026-08-19). Rebuilt from the home page's vocabulary, not evolved from their own v1 layouts. |
-| `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3 is NEXT** (officer, 2026-09-18: the UI redesign of the member portal and every page in it). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — `npm run test:ui` catches it on `/portal/attend`'s first-timer confirmation, and a `definition-list` fault on `/portal/lookup`'s result. 🧰 **Rebuilt through §Design toolkit**: all four portal surfaces are registered in `docs/design/surfaces.json`, so their files are guarded until each has a brief (`/design-brief`). |
+| `/portal/attend`, `/portal/leaderboard`, `/portal/lookup` (were `/attend`, `/leaderboard`, `/lookup` until 2026-09-18; the old paths 308 here) | ⏳ **NOT YET REBUILT — phase 3 is NEXT** (officer, 2026-09-18: the UI redesign of the member portal and every page in it). Never had a design; they wear the shared primitives. ⚠️ They still carry the `--misa-muted`-on-Vellum AA failure — `npm run test:ui` catches it on `/portal/attend`'s first-timer confirmation, and a `definition-list` fault on `/portal/lookup`'s result. 🧰 **Rebuilt through §Design toolkit**: none of the five portal surfaces (`/portal`, these three and `/portal/bingo`) is registered in `docs/design/surfaces.json` yet. Each is registered the first time it is edited (officer, 2026-10-12), and from then on its files are guarded until it has a brief (`/design-brief`). |
 | `/portal` (the member portal hub, 2026-09-18) | 🧩 **Shared primitives only** — PageHero, then three white `Panel` rows, each with one navy button of one fixed width, all formatted the same (officer); no muted ink on the grey ground. The header's MEMBER PORTAL button is the site's one way in. Phase 3 owns the member area's real design and may re-compose it. *(Three rows: Event Check-In, Points Leaderboard and, since 2026-10-11 on `portal-launch`, House Bingo.)* |
 | `/portal/bingo` (house bingo for members, migration 33; built 2026-10-11 on `portal-launch`, live on production since 2026-10-11 as `3c8f216`) | 🧩 **Shared primitives only, and ⏳ NOT YET REBUILT: phase 3 owns its design** and may re-compose it. Two layout families, declared at the top of the page: PageHero, then one `<Section>` holding the card's rule, the standings on one white `Panel` (a decorative navy bar per house on a 15% navy track), and four 5×5 cards, two by two from `lg`. Each card is one shared-rule plate (`gap-px` over the hairline, never a border per tile), its rows at least as tall as a column is wide. The free centre is a navy cell; an open square is plain text on white; a done square is a navy button, the thumbnail above a solid navy band, opening a native `<dialog>` (the elevation table's `shadow-overlay`). No `--misa-muted` anywhere: copy on the grey ground uses `--misa-secondary`, and the tiles and standings sit on white. Two departures, both recorded below: the **tile label** (*Typography*) and the **two-tone focus ring** (*Accessibility*). |
 | `/admin` | ✅ **v2** (phase 4, 2026-08-29), governed by scanability rather than expression. Ground, surfaces and the shared vocabulary; **not** a re-composition. |
@@ -78,11 +78,14 @@ look like v1. Do not read "it has the grey background" as "it has been done."
 📌 **From 2026-09-18 a rebuild's status also lives in `docs/design/surfaces.json`**
 (§Design toolkit), which the tests read. This table is for people; that file is
 for the checks. **They must agree** — a surface is ✅ here only once it is
-`rebuilt` there and its receipts pass. **No surface is registered yet** (2026-09-30):
-the toolkit ships on its own, ahead of the redesign, from the `design-tools` branch.
-Registering the four portal surfaces is the first step of v2 phase 3, so it ships
-with that work: from then on their files are guarded until each has a brief. The
-phase 1, 2 and 4 surfaces predate the toolkit and are not registered.
+`rebuilt` there and its receipts pass. **No surface is registered yet**
+(2026-10-12): the toolkit merged into `portal-launch` from `design-tools` on
+2026-10-12 and registered nothing. Under the officer's rule of that day
+(§Design toolkit), a page is registered the first time it is created or edited,
+the five portal surfaces included, and from then on its files are guarded until
+it has a brief. The ✅ rows above predate the toolkit (phases 1, 2 and 4, and
+`/admin/bingo`, built before the merge), so they are not registered until they
+are next edited.
 
 ---
 
@@ -885,7 +888,13 @@ scope) stayed in `CLAUDE.md`; invariants with evidence are in `docs/invariants.m
 
 ### Design toolkit (2026-09-18) — the roster, the pipeline, and what enforces them
 
-Replaces "Design skill precedence". v1 failed because it "treated the installed skills as advisory and hand-rolled everything" (`docs/frontend-redesign-v2-plan.md`); this section makes skill use **checkable**. The skills, agent, hooks and the `/design-brief` + `/design-gate` skills are **committed** (`.claude/`), so every clone carries the same toolkit. Licences: `.claude/third-party-licenses/`.
+Replaces "Design skill precedence". v1 failed because it "treated the installed skills as advisory and hand-rolled everything" (`docs/frontend-redesign-v2-plan.md`); this section makes skill use **checkable**. The skills, agent, hooks and the `/design-brief` + `/design-gate` skills are **committed** (`.claude/`), so every clone carries the same toolkit. Licences: `.claude/third-party-licenses/`. Merged into `portal-launch` from `design-tools` on 2026-10-12.
+
+**When it runs: every page, created or edited (officer, 2026-10-12).** Until then the pipeline ran for a redesign the officer asked for. Now it runs whenever a page is created or edited, whether public, portal or `/admin`:
+- **A new page** gets the full pipeline below: a brief written with the officer, two concepts, the build, `/design-gate`, then the officer's sign-off, in the order under *A new page, step by step*.
+- **An existing page** is registered in `docs/design/surfaces.json` the first time it is edited, and work on it starts with a design brief written with the officer through `/design-brief`. From then on Claude cannot edit it without its brief, which the brief guard enforces, and every change to it gets `/design-gate` before handover.
+- **Pages are registered one at a time, when work on each begins.** The merge registered nothing.
+- **`components/ui/` primitives are not pages.** Editing one registers nothing and makes no surface stale (*What it cannot catch*, below).
 
 **Precedence:**
 - **The Invariants in `CLAUDE.md` outrank every skill, without exception.** Then this file. Then the skill that owns the concern below.
@@ -908,13 +917,20 @@ Replaces "Design skill precedence". v1 failed because it "treated the installed 
 | Rendered review | `design-reviewer` agent (`.claude/agents/`) | Claude in Chrome, or Playwright when the extension is absent. Local stack only — previews write to production. |
 | Fixed checks | impeccable detector, Playwright + axe, token contrast | See enforcement. |
 
-**The pipeline, per surface** (a page or hub registered in `docs/design/surfaces.json` — registering one is how its redesign starts):
+**The pipeline, per surface** (a page or hub registered in `docs/design/surfaces.json`; registering one is how work on it starts):
 1. **Brief** — `/design-brief <surface>`: impeccable's `shape` interview with the officer, written from `docs/design/templates/brief.md` and persisted with impeccable's `surface-brief.mjs` at `.impeccable/surfaces/<slug>.md` — **impeccable's own brief, so the lead loads it on every command** rather than a document nothing reads.
 2. **Diverge** — `frontend-design`, two concepts; the lead adopts or rejects each, with reasons.
 3. **Evidence** — `ui-ux-pro-max` lookups (EV1, EV2…); every adopted one cited in the brief.
 4. **Build** — the lead drives; the shadcn MCP sources components; emil on any motion.
 5. **Review** — `/design-gate <surface>`: the lead's self-review, `impeccable critique` + `audit`, `web-design-guidelines`, the `design-reviewer` agent at 360/768/1280, the detector, emil if it moves.
 6. **Gate** — the checkers green, then the officer. Changes the officer asks for are recorded in `receipts/officer.md` with their commits.
+
+**A new page, step by step.** Its files do not exist when work starts, and two checks fix the order. The brief guard refuses an Edit/Write to a registered surface's files until its brief exists, and `tests/design-receipts.test.ts` fails any registered surface whose `files` do not all exist. So the brief comes before the registry entry, and the entry lands in the same commit as the files:
+1. **Brief first, before the page is registered or any file exists.** Run `/design-brief` with the officer, and write the brief with `node .claude/skills/impeccable/scripts/surface-brief.mjs write route:<route> <body-file> <each file the page will have>`. It lands where `surface-brief.mjs path route:<route>` says. 📌 **`write` does not need the files to exist.** It reads only the body file, and records the other targets without checking them (`writeSurfaceBrief` and `normalizeSurfaceTarget` in `.claude/skills/impeccable/scripts/lib/surface-briefs.mjs`). Tried on 2026-10-12 with files that did not exist: it wrote the brief and listed them.
+2. **Diverge and evidence**, as for any surface. Commit the brief and the two receipts **without a registry entry**: for a new page, `/design-brief`'s closing commit leaves the registry out. Show the officer the brief and the two concepts. 🪤 Nothing checks an unregistered brief, so `tests/design-receipts.test.ts` first checks this one's completeness once step 3 registers it.
+3. **Register the surface just before writing its first file:** `mode`, `status` `in-progress` (its brief is complete), `routes`, `files`, and `brief` set to the path from step 1. The guard now covers the files, and lets them be written because the brief exists.
+4. **Build, and commit the registry entry together with the files it lists**, so no commit registers a file that is not there.
+5. **`/design-gate`, then the officer's sign-off**, as for any surface.
 
 **What enforces it:**
 - 🔓 **A brief before any edit.** `.claude/settings.json` runs `scripts/design/brief-guard.mjs` as a PreToolUse hook: an Edit/Write to a registered surface's files is **refused** until its brief exists. The human-only bypass, for an urgent non-design fix, is `MISA_DESIGN_GUARD=off` in the environment Claude Code is launched with.
@@ -926,11 +942,12 @@ Replaces "Design skill precedence". v1 failed because it "treated the installed 
   - **a surface commit lands after a review step and no receipt names it** (stale). The pre-build steps are exempt, since the build is their purpose;
   - a SHA is unquoted — 🪤 YAML reads `1836e72` as the float 1.836e+75 — or is not in the branch's history. **Merge a branch that carries receipts; never squash it.**
 - **Token contrast** — `tests/design-tokens.test.ts` measures the sanctioned pairings from `app/globals.css`, and asserts muted-on-Vellum still fails so the rule is re-read if the palette moves.
-- **Detector regression** — `tests/design-detector.test.ts` fails on any finding in `app/` or `components/` outside `.impeccable/baseline.json` (empty, 2026-09-18). impeccable's PostToolUse/Stop hooks still advise during edits.
+- **Detector regression** — `tests/design-detector.test.ts` fails on any finding in `app/` or `components/` outside `.impeccable/baseline.json` (empty, 2026-09-18). Still empty after the 2026-10-12 merge: the detector found nothing in the UI `portal-launch` had built since the toolkit forked (house bingo, manual dues entry, the directory's columns and member types). impeccable's PostToolUse/Stop hooks, in the tracked `.claude/settings.json` beside the brief guard, still advise during edits.
 - **Rendered** — `npm run test:ui` (`tests/ui/`, Playwright + axe, local stack, not part of `npm test`): WCAG 2.0–2.2 A/AA, no overflow at 360px, no reveal hidden without JS, on every public route (plus `/admin/login` and the 404) and every registered surface — **and the states a first render never shows**: `/portal/lookup`'s result and miss, and `/portal/attend`'s field errors, miss and both first-timer confirmations, reached against a short-lived local event. Each state test asserts it reached its state before axe runs. It reuses a running `npm run dev` (found through Next's `.next/dev/lock`) and never anything else on a port. Red on a `legacy` surface is expected; a `rebuilt` one must be green.
 
 **What it cannot catch, stated so nobody assumes it does:**
 - 🪤 The hook sees Edit/Write only; a shell edit is not intercepted. The receipts test is the backstop that cannot be walked around.
 - A change to a shared primitive in `components/ui/` does not make any surface stale. It is reviewed by the gate of whatever surface it was made for, and seen by `test:ui` everywhere.
+- 🪤 **A registered `/admin` page gets no rendered check from `test:ui`.** `proxy.ts` sends every `/admin/*` request without a session to `/admin/login`, and nothing in `tests/ui/` or the `design-reviewer` agent's instructions signs in. So axe and the 360px check would measure the login page, and pass. Until one of them signs in as a local officer, an `/admin` page's rendered review is a signed-in walk on the local stack (`tasks.md`).
 - Axe cannot judge hierarchy, clarity or taste. That is the design-reviewer's and the officer's job, and a green `test:ui` is not a design review.
 - A receipt records a decision; it cannot prove the decision was good. The officer's gate still exists.

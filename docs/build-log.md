@@ -7,6 +7,35 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🧰 **The design toolkit merged into `portal-launch` from `design-tools`, and every page now goes through it (officer, 2026-10-12; doc v1.87, `DESIGN.md` v2.2).** The officer chose `design-tools`, the tools-only branch, over the stale `design-toolkit`, and chose `portal-launch` because it is the branch the team iterates on. The same day, from three options, they chose the rule for when the pipeline runs: whenever a page is created or edited, whether public, portal or `/admin`. A new page gets the full pipeline. An existing page is registered the first time it is edited, and work on it starts with a `/design-brief`. None of it is on `main` yet.
+
+  - **The merge, `5dc13b1`,** is a real `--no-ff` merge of `b3f6242` into `1c495ee`, with merge base `ce7913f`. It changes no file under `app/`, `components/`, `lib/`, `public/` or `supabase/`. Five docs conflicted, and both sides survive in each:
+    - **`DESIGN.md`:** this branch's `/portal` hub row, with its House Bingo note, and its `/portal/bingo` and `/admin/bingo` rows, beside `design-tools`' `/portal/attend` row and registry note.
+      - "Design skill precedence" gave way to "Design toolkit", which carries or supersedes each of its bullets. Still there: the Invariants first, `DESIGN.md` as the source of truth, the refused and adopted skill conflicts, emil on motion, `web-design-guidelines` before shipping, and "ask, don't average".
+      - `design-taste-frontend`'s lead over all public UI narrowed to Persuade surfaces, because the officer gave Operate surfaces to impeccable on 2026-09-18. impeccable's hook moved from `settings.local.json` to the tracked `settings.json`.
+      - Two phrases went. "The handoff is historical reference" is still said at the top of `DESIGN.md`, and "the scroll reveal is the house pattern" is still documented under §Motion's scroll reveal.
+    - **`tasks.md`:** both sides had added a section at the same spot, and both were kept.
+    - **The architecture doc:** `design-tools` had labelled its toolkit block v1.82, a number this branch had already given the directory's Fields menu. The block became **v1.87** and moved to the top, so the blocks stay newest first. The header is 1.87, and v1.66's "Superseded by" note points at v1.87.
+    - **`docs/layout.md`:** one `tests/` entry, true for the merged tree, plus the toolkit's `tests/ui/` entry.
+    - **`docs/local-testing-plan.md`:** `design-tools`' pass 9, which describes the EID-alone gate, beside this branch's pass 10 (house bingo) and the `test:ui` note.
+  - **The records commit** holds the rule (`CLAUDE.md`'s Working agreements, `DESIGN.md` §Design toolkit and the v1.87 block), the order of steps for a new page, and `/design-brief`'s trigger sentence. It also corrects what the merge made false:
+    - "all four portal surfaces are registered", when the registry is empty and the portal now has five surfaces;
+    - "no surface is registered yet … ships on its own from `design-tools`";
+    - the "unmerged" toolkit in `tasks.md`'s `design-toolkit` section;
+    - a 2026-08-16 line in `tasks.md` that said to roll impeccable back by deleting `settings.local.json`.
+  - 📌 **The order for a new page comes from the two checks.** The guard refuses an edit to a registered surface's files until its brief exists, and `tests/design-receipts.test.ts` fails a registered surface whose `files` do not all exist. `surface-brief.mjs write` reads only the body file and records the other targets without checking them (`.claude/skills/impeccable/scripts/lib/surface-briefs.mjs`), and a trial in a scratch project confirmed it. So the brief comes first, and the registry entry is committed together with the page's first files.
+  - ✅ **Checks:**
+    - `tsc`, lint (0 errors) and the build are clean.
+    - **`npm test` passes 1,636 across 50 files**, exactly this branch's 1,599 across 47 plus the toolkit's 37 across 3.
+    - **`npm run test:ui` passes 27 and fails the 3 known phase-3 checks.** It ran against a dev server it started itself, on the local stack (`Environments: .env.development.local, .env.local`).
+    - **The detector found nothing** in the UI built here since the toolkit forked. A planted finding in a copy of the bingo directory proved it was looking, so `.impeccable/baseline.json` stays `[]` and no debt was recorded.
+    - **The brief guard** allowed an edit with the real registry, and in a scratch project blocked one for a registered page with no brief.
+  - 🪤 **Surprises:**
+    - **This machine's `main-gate` hook was in the way.** It was registered in an untracked `.claude/settings.json`, the path where `design-tools` tracks its own, so git refused the merge. The block moved, unchanged, to the gitignored `.claude/settings.local.json`, and the old file was backed up outside the repo.
+    - **The new rule reaches pages the rendered checks cannot see.** `test:ui` and the `design-reviewer` agent never sign in, and `proxy.ts` redirects every anonymous `/admin/*` request to the login page, so a registered `/admin` page would be measured as the login page. It is open in `tasks.md`.
+    - **`git diff --check` against this branch flags five vendored skill files** for trailing whitespace or a blank last line: impeccable's `extract.md`, `harden.md`, `optimize.md` and `concept-catalog.mjs`, and ui-ux-pro-max's `design_system.py`. They are byte-identical to `design-tools`, which vendored them, so they were left alone. Nothing the merge resolved has a whitespace error.
+    - **With `core.autocrlf=true`, the working copy of `.claude/settings.json` is CRLF.** The committed blob is byte-identical to `design-tools`', and `scripts/design/*.mjs` checked out LF, as `.gitattributes` requires.
+
 🎯 **House bingo, built 2026-10-10/11 on `portal-launch` (doc v1.86, migration 33), and live on production since 2026-10-11 (`3c8f216`). Migration 33 reached production first.** Each house (M, I, S, A) works through one shared card of 24 activities. An officer records one photo or video as proof of a completed square at `/admin/bingo`, and members watch all four cards at `/portal/bingo`. Seven commits in three tasks, each reviewed and fixed before the next. The user's decisions of 2026-10-10: the same 24 activities in the same spots on all four cards; one card with no terms; an audited rename that changes all four cards; uploaded video files as video proof; and one approved exception to "all writes go through the server", for a video's bytes. Out of scope: assigning members to houses, terms, any score beyond "N of 24", and the v2 phase 3 redesign.
 
   - **What shipped.**

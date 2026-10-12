@@ -7,9 +7,12 @@ description: Start the redesign of a MISA design surface — steps 1–3 of the 
 
 The front half of the pipeline; `/design-gate` is the back half. Read
 `DESIGN.md` §Design toolkit first. `<surface>` is a key in
-`docs/design/surfaces.json` — if the officer has asked for a page's redesign and
-it is not registered, register it (mode, `legacy`, routes, files, and the
-`brief` path from `surface-brief.mjs path route:<first route>`). Registering is
+`docs/design/surfaces.json` — if a page is being created or edited and it is not
+registered (every page, public, portal or `/admin`: officer, 2026-10-12),
+register it (mode, `legacy`, routes, files, and the `brief` path from
+`surface-brief.mjs path route:<first route>`); a page that does not exist yet
+is registered later, in the order `DESIGN.md` §Design toolkit gives for a new
+page. Registering is
 what turns the brief guard on for its files.
 
 ## Hard limits — every step
