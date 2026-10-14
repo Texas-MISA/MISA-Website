@@ -33,14 +33,17 @@ raw output beside its receipt (`<step>.output.md`).
 2. **critique** — `/impeccable critique <target>`. A team worker has no Agent
    tool, so it runs degraded: keep its `⚠️ DEGRADED: single-context (…)` first
    line in `critique.output.md`, quote it in the receipt below the frontmatter,
-   and return its closing question verbatim rather than answering it.
+   and do not stop at its closing questions: end the output with
+   `Questions skipped: deferred to the step-5 hand-back` and carry them,
+   verbatim, to step 5.
 3. **audit** — `/impeccable audit <target>`.
 4. **guidelines** — the `web-design-guidelines` skill on the surface's files.
 5. **design-review** — spawn the `design-reviewer` agent with the surface name
    and the dev-server URL; its YAML goes straight into the receipt. A team
    worker stops instead and reports `ready for design review` with the
-   surface, the full SHA and the dev-server URL; the coordinator spawns the
-   agent and returns its YAML, which goes into the receipt the same way.
+   surface, the full SHA, the dev-server URL and critique's carried questions;
+   the coordinator spawns the agent and returns its YAML, which goes into the
+   receipt the same way, with the officer's answers.
 6. **detector** — `node .claude/skills/impeccable/scripts/detect.mjs --json
    --no-advisory <surface files> > receipts/detector.output.json`. It exits 2
    when it finds anything; that is not a crash. One finding per hit.

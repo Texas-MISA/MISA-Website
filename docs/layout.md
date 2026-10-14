@@ -433,12 +433,20 @@ docs/design/surfaces/<surface>/receipts/  <step>.md + each skill's raw output.
                         emil-design-eng, web-design-guidelines, frontend-design,
                         ui-ux-pro-max — pinned by skills-lock.json, impeccable
                         by its own version) plus the first-party design-brief
-                        (steps 1–3) and design-gate (steps 5–6);
-                        agents/design-reviewer.md walks a surface in Chrome, or
-                        Playwright without the extension; settings.json carries
-                        the brief guard and impeccable's hooks;
+                        (steps 1–3) and design-gate (steps 5–6); settings.json
+                        carries the brief guard and impeccable's hooks;
                         third-party-licenses/ the upstream licence texts.
                         settings.local.json stays machine-local
+.claude/agents/         the agent team (claude --agent coordinator); the five
+                        team agents tracked since 2026-10-14
+  coordinator.md        main session: plans, delegates, verifies; edits nothing
+  implementer.md        makes one scoped change, runs its checks, commits, pushes
+  researcher.md         read-only: the code, the project docs, outside docs
+  reviewer.md           checks a branch against its criteria; runs the suite
+  tester.md             walks flows in two headless browsers on the local stack
+  design-reviewer.md    walks a design surface in two headless Playwright
+                        browsers on the local stack, signed in for /admin; no
+                        Chrome
 .mcp.json               the shadcn MCP server (npx shadcn mcp — the PINNED
                         package, not @latest). 🔴 Never `shadcn init`
 .impeccable/baseline.json  detector findings accepted as standing — EMPTY at
