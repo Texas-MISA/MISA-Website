@@ -39,6 +39,10 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
     - `DESIGN.md` step 6 points at *Under the team*'s gate order instead of repeating it. The agent files and the gate skill keep their own copies.
     - The worktree limit is now conditional: `brief-guard.mjs` resolves paths against `CLAUDE_PROJECT_DIR`, and a worktree edit matches no registered file only if that variable stays the main checkout.
     - `tasks.md` no longer says the rival-source check runs only on `app/` or `components/` diffs.
+  - 🔍 **Review round 3 on `395cd26`: no blockers; three fixes in the commit after it.**
+    - The reviewer's should-fix for a changed page file in no surface's `files` now names both causes: an unregistered page, or a surface whose `files` miss it.
+    - The coordinator's worktree rule is conditional, like the records: `brief-guard.mjs` resolves paths against `CLAUDE_PROJECT_DIR`, so a worktree's edits may match no registered file.
+    - *What a page's `files` cover* says `files` lists a folder only when every file in it belongs to the page, because a folder entry claims everything in it: `app/admin/(shell)/_components/` would claim the shared `notice.tsx`.
   - 📌 **What a page's `files` cover (user, 2026-10-14).** Recorded with round 2's fixes, it replaces round 1's folder-based definition (`page.tsx` plus its route-private `_components/`). A page's files are its `page.tsx` plus every file that only that page renders, directly or through other files; the folder a file sits in does not decide. A file that more than one page renders is shared chrome, and belongs to no surface until the officer rules on it. `components/ui/` primitives remain not pages. It is defined once, in `DESIGN.md` §Design toolkit, and cited by `/design-brief`'s register step, the new-page step 3 and the reviewer.
   - ✅ **Checks:** `npx vitest run tests/design-receipts.test.ts` passes. Nothing ran end to end: no surface is registered, so no gate has run under the team.
 
