@@ -30,10 +30,11 @@ what turns the brief guard on for its files.
 1. Load impeccable's context once: `node .claude/skills/impeccable/scripts/context.mjs --target route:<route>`.
 2. Run impeccable's **shape** discovery (`reference/shape.md`) with the officer:
    who arrives, where (a phone at the door?), the task, every state. Ask; do
-   not invent. **A team worker** (a subagent with no AskUserQuestion: DESIGN.md
-   §Design toolkit, *Under the team*) stops here and returns shape's questions
-   verbatim, with the reading it would assert, and goes on only with the
-   officer's answers quoted back to it.
+   not invent. **A team worker** (the coordinator's implementer, with no
+   AskUserQuestion: DESIGN.md §Design toolkit, *Under the team*) stops here and
+   returns shape's questions verbatim, with the reading it would assert, and
+   goes on only with the officer's answers quoted back to it. In any other
+   session: with no officer to answer, mark assumptions plainly and stop.
 3. Fill `docs/design/templates/brief.md` — every heading, the Mode matching the
    registry, the CLAUDE.md invariants quoted by name, no placeholders left.
 4. Persist it as impeccable's surface brief, so every later impeccable command

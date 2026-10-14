@@ -33,15 +33,18 @@ Check each finding against the code before you report it, and count things exact
 
 ## Design work
 
-Only when the diff touches `app/` or `components/`. Every page is created and edited through DESIGN.md §Design toolkit (CLAUDE.md, Working agreements).
+On any diff: no `design-system/` directory, and no DESIGN.md regenerated from code. Its diff must be hand edits.
 
-- Unregistered pages. Take the changed paths as git spells them (`git diff --name-only main...HEAD`, plus untracked files) and match each against every surface's `files` in `docs/design/surfaces.json` the way the brief guard does: equal to an entry, or inside one. A changed file that renders part of a route and belongs to no surface is at least should-fix. Exempt: `components/ui/` and `components/shadcn/`, and files that render nothing, such as `app/actions/` and `route.ts` handlers. Git's spelling, not a typed path, also covers the guard's case-sensitive match on Windows.
+The rest applies only when the diff touches `app/` or `components/`. Every page is created and edited through DESIGN.md §Design toolkit (CLAUDE.md, Working agreements).
+
+- Unregistered pages. A page is its `page.tsx` and its route-private `_components/`. Take the changed paths as git spells them (`git diff --name-only main...HEAD`, plus untracked files) and match each against every surface's `files` in `docs/design/surfaces.json` at HEAD, the way the brief guard does: equal to an entry, or inside one. A changed page file that no surface owns is at least should-fix. Git's spelling, not a typed path, also covers the guard's case-sensitive match on Windows.
+  - Exempt: `components/ui/` and `components/shadcn/`, and files that render nothing, such as `app/actions/` and `route.ts` handlers.
+  - Shared chrome has no owner until the officer rules on it: `components/site-header.tsx` and `site-footer.tsx`, layouts, `admin-nav`, `error.tsx`, `loading.tsx`, `not-found.tsx`, `app/globals.css`, and any other file more than one page renders. A change to it is a note that raises the question for the user.
 - Each registered surface whose files changed:
-  - Run `node scripts/design/receipts.mjs <surface>`. A `rebuilt` surface must print `ok`.
-  - Brief first. The first line of `git --literal-pathspecs log --reverse --format=%H -- <brief>` is the commit that added the brief, and the first of `git --literal-pathspecs log --reverse --format=%H main..HEAD -- <each files entry>` is the branch's first change to the surface. `git merge-base --is-ancestor <brief commit> <first change>` must succeed. If not, a surface file changed before its brief existed: a blocker if `git show <first change>:docs/design/surfaces.json` already registers the surface (the edit went around the guard), otherwise should-fix.
+  - Run `node scripts/design/receipts.mjs <surface>`. Once `/design-gate` has run, it must print `ok`, whether the surface is `in-progress` or `rebuilt`.
+  - Brief first. The first line of `git --literal-pathspecs log --reverse --format=%H -- <brief>` is the commit that added the brief, and the first of `git --literal-pathspecs log --reverse --format=%H main..HEAD -- <each files entry>` is the branch's first change to the surface. `git merge-base --is-ancestor <brief commit> <first change>` must succeed. If it fails, read the registry in that change's parent: `git show <first change>^:docs/design/surfaces.json`. If it registers the surface, that is a blocker, worded "registered before this commit and briefed later: possibly edited around the guard, or under the user's `MISA_DESIGN_GUARD=off`". Anything else is should-fix, including a new page, whose registry entry lands with its files (DESIGN.md §Design toolkit, *A new page, step by step*).
   - Every `rejected` finding's reason names the rule or brief line it conflicts with, and every `deferred` one names its `tasks.md` entry, which exists.
   - A worker's critique is degraded: `critique.output.md` opens with `⚠️ DEGRADED: single-context (…)`, and `receipts/critique.md` quotes it. A worker's critique without the banner is a silent degraded run, which impeccable counts as failed.
-- Rival sources of truth: no `design-system/` directory, and no DESIGN.md regenerated from code. Its diff must be hand edits.
 
 ## Hard limits
 

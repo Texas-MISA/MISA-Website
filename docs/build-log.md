@@ -19,15 +19,21 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
     - All five team agents were untracked until now. `researcher.md` and `tester.md` are committed unchanged.
   - 📌 **Facts the design rests on**, from research before planning:
     - Hooks in `.claude/settings.json` fire inside subagents, so the brief guard does guard a worker.
-    - A subagent can spawn agents only with `Agent` in its tools, and a subagent's own `Agent(type, …)` list is ignored. So the implementer is not given Agent, and `/impeccable critique` runs degraded inside it, which `critique.md` permits only with its `⚠️ DEGRADED: single-context` banner.
-    - A subagent that finishes fires `SubagentStop`, never `Stop`, and impeccable's `hook.mjs` matches only `Stop`. So the deep pass reports to the coordinator, and the implementer runs the detector itself.
+    - In a subagent's definition, the `Agent(type, …)` list is ignored. So the implementer is not given Agent, and `/impeccable critique` runs degraded inside it, which `critique.md` permits only with its `⚠️ DEGRADED: single-context` banner.
+    - A subagent that finishes fires `SubagentStop`, never `Stop`, and impeccable's `hook.mjs` matches only `Stop`. So the deep pass never runs for a worker; the one that may run at the coordinator's Stop scans only the files cached under one `session_id`. The implementer runs the detector itself.
   - 🪤 **Limits recorded rather than fixed:**
     - The brief guard resolves paths against `CLAUDE_PROJECT_DIR`, so an edit in a git worktree bypasses it, and design work never uses one.
-    - Inline `mcpServers:` load only once the folder is trusted, and are skipped silently otherwise.
+    - Inline `mcpServers:` load only once the folder is trusted.
     - `--allowed-origins` is not a security boundary, so the proof of target stays the sign-in of an officer that exists only locally.
     - Playwright MCP resolves an explicit screenshot name against the workspace root, so a bare name would land in the repository.
     - The member browser keeps a phone's touch at every width, so hover is judged in the officer browser.
-    - The reviewer's new checks close the guard's shell-edit, first-edit and case gaps only when the team runs the work.
+    - The reviewer's new checks narrow the guard's shell-edit, first-edit and case gaps and close none of them. An edit made before the brief and committed with it or after it still passes, and a solo session has all three.
+  - 🔍 **Review round 1 on `857417f`: changes requested, fixed in the commit after it.**
+    - The gate's end now has one order, written the same way in five places: the worker reports, then the reviewer, then the tester, then the user sees all three together, then the same gate implementer makes the fixes and writes `receipts/officer.md`.
+    - Critique's deferred questions now end `critique.output.md` under "Deferred to the step-5 hand-back (team worker, no AskUserQuestion)", and the officer's quoted answers go in `receipts/critique.md`. The `Questions skipped:` line was wrong, because `critique.md` allows it only below 3 Priority Issues.
+    - The guidelines step has a worker path, since a worker has no WebFetch: `curl` on the one URL the skill names, with its sha256 recorded.
+    - The reviewer reads the registry in the first change's parent before calling a blocker, treats shared chrome as a question for the user, and runs the rival-source check on every diff.
+    - Overclaims came out: the reviewer narrows the guard's gaps rather than closing them, and the deep pass "may" report.
   - ✅ **Checks:** `npx vitest run tests/design-receipts.test.ts` passes. Nothing ran end to end: no surface is registered, so no gate has run under the team.
 
 🧰 **The design toolkit merged into `portal-launch` from `design-tools`, and every page now goes through it (officer, 2026-10-12; doc v1.87, `DESIGN.md` v2.2).** The officer chose `design-tools`, the tools-only branch, over the stale `design-toolkit`, and chose `portal-launch` because it is the branch the team iterates on. The same day, from three options, they chose the rule for when the pipeline runs: whenever a page is created or edited, whether public, portal or `/admin`. A new page gets the full pipeline. An existing page is registered the first time it is edited, and work on it starts with a `/design-brief`. None of it is on `main` yet.
