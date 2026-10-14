@@ -30,7 +30,10 @@ what turns the brief guard on for its files.
 1. Load impeccable's context once: `node .claude/skills/impeccable/scripts/context.mjs --target route:<route>`.
 2. Run impeccable's **shape** discovery (`reference/shape.md`) with the officer:
    who arrives, where (a phone at the door?), the task, every state. Ask; do
-   not invent. With no officer to answer, mark assumptions plainly and stop.
+   not invent. **A team worker** (a subagent with no AskUserQuestion: DESIGN.md
+   §Design toolkit, *Under the team*) stops here and returns shape's questions
+   verbatim, with the reading it would assert, and goes on only with the
+   officer's answers quoted back to it.
 3. Fill `docs/design/templates/brief.md` — every heading, the Mode matching the
    registry, the CLAUDE.md invariants quoted by name, no placeholders left.
 4. Persist it as impeccable's surface brief, so every later impeccable command
@@ -69,7 +72,9 @@ fails an adopted lookup nobody cites.
    `node scripts/design/receipts.mjs <surface>` will still list the review
    receipts as missing; that is correct until `/design-gate`.
 5. Commit the brief, the registry change and the two receipts together, then
-   show the officer the brief and the two concepts before building.
+   show the officer the brief and the two concepts before building. A team
+   worker returns the brief's path and both concepts as its report, and the
+   build waits for the officer's go-ahead.
 
 **For a new page**, which has no files yet and so no registry entry
 (`DESIGN.md` §Design toolkit, *A new page, step by step*):

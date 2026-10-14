@@ -1,7 +1,7 @@
 ---
 name: Texas MISA
 description: A navy-and-white institutional drawing set, now with depth — a drawn navy field, a flat grey page, and white surfaces lifted off it. Square structure, softened plates, hairline rules.
-version: 2.2
+version: 2.3
 status: Written from what phase 1 of the v2 redesign actually shipped (2026-08-19). Sections marked NOT YET REBUILT describe surfaces still running the v1 system.
 colors:
   drafting-navy: "#16305c"
@@ -914,7 +914,7 @@ Replaces "Design skill precedence". v1 failed because it "treated the installed 
 | Motion | `emil-design-eng` | Always wins on easing, duration, and whether to animate at all. Reviews in its required format. |
 | Components | shadcn MCP (`.mcp.json`) | Search and view through the MCP; `shadcn add … --dry-run` before any add, never `--overwrite`; it lands in `components/shadcn/` (the `ui` alias) and is wrapped in `components/ui/`; then run the MCP's `get_audit_checklist`. 🔴 `shadcn init` stays forbidden — it overwrote `button.tsx` once. |
 | Code review | `web-design-guidelines` | Its accessibility findings override aesthetic preference. |
-| Rendered review | `design-reviewer` agent (`.claude/agents/`) | Claude in Chrome, or Playwright when the extension is absent. Local stack only — previews write to production. |
+| Rendered review | `design-reviewer` agent (`.claude/agents/`) | Two headless Playwright browsers, the tester's: a phone for public and portal routes, and a desktop signed in as a local-only officer for `/admin`, each at 1280, 768 and 360. That sign-in is also its proof that it is on the local stack — previews write to production. `npx playwright` if the browser tools do not load. |
 | Fixed checks | impeccable detector, Playwright + axe, token contrast | See enforcement. |
 
 **The pipeline, per surface** (a page or hub registered in `docs/design/surfaces.json`; registering one is how work on it starts):
@@ -932,6 +932,12 @@ Replaces "Design skill precedence". v1 failed because it "treated the installed 
 4. **Build, and commit the registry entry together with the files it lists**, so no commit registers a file that is not there.
 5. **`/design-gate`, then the officer's sign-off**, as for any surface.
 
+**Under the team** (2026-10-14: `claude --agent coordinator` and the workers in `.claude/agents/`). A worker is a subagent: it cannot ask the officer anything, and the implementer cannot spawn an agent. So each step goes to whoever can do it:
+- **Brief (steps 1–3):** an implementer runs `/design-brief` and hands back shape's questions. The coordinator puts them to the officer and resumes the same implementer with the answers quoted verbatim. Every other question a skill asks the officer comes back the same way. The officer sees the brief and both concepts, and the build (step 4, an implementer) waits for their go-ahead.
+- **Review (step 5):** a fresh implementer, never the one that built the page, runs `/design-gate`. Its critique runs degraded (*What it cannot catch*). At the design-review step it hands back `ready for design review` with the surface, the full SHA and the dev-server URL, and the coordinator spawns `design-reviewer` and returns its YAML.
+- **Gate (step 6):** the reviewer, whose design section checks registration, the receipts and that the brief came first; then the tester for flows; then the officer. Their sign-off goes in `receipts/officer.md` before `rebuilt` is proposed, and it is not approval to merge.
+- `design-reviewer` shares the local stack and dev server with the tester and `npm test`, so only one of them runs at a time. Design work never uses a git worktree, which the brief guard cannot see.
+
 **What enforces it:**
 - 🔓 **A brief before any edit.** `.claude/settings.json` runs `scripts/design/brief-guard.mjs` as a PreToolUse hook: an Edit/Write to a registered surface's files is **refused** until its brief exists. The human-only bypass, for an urgent non-design fix, is `MISA_DESIGN_GUARD=off` in the environment Claude Code is launched with.
 - 🔓 **Receipts that prove use, not presence.** Each step writes `docs/design/surfaces/<surface>/receipts/<step>.md` (template `docs/design/templates/receipt.md`) plus the skill's raw output. `scripts/design/receipts.mjs`, run by `tests/design-receipts.test.ts`, fails a surface once it is `rebuilt` (and its brief once it is `in-progress`) when:
@@ -946,10 +952,15 @@ Replaces "Design skill precedence". v1 failed because it "treated the installed 
 - **Rendered** — `npm run test:ui` (`tests/ui/`, Playwright + axe, local stack, not part of `npm test`): WCAG 2.0–2.2 A/AA, no overflow at 360px, no reveal hidden without JS, on every public route (home, the five content pages, `/admin/login` and the 404) and every registered surface. 🪤 None is registered yet, so no portal page's first render is checked. It also covers **the states a first render never shows**: `/portal/lookup`'s result and miss, and `/portal/attend`'s field errors, miss and both first-timer confirmations, reached against a short-lived local event. Each state test asserts it reached its state before axe runs. It reuses a running `npm run dev` (found through Next's `.next/dev/lock`) and never anything else on a port. Red on a `legacy` surface is expected; a `rebuilt` one must be green.
 
 **What it cannot catch, stated so nobody assumes it does:**
-- 🪤 The hook sees Edit/Write only; a shell edit is not intercepted. The receipts test is the backstop that cannot be walked around.
-- 🪤 **Nothing mechanical registers an existing page on its first edit.** The guard acts only on a page that is already registered, so an unregistered page's first edit goes through. What makes that edit start with a brief is the working agreement in `CLAUDE.md` and `/design-brief`'s description, not the hook.
-- 🪤 **On Windows the guard compares paths case-sensitively.** It matches the edited path against the registry's `files` as a plain string, so a differently cased spelling of a registered file, such as `APP\…` for `app\…`, slips past it, although Windows opens the same file. The toolkit shipped this way. Checked 2026-10-12 against a scratch registry: exit 2 for `app/…`, exit 0 for `APP/…`.
+- 🪤 **The guard has three gaps, and the reviewer covers them only when the team runs the work.** A solo session still has all three. Under the team, the reviewer's design section flags a changed page that no surface owns, matches paths as git spells them, and flags a surface file committed before its brief.
+  - **A shell edit is not intercepted.** The hook sees Edit/Write only. The receipts test stays the backstop for a `rebuilt` surface.
+  - **Nothing mechanical registers an existing page on its first edit.** The guard acts only on a page that is already registered, so an unregistered page's first edit goes through. In a solo session, what makes that edit start with a brief is the working agreement in `CLAUDE.md` and `/design-brief`'s description, not the hook.
+  - **On Windows the guard compares paths case-sensitively.** It matches the edited path against the registry's `files` as a plain string, so a differently cased spelling of a registered file, such as `APP\…` for `app\…`, slips past it, although Windows opens the same file. Checked 2026-10-12 against a scratch registry: exit 2 for `app/…`, exit 0 for `APP/…`.
 - A change to a shared primitive in `components/ui/` does not make any surface stale. It is reviewed by the gate of whatever surface it was made for, and seen by `test:ui` everywhere.
-- 🪤 **A registered `/admin` page gets no rendered check from `test:ui`.** `proxy.ts` sends every `/admin/*` request without a session to `/admin/login`, and nothing in `tests/ui/` or the `design-reviewer` agent's instructions signs in. So axe and the 360px check would measure the login page, and pass. Until one of them signs in as a local officer, an `/admin` page's rendered review is a signed-in walk on the local stack (`tasks.md`).
+- 🪤 **`test:ui` still does not sign in, so a registered `/admin` page gets no automated rendered check.** `proxy.ts` sends every `/admin/*` request without a session to `/admin/login`, so axe and the 360px check would measure the login page, and pass. Since 2026-10-14 `design-reviewer` signs in as a local officer and walks an `/admin` surface at all three widths, so the page does get a signed-in rendered review, but no axe run (`tasks.md`).
+- 🪤 **A worker's critique is degraded.** `/impeccable critique` requires its two assessments in isolated sub-agents. A worker has no Agent tool, so it runs them one after the other in one context, A recorded before B, and with no browser of its own. Its output then opens with `⚠️ DEGRADED: single-context (…)`, which the receipt quotes. `scripts/design/receipts.mjs` does not check for the banner; the reviewer does.
+- 🪤 **impeccable's end-of-turn deep pass never reaches a worker.** A subagent that finishes fires `SubagentStop`, not `Stop`, and `hook.mjs` acts on `Stop` alone, so registering it under `SubagentStop` would do nothing. The pass reports at the end of the coordinator's turn, and the coordinator relays it. The implementer runs the detector on the UI files it changed before it reports. The per-edit pass does reach workers.
+- 🪤 **A git worktree bypasses the guard.** `brief-guard.mjs` resolves paths against `CLAUDE_PROJECT_DIR`, so an edit in a worktree matches no registered file. Design work never uses one.
+- 🪤 **The browsers load only in a trusted folder.** `design-reviewer`'s and the tester's browsers are inline `mcpServers:` in their agent files, which Claude Code skips, silently, in a folder that has not been trusted, as on a newly set-up machine. `design-reviewer` then falls back to `npx playwright` and says so.
 - Axe cannot judge hierarchy, clarity or taste. That is the design-reviewer's and the officer's job, and a green `test:ui` is not a design review.
 - A receipt records a decision; it cannot prove the decision was good. The officer's gate still exists.

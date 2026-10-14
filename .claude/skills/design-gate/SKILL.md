@@ -7,7 +7,10 @@ description: Run the review half (steps 5–6) of the MISA design pipeline on a 
 
 The pipeline and roster live in `DESIGN.md` §Design toolkit; this skill runs
 its review half and leaves evidence the tests check. `/design-brief` is the
-front half. `<surface>` is a key in `docs/design/surfaces.json`.
+front half. `<surface>` is a key in `docs/design/surfaces.json`. A **team
+worker** (a subagent with no Agent or AskUserQuestion tool: DESIGN.md §Design
+toolkit, *Under the team*) follows the worker notes below; any other session
+runs the steps as written.
 
 ## Preconditions — stop and say so if any fails
 - `node scripts/design/receipts.mjs <surface>` shows a complete brief and the
@@ -27,11 +30,17 @@ raw output beside its receipt (`<step>.output.md`).
    `/impeccable polish <target>` — the final pass against craft-floor, its
    changes recorded as findings) or `design-taste-frontend` (Persuade: its
    `## 14. FINAL PRE-FLIGHT CHECK`, every item).
-2. **critique** — `/impeccable critique <target>`.
+2. **critique** — `/impeccable critique <target>`. A team worker has no Agent
+   tool, so it runs degraded: keep its `⚠️ DEGRADED: single-context (…)` first
+   line in `critique.output.md`, quote it in the receipt below the frontmatter,
+   and return its closing question verbatim rather than answering it.
 3. **audit** — `/impeccable audit <target>`.
 4. **guidelines** — the `web-design-guidelines` skill on the surface's files.
 5. **design-review** — spawn the `design-reviewer` agent with the surface name
-   and the dev-server URL; its YAML goes straight into the receipt.
+   and the dev-server URL; its YAML goes straight into the receipt. A team
+   worker stops instead and reports `ready for design review` with the
+   surface, the full SHA and the dev-server URL; the coordinator spawns the
+   agent and returns its YAML, which goes into the receipt the same way.
 6. **detector** — `node .claude/skills/impeccable/scripts/detect.mjs --json
    --no-advisory <surface files> > receipts/detector.output.json`. It exits 2
    when it finds anything; that is not a crash. One finding per hit.
@@ -45,9 +54,10 @@ Decide every finding with the lead's judgement and the CLAUDE.md invariants:
 - **rejected** → a real `reason` naming the rule or brief line it conflicts
   with. "Not needed" is not a reason.
 - **deferred** → a reason and where it is tracked (`tasks.md`).
-If two skills conflict, ask the officer; never average them. If every finding
-is rejected, say so plainly — the checker fails the surface, and that is the
-point: skills that ran and changed nothing were not used.
+If two skills conflict, ask the officer (a team worker returns both positions
+verbatim and waits); never average them. If every finding is rejected, say so
+plainly — the checker fails the surface, and that is the point: skills that
+ran and changed nothing were not used.
 
 ## Close
 1. Re-run any step a fix touched, so its receipt is fresh. The checker flags
@@ -55,6 +65,8 @@ point: skills that ran and changed nothing were not used.
 2. `node scripts/design/receipts.mjs <surface>` — must print `ok`.
 3. `npm test` and `npm run test:ui` — the surface's routes and states green.
 4. Report to the officer: findings adopted / rejected / deferred per skill.
+   A team worker makes this its report to the coordinator, who shows the
+   officer; the officer's answer comes back quoted.
    Changes the officer asks for go in `receipts/officer.md` (skill `officer`),
    each with its fix commit — only then propose `"status": "rebuilt"`.
 5. Receipts name commits that must survive: **merge the branch, never squash

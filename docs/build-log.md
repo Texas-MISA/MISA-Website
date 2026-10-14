@@ -7,6 +7,29 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
 ---
 
 
+🤝 **The design toolkit made to run under the agent team (2026-10-14; doc v1.88, `DESIGN.md` v2.3).** Before this, the pipeline could not finish when the coordinator's team ran it. `/design-gate` step 5 spawns `design-reviewer`, but the implementer has no Agent tool, and the coordinator's `Agent(…)` allowlist left that agent out. `/design-brief` step 1 interviews the officer, which a subagent cannot do. The change is agent instructions and docs only: no page, test, script, hook or setting changed, and impeccable's own files are untouched. The user chose to commit the five team agents and to keep `design-reviewer` as its own agent, moved onto the tester's browsers.
+
+  - **What changed, by file:**
+    - **`.claude/agents/coordinator.md`:** `design-reviewer` joins its allowlist and its team, and a *Design work* section covers the brief's questions, the gate's hand-back at step 5, what follows the gate, one browser agent at a time, no worktrees, the deep pass, and the brief guard as a lock.
+    - **`.claude/agents/implementer.md`:** the dead pointer to "Design skill precedence" now points at §Design toolkit, and it gains the hand-back rule, the degraded banner, the guard as a lock, and a detector run before reporting.
+    - **`.claude/agents/reviewer.md`:** a design section, for diffs touching `app/` or `components/`.
+    - **`.claude/agents/design-reviewer.md`:** off Claude in Chrome, onto two headless `@playwright/mcp@0.0.83` browsers copied from the tester, with the tester's proof of the local stack.
+    - **`/design-brief` and `/design-gate`:** a worker path wherever a step needs the officer or an agent. A session with both tools runs as before.
+    - **`DESIGN.md` §Design toolkit:** the roster's rendered-review row, an *Under the team* passage, and an honest *What it cannot catch*.
+    - All five team agents were untracked until now. `researcher.md` and `tester.md` are committed unchanged.
+  - 📌 **Facts the design rests on**, from research before planning:
+    - Hooks in `.claude/settings.json` fire inside subagents, so the brief guard does guard a worker.
+    - A subagent can spawn agents only with `Agent` in its tools, and a subagent's own `Agent(type, …)` list is ignored. So the implementer is not given Agent, and `/impeccable critique` runs degraded inside it, which `critique.md` permits only with its `⚠️ DEGRADED: single-context` banner.
+    - A subagent that finishes fires `SubagentStop`, never `Stop`, and impeccable's `hook.mjs` matches only `Stop`. So the deep pass reports to the coordinator, and the implementer runs the detector itself.
+  - 🪤 **Limits recorded rather than fixed:**
+    - The brief guard resolves paths against `CLAUDE_PROJECT_DIR`, so an edit in a git worktree bypasses it, and design work never uses one.
+    - Inline `mcpServers:` load only once the folder is trusted, and are skipped silently otherwise.
+    - `--allowed-origins` is not a security boundary, so the proof of target stays the sign-in of an officer that exists only locally.
+    - Playwright MCP resolves an explicit screenshot name against the workspace root, so a bare name would land in the repository.
+    - The member browser keeps a phone's touch at every width, so hover is judged in the officer browser.
+    - The reviewer's new checks close the guard's shell-edit, first-edit and case gaps only when the team runs the work.
+  - ✅ **Checks:** `npx vitest run tests/design-receipts.test.ts` passes. Nothing ran end to end: no surface is registered, so no gate has run under the team.
+
 🧰 **The design toolkit merged into `portal-launch` from `design-tools`, and every page now goes through it (officer, 2026-10-12; doc v1.87, `DESIGN.md` v2.2).** The officer chose `design-tools`, the tools-only branch, over the stale `design-toolkit`, and chose `portal-launch` because it is the branch the team iterates on. The same day, from three options, they chose the rule for when the pipeline runs: whenever a page is created or edited, whether public, portal or `/admin`. A new page gets the full pipeline. An existing page is registered the first time it is edited, and work on it starts with a `/design-brief`. None of it is on `main` yet.
 
   - **The merge, `5dc13b1`,** is a real `--no-ff` merge of `b3f6242` into `1c495ee`, with merge base `ce7913f`. It changes no file under `app/`, `components/`, `lib/`, `public/` or `supabase/`. Five docs conflicted, and both sides survive in each:

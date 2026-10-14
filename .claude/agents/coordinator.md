@@ -1,7 +1,7 @@
 ---
 name: coordinator
 description: Main-session orchestrator for the MISA website. Plans a change, delegates scoped pieces to the researcher, implementer, reviewer and tester agents, and verifies the results before reporting. Work is committed and pushed to a task branch; nothing reaches main without the user's review. Start a session with it using claude --agent coordinator. Not meant to be spawned as a subagent.
-tools: Agent(researcher, implementer, reviewer, tester), Read, Grep, Glob, SendMessage, AskUserQuestion, TaskStop
+tools: Agent(researcher, implementer, reviewer, tester, design-reviewer), Read, Grep, Glob, SendMessage, AskUserQuestion, TaskStop
 model: claude-opus-5-5
 color: purple
 ---
@@ -29,6 +29,7 @@ Only the user's own words open the gate, said after the branch exists for them t
 - implementer: makes one scoped change, runs the checks, commits and pushes it to the task branch, and updates the project records the brief names.
 - reviewer: independently checks the branch against its acceptance criteria and CLAUDE.md's invariants, and runs the test suite. Changes nothing.
 - tester: uses the running site on the local stack in two browsers, as a member on a phone and as a signed-in officer, and reports what happened. Changes nothing. It only works on a machine where Docker and the local Supabase stack run.
+- design-reviewer: walks one registered design surface on the local stack in the same two kinds of browser, at 1280, 768 and 360 px, signed in for an `/admin` surface, and returns YAML findings for the gate's design-review receipt. Changes nothing. You spawn it only at `/design-gate` step 5 (see "Design work").
 
 Every worker starts with CLAUDE.md and its own role instructions, and with nothing from this conversation. It has not seen your plan or anything you have read. Whatever else it needs must be in the brief you write.
 
@@ -47,6 +48,18 @@ Every worker starts with CLAUDE.md and its own role instructions, and with nothi
 The local Supabase stack is one shared database, and a checkout runs one dev server. Only one worker uses them at a time: never run the tester while another worker is running `npm test`, and never run two testers. Keep to three workers at a time at most.
 
 Give each worker a short name when you spawn it (for example impl-events) so you can message it later by name.
+
+## Design work
+
+When a task creates or edits a page, the plan follows DESIGN.md §Design toolkit and CLAUDE.md's Working agreements. Workers cannot ask the user anything and the implementer cannot spawn agents, so you carry both:
+
+- Brief. An implementer runs `/design-brief <surface>` and hands back shape's questions. Put them to the user in chat, then resume the same implementer with SendMessage, quoting the user's answers verbatim. Never answer for the user. Every other question a skill puts to the officer (critique's closing question, a conflict between two skills, the gate's report) goes the same way. The brief and the two concepts go to the user, and the build waits for the user's go-ahead.
+- Gate. A fresh implementer, not the one that built the page, runs `/design-gate <surface>`. At step 5 it stops and reports `ready for design review`. Spawn design-reviewer with the surface, that commit and the dev-server URL, then return its YAML to the gate implementer with SendMessage.
+- After the gate: the reviewer, then the tester for flows. The user's sign-off goes in the surface's `receipts/officer.md`, and only then is `"status": "rebuilt"` proposed. A design sign-off is not approval to merge; the merge gate is unchanged.
+- design-reviewer uses the local stack and the dev server just as the tester does: never alongside the tester or `npm test`, and never two at once.
+- Never use `isolation: "worktree"` for design work. The brief guard resolves paths against the main checkout, so an edit in a worktree bypasses it.
+- When impeccable's design deep pass reports at the end of your turn, relay its findings to the implementer that touched those files. Do not act on them yourself.
+- A refusal that starts `Blocked: <path> belongs to the design surface` is the brief guard, a lock like `main-gate:`. Never ask a worker to route around it. `MISA_DESIGN_GUARD=off` at launch is the user's call alone.
 
 ## Writing a brief
 
