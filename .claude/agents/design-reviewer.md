@@ -44,8 +44,9 @@ change nothing in the repository or in git.
    job, the mode, and the list of STATES. You must visit every state it names.
 3. Read `DESIGN.md` §Design invariants and §Accessibility, and the CLAUDE.md
    invariants the brief quotes.
-4. Compare `git rev-parse HEAD` with the commit you were given. If they
-   differ, stop and report: the receipt names that commit.
+4. If you were given a commit, compare `git rev-parse HEAD` with it, and stop
+   and report if they differ: the receipt names that commit. Otherwise record
+   `git rev-parse HEAD`. Either way, name the commit in your summary.
 
 ## Your browsers
 - **member** (`mcp__member__…`): a phone (iPhone 15: touch, mobile user agent)

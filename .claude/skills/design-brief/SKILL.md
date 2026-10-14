@@ -9,7 +9,8 @@ The front half of the pipeline; `/design-gate` is the back half. Read
 `DESIGN.md` §Design toolkit first. `<surface>` is a key in
 `docs/design/surfaces.json` — if a page is being created or edited and it is not
 registered (every page, public, portal or `/admin`: officer, 2026-10-12),
-register it (mode, `legacy`, routes, files, and the `brief` path from
+register it (mode, `legacy`, routes, files as `DESIGN.md` §Design toolkit's
+*What a page's `files` cover* defines them, and the `brief` path from
 `surface-brief.mjs path route:<first route>`); a page that does not exist yet
 is registered later, in the order `DESIGN.md` §Design toolkit gives for a new
 page. Registering is

@@ -22,7 +22,7 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
     - In a subagent's definition, the `Agent(type, …)` list is ignored. So the implementer is not given Agent, and `/impeccable critique` runs degraded inside it, which `critique.md` permits only with its `⚠️ DEGRADED: single-context` banner.
     - A subagent that finishes fires `SubagentStop`, never `Stop`, and impeccable's `hook.mjs` matches only `Stop`. So the deep pass never runs for a worker; the one that may run at the coordinator's Stop scans only the files cached under one `session_id`. The implementer runs the detector itself.
   - 🪤 **Limits recorded rather than fixed:**
-    - The brief guard resolves paths against `CLAUDE_PROJECT_DIR`, so an edit in a git worktree bypasses it, and design work never uses one.
+    - `brief-guard.mjs` resolves paths against `CLAUDE_PROJECT_DIR`. If that variable stays the main checkout inside a worktree session, a worktree edit matches no registered file. Design work never uses a worktree either way.
     - Inline `mcpServers:` load only once the folder is trusted.
     - `--allowed-origins` is not a security boundary, so the proof of target stays the sign-in of an officer that exists only locally.
     - Playwright MCP resolves an explicit screenshot name against the workspace root, so a bare name would land in the repository.
@@ -34,6 +34,12 @@ Reading order is newest first, matching how it accumulated. `CLAUDE.md` carries 
     - The guidelines step has a worker path, since a worker has no WebFetch: `curl` on the one URL the skill names, with its sha256 recorded.
     - The reviewer reads the registry in the first change's parent before calling a blocker, treats shared chrome as a question for the user, and runs the rival-source check on every diff.
     - Overclaims came out: the reviewer narrows the guard's gaps rather than closing them, and the deep pass "may" report.
+  - 🔍 **Review round 2 on `702032b`: changes requested, fixed in the commit after it.**
+    - A solo `/design-gate` now spawns `design-reviewer` with the full SHA, and the agent checks `HEAD` against a commit it was given, or records `HEAD` when given none, naming the commit either way.
+    - `DESIGN.md` step 6 points at *Under the team*'s gate order instead of repeating it. The agent files and the gate skill keep their own copies.
+    - The worktree limit is now conditional: `brief-guard.mjs` resolves paths against `CLAUDE_PROJECT_DIR`, and a worktree edit matches no registered file only if that variable stays the main checkout.
+    - `tasks.md` no longer says the rival-source check runs only on `app/` or `components/` diffs.
+  - 📌 **What a page's `files` cover (user, 2026-10-14).** Recorded with round 2's fixes, it replaces round 1's folder-based definition (`page.tsx` plus its route-private `_components/`). A page's files are its `page.tsx` plus every file that only that page renders, directly or through other files; the folder a file sits in does not decide. A file that more than one page renders is shared chrome, and belongs to no surface until the officer rules on it. `components/ui/` primitives remain not pages. It is defined once, in `DESIGN.md` §Design toolkit, and cited by `/design-brief`'s register step, the new-page step 3 and the reviewer.
   - ✅ **Checks:** `npx vitest run tests/design-receipts.test.ts` passes. Nothing ran end to end: no surface is registered, so no gate has run under the team.
 
 🧰 **The design toolkit merged into `portal-launch` from `design-tools`, and every page now goes through it (officer, 2026-10-12; doc v1.87, `DESIGN.md` v2.2).** The officer chose `design-tools`, the tools-only branch, over the stale `design-toolkit`, and chose `portal-launch` because it is the branch the team iterates on. The same day, from three options, they chose the rule for when the pipeline runs: whenever a page is created or edited, whether public, portal or `/admin`. A new page gets the full pipeline. An existing page is registered the first time it is edited, and work on it starts with a `/design-brief`. None of it is on `main` yet.
